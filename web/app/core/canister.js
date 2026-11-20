@@ -256,7 +256,7 @@ export async function loadInjectable() {
   return (row) => injectableWith(tweaksMod.injectableFromFields, row);
 }
 export function injectableWith(check, row) {
-  return check({ package: row?.id, architecture: row?.arch, section: row?.section, tag: row?.tag });
+  return check({ package: row?.id, architecture: row?.arch, section: row?.section, tag: row?.tag, description: row?.description }); // B185: libraries
 }
 
 export const REPO_CACHE_KEY = "ifizbox.canisterRepos";

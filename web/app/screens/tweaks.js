@@ -19,6 +19,7 @@ import { showActionSheet } from "../nav/actionsheet.js";
 import { openIpaStore, memoryIpaStore } from "../core/myipas.js";
 import { prepareTweaks, tweakProblem, tweakKind, TWEAK_ACCEPT, ELLEKIT, checkElleKit, needsElleKit, withElleKit } from "../core/tweaks.js";
 import { inspectTweakDeb, targetsApp, worksInText, TWEAK_LIMIT, UnpackError } from "../core/tweaks.js"; // F302
+import { isLibraryStanza, LIBRARY_WHY } from "../core/tweaks.js"; // B185
 import { detectMode } from "../core/settings.js"; // F302
 import { debOf, tweakTitle, withTweaksText, tweakSteps, madeFor, tweakUpdates, ipaEncrypted, ENCRYPTED_ALERT, HOW_TO_GET_ONE,
   HOW_TO_TEXT, tweakParams } from "../core/tweaks.js"; // F302a
@@ -208,6 +209,7 @@ export function tweaksGroup({ bundleId = "", store = tweakStore, alert = showAle
 
 export const INFO_KEY = "ifizbox.tweakInfo";
 const INFO_MAX = 400;
+const INFO_V = 2; // B185: libraries and plain reasons
 const debKey = (st) => `${st?.package ?? ""}@${st?.version ?? ""}`;
 // F304: a GitHub release's tweak may be a bare .dylib (core/github.js X-GitHub-Asset): kept and injected as it is.
 export const isDylibTweak = (st) => String(st?.["x-github-asset"] ?? "").trim().toLowerCase() === "dylib";
@@ -218,7 +220,8 @@ function infoStore(storage = globalThis.localStorage) {
   let map = {};
   try { map = JSON.parse(storage?.getItem(INFO_KEY) ?? "{}") ?? {}; } catch { map = {}; }
   return {
-    get: (k) => (map && typeof map[k] === "object" ? map[k] : null),
+    // B185: a refusal kept by an older build (no INFO_V) is checked again: its reason may be the old jargon
+    get: (k) => (map && typeof map[k] === "object" && map[k] && (map[k].ok || map[k].v === INFO_V) ? map[k] : null),
     set(k, v) {
       map[k] = v;
       const keys = Object.keys(map);
@@ -257,11 +260,13 @@ export async function tweakInfo(st, { fetchDeb = defaultFetchDeb, storage } = {}
   let info;
   // F304: a bare .dylib has no filter .plist to say which app it is for: it loads into whichever app it is put in.
   if (isDylibTweak(st)) info = { ok: true, why: null, bundles: [], anyApp: true };
+  else if (isLibraryStanza(st)) info = { ok: false, why: LIBRARY_WHY, bundles: [], anyApp: false, library: true }; // B185: no download
   else try { info = inspectTweakDeb(await tweakDeb(st, { fetchDeb })); } catch (e) {
     if (e instanceof UnpackError) info = { ok: false, why: String(e.message), bundles: [], anyApp: false };
     else throw e; // a failed download is asked again next time
   }
-  const kept = { ok: info.ok, why: info.why ?? null, bundles: info.bundles ?? [], anyApp: Boolean(info.anyApp) };
+  const kept = { v: INFO_V, ok: info.ok, why: info.why ?? null, bundles: info.bundles ?? [], anyApp: Boolean(info.anyApp),
+    ...(info.library ? { library: true } : {}) };
   store.set(debKey(st), kept);
   return kept;
 }
@@ -311,7 +316,7 @@ export async function addToApp(st, { alert = showAlert, pick = pickApp, hud = nu
   }
   hide();
   if (!info.ok) {
-    await alert({ title: "Can't Take This Tweak", message: info.why || "It can't go into an app.", buttons: ["OK"] });
+    await alert({ title: info.library ? "Not a Tweak for Apps" : "Can't Take This Tweak", message: info.why || "It can't go into an app.", buttons: ["OK"] });
     return null;
   }
   // F302a: an App Store copy (still encrypted) can't take tweaks: listed greyed under Can't Take Tweaks
@@ -362,7 +367,7 @@ export function worksInGroup(st, { onAdd = () => addToApp(st), apps = signableAp
   };
   const ready = Promise.all([tweakInfo(st, { fetchDeb, storage }), apps().catch(() => [])]).then(([info, list]) => {
     if (!info.ok) {
-      ul.replaceChildren(row("Can't Go into an App"));
+      ul.replaceChildren(row(info.library ? "A Library for Other Tweaks" : "Can't Go into an App"));
       foot.textContent = info.why || "";
       foot.classList.add("ss-tweak-problem");
       return info;

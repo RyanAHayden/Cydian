@@ -132,6 +132,38 @@ class InstallNeverHangs(unittest.TestCase):
         self.assertIn(".notConnectedToInternet", sign)
 
 
+class RemotePairingPort(unittest.TestCase):
+    # B220: remotepairingd's port isn't fixed at 49152; a connect finds it (last good, 49152, then mDNS) over the
+    # route in use, and a refused or turned-down pairing comes back as a code the page answers with Pair Again.
+    def test_session_finds_the_port_over_its_route(self):
+        src = read("IDevice.swift")
+        session = src[src.index("final class Session"):src.index("static func verify()")]
+        self.assertIn("IDevice.findRemotePairingPort", session)
+        self.assertIn("Tailscale.probe($0)", session)
+        self.assertIn("VPNCheck.probe($0)", session)
+        self.assertIn("Tailscale.mapPort(rpPort)", session)
+        self.assertIn("IDevice.connectFailure(e)", session)
+
+    def test_port_search_order_and_codes(self):
+        src = read("IDevice.swift")
+        find = src[src.index("static func findRemotePairingPort"):src.index("private final class BrowseBox")]
+        self.assertLess(find.index("knownRemotePairingPorts()"), find.index("advertisedRemotePairingPorts()"))
+        self.assertIn('Failure(code: "refused"', find)
+        self.assertIn('static let remotePairingService = "_remotepairing._tcp"', src)
+        self.assertIn("DNSServiceBrowse(&browse, 0, 0, remotePairingService", src)
+        fail = src[src.index("static func connectFailure"):]
+        self.assertIn('"pairing_rejected"', fail)
+        self.assertIn('"refused"', fail)
+
+    def test_browse_type_is_allowed(self):
+        with open(os.path.join(NATIVE, "Info-sideload.plist")) as f:
+            plist = f.read()
+        bonjour = plist[plist.index("<key>NSBonjourServices</key>"):]
+        bonjour = bonjour[:bonjour.index("</array>")]
+        self.assertIn("<string>_remotepairing._tcp</string>", bonjour)  # iOS refuses to browse an unlisted type
+        self.assertIn("<string>_remotepairing-pairable-host._tcp</string>", bonjour)
+
+
 class Built(unittest.TestCase):
     # The built IPA is checked by mkipa.py check right after native/build.sh builds it (the gate's last step). A
     # check here would read whatever native/build/ipa a checkout last built, from before a merge brought idevice in.

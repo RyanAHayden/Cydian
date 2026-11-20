@@ -188,7 +188,7 @@ export function tailscaleTestResult(r) {
       const rule = aclRule(r.name, r.address);
       return { title: "Blocked by Your Tailnet", message: `Your tailnet's access rules don't let ${r.name || NAME} reach this iPhone${r.peer ? ` (${r.peer})` : ""}${d}. Add this rule to the policy file in the admin console: ${rule}`, copy: rule };
     }
-    case "refused": return { title: "iPhone Refused", message: `This iPhone refused the connection${d}. Check that Developer Mode is on.` };
+    case "refused": return { title: "iPhone Refused", message: `This iPhone refused the connection${d}. It no longer has ${NAME}'s pairing: pair again in Pairing.` }; // B220
     case "no_answer": return { title: "No Answer", message: `This iPhone didn't answer through Tailscale${d}. Try again.` };
     default: return { title: "Couldn't Connect", message: `Tailscale didn't connect${d}. Check the internet connection and try again.` };
   }
@@ -341,6 +341,10 @@ export function pairFooter(p) {
 export function verifyFailure(err) {
   const raw = String(err?.message ?? err ?? "");
   const code = err?.code ?? raw.split(":")[0];
+  // B220: refused on every port RemotePairing is advertised on, or turned down: the phone no longer has the pairing
+  if (code === "refused" || code === "pairing_rejected" || (code === "connect_failed" && /connection refused/i.test(raw))) {
+    return { title: "Pair Again", message: `This iPhone no longer accepts ${NAME}'s pairing, so every connection is refused. Pair again.`, again: true, unusable: true };
+  }
   if (code === "connect_failed") {
     return { title: `Turn On ${VPN}`, message: `${NAME} couldn't reach this iPhone. Turn ${VPN} on and try again.`, again: false };
   }

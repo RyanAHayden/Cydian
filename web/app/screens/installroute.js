@@ -383,11 +383,35 @@ async function tailscaleSignIn(native, alert, redraw, done = `${NAME} is on your
     signInVisit = null;
     redraw();
     await alert({ title: "Signed In", message: done, buttons: ["OK"] });
+    await recheckPairing(native, alert, redraw);
   } catch (e) {
     signingIn = null;
     signInVisit = null;
     redraw();
     if (!/^cancel+ed/.test(e?.message || "") && e?.code !== "canceled") alert({ title: "Couldn't Sign In", message: e?.message || "No answer.", buttons: ["OK"] });
+  }
+}
+
+// B220: setting Tailscale up again with a pairing kept used to skip the pairing, and every connect was then refused.
+// After a sign-in the kept pairing is checked once (the VPN route on); when the phone no longer accepts it
+// (verifyFailure's `unusable`: refused, or turned down) it is forgotten and the pair step runs again on Pairing. Other
+// failures (the VPN off, no answer) say nothing here: Check Connection explains them.
+export const recheckHooks = { goPair: () => goTo("pair") }; // tests
+export async function recheckPairing(native, alert, redraw) {
+  const st = await status(native);
+  if (!st?.paired || !vpnOn(st)) return "skipped";
+  try {
+    await busy("Checking Pairing", () => within(call(native, "idevice.verify"), TIMEOUTS.verify));
+    return "ok";
+  } catch (e) {
+    const why = isLate(e) ? null : verifyFailure(e);
+    if (!why?.unusable) return "failed";
+    await busy("Forgetting Pairing", () => call(native, "idevice.forget").catch(() => {}));
+    forgetStatus();
+    if (visit) visit.started = false;
+    await alert({ title: why.title, message: `This iPhone no longer accepts ${NAME}'s pairing, so every connection was refused. Pairing starts again now.`, buttons: ["OK"] });
+    if (typeof location !== "undefined" && onPairPage()) redraw(); else recheckHooks.goPair();
+    return "repair";
   }
 }
 

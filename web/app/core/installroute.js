@@ -269,3 +269,16 @@ export function verifyFailure(err) {
   }
   return { title: "Pairing Didn't Work", message: `This iPhone didn't accept the pairing (${raw || "no answer"}). Pair again.`, again: true };
 }
+
+// Leaving This iPhone's page while a step runs asks first (screens/installroute.js guards Back, the tab bar and the
+// edge swipe): `step` is what runs ("pairing": idevice.pair waiting for the code to be typed; "checking": the page's
+// first idevice.status read), or null when nothing does and leaving needs no question. Cancel stays (index 0),
+// Leave stops the step (index 1).
+export const LEAVE = 1;
+export function leaveQuestion(step) {
+  if (step !== "pairing" && step !== "checking") return null;
+  const message = step === "pairing"
+    ? "Leaving stops pairing. It starts again when you come back to This iPhone."
+    : "Leaving stops checking this iPhone. It checks again when you come back.";
+  return { title: "Stop Setting Up?", message, buttons: ["Cancel", "Leave"], cancel: 0 };
+}

@@ -15,8 +15,9 @@ bundle's own in the installed app.
 - The first launch writes two snapshots, light and dark, to the app's data container:
   `Library/SplashBoard/Snapshots/<bundle id> - {DEFAULT GROUP}/<UUID>@3x.ktx`. Every later launch draws those
   files, not the bundle.
-- After copying Gunmetal over the bundle, the next launch was **pixel-identical to Classic**. Rebooting the
-  Simulator didn't change it either (the files stay).
+- After copying Gunmetal over the bundle, the next launch was **pixel-identical to Classic**. A Simulator reboot
+  without a clear doesn't help either: in `jb3`, OLED Black was copied in and re-signed, and the launch after a
+  reboot still drew the cached Classic snapshot.
 - Deleting the snapshot folder (what `Splash.clearSnapshots` does) after the copy made it worse: SplashBoard
   regenerated the image from the bundle, checked the launch resources against the code signature, and refused them:
   `Resource validation error: Security error errSecCSBadResource reading resource from bundle` →
@@ -29,9 +30,10 @@ bundle's own in the installed app.
   render, but from cached launch resources). That was true for Gunmetal and for OLED Black.
 - **Clear + re-sign + restart SpringBoard** (a Simulator reboot) finally showed **OLED Black**. Clear + re-sign
   without a restart didn't, and neither did a reboot without the clear.
-- An app-update install over it (the same bundle with Gunmetal copied in and re-signed, the same CFBundleVersion and
-  then a bumped one, with the snapshots cleared too) kept showing the previous snapshot (OLED Black). So whatever
-  `uicache` triggers on a jailbroken phone is not likely to be enough either. Not tried on a phone.
+- App-update installs over it kept showing the previous snapshot (OLED Black). I tried three: Gunmetal copied in
+  and re-signed at the same CFBundleVersion; Midnight at version 2; Sepia at version 3 with the snapshots cleared
+  first. So re-registering the app, which is what `uicache` does on a jailbroken phone, probably isn't enough either.
+  That's an inference: it wasn't tried on a phone.
 - Symlinks out of the bundle (the 13 files pointing to a folder the app could rewrite): `simctl install` refuses
   them (`invalid symlink`). Made in the installed copy and re-signed there, they behaved like the re-sign case: no
   denylist, but still Classic after clearing (a respring wasn't tried with them).
@@ -43,21 +45,23 @@ respring. Neither was seen on a jailbroken iOS 16+ phone (none here). On the iPh
 snapshot at all and the bundle copy worked.
 
 **The themed cover works on iOS 26**: `cover <key>` (Splash.cover's `Bundle(path:)` load of
-`LaunchThemes/<key>/LaunchScreen.storyboardc`) drew the right frame for Gunmetal and OLED Black, safe areas included,
-on the Dynamic Island screen.
+`LaunchThemes/<key>/LaunchScreen.storyboardc`) drew the right frame for Classic, Gunmetal and OLED Black, safe areas
+included, on the Dynamic Island screen. Classic was shot over an app whose splash was cached OLED Black, so the
+Classic frame there can only be the cover.
 
 ## 2. Sideload IPA's neutral splash (empty `UILaunchScreen`)
 
 - Light: plain **white**, no bars. Dark: plain **black**. Both as documented.
 - **The status bar is invisible on the light one**: the IPA inherits `UIStatusBarStyle` = LightContent from
-  `native/Info.plist`, so the clock and icons are drawn white on white during the light splash (seen in the shot:
+  `native/Info.plist`. `mkipa.merge_plist` lays `Info-sideload.plist` over it, and that file doesn't set the key.
+  The harness's test app uses the same key, so the clock and icons are drawn white on white during the light splash (seen in the shot:
   only the green battery shows). In dark it's fine. Filed as B212.
 - The themed cover on top (Gunmetal in light, OLED Black in dark) drew correctly once the app ran.
 
 ## 3. Can a sideloaded app swap its own cached snapshot? **Yes, on the Simulator.**
 
 - **Copying in a snapshot file**: the Lite test app (empty `UILaunchScreen`) copied another app's OLED Black
-  snapshot over both of its own `.ktx` files, from inside its own process, in place (same names). The next
+  snapshot (the re-signed JB app's, `JB_ID=com.example.r46rs2 bash r46.sh swap`) over both of its own `.ktx` files, from inside its own process, in place (same names). The next
   launch showed **OLED Black** instead of white, and it still did after a reboot.
 - **Rendering one itself**: the files aren't real KTX. They start `AAPL\r\n\x1a\n`, Apple's ATX texture
   container, at the screen's pixel size (1206×2622 here) with no status bar. ImageIO writes that type
@@ -69,10 +73,11 @@ on the Dynamic Island screen.
   each launch.
 
 What that means for the IPA: the app could give the *next* launch the theme's frame by writing the theme cover into
-its own snapshot files whenever the theme changes. The first launch after an install or update would still be the
-neutral splash, because SplashBoard regenerates from the bundle then. The same write would also work for the
-jailbreak build on iOS 16+ instead of touching the bundle (its snapshots live under mobile's
-`Library/SplashBoard/Snapshots/<id> - {DEFAULT GROUP}/`). Filed as F330, not built here.
+its own snapshot files whenever the theme changes. Expected but not tested: the first launch after an install or
+update would be the neutral splash again (a reinstall gave the snapshots new file names, so SplashBoard regenerated
+them), until the app writes them. The same write should also work for the jailbreak build on iOS 16+, without
+touching the bundle (its snapshots would be under mobile's `Library/SplashBoard/Snapshots/<id> - {DEFAULT GROUP}/`).
+That is untested, since `atx` only ran on the Lite app. Filed as F330, not built here.
 
 ## Limits of these findings
 

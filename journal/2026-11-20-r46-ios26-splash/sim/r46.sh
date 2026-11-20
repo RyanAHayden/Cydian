@@ -6,8 +6,12 @@
 #   bash r46.sh jb             jailbreak-style: Classic, then the helper's copy of Gunmetal, then OLED Black,
 #                              relaunching after each, without and then with clearing the snapshot
 #   bash r46.sh lite           the IPA's neutral splash in light and dark
-#   bash r46.sh swap           whether the Lite app can swap its own SplashBoard snapshot for a themed one
-# Shots and logs land in out/.
+#   bash r46.sh swap           whether the Lite app can swap its own SplashBoard snapshot for a themed one; run it as
+#                              JB_ID=<a jb2 resign id> (jb's own app ends denylisted, its frames black)
+#   bash r46.sh jb2 resign|symlink <fresh id>, jb3 <id>, jb4 <id>   ways around the cache (see each step)
+#   bash r46.sh atx            the Lite app writes the theme cover into its own snapshots
+#   bash r46.sh log [id]       SplashBoard's log around one launch
+# Shots and logs land in out/. Extends B180's harness (journal/2026-11-20-b180-launch-strips/sim/run.sh).
 set -uo pipefail
 cd "$(dirname "$0")"
 export DEVELOPER_DIR=${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}
@@ -260,6 +264,6 @@ log) # $2 id (default JB): SplashBoard's log around one cold launch
     | grep -v "^Timestamp" | tail -60 > "out/log-$id.txt"
   xcrun simctl terminate "$dev" "$id" 2>/dev/null || true
   ;;
-*) echo "usage: r46.sh build|jb|lite|swap|log"; exit 64 ;;
+*) echo "usage: r46.sh build|jb|jb2|jb3|jb4|lite|swap|atx|log"; exit 64 ;;
 esac
 echo done

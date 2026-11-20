@@ -13,6 +13,9 @@ No product change.
 
 ## What I did
 
+The brief named B180's `sim/run.sh`. I extended its app and steps into a new `sim/` here rather than changing
+B180's journal. It uses the same build, install and screenshot approach on the same simulators.
+
 - `sim/main.swift`: B180's harness app plus B203's `Bundle(path:)` cover (`cover <key>`), a tree dump and in-place
   copy into its own snapshots (`snap`), a wipe of `Library/SplashBoard` (`wipe`), and the ATX write of the cover
   (`cover <key> atx`). It holds the system splash for 10 s.

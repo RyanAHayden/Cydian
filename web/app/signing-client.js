@@ -636,7 +636,8 @@ export async function prepareOnDevice(job, { tag, signal = null, progress = () =
     // B104: an http link with no https twin asks first (askInsecure); Cancel ends the row as its stop does
     return await askInsecure((extra) => abortable(native, "signing.prepare", { ...params, ...extra }, (ev) => {
       if (ev?.log) { log(ev.log); return; }
-      if (ev?.phase) progress(ev.phase === "downloading" ? "downloading" : "signing", Number(ev.progress) || 0);
+      // B152: the signer's own phase (reading, signing) goes along, so the run gives each its share of Signing
+      if (ev?.phase) progress(ev.phase === "downloading" ? "downloading" : "signing", Number(ev.progress) || 0, ev.phase);
     }, { tag, signal }), { alert, url: params?.url ?? null });
   } catch (e) { throw rowError(e, job?.name || job?.id || ""); }
 }

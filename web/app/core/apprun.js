@@ -47,6 +47,8 @@
 //                              iOS prompt", "Re-signed, expires Dec 3, 2026")
 //   summaryLine(rows)          -> "2 installed, 1 re-signed, 1 failed, 1 cancelled"
 //   runStatus(rows) / runPercent(rows)   the bottom status and bar
+//   rowProgress(row) / barOf(row)  B152: a row's place in its whole run (stage weights) / the row bar's fill: row.progress,
+//                              which never goes backwards within one try (a retry or a fresh signing starts it again)
 //   helperRow(row)             B71a: a jailbreak app run's row (job.helper: the root helper installs the IPA or, mode
 //                              "remove", uninstalls the app): Waiting, Checking, Installing 40% / Removing, Installed /
 //                              Removed; "N removed" in the summary; no Signed line in the log
@@ -84,6 +86,10 @@ const WITH_IOS = new Set(["asking", "installing"]);
 // B65's limit for a phase that goes quiet (core/signing.js STALL_LIMIT), kept here so this module stays pure.
 export const APP_STALL = 180_000;
 
+// B152: the signer's own phases under "signing" (native/sign/IPASigner.swift: "reading" hashes the IPA 0..1, then
+// "signing" signs its bundles 0..1): each fills its part of the row's Signing, so the bar doesn't empty in between
+export const SIGN_STEPS = { reading: [0, 0.5], signing: [0.5, 1] };
+
 const PHASE_WORD = { downloading: "Downloading", signing: "Signing", asking: "Asking iOS", installing: "Installing",
   copying: "Copying to iPhone" };
 
@@ -91,7 +97,7 @@ export function appRows(jobs = []) {
   return runOrder(jobs).map((j) => ({
     id: j.id, name: j.name || j.id, mode: j.mode || "install", job: j, size: Number(j.size) > 0 ? Number(j.size) : null,
     state: "waiting", phase: null, fraction: 0, error: null, token: null, bundleId: null, expires: null, unsure: false,
-    dismissed: false, again: false, here: false, local: false, busy: false,
+    dismissed: false, again: false, here: false, local: false, busy: false, progress: 0,
   }));
 }
 
@@ -174,7 +180,13 @@ export function createAppRun({ rows, sign, install, discard = () => {}, reprompt
   const changed = (r) => { try { onChange(r); } catch { /* the page's bug isn't the run's */ } };
   const log = (r, kind, text) => { try { onLog({ id: r?.id ?? null, kind, text }); } catch { /* as above */ } };
 
-  const set = (r, patch) => { Object.assign(r, patch); changed(r); };
+  // B152: row.progress only moves forward; a patch that names `progress` (a new try) sets it outright
+  const set = (r, patch) => {
+    const before = Number(r.progress) || 0;
+    Object.assign(r, patch);
+    if (!("progress" in patch)) r.progress = Math.max(before, rowProgress(r));
+    changed(r);
+  };
   // B137: the row's install starts on the This iPhone route (Settings > Installation): no iOS prompt to tap
   const localRoute = (r) => { try { return Boolean(local(r)); } catch { return false; } };
 
@@ -184,8 +196,9 @@ export function createAppRun({ rows, sign, install, discard = () => {}, reprompt
     set(r, { state, ...patch });
   };
 
-  // One phase's progress: a new phase gets its log line once; a percent only moves the bar.
-  const progressOf = (r, f) => (phase, fraction = 0) => {
+  // One phase's progress: a new phase gets its log line once; a percent only moves the bar. B152: `step` is the
+  // shell's own phase under "signing" (the signer reads the IPA 0..1, then signs it 0..1): each gets its half.
+  const progressOf = (r, f) => (phase, fraction = 0, step = null) => {
     if (f.ctl.signal.aborted || ended(r)) return;
     const first = r.phase !== phase;
     if (first && helperRow(r)) { // B71a: the jailbreak app's helper: one step per app, no signing, no iOS prompt
@@ -203,7 +216,9 @@ export function createAppRun({ rows, sign, install, discard = () => {}, reprompt
     }
     const here = r.here || phase === "copying";
     const state = phase === "copying" ? "installing" : SIGNING.has(phase) || WITH_IOS.has(phase) ? phase : r.state;
-    set(r, { phase, state, here, fraction: Math.max(0, Math.min(1, Number(fraction) || 0)) });
+    let frac = Math.max(0, Math.min(1, Number(fraction) || 0));
+    if (phase === "signing" && SIGN_STEPS[step]) frac = SIGN_STEPS[step][0] + (SIGN_STEPS[step][1] - SIGN_STEPS[step][0]) * frac;
+    set(r, { phase, state, here, fraction: frac });
     if (SIGNING.has(phase)) arm(r, f);
   };
 
@@ -251,7 +266,7 @@ export function createAppRun({ rows, sign, install, discard = () => {}, reprompt
 
   async function startSign(r) {
     const f = fly(r);
-    set(r, { state: "downloading", phase: null, fraction: 0, error: null });
+    set(r, { state: "downloading", phase: null, fraction: 0, error: null, progress: 0 });
     arm(r, f);
     let res;
     try {
@@ -282,7 +297,7 @@ export function createAppRun({ rows, sign, install, discard = () => {}, reprompt
       if (f.why || ended(r)) return;
       if (again && e?.code === "gone") {
         // B91: the shell no longer serves that IPA: the row signs it again from the start
-        finishRow(r, "waiting", { token: null, dismissed: false, phase: null, fraction: 0 });
+        finishRow(r, "waiting", { token: null, dismissed: false, phase: null, fraction: 0, progress: 0 });
         log(r, "step", `${label(r)} is no longer with iOS; signing it again`);
         pump();
         return;
@@ -314,7 +329,7 @@ export function createAppRun({ rows, sign, install, discard = () => {}, reprompt
   // prompt with the IPA the shell still serves ("signed" with `again`: the install lane offers it in turn).
   const retryPatch = (r) => {
     const back = r.state === "failed" && r.dismissed && Boolean(reprompt) && Boolean(r.bundleId) && !helperRow(r);
-    return { state: back ? "signed" : "waiting", again: back, phase: null, fraction: back ? 1 : 0, error: null,
+    return { state: back ? "signed" : "waiting", again: back, phase: null, fraction: back ? 1 : 0, progress: back ? 0.5 : 0, error: null,
       token: null, unsure: false, dismissed: false, busy: false };
   };
 
@@ -413,7 +428,7 @@ export function createAppRun({ rows, sign, install, discard = () => {}, reprompt
     notTaken(id, why) {
       const r = rows.find((x) => x.id === id);
       if (!r || running || r.state !== "installed" || !r.unsure) return false;
-      set(r, { state: "failed", unsure: false, dismissed: false, error: why, phase: null, fraction: 0 });
+      set(r, { state: "failed", unsure: false, dismissed: false, error: why, phase: null, fraction: 0, progress: 0 });
       log(r, "error", `${label(r)}: ${why}`);
       return true;
     },
@@ -423,7 +438,7 @@ export function createAppRun({ rows, sign, install, discard = () => {}, reprompt
       const r = rows.find((x) => x.id === id);
       if (!r || r.state !== "failed" || !ownIdOk(r)) return null;
       r.job = ownIdJob(r.job);
-      set(r, { ...retryPatch(r), state: "waiting", again: false, fraction: 0, bundleId: null });
+      set(r, { ...retryPatch(r), state: "waiting", again: false, fraction: 0, progress: 0, bundleId: null });
       // B153: logged after start(), so a new pass's clean log opens with it
       const p = running ? endPromise : start();
       log(r, "step", `Installing ${label(r)} with its own bundle ID`);
@@ -520,18 +535,27 @@ export function runStatus(rows) {
 
 // Each row counts 1 once ended: half for its download and signing, half for iOS's install. B111: on This iPhone that
 // half is the copy (a fifth) and installd's percent (the rest), so the bar follows both to 100%.
+// B152: rowProgress is that weight for one row as it stands; the run keeps the most it reached (row.progress), so
+// stages that each start at 0 (the signer's reading then signing, iOS's prompt then its install) never pull it back.
+export function rowProgress(r) {
+  const f = Math.max(0, Math.min(1, Number(r?.fraction) || 0));
+  if (ended(r)) return 1;
+  if (r?.state === "installing" && r.phase === "copying") return 0.5 + 0.1 * f;
+  if (r?.state === "installing" && r.here) return 0.6 + 0.4 * f;
+  if (r?.state === "downloading") return 0.25 * f;
+  if (r?.state === "signing") return 0.25 + 0.25 * f;
+  if (r?.state === "signed" || r?.state === "asking") return 0.5;
+  if (r?.state === "installing") return 0.5 + 0.5 * f;
+  return 0;
+}
+
+// The row's bar: the most it reached in this try (row.progress), or where it stands for a row the run hasn't set.
+export const barOf = (r) => (ended(r) ? 1 : Math.max(Number(r?.progress) || 0, rowProgress(r)));
+
 export function runPercent(rows) {
   if (!rows.length) return 100;
   let n = 0;
-  for (const r of rows) {
-    if (ended(r)) n += 1;
-    else if (r.state === "installing" && r.phase === "copying") n += 0.5 + 0.1 * (r.fraction || 0);
-    else if (r.state === "installing" && r.here) n += 0.6 + 0.4 * (r.fraction || 0);
-    else if (r.state === "downloading") n += 0.25 * (r.fraction || 0);
-    else if (r.state === "signing") n += 0.25 + 0.25 * (r.fraction || 0);
-    else if (r.state === "signed" || r.state === "asking") n += 0.5;
-    else if (r.state === "installing") n += 0.5 + 0.5 * (r.fraction || 0);
-  }
+  for (const r of rows) n += barOf(r);
   return Math.round((n / rows.length) * 100);
 }
 

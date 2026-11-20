@@ -13,6 +13,7 @@
 // (Files, AirDrop, LocalSend; From a Computer per system, F176). Nothing jailbreak-only is named there (guides.test.js).
 // Cydia's Storage Information and Developers Only are left out: there's no storage page to show.
 import { el, grouped, row, segmented } from "../nav/ui.js";
+import { go as navGo } from "../nav/go.js";
 import { format, settingsRoute, rootOn } from "../router.js";
 import { NAME } from "../brand.js";
 import { GUIDE_ID as KEEP_GUIDE } from "../core/keepid.js";
@@ -146,7 +147,7 @@ export const answerFor = (id, lite) => faqFor(lite).find((f) => f.id === id) ?? 
 export const APP_HELP = "app";
 export const appHelpHref = (fmt = format) => fmt({ tab: "home", path: ["guides", "faq", APP_HELP] });
 // The Help button's tap: the progress page goes, Home shows the answer.
-export function openAppHelp(page, { go = (href) => { globalThis.location.hash = href.replace(/^#/, ""); } } = {}) {
+export function openAppHelp(page, { go = navGo } = {}) {
   try { page?.close?.(); } catch { /* the answer opens anyway */ }
   go(appHelpHref());
 }

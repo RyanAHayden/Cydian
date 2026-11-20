@@ -91,6 +91,7 @@ import { liveHUD } from "../nav/hud.js";
 import { onPageOpen } from "../nav/pagestate.js";
 import { onPageShow } from "../nav/pagestate.js"; // B172
 import { selectPreset } from "../nav/selection.js";
+import { go as navGo, back as navBack } from "../nav/go.js";
 import { flagPiracy, packageWarning, PIRACY_SUBTITLE } from "../core/warnings.js";
 import { scanRequest, malwareFindings, removalIds, orphanFiles, malwareAlert, deleteConfirm } from "../core/known-malware.js";
 import { installQueue } from "../queue.js";
@@ -548,7 +549,7 @@ export const wishRoute = (route) => ({ tab: route.tab, path: [WISH] });
 export function wishButton(route, n, { go, ref } = {}) {
   const to = wishRoute(route);
   return { label: wishButtonLabel(n), ref,
-    onClick: () => (go ? go(to) : (location.hash = format(to).replace(/^#/, ""))) };
+    onClick: () => (go ?? navGo)(to) };
 }
 
 // The installed package ids known so far (the count leaves them out): dpkg's rows, or the apps page's ids.
@@ -1220,8 +1221,7 @@ async function renderAppPage(body, route, ctx) {
   if (!r) { body.replaceChildren(note("This app isn't installed.")); return; }
   appNames.set(id, r.name);
   const ipa = detectMode() === "sideload" ? await keptIpa(r) : null;
-  const back = () => (ctx?.back ? ctx.back() : history.back());
-  body.replaceChildren(grouped(appPageSections(r, { ipa, onAction: (label) => runAppAction(label, r, { ipa, after: back }) })));
+  body.replaceChildren(grouped(appPageSections(r, { ipa, onAction: (label) => runAppAction(label, r, { ipa, after: navBack }) })));
 }
 
 // The page's sections for a row `r` (with `signed`), testable without a page.

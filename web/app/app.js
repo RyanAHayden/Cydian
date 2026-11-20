@@ -5,7 +5,7 @@
 // keeps every screen's scroll position. The nav bar holds a matching .nav-stack of .nav-items per tab. Only the
 // top page of the active tab is visible; the one below shows during a slide or swipe.
 //
-// Screens (screens/*.js) export `title`, `render(body, route, ctx)` and optionally `nav(route, ctx)` returning
+// Screens (screens/*.js) export `title`, `render(body, route, ctx, page)` (page: its nav item, nav/go.js pageHandle) and optionally `nav(route, ctx)` returning
 // { title, back (the back button's label above it; else the title), style: "grouped" | "plain", left: { label, onClick }, right: { label, onClick } | [several] } and `init(ctx)`,
 // run once at start (e.g. to set the tab's badge). ctx: { go, back, setBadge, showHUD }.
 import { detectMode } from "./core/settings.js";
@@ -42,6 +42,7 @@ import { notIphonePage } from "./core/platform.js";
 import { showNotIphone } from "./screens/notiphone.js";
 import { handoffRecent } from "./handoffclock.js";
 import { navButtons, MOVED_CLASS } from "./nav/navbuttons.js";
+import { setNavigator, pageHandle } from "./nav/go.js";
 
 // F266: a Mac, PC or Android phone gets the Not-an-iPhone page first, and the app only starts once it's left (Look
 // Around Anyway, or What Is …? onto the FAQ). Decided by user agent before anything is drawn, so an iPhone, an iPad
@@ -136,7 +137,8 @@ function makePage(tab, path) {
   item.className = "nav-item";
   navStacks[tab].append(item);
 
-  const entry = { el: page, body, shade, item, title: "", back: "" }; // back: the label pages above it show
+  // back: the label pages above it show; handle: the page's own nav item for its screen (nav/go.js pageHandle)
+  const entry = { el: page, body, shade, item, title: "", back: "", handle: pageHandle(item, body) };
   drawPage(entry, route, below);
   return entry;
 }
@@ -154,7 +156,7 @@ function drawPage(entry, route, below) {
     entry.body.className = "page-body " + (info.style === "plain" ? "plain" : "grouped");
     entry.body.replaceChildren();
     entry.item.replaceChildren(...navParts(info, below, title));
-    screen.render(entry.body, route, ctx);
+    screen.render(entry.body, route, ctx, entry.handle);
   } catch (e) {
     if (!(e instanceof NotLoaded)) throw e;
     entry.title ||= TAB_TITLES[route.tab];
@@ -272,6 +274,8 @@ function onRoute(route) {
 }
 
 const router = createRouter({ win: window, onRoute });
+// Screens' go()/back() (nav/go.js): the router's go and the nav bar's Back.
+setNavigator({ go: (hash) => router.go(parse(hash)), back: () => goBack() });
 
 function showRoute(route) {
   initLoadedTabs(); // a tab a press or the background load brought in starts before its pages draw

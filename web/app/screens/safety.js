@@ -18,6 +18,7 @@
 import { el, grouped } from "../nav/ui.js";
 import { showAlert } from "../nav/alert.js";
 import { showActionSheet } from "../nav/actionsheet.js";
+import { go as navGo } from "../nav/go.js";
 import { detectMode } from "../core/settings.js";
 import { exposureOf, exposureDue, exposureAlert, loadSeen, markSeen, SOFTWARE_UPDATE, SOFTWARE_UPDATE_URL, patchesFor, duePatch,
   patchAlert, patchRow, loadSnooze, snoozePatch } from "../core/ios-exposure.js";
@@ -256,5 +257,5 @@ export async function installPatch(p) {
   const [{ addSourceAndInstall }, { catalog }, { getBackend }, { showHUD }] = await Promise.all([import("./extras.js"),
     import("../catalog.js"), import("../backend.js"), import("../nav/hud.js")]);
   return addSourceAndInstall({ id: p.id, name: p.name, repo: { uri: p.repo, name: p.repo } }, {
-    backend: getBackend(), catalog, showHUD, showAlert, go: (href) => { location.hash = href.replace(/^#/, ""); } });
+    backend: getBackend(), catalog, showHUD, showAlert, go: navGo });
 }

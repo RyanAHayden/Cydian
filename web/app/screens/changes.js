@@ -42,11 +42,12 @@ import { SELF_ID } from "../core/essential.js";
 import { showHUD } from "../nav/hud.js"; // F250: reloadSources from outside the tab
 import { appQueue } from "../app-queue.js"; // F255: the jailbreak app's Upgrade (N) queues app upgrades there
 import { onPageShow } from "../nav/pagestate.js"; // B169
+import { go as navGo, handleOf } from "../nav/go.js";
 import { isInsecureSource } from "../core/sources.js"; // B192
 
 export const title = "Changes";
 
-const state = { body: null, route: null, list: null, busy: false, seq: 0, query: "", scope: null, data: null, note: null, segs: null };
+const state = { body: null, page: null, route: null, list: null, busy: false, seq: 0, query: "", scope: null, data: null, note: null, segs: null };
 
 export const SCOPES = [["all", "All"], ["installed", "Installed"]];
 
@@ -206,7 +207,7 @@ export async function upgradeEverything() {
 // the catalog (up to `wait` ms); with no row by then (not loaded, apt's repo not refreshed yet, ignored) it opens
 // Changes instead. -> "queued" | "changes".
 export async function upgradeSelf({ mode = detectMode(), upgrades = null, queue = queueFn, add = null, pkgOf = null, wait = 20000,
-  changes = () => { location.hash = "#/changes"; } } = {}) {
+  changes = () => navGo("#/changes") } = {}) {
   upgrades ??= () => selfUpgrades(mode);
   let u = null;
   let timer = 0;
@@ -258,14 +259,9 @@ export async function queueUpgrades(available = [], { pkgOf = (id) => catalog.pa
 
 const queueFn = () => { const b = getBackend(); return typeof b.queue === "function" ? (job) => b.queue(job) : null; };
 
-// The root page's nav bar button, found as browse.js setRightLabel finds its own: label and shown with the count.
+// The root page's nav bar button (its page handle's), labelled and shown with the count.
 function drawUpgradeButton(n) {
-  const page = state.body?.closest(".page");
-  const stack = page?.parentElement;
-  if (!stack) return;
-  const i = [...stack.children].filter((c) => c.classList.contains("page")).indexOf(page);
-  const item = document.querySelectorAll(`.nav-stack[data-tab="${stack.dataset.tab}"] > .nav-item`)[i];
-  const b = item?.querySelector(".nav-right .bar-button:not(.nav-moved)"); // B176: not a pushed copy's Refresh
+  const b = state.page?.rightButton(); // B176: not a pushed copy's Refresh (nav/go.js pageHandle)
   if (!b) return;
   const label = upgradeLabel(n);
   if (b.textContent !== label) b.textContent = label;
@@ -282,12 +278,13 @@ export function redrawCopy(body, route, ctx) {
   return true;
 }
 
-export function render(body, route, ctx) {
+export function render(body, route, ctx, page = handleOf(body)) {
   if (route.path.length) {
-    browse.render(body, route, ctx);
+    browse.render(body, route, ctx, page);
     return;
   }
   state.body = body;
+  state.page = page;
   state.route = route;
   state.list?.destroy();
   state.list = null;

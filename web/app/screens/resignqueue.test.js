@@ -9,6 +9,7 @@ import { openAppConfirm, runAppQueue, resignApp } from "./queue.js";
 import { queueResignAll } from "./signed-apps.js";
 import { createAppQueue, SELF_ID } from "../core/appqueue.js";
 import { needsResign, signedAppRows } from "../core/signing.js";
+import { withDocument } from "../fakes.test-helper.js";
 
 const now = new Date("2026-11-18T12:00:00Z");
 const inDays = (d) => new Date(now.getTime() + d * 86400000).toISOString();
@@ -137,30 +138,11 @@ test("Signed Apps: Re-sign All queues every app as a resign job (Confirm opens) 
 });
 
 // Confirm over a small fake DOM (as essentialqueue.test.js): its Modifications has a Re-sign row with the names.
-function fakeElement(tag) {
-  const e = {
-    tagName: String(tag).toUpperCase(), children: [], attrs: {}, listeners: {}, style: {}, hidden: false, textContent: "",
-    className: "", dataset: {}, parentElement: null,
-    classList: { add: (...c) => { e.className = [e.className, ...c].filter(Boolean).join(" "); }, remove() {}, contains: (c) => e.className.split(" ").includes(c), toggle() {} },
-    append(...k) { for (const c of k) if (c && typeof c === "object") { c.parentElement = e; e.children.push(c); } },
-    prepend(...k) { e.append(...k); },
-    replaceChildren(...k) { e.children = []; e.append(...k); },
-    setAttribute(a, v) { e.attrs[a] = v; }, getAttribute: (a) => e.attrs[a] ?? null, removeAttribute(a) { delete e.attrs[a]; },
-    addEventListener(t, f) { (e.listeners[t] ??= []).push(f); }, removeEventListener() {},
-    animate: () => ({ finished: Promise.resolve(), cancel() {} }),
-    querySelector: () => null, querySelectorAll: () => [], closest: () => null,
-    remove() {}, focus() {}, click() { for (const f of e.listeners.click ?? []) f({ preventDefault() {}, stopPropagation() {} }); },
-  };
-  return e;
-}
-const texts = (root, out = []) => { if (root.textContent) out.push(root.textContent); for (const c of root.children ?? []) texts(c, out); return out; };
+// Each node's own text, in tree order.
+const texts = (root, out = []) => { if (root._text) out.push(root._text); for (const c of root.children) texts(c, out); return out; };
 
 test("Confirm: a Re-sign group in Modifications", async () => {
-  const saved = globalThis.document;
-  const body = fakeElement("body");
-  globalThis.document = { createElement: fakeElement, createTextNode: (t) => ({ textContent: t }), createDocumentFragment: () => fakeElement("#frag"),
-    body, documentElement: fakeElement("html"), querySelector: () => null, querySelectorAll: () => [] };
-  try {
+  await withDocument(async ({ body }) => {
     const q = createAppQueue();
     q.add({ id: "b", name: "Bravo", version: "2.0", mode: "resign" });
     q.add({ id: "c", name: "Charlie", version: "3.0", mode: "resign" });
@@ -172,9 +154,7 @@ test("Confirm: a Re-sign group in Modifications", async () => {
     assert.equal(t[at + 1], "Bravo\nCharlie");
     assert.ok(t.includes("Upgrade"));
     q.clearAll();
-  } finally {
-    globalThis.document = saved;
-  }
+  });
 });
 
 // F134: Settings > Signing > Show Expiry Dates off hides the days left (pills, the Signature row) but not Expired,

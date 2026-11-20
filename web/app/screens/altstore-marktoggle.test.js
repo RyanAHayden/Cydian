@@ -9,32 +9,9 @@ import { pageHandle } from "../nav/go.js";
 import { memoryAppStore, recordInstall, removeInstall } from "../core/installed.js";
 import { BUNDLE_ID, GITHUB_REPO, NAME } from "../brand.js";
 
-function fakeElement(tag) {
-  const cls = new Set();
-  const attrs = new Map();
-  const listeners = {};
-  const e = {
-    tagName: tag.toUpperCase(), children: [], parentElement: null, dataset: {}, type: "",
-    classList: {
-      add: (...c) => c.forEach((x) => cls.add(x)), remove: (...c) => c.forEach((x) => cls.delete(x)), contains: (c) => cls.has(c),
-      toggle: (c, on = !cls.has(c)) => { if (on) cls.add(c); else cls.delete(c); return on; },
-    },
-    set className(v) { cls.clear(); String(v).split(/\s+/).filter(Boolean).forEach((x) => cls.add(x)); },
-    get className() { return [...cls].join(" "); },
-    setAttribute: (k, v) => attrs.set(k, String(v)), getAttribute: (k) => attrs.get(k) ?? null,
-    addEventListener: (t, f) => { (listeners[t] ??= []).push(f); },
-    click: () => Promise.all((listeners.click ?? []).map((f) => f({ currentTarget: e }))),
-    append: (...kids) => kids.forEach((k) => { k.parentElement?.children.splice(k.parentElement.children.indexOf(k), 1); k.parentElement = e; e.children.push(k); }),
-    remove: () => { if (e.parentElement) { e.parentElement.children.splice(e.parentElement.children.indexOf(e), 1); e.parentElement = null; } },
-  };
-  return e;
-}
+import { fakeDocument, withDocument } from "../fakes.test-helper.js";
 
-function withDocument(doc, f) {
-  const saved = globalThis.document;
-  globalThis.document = doc;
-  return Promise.resolve().then(f).finally(() => { globalThis.document = saved; });
-}
+const fakeElement = (tag) => fakeDocument().createElement(tag);
 
 const APP = { bundleIdentifier: "com.x.a", name: "A", sourceUrl: "https://s/apps.json", sourceName: "S", iconURL: "https://s/a.png",
   versions: [{ version: "2.1", downloadURL: "https://s/a2.ipa" }, { version: "2.0", downloadURL: "https://s/a1.ipa" }] };
@@ -53,7 +30,7 @@ test("toggleMarked: the first tap records the source's latest version, the secon
 });
 
 test("markToggle: outline and 'Mark as Installed' until marked, filled and 'Mark as Not Installed' after; HUD and haptic each tap", async () => {
-  await withDocument({ createElement: fakeElement }, async () => {
+  await withDocument(async () => {
     const mem = memoryAppStore();
     const said = [];
     let buzzes = 0;
@@ -95,7 +72,7 @@ test("markToggle: outline and 'Mark as Installed' until marked, filled and 'Mark
 });
 
 test("markToggle: no store, nothing changes and no HUD claims it did", async () => {
-  await withDocument({ createElement: fakeElement }, async () => {
+  await withDocument(async () => {
     const said = [];
     const b = markToggle(APP, PKG, null, { store: async () => { throw new Error("no IndexedDB"); }, buzz() {}, feedback: (t) => said.push(t) });
     await b.refreshed;
@@ -128,8 +105,8 @@ test("addNavIcon: after Install in the DOM (setRightLabel still finds Install fi
   right.append(share, install);
   const body = {};
   pageHandle(item, body); // the page's nav item, as app.js hands it in (navbar.js finds it with handleOf)
-  const doc = { createElement: fakeElement, querySelectorAll: () => { throw new Error("navbar.js looks its nav item up by handle, not by selector"); } };
-  await withDocument(doc, () => {
+  const doc = Object.assign(fakeDocument(), { querySelectorAll: () => { throw new Error("navbar.js looks its nav item up by handle, not by selector"); } });
+  await withDocument(() => {
     const icon = fakeElement("button");
     assert.equal(addNavIcon(body, icon, "mark"), true);
     assert.deepEqual(right.children, [share, install, icon]);
@@ -141,7 +118,7 @@ test("addNavIcon: after Install in the DOM (setRightLabel still finds Install fi
     addNavIcon(body, again, "mark");
     assert.deepEqual(right.children, [share, install, again], "the page drawn again: one toggle");
     assert.equal(addNavIcon({ closest: () => null }, fakeElement("button")), false, "no nav item yet");
-  });
+  }, doc);
 });
 
 // F242: the jailbreak app can tell what's installed, so it has no hand marking: no nav toggle, no Mark rows. The
@@ -220,7 +197,7 @@ test("queueToggleMessage words it as a row's swipe does", () => {
 });
 
 test("queueToggle: + queues quietly with a haptic and undo bar, x takes it out, Undo puts back, and it follows the queue", async () => {
-  await withDocument({ createElement: fakeElement }, async () => {
+  await withDocument(async () => {
     const queue = createAppQueue();
     const events = [];
     queue.subscribe((e) => events.push(e));
@@ -265,7 +242,7 @@ test("queueToggle: + queues quietly with a haptic and undo bar, x takes it out, 
 });
 
 test("queueToggle: nothing to install, nothing queued and no undo bar claims it was", async () => {
-  await withDocument({ createElement: fakeElement }, async () => {
+  await withDocument(async () => {
     const queue = createAppQueue();
     const bars = [];
     const b = queueToggle({ stanza: { ipa: { ...APP, versions: [] } } }, null, { queue, store: async () => memoryAppStore(), buzz() {}, undo: (o) => bars.push(o) });

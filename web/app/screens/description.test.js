@@ -4,50 +4,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { descriptionGroup, estimateLines, needsToggle, LINES } from "./description.js";
+import { withDocument as withDom } from "../fakes.test-helper.js";
 
-function fakeElement(tag) {
-  const e = {
-    tagName: String(tag).toUpperCase(), children: [], parent: null, listeners: {}, attrs: {}, style: {}, _text: "",
-    get className() { return [...e._cls].join(" "); },
-    set className(v) { e._cls = new Set(String(v).split(" ").filter(Boolean)); },
-    _cls: new Set(),
-    classList: {
-      add: (...c) => c.forEach((x) => e._cls.add(x)), remove: (...c) => c.forEach((x) => e._cls.delete(x)),
-      contains: (c) => e._cls.has(c),
-      toggle: (c, on = !e._cls.has(c)) => { if (on) e._cls.add(c); else e._cls.delete(c); return on; },
-    },
-    get textContent() { return e._text + e.children.map((c) => c.textContent).join(""); },
-    set textContent(v) { e._text = String(v); e.children = []; },
-    get firstElementChild() { return e.children.find((c) => c.tagName) ?? null; },
-    append(...k) {
-      for (const c of k) {
-        if (c == null) continue;
-        if (typeof c === "string") { e.children.push({ nodeType: 3, textContent: c }); continue; }
-        if (c.tagName === "#FRAG") { for (const x of [...c.children]) e.append(x); continue; }
-        c.parent?.children.splice(c.parent.children.indexOf(c), 1);
-        c.parent = e;
-        e.children.push(c);
-      }
-    },
-    replaceChildren(...k) { e.children = []; e._text = ""; e.append(...k); },
-    remove() { if (e.parent) { e.parent.children.splice(e.parent.children.indexOf(e), 1); e.parent = null; } },
-    replaceWith(n) { const p = e.parent; const i = p.children.indexOf(e); e.remove(); n.parent = p; p.children.splice(i, 0, n); },
-    closest() { return null; },
-    querySelector(sel) { return all(e).slice(1).find((n) => matches(n, sel)) ?? null; },
-    setAttribute(a, v) { e.attrs[a] = String(v); },
-    addEventListener(t, f) { (e.listeners[t] ??= []).push(f); },
-  };
-  return e;
-}
-const matches = (n, sel) => (sel.startsWith(".") ? n.classList?.contains(sel.slice(1)) : n.tagName === sel.toUpperCase());
 const all = (root, out = []) => { out.push(root); for (const c of root.children ?? []) all(c, out); return out; };
 const byClass = (root, cls) => all(root).filter((n) => n.classList?.contains(cls));
-
-function withDom(fn) {
-  const saved = globalThis.document;
-  globalThis.document = { createElement: fakeElement, createDocumentFragment: () => fakeElement("#frag") };
-  try { return fn(); } finally { globalThis.document = saved; }
-}
 
 const tap = (row) => { const b = row.querySelector(".cell-inner"); for (const f of b.listeners.click) f({ currentTarget: b }); };
 const toggleRows = (g) => byClass(g, "desc-more");

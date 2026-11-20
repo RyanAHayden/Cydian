@@ -11,41 +11,23 @@ import { keptTweakParams, installTweaksChoice, addTweaksGroup, openAddTweaks, ad
 import { memoryIpaStore } from "../core/myipas.js";
 import { HOW_TO_GET_ONE } from "../core/tweaks.js";
 import { addTweakPill } from "./installed.js";
-import { tick } from "../fakes.test-helper.js";
+import { fakeDocument, tick, withDocument } from "../fakes.test-helper.js";
 
 const fx = (n) => new Uint8Array(readFileSync(new URL(`../core/fixtures/tweaks/${n}`, import.meta.url)));
 const storage = () => { const m = new Map(); return { getItem: (k) => m.get(k) ?? null, setItem: (k, v) => m.set(k, String(v)), m }; };
 const memStore = () => { const mem = memoryIpaStore(); return async () => mem; };
 const st = (o = {}) => ({ package: "com.me.fixture", name: "Fixture", version: "1.0", debUrl: "https://repo.x/fixture.deb", depends: "mobilesubstrate", ...o });
 
-// ---- a small DOM: enough for the group and the sheet ----
+// ---- the shared fake DOM, each element with all(cls): itself (when it has the class) and every node under it that does ----
+const doc = Object.assign(fakeDocument(), { head: { append() {} } });
+const plainElement = doc.createElement;
 function fakeEl(tag) {
-  const cls = new Set();
-  const listeners = {};
-  const e = {
-    tagName: tag.toUpperCase(), children: [], parentNode: null, dataset: {}, type: "", id: "", htmlFor: "", _text: "",
-    classList: {
-      add: (...c) => c.forEach((x) => cls.add(x)), remove: (...c) => c.forEach((x) => cls.delete(x)), contains: (c) => cls.has(c),
-      toggle: (c, on = !cls.has(c)) => { if (on) cls.add(c); else cls.delete(c); return on; },
-    },
-    set className(v) { cls.clear(); String(v).split(/\s+/).filter(Boolean).forEach((x) => cls.add(x)); },
-    get className() { return [...cls].join(" "); },
-    set textContent(v) { e.children = []; e._text = String(v); },
-    get textContent() { return e._text + e.children.map((c) => c.textContent).join(""); },
-    addEventListener: (t, f) => { (listeners[t] ??= []).push(f); },
-    fire: (t, ev = {}) => Promise.all((listeners[t] ?? []).map((f) => f({ stopPropagation() {}, currentTarget: e, ...ev }))),
-    append: (...kids) => kids.forEach((k) => { k.parentNode = e; e.children.push(k); }),
-    replaceChildren: (...kids) => { e.children = []; e._text = ""; e.append(...kids); },
-    all: (c) => [...(cls.has(c) ? [e] : []), ...e.children.flatMap((k) => k.all?.(c) ?? [])],
-  };
+  const e = plainElement(tag);
+  e.all = (c) => [...(e._cls.has(c) ? [e] : []), ...e.querySelectorAll(`.${c}`)];
   return e;
 }
-const doc = { createElement: fakeEl, createTextNode: (t) => ({ textContent: String(t), all: () => [] }), head: { append() {} } };
-async function withDoc(f) {
-  const saved = globalThis.document;
-  globalThis.document = doc;
-  try { return await f(); } finally { globalThis.document = saved; }
-}
+doc.createElement = fakeEl;
+const withDoc = (f) => withDocument(f, doc);
 
 test("keptTweakParams: a plain install from a source takes the app's kept tweaks, ElleKit with them, a log line each", async () => {
   const store = memStore();

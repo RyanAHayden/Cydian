@@ -4,28 +4,10 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 // A small fake DOM: enough for nav/ui.js grouped() and the pair page's sections.
-function make(tag, frag = false) {
-  const e = {
-    tagName: String(tag).toUpperCase(), isFragment: frag, children: [], attrs: {}, listeners: {}, style: {}, _text: "", _cls: new Set(),
-    get className() { return [...e._cls].join(" "); },
-    set className(v) { e._cls = new Set(String(v).split(/\s+/).filter(Boolean)); },
-    classList: { add: (...c) => c.forEach((x) => e._cls.add(x)), contains: (c) => e._cls.has(c) },
-    get textContent() { return e._text + e.children.map((c) => c.textContent).join(""); },
-    set textContent(v) { e._text = String(v); e.children = []; },
-    get firstChild() { return e.children[0] ?? null; },
-    setAttribute(k, v) { e.attrs[k] = String(v); },
-    append(...c) {
-      for (const x of c) {
-        if (x.isFragment) { x.children.splice(0).forEach((k) => e.append(k)); continue; }
-        e.children.push(x);
-      }
-    },
-    replaceChildren(...c) { e.children = []; e.append(...c); },
-    addEventListener(t, f) { (e.listeners[t] ??= []).push(f); },
-  };
-  return e;
-}
-globalThis.document = { createElement: (t) => make(t), createDocumentFragment: () => make("#fragment", true) };
+import { fakeDocument } from "../fakes.test-helper.js";
+
+globalThis.document = fakeDocument();
+const make = (tag) => document.createElement(tag);
 
 const { drawInstallation, leave, connectGroups, setupGroups, pickRoute } = await import("./installroute.js");
 const { LOCALDEVVPN_STORE, TAILSCALE_URL } = await import("../core/installroute.js");

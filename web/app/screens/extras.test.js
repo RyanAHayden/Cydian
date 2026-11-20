@@ -3,6 +3,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { busyAction, vendorSignIn, CANCELLED } from "./extras.js";
+import { withDocument } from "../fakes.test-helper.js";
 
 function fakeClient({ finish = true } = {}) {
   const seen = [];
@@ -72,28 +73,17 @@ test("B13: Purchased only for a signed-in account; signed out shows the price", 
 
 // B33: Search's Other Sources leaves out rows not built for this device while the Filter hides incompatible
 // packages (Show Incompatible off), keeps them (with "Other device") when it's on, and draws nothing when all go.
-function fakeEl(tag) {
-  const e = {
-    tagName: tag.toUpperCase(), children: [], style: { setProperty() {} }, attrs: {}, textContent: "", className: "",
-    classList: { add() {}, remove() {}, contains: () => false, toggle() {} },
-    setAttribute(k, v) { e.attrs[k] = v; }, addEventListener() {},
-    append(...kids) { e.children.push(...kids); },
-    replaceChildren(...kids) { e.children = [...kids]; },
-  };
-  return e;
-}
-const texts = (n) => (typeof n === "string" ? [n] : [...(n.textContent ? [n.textContent] : []), ...(n.children ?? []).flatMap(texts)]);
+// Each node's own text and its text nodes', in tree order.
+const texts = (n) => [...(n._text ? [n._text] : []), ...n.children.flatMap(texts)];
 
 async function otherSources(hide, data) {
   const { discoveryGroup } = await import("./extras.js");
-  const saved = globalThis.document;
-  globalThis.document = { createElement: fakeEl, createDocumentFragment: () => fakeEl("#fragment"), createTextNode: (t) => t };
-  try {
+  return withDocument(async () => {
     const g = discoveryGroup(null, { hideIncompatible: () => hide, search: async () => ({ data }), sources: async () => [],
       arch: () => "iphoneos-arm64", wait: 0 });
     await g.search("you");
     return texts(g.el);
-  } finally { globalThis.document = saved; }
+  });
 }
 const pkg = (id, name, architecture) => ({ package_id: id, name, version: "1", architecture,
   repository: { uri: "https://tinyapps.example/", name: "Tinyapps", suite: "./" } });

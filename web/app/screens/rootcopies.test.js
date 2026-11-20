@@ -2,128 +2,48 @@
 // (nav/pageviews.js): both copies are mounted, a reload draws both, and one copy's search leaves the other alone.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { memStorage, fakeIndexedDB, tick } from "../fakes.test-helper.js";
+import { fakeDocument, memStorage, fakeIndexedDB, tick } from "../fakes.test-helper.js";
 import { pageViews } from "../nav/pageviews.js";
 
 // ---- a DOM just big enough for the Sources list (nav/ui.js plain, nav/searchbar.js, nav/pullrefresh.js) ----------
 
-function matches(n, sel) {
-  if (!n?.classList) return false;
-  const m = /^([a-z]+)?((?:\.[\w-]+)*)((?:\[[\w-]+(?:="[^"]*")?\])*)$/i.exec(sel.trim());
-  if (!m) return false;
-  if (m[1] && n.tagName !== m[1].toUpperCase()) return false;
-  for (const c of m[2].split(".").filter(Boolean)) if (!n.classList.contains(c)) return false;
-  for (const [, k, v] of m[3].matchAll(/\[([\w-]+)(?:="([^"]*)")?\]/g)) {
-    const got = k.startsWith("data-") ? n.dataset[k.slice(5).replace(/-(\w)/g, (_, x) => x.toUpperCase())] : n.getAttribute(k);
-    if (got == null || (v !== undefined && String(got) !== v)) return false;
-  }
-  return true;
-}
-// One selector (a comma list of descendant chains, `:scope >` for children) under `root`.
-function select(root, sel) {
-  const out = [];
-  for (const part of sel.split(",")) {
-    const chain = part.trim().split(/\s+/);
-    let set = [root];
-    for (let i = 0; i < chain.length; i++) {
-      if (chain[i] === ":scope") continue;
-      const child = chain[i] === ">";
-      if (child) i++;
-      const next = [];
-      for (const r of set) {
-        const walk = (x, deep) => { for (const c of x.children) { if (matches(c, chain[i])) next.push(c); if (deep) walk(c, true); } };
-        walk(r, !child);
-      }
-      set = [...new Set(next)];
-    }
-    out.push(...set.filter((x) => x !== root));
-  }
-  return [...new Set(out)];
-}
-
+// The shared fake DOM's elements, with a phone's layout numbers and plain-markup innerHTML.
+const plainElement = fakeDocument().createElement;
 function node(tag) {
-  const cls = new Set();
-  const listeners = {};
-  const n = {
-    tagName: tag.toUpperCase(), nodeType: 1, children: [], parentNode: null, style: {}, dataset: {}, attrs: {}, _text: "",
-    classList: {
-      add: (...c) => c.forEach((x) => cls.add(x)), remove: (...c) => c.forEach((x) => cls.delete(x)), contains: (c) => cls.has(c),
-      toggle: (c, on = !cls.has(c)) => { if (on) cls.add(c); else cls.delete(c); return on; },
-      replace: (a, b) => { if (!cls.has(a)) return false; cls.delete(a); cls.add(b); return true; },
-    },
-    set className(v) { cls.clear(); String(v).split(/\s+/).filter(Boolean).forEach((x) => cls.add(x)); },
-    get className() { return [...cls].join(" "); },
-    get textContent() { return n._text + n.children.map((c) => c.textContent).join(""); },
-    set textContent(v) { n._text = String(v); for (const c of n.children) c.parentNode = null; n.children = []; },
-    get isConnected() { let p = n; while (p.parentNode) p = p.parentNode; return Boolean(p.connected); },
-    get firstElementChild() { return n.children[0] ?? null; },
-    get firstChild() { return n.children[0] ?? null; },
-    get lastElementChild() { return n.children.at(-1) ?? null; },
-    get nextSibling() { const s = n.parentNode?.children; return s ? s[s.indexOf(n) + 1] ?? null : null; },
-    get nextElementSibling() { return n.nextSibling; },
-    get previousElementSibling() { const s = n.parentNode?.children; return s ? s[s.indexOf(n) - 1] ?? null : null; },
-    setAttribute(k, v) { n.attrs[k] = String(v); }, getAttribute(k) { return n.attrs[k] ?? null; },
-    removeAttribute(k) { delete n.attrs[k]; }, hasAttribute: (k) => k in n.attrs,
-    addEventListener(t, f) { (listeners[t] ??= []).push(f); }, removeEventListener(t, f) { listeners[t] = (listeners[t] ?? []).filter((g) => g !== f); },
-    dispatchEvent(e) { for (const f of listeners[e.type] ?? []) f(e); return true; },
-    insertBefore(k, ref) {
-      const list = k.tagName === "#FRAGMENT" ? k.children.splice(0) : [k];
-      for (const c of list) {
-        c.parentNode?.children.splice(c.parentNode.children.indexOf(c), 1);
-        c.parentNode = n;
-        const i = ref ? n.children.indexOf(ref) : -1;
-        if (i < 0) n.children.push(c); else n.children.splice(i, 0, c);
-      }
-      return k;
-    },
-    append(...kids) { for (const k of kids) n.insertBefore(typeof k === "string" ? Object.assign(node("#text"), { _text: k }) : k, null); },
-    appendChild(k) { n.append(k); return k; },
-    prepend(...kids) { const first = n.children[0] ?? null; for (const k of kids) n.insertBefore(typeof k === "string" ? Object.assign(node("#text"), { _text: k }) : k, first); },
-    before(...kids) { for (const k of kids) n.parentNode?.insertBefore(k, n); },
-    after(...kids) { const p = n.parentNode, next = n.nextSibling; for (const k of kids) p?.insertBefore(k, next); },
-    remove() { if (n.parentNode) { n.parentNode.children.splice(n.parentNode.children.indexOf(n), 1); n.parentNode = null; } },
-    replaceWith(k) { n.before(k); n.remove(); },
-    replaceChildren(...kids) { for (const c of n.children) c.parentNode = null; n.children = []; n._text = ""; n.append(...kids); },
-    contains(o) { for (let p = o; p; p = p.parentNode) if (p === n) return true; return false; },
-    closest(sel) { for (let p = n; p; p = p.parentNode) if (sel.split(",").some((s) => matches(p, s))) return p; return null; },
-    querySelectorAll: (sel) => select(n, sel),
-    querySelector: (sel) => select(n, sel)[0] ?? null,
+  const n = Object.assign(plainElement(tag), {
+    scrollTop: 0, clientHeight: 480, offsetHeight: 44, scrollTo() {},
     getBoundingClientRect: () => ({ top: 0, left: 0, width: 320, height: 44, bottom: 44, right: 320 }),
-    // Plain markup only (nav/pullrefresh.js's): tags with a class, text between them.
-    set innerHTML(html) {
-      n.replaceChildren();
-      const stack = [n];
-      for (const [, close, tagName, attrs, text] of String(html).matchAll(/<(\/)?([a-z]+)([^>]*)>|([^<]+)/gi)) {
-        if (text) { stack.at(-1).append(text); continue; }
-        if (close) { stack.pop(); continue; }
-        const c = node(tagName);
-        const cl = /class="([^"]*)"/.exec(attrs);
-        if (cl) c.className = cl[1];
-        stack.at(-1).append(c);
-        stack.push(c);
-      }
-    },
-    focus() {}, blur() {}, scrollTo() {},
-    scrollTop: 0, clientHeight: 480, offsetHeight: 44, value: "",
-  };
+  });
+  // Plain markup only (nav/pullrefresh.js's): tags with a class, text between them.
+  Object.defineProperty(n, "innerHTML", { configurable: true, get: () => "", set(html) {
+    n.replaceChildren();
+    const stack = [n];
+    for (const [, close, tagName, attrs, text] of String(html).matchAll(/<(\/)?([a-z]+)([^>]*)>|([^<]+)/gi)) {
+      if (text) { stack.at(-1).append(text); continue; }
+      if (close) { stack.pop(); continue; }
+      const c = node(tagName);
+      const cl = /class="([^"]*)"/.exec(attrs);
+      if (cl) c.className = cl[1];
+      stack.at(-1).append(c);
+      stack.push(c);
+    }
+  } });
   return n;
 }
 
 function installDom() {
+  const doc = fakeDocument();
   const root = node("html");
   root.connected = true;
   const body = node("body");
   root.append(body);
-  globalThis.document = {
+  globalThis.document = Object.assign(doc, {
     documentElement: root, body,
     createElement: (t) => node(t),
     createElementNS: (_, t) => node(t),
-    createDocumentFragment: () => node("#fragment"),
-    createTextNode: (t) => Object.assign(node("#text"), { _text: t }),
-    querySelectorAll: (sel) => select(root, sel),
-    querySelector: (sel) => select(root, sel)[0] ?? null,
-    addEventListener() {}, removeEventListener() {},
-  };
+    querySelectorAll: (sel) => root.querySelectorAll(sel),
+    querySelector: (sel) => root.querySelector(sel),
+  });
   globalThis.CSS ??= { escape: (s) => String(s).replace(/["\\]/g, "\\$&") };
   globalThis.requestAnimationFrame ??= (f) => setTimeout(f, 0);
   globalThis.Image ??= function Image() { return node("img"); };

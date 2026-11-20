@@ -30,6 +30,9 @@ import { selfLevels } from "./core/progress.js";
 import { lockSelfUpdate } from "./nav/progress.js";
 import { storedKeep, withKeep, sheetNotes, originalState, OLD_WAY_ALERT, OLD_WAY_TEXT, GUIDE_LINK } from "./core/keepid.js";
 import { keepGuideHref, openAppHelp } from "./screens/guides.js";
+import { tweaksGroup } from "./screens/tweaks.js"; // F288
+import { tweakParams } from "./core/tweaks.js";
+import { toBase64 } from "./core/signing.js";
 
 const ICON_SIZE = 180; // the 60pt @3x icon; the signer writes the same PNG as @2x and @3x
 
@@ -324,6 +327,10 @@ function openSignSheet(info, { onSign, onClose = () => {}, fallbackName = "" } =
     if (grp.querySelector(".group-header")?.textContent === "Your Profile Can't Give It") grp.classList.add("ss-missing");
   }
 
+  // F288: Inject Tweaks, kept per app (screens/tweaks.js)
+  const tg = tweaksGroup({ bundleId: app.bundleId || "" });
+  box.append(tg.el);
+
   // Extensions: on means signed and kept; off leaves the bundle out.
   const exts = Array.isArray(app.extensions) ? app.extensions : [];
   if (exts.length) {
@@ -351,7 +358,15 @@ function openSignSheet(info, { onSign, onClose = () => {}, fallbackName = "" } =
   const sheetEl = box.closest(".sheet");
   // nav/sheet.js's bar row is [spacer, title, right]: the spacer is the left side
   signSheetButtons({ right: sheetEl?.querySelector(".sheet-right"), left: sheetEl?.querySelector(".sheet-bar-row")?.firstElementChild, box,
-    onInstall: () => onSign?.({ ...edits, removeExtensions: [...edits.removeExtensions] }), onCancel: () => close() });
+    onInstall: async () => {
+      let tweaks = null; // F288: prepared here (the .debs unpacked), sent to the signer as files
+      try { const p = await tg.prepared(); tweaks = p ? tweakParams(p, toBase64) : null; } catch (e) {
+        await showAlert({ title: "Can't Inject These Tweaks", message: String(e?.message ?? e), buttons: ["OK"] });
+        return;
+      }
+      await tg.save();
+      onSign?.({ ...edits, removeExtensions: [...edits.removeExtensions], ...(tweaks ? { tweaks } : {}) });
+    }, onCancel: () => close() });
   sheetEl?.classList.add("sign-sheet-modal");
   return close;
 }

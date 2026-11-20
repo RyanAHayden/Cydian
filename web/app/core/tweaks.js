@@ -146,8 +146,10 @@ export function editCommands(bin, edit, what = "the binary") {
     const next = edit(list, { is64: h.is64 });
     if (next === list) continue;
     const total = next.reduce((n, c) => n + c.bytes.length, 0);
-    // section and segment offsets are the slice's own, so the room is too
-    if (h.size + total > roomEnd(b, off, size)) fail(`There's no room in ${what} for more load commands.`);
+    // section and segment offsets are the slice's own, so the room is too; an unsigned binary keeps 16 bytes for the
+    // LC_CODE_SIGNATURE the signer adds
+    const reserve = next.some((c) => c.cmd === 0x1d) ? 0 : 16;
+    if (total > h.sizeofcmds && h.size + total + reserve > roomEnd(b, off, size)) fail(`There's no room in ${what} for more load commands.`);
     let p = off + h.size;
     for (const c of next) { b.set(c.bytes, p); p += c.bytes.length; }
     b.fill(0, p, Math.max(p, off + h.size + h.sizeofcmds));

@@ -65,10 +65,15 @@ enum SignAhead {
                 source = r.url
                 options = SignOptions(r.options)
             } else {
-                do { options = try SignOptions(json: c.params) } catch { return fail(error) }
+                var o: SignOptions
+                do { o = try SignOptions(json: c.params) } catch { return fail(error) }
                 // a My IPAs file (library: its name) signs from the library, and its record says so for Re-sign
-                if let f = c.params["library"] as? String, !f.isEmpty { source = MyIPAs.libraryURL(f) }
+                if let f = c.params["library"] as? String, !f.isEmpty {
+                    source = MyIPAs.libraryURL(f)
+                    if c.params["tweaks"] == nil { o.tweaks = MyIPAs.library.options(f).tweaks } // F288: its Sign Options' tweaks
+                }
                 else { source = c.params["url"] as? String ?? "" }
+                options = o
             }
             let signThat = { (file: URL) in
                 SignBridge.queue.async {

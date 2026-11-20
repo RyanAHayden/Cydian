@@ -119,6 +119,8 @@ export function optionsParams(info, edits = {}) {
     fixArm64e: edits.fixArm64e !== false,
   };
   if (edits.icon) out.icon = edits.icon;
+  // F288: prepared tweaks (core/tweaks.js tweakParams), or null to clear them; left out, the app keeps its saved ones
+  if ("tweaks" in edits) out.tweaks = edits.tweaks?.files?.length ? edits.tweaks : null;
   return out;
 }
 

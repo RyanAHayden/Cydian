@@ -1279,8 +1279,10 @@ export async function signInBrowser({ url, name = "", onInstalled = () => {}, br
     const keep = withKeep({}).keepBundleId !== false && !self;
     const made = keep ? await guard((await import("./screens/devaccount.js")).autoProfileSite({ ipa, id, bundleId: bundleId || null,
       log: (t) => h.page?.raw?.(t) })) : null;
+    // F288: the tweaks kept for this app (screens/tweaks.js, Inject Tweaks on its IPA page), unpacked and prepared here
+    const tweaks = !self && bundleId ? await guard((await import("./screens/tweaks.js")).preparedFor(bundleId)) : null;
     const signed = await guard(worker({ ipa: buffer(ipa), p12: buffer(id.p12), profile: buffer(made ?? id.profile), password: id.password ?? "", bring: carry,
-        appBundleId: bundleId || (isSelfIpa(url) ? IFIZBOX_ID : null), ...withKeep({}) },
+        appBundleId: bundleId || (isSelfIpa(url) ? IFIZBOX_ID : null), ...withKeep({}), ...(tweaks ? { tweaks } : {}) },
       { onProgress: (t) => h.set(t), ...(signal ? { signal } : {}) }));
     noteSigned(storage, ipaSize); // F261
     h.set("Uploading");

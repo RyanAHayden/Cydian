@@ -989,8 +989,14 @@ async function renderIpa(body, route, file) {
     body.append(grouped([
       { header: "Details", rows: details,
         footer: "Kept in this browser. Install signs it here with your certificate (Settings > Signing) and iOS installs it." },
-      { rows: [{ label: "Delete", onClick: () => confirmDelete(entry) }] },
     ]));
+    // F288: Inject Tweaks, kept for this app in this browser as soon as they change; Install injects them
+    if (entry.bundleId) {
+      const { tweaksGroup } = await import("./tweaks.js");
+      const tg = tweaksGroup({ bundleId: entry.bundleId, onChange: () => { tg.save(); } });
+      body.append(tg.el);
+    }
+    body.append(grouped([{ rows: [{ label: "Delete", onClick: () => confirmDelete(entry) }] }]));
     markDelete(body);
     return;
   }
@@ -1075,6 +1081,7 @@ function markDelete(body) {
 }
 
 const optionsChanged = (o) => Boolean(o && (o.name || o.bundleId || o.icon || o.removeExtensions?.length || o.fixArm64e === false
+  || o.tweaks?.length // F288
   || o.keepBundleId === false)); // F243: the old way (or Sign Options saved before Keep Bundle IDs)
 
 function rerender(body, route) {
@@ -1294,6 +1301,12 @@ async function renderOptions(body, route, file) {
   ag.append(aul, el("p", "group-footer", "Mends binaries built for the old arm64e ABI so they run on newer iPhones. Leave it on unless an app won't open."));
   body.append(ag);
 
+  // F288: Inject Tweaks (screens/tweaks.js); sent with Save only once changed, so the app keeps its saved ones
+  const { tweaksGroup } = await import("./tweaks.js");
+  const cur = edits.get(file);
+  cur.tweaks = tweaksGroup({ bundleId: entry.bundleId || "", onChange: () => { cur.tweaksChanged = true; } });
+  body.append(cur.tweaks.el);
+
   // F243: Keep Bundle ID, as Custom Install's (signing-sheet.js): starts as this IPA's saved choice, else Settings >
   // Signing's; turning it off says what the old way does first; the footer warns when the original is on the phone.
   const kg = el("div", "group");
@@ -1371,6 +1384,18 @@ async function saveOptions(file) {
   const cur = edits.get(file);
   if (!cur) return;
   let params;
+  // F288: changed tweaks go prepared (null clears them); unchanged, the key stays out and the app keeps its own
+  if (cur.tweaks && cur.tweaksChanged) {
+    try {
+      const [{ tweakParams }, { toBase64 }] = await Promise.all([import("../core/tweaks.js"), import("../core/signing.js")]);
+      const p = await cur.tweaks.prepared();
+      cur.ed.tweaks = p ? tweakParams(p, toBase64) : null;
+    } catch (e) {
+      await showAlert({ title: "Can't Inject These Tweaks", message: String(e?.message ?? e), buttons: ["OK"] });
+      return;
+    }
+    await cur.tweaks.save();
+  }
   // F243: the Keep Bundle ID switch is saved as it stands (library.options keepBundleId)
   try { params = { ...optionsParams(cur.entry, cur.ed), keepBundleId: cur.ed.keepBundleId !== false }; } catch (e) {
     await showAlert({ title: "Can't Save", message: e.message, buttons: ["OK"] });

@@ -127,6 +127,10 @@ Signed apps keep their own bundle ID, so they replace the originals. With a prof
 in an Ad Hoc profile covers every app, your own or a signing service's), they get their own notifications:
 **Home > User Guides > Notifications for Signed Apps**.
 
+With a paid account's App Store Connect API key (**Apple Developer Account**, in Settings > Installation & Signing
+in the app or Settings > Signing on the website), iFizBox makes each app's App ID and Ad Hoc profile itself and adds
+your iPhone to the account: [docs/signing.md](docs/signing.md#own-provisioning-profiles-app-store-connect-api-key).
+
 Also on Feather, AltStore or SideStore: `https://ifizbox.com/repo/source.json`
 
 <br clear="right">
@@ -168,11 +172,12 @@ graph TD
   | `/` | the website: `web/app/` as static assets, revalidated on every load |
   | `/api/fetch` | the website's fetch proxy (APT repos and AltStore sources don't let a page read them), behind an SSRF guard: no private, loopback or link-local addresses, with size and time limits |
   | `/api/applookup`, `/api/appreviews`, `/api/ipainfo` | App Store details and reviews for an app, and an IPA's `Info.plist` (supported iOS versions) |
-  | `/sign/status` | tells Settings > Signing the server answers |
+  | `/sign/status` | tells the sideload app's Settings > Installation & Signing the server answers |
   | `/sign/manifest`, `/sign/host/*` | the install manifest iOS needs when the app signs on the phone, and iFizBox's own update held for 10 minutes while iOS replaces the app |
   | `/sign/upload`, `/sign/up/*` | an app the website signed in the browser, held for 10 minutes for iOS's install prompt |
   | `/repo/` | iFizBox's flat APT repo, served from the latest GitHub release's assets |
   | `/repo/source.json` | iFizBox's AltStore source |
+  | `/apple/*` | the website's App Store Connect calls with your own API key (Apple sends no CORS headers), and the free Apple ID sign-in relay where a deploy turns it on; allow-listed hosts and paths, nothing logged |
   | `/api/account/*` | iFizBox Account (below) |
   | `/reviews/*` | package reviews (Cloudflare D1) |
 
@@ -240,9 +245,9 @@ node worker/node.mjs    # PORT, HOST, HOST_IDS, TTL as in worker/wrangler.toml
 docker build -f worker/Dockerfile -t ifizbox . && docker run -d -p 8787:8787 -v ifizbox-data:/data ifizbox
 ```
 
-<img src="docs/img/crop-signing-server.png" alt="Settings > Signing > Signing Server: Server, Check Server, Run Your Own" width="300" align="right">
+<img src="docs/img/crop-signing-server.png" alt="Settings > Installation & Signing > Signing Server: Server, Check Server, Run Your Own" width="300" align="right">
 
-Then in the sideload app: **Settings > Signing > Signing Server**, paste your address and tap **Check Server**. iOS accepts
+Then in the sideload app: **Settings > Installation & Signing > Signing Server**, paste your address and tap **Check Server**. iOS accepts
 install manifests only over HTTPS with a trusted certificate, so a self-hosted Node server has to sit behind
 Tailscale, a Cloudflare Tunnel or a reverse proxy with a real domain.
 

@@ -38,16 +38,16 @@ The website's page, and the lower half of the sideload build's Installation & Si
 
 | Group | Builds | Rows |
 |---|---|---|
-| Certificate | website, sideload | Name, Team, Expires (or Certificate: None / Incomplete), then **Import Certificate** or **Replace Certificate**, which opens the file picker (the .p12, .mobileprovision and password file, or their .zip). The footer shows any problem in red |
+| Certificate | website, sideload | Name, Team, Expires (or Certificate: None / Incomplete), then **Import Certificate** or **Replace Certificate**, which opens the file picker (the .p12, .mobileprovision and password file, or their .zip), and beside it in the same row the red **Remove Certificate** when there is a certificate or a picked file. The footer shows any problem in red |
 | Files | while a file or the password is missing | .p12, .mobileprovision, Password, each with Browse |
 | Provisioning Profile | once there is one | Name, (website: Type), Expires, Devices, App ID |
+| Apple Developer Account | website, sideload, once there is a certificate | **Add API Key** (the App Store Connect `AuthKey_<Key ID>.p8`, then the Issuer ID); with a key: API Key, Issuer ID, Check Account, Remove API Key, and a Profiles Made by iFizBox group below (screens/devaccount.js; docs/signing.md, "Own provisioning profiles") |
 | (options) | sideload | **Show Expiry Dates** (switch, on), Re-sign Reminder (list) |
 | (expiry warning) | sideload | **Show Expiry Warning** (switch, on), Expiry Warning (list: 3 Days, 1 Week, 2 Weeks, 1 Month, 2 Months; hidden while the switch is off): how far ahead Home's certificate tile shows. The tile turns amber inside that window, red inside Re-sign Reminder's days, and solid red once the certificate or profile (whichever ends first) has expired. It stays solid red with the switch off |
 | Signing Server | sideload | the server, Check Server, Run Your Own |
 | Certificate Status, Signed Apps | sideload | Check Certificate; the signed apps (days left, or Expired), Re-sign All |
 | Install iFizBox App, Bring My Certificate | website, certificate working | |
 | Free Apple ID | website, no certificate set, the Worker's Apple relay on | **Use a Free Apple ID**, which opens the free route in place (the same group How Signing Works ends with) |
-| Remove Certificate | when there is a certificate or a picked file | |
 | How Signing Works | website, sideload | a link to `signing/help`: the two-step walkthrough (Select All Files, the Files picker's picture, the server) |
 
 Show Expiry Dates is in the sideload build only: the website keeps no record of the apps it signs, so it shows no

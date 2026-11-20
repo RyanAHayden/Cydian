@@ -89,7 +89,9 @@ iOS's install prompt.
 
 What leaves the browser: the IPA's address (to `/api/fetch`) and the signed app (to `/sign/upload`, for 10 minutes).
 The certificate, key and password never do, except inside iFizBox's own signed IPA with Bring My Certificate (that
-copy waits on the Worker for the same 10 minutes).
+copy waits on the Worker for the same 10 minutes). With an App Store Connect API key added, the App Store Connect
+calls and their JWT go through the Worker's pass-through to Apple ("Own provisioning profiles" below); the `.p8` stays
+in the browser.
 
 Limits: the whole IPA, unpacked, and the signed copy sit in the browser's memory at once (WebAssembly up to 4 GB,
 less on an iPhone), so very large apps may fail with "zsign stopped … too big for this browser".
@@ -106,8 +108,10 @@ through `installation_proxy` (pairing file + LocalDevVPN), which the app doesn't
 
 Where: How Signing Works (the walkthrough Install opens when there's no certificate), under the two steps, as
 **Use a Free Apple ID**. It shows only when the Worker's Apple relay is on (`GET /apple/status` answers
-`{"on":true}`; off, every `/apple/*` path is a 404). The relay is off unless the deploy sets `APPLE_RELAY = "1"`
-(`worker/src/apple-relay.js`, `worker/README.md`), so ifizbox.com doesn't show it today.
+`{"on":true}`; off, `/apple/status` and every sign-in, developer-services and anisette path are a 404). The relay is
+off unless the deploy sets `APPLE_RELAY = "1"` (`worker/src/apple-relay.js`, `worker/README.md`), so ifizbox.com
+doesn't show it today. The App Store Connect pass-through for your own API key (below) is not part of it and works
+either way.
 
 The flow (`web/app/screens/free-apple-id.js`):
 
@@ -149,6 +153,59 @@ the private key. Tests: `core/freeroute.test.js` (CSR checked with WebCrypto, th
 portal, the limit and Cancel), `screens/free-apple-id.test.js` (the alerts' effects, storage, the hand-off zip read
 back by the import's unzip, the relay check), `worker/test.mjs` (`/apple/status`).
 
+## Own provisioning profiles (App Store Connect API key)
+
+For a paid developer account. Instead of one imported `.mobileprovision` that covers one App ID and goes stale when
+an iPhone is added, iFizBox makes the App ID and an Ad Hoc profile for each app itself, with the account's App Store
+Connect API key. The website and the sideload build both do it; the jailbreak build doesn't sign.
+
+**Where:** the **Apple Developer Account** group (`screens/devaccount.js`), under the Provisioning Profile on the
+website's Settings > Signing and on the sideload build's Settings > Installation & Signing. It shows once a
+certificate is imported: the key makes profiles, not certificates, so the `.p12` and a first profile still come from
+[developer-account.md](developer-account.md).
+
+- **Add API Key**: the `AuthKey_<Key ID>.p8` downloaded from App Store Connect > Users and Access > Integrations (the
+  Key ID is read from the file name, or asked when the name doesn't hold it), then the Issuer ID, typed. The key is
+  saved only once Apple accepts a token made from it. A key with the Admin or App Manager role.
+- **API Key**, **Issuer ID**, **Check Account** (is the imported certificate in this account; is this iPhone
+  registered, and it registers it when it isn't) and **Remove API Key** (iFizBox stops making profiles; the ones it
+  made stay in the account).
+- **Profiles Made by iFizBox**: one row per App ID, from the cache (`core/asc.js profileRows`).
+
+**When signing**, with Keep Bundle IDs on (for this app), every route that signs (install, My IPAs, sign-ahead,
+re-sign; on the website, Install) asks for the app's profile first:
+
+1. The App ID: `<prefix>.<last component of the app's bundle ID>`, explicit, one per app so keychains and App Groups
+   don't mix. The prefix comes from the imported profile's App ID (else `ifizbox.<team>`; `core/asc.js appIdFor`,
+   `appIdPrefix`; two apps whose IDs end the same share one). Made when missing, with Push, App Groups and Associated Domains turned on.
+2. This iPhone is registered in the account when its UDID is known and it isn't there yet. Without a UDID the
+   profile still gets every enabled iPhone.
+3. The profile: `IOS_APP_ADHOC`, named `iFizBox <App ID>`, with every enabled iOS device and the imported
+   certificate. A cached one is reused unless it's missing, expires within a day, lacks this iPhone, the App ID's
+   capabilities changed or the certificate did (`remakeReason`); the old profile is deleted before its new one is
+   made.
+
+The app is then signed with that profile instead of the imported one. An Apple error stops the sign with Apple's
+words, and a certificate that isn't in the key's account stops it with a line that says so. Keep Bundle IDs off
+signs with the imported profile.
+
+**The app** (`native/Sources/ASC.swift`): the key goes into the Keychain (`com.ryha.ifizbox.asc`, this device only)
+through `asc.key.set` and never comes back to the page; the ES256 JWT is made with CryptoKit and goes only to Apple.
+The UDID comes from `device.udid` (the app's own profile), else This iPhone's pairing (`IDevice.readUDID`, lockdown),
+which is remembered. Bridge calls: `asc.key.set`, `asc.key.info`, `asc.key.remove`, `asc.request` (host fixed, a
+`/v1/...` path, for the page's checks), `asc.profiles` (the cache) and `asc.udid`.
+
+**The website** (`core/asc.js`, `autoProfileSite` in devaccount.js, called from `signing-client.js` before zsign):
+the key stays in this browser's localStorage (`ifizbox.asc`, the cache in `ifizbox.asc.profiles`), like the `.p12`;
+the JWT is made with WebCrypto. App Store Connect sends no CORS headers, so the calls go through the Worker's
+`/apple/api.appstoreconnect.apple.com/v1/…` pass-through (`devices`, `certificates`, `bundleIds`,
+`bundleIdCapabilities`, `profiles`), which forwards the Authorization header and allows DELETE for that host only,
+logs nothing and stays on whatever `APPLE_RELAY` says. The UDID is the one Find This iPhone's UDID stored.
+
+What leaves: the JWT and the requests above, to Apple (on the website through the pass-through). The `.p8` never
+leaves the phone or the browser. Tests: `core/asc.test.js` (the JWT checked with WebCrypto, every step against a
+fake App Store Connect, the remake rules), `worker/test.mjs` (the pass-through).
+
 ## On the phone
 
 The iFizBox app's sideload build signs IPAs by itself and serves the signed IPA from the phone; the certificate
@@ -174,14 +231,16 @@ relies on it). What could serve a trusted manifest:
 | E. A `data:` URL or a file URL as the manifest | – | – | Not accepted: the manifest URL must be https. |
 
 So every install in the app takes its manifest from the Signing Server; with no server set (or one that isn't
-https) `signing.install` and `signing.resignAll` answer `no_server`, and Install opens Settings > Signing at the
+https) `signing.install` and `signing.resignAll` answer `no_server`, and Install opens Settings > Installation & Signing at the
 server step.
 
 ### Setting it up (once)
 
 Getting the certificate and profile from an Apple Developer account: [developer-account.md](developer-account.md).
+With the account's App Store Connect API key added too, iFizBox makes each app's profile itself ("Own provisioning
+profiles" above).
 
-1. **Settings > Signing**: the `.p12`, its password and the `.mobileprovision`. In the app they go
+1. **Settings > Installation & Signing**: the `.p12`, its password and the `.mobileprovision`. In the app they go
    to `signing.import`: the `.p12` is opened with `SecPKCS12Import` and its identity (certificate and private key)
    is added to the iOS Keychain, `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly` (never synced to iCloud, never in
    a backup that restores to another phone). The `.p12` file as picked and its password are kept too, as one
@@ -203,7 +262,9 @@ they are signed on the phone and served from 127.0.0.1. iFizBox itself can't be 
 while it installs, which stops its install server), so iFizBox's own update is signed on the phone too and then
 uploaded to the Signing Server (`signing.install {host: true}`, `POST /sign/host`), which holds that signed IPA for
 10 minutes and serves it to iOS (`worker/README.md`). The certificate and key stay on the phone; the signed iFizBox
-(which embeds the profile, as every signed app does) is on the server for those 10 minutes.
+(which embeds the profile, as every signed app does) is on the server for those 10 minutes. With an App Store
+Connect API key, signing also calls Apple's App Store Connect API directly (the app's App ID, profile and this
+iPhone's UDID; "Own provisioning profiles" above); the key stays in the Keychain.
 
 One exception for other apps: iOS can freeze iFizBox while it serves an IPA (seen on iOS 27, even with the silent
 audio playing), and the frozen app's listening socket stays shut, so iOS's installer can't reach 127.0.0.1 and says
@@ -230,7 +291,7 @@ still the older version, a banner says the update didn't finish, with Try Again.
 
 ### The page's side: setting up
 
-In the sideload build Settings > Signing has the Certificate rows (`.p12`, `.mobileprovision`, Password, each
+In the sideload build Settings > Installation & Signing has the Certificate rows (`.p12`, `.mobileprovision`, Password, each
 with Browse; one pick can fill all three), but the picks wait in memory only (`signing-client.js`: no IndexedDB)
 until all three are there and the password isn't known to be wrong, then go to `signing.import`; after that only the
 file names stay, until the app quits. The rest of the page comes from `signing.status`: the identity and its profile
@@ -393,7 +454,7 @@ Plus the arm64e fix-up and the user's edits (below). No dylib injection.
   `unknown`; its signature isn't checked (Feather's doesn't either): it's a warning, and iOS checks for itself when
   the app opens. The last answer is cached and `signing.status` shows it as `identity.revocation`, beside
   `identity.signatureExpires` and `profile.kind`. Asking is an internet call to Apple only when the page asks.
-- **Re-sign reminder.** `signing.remind {days}` (Settings > Signing > Re-sign Reminder) keeps one local notification at 10:00,
+- **Re-sign reminder.** `signing.remind {days}` (Settings > Installation & Signing > Re-sign Reminder) keeps one local notification at 10:00,
   `days` before the earliest recorded signature expiry (or the certificate's and profile's, with no apps yet):
   "Delta stops opening in 2 days. Open iFizBox and tap Re-sign All." It moves after every install and `forget`; 0 turns
   it off. The first call asks for notification permission.
@@ -403,8 +464,8 @@ no backloop pack expiry check or genPlist URL encoding; and no Zsign-Package (iF
 
 ### Keep Bundle IDs
 
-Settings > Signing's **Keep Bundle IDs** (on by default, `core/settings.js keepBundleId`, the website and the
-sideload build), and the same switch per app in Custom Install. Both signers apply it (`Profile.signingIDs`,
+**Keep Bundle IDs** (on by default, `core/settings.js keepBundleId`; Settings > Signing on the website, Settings >
+Installation & Signing in the sideload build), and the same switch per app in Custom Install. Both signers apply it (`Profile.signingIDs`,
 `SignOptions.keepBundleID`; `core/websign.js signingIds`). iOS's installer never compares `application-identifier`
 with the bundle ID, and keys the app's data by the bundle ID:
 
@@ -465,7 +526,7 @@ against this phone (`native/sign/DeviceCheck.swift`, and the same check and sent
   "identify this iPhone" configuration profile. `device.udid` answers it in every build (`native/Sources/PhoneID.swift`).
 - **The website's UDID** comes from a configuration profile (below): Find This iPhone's UDID, under This iPhone
   while the check is unknown on an iPhone or iPad.
-- **Settings > Signing**, under the Provisioning Profile: "This iPhone is in the profile.", or in red "This iPhone
+- **Settings > Signing** (website) and **Settings > Installation & Signing** (sideload), under the Provisioning Profile: "This iPhone is in the profile.", or in red "This iPhone
   isn't in the profile: add its UDID … to the developer account, then make the profile again." with Copy UDID. When
   the UDID can't be read, it gives the profile's device count and how to find the UDID (Finder, or `idevice_id -l`).
   `signing.status`'s `profile.device` is `{state: in | out | unknown | skip, udid?, count, shared}`.
@@ -532,7 +593,7 @@ A web page can't read the UDID, but iOS gives it to a "Profile Service" profile 
   then Confirm again with the finished apps cleared), Retry All after failures, Done when clean. Re-sign rows end
   "Re-signed, expires <date>". The Log has one line per phase per app; percents only move the bars. A Custom Install
   job signs from its url with its edits here (the look's token isn't used). The website keeps the one-at-a-time run.
-- **Settings > Signing** (sideload, under the walkthrough; `screens/signed-apps.js`): Certificate Status with Check
+- **Settings > Installation & Signing** (sideload, under the walkthrough; `screens/signed-apps.js`): Certificate Status with Check
   Certificate (`signing.checkCertificate`; the row shows Good / Revoked / Unknown / Not Checked from
   `identity.revocation`) and a red footer when the certificate is revoked or `identity.signatureExpires` is under 7
   days away (`certificateWarnings`); Signed Apps from `signing.installed`, soonest to expire first, with Re-sign All

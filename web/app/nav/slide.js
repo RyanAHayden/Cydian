@@ -329,6 +329,12 @@ export function slideChange(node, change) {
   if (root) update(root);
 }
 
+// A change of text alone (a ticking label, a count, a percentage): no box comes or goes, so nothing can move unless a
+// box changes size, and every measured box is under the ResizeObserver, which reports exactly that. Measuring the
+// whole root on every tick instead cost up to 600 boxes a frame (R44, journal/2026-11-20-r44-slide-watcher-trace).
+const textOnly = (r) => Boolean(ro) && (r.type === "characterData"
+  || (r.type === "childList" && [...r.addedNodes, ...r.removedNodes].every((n) => n.nodeType === 3)));
+
 export function installSlides(doc = globalThis.document) {
   if (installed || !doc?.body || typeof MutationObserver !== "function" || typeof Element === "undefined"
     || typeof Element.prototype.animate !== "function") return false;
@@ -351,6 +357,7 @@ export function installSlides(doc = globalThis.document) {
     const roots = new Set();
     let gone = false;
     for (const r of records) {
+      if (textOnly(r)) continue;
       const ghostOnly = [...r.addedNodes, ...r.removedNodes].every((n) => n.nodeType === 1 && n.hasAttribute("data-slide-ghost"));
       if (r.type === "childList" && ghostOnly) continue;
       if (r.removedNodes.length) gone = true;

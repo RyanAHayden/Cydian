@@ -54,6 +54,8 @@
 //   helperRow(row)             B71a: a jailbreak app run's row (job.helper: the root helper installs the IPA or, mode
 //                              "remove", uninstalls the app): Waiting, Checking, Installing 40% / Removing, Installed /
 //                              Removed; "N removed" in the summary; no Signed line in the log
+//   installdText(text, row)    B138: a row's error with installd's raw words made plain (the App ID refusal, error 15:
+//                              appIdMismatchText; any other UnknownErrorType: "iOS refused to install it: <why>")
 //
 // Two lanes. Signing: `ahead` apps at a time in the run's order are downloaded and signed. Installing: one app at a
 // time, strictly in order: the first row that hasn't ended is handed to iOS once it is signed, and the next waits for
@@ -116,8 +118,31 @@ export const DIDNT_DOWNLOAD = "iOS didn't download it";
 // when neither was tapped (the shell's job for it was stopped from elsewhere) fails the row with these words instead,
 // and the next app goes on.
 export const NOT_YOU = "stopped before it finished (not by Cancel)";
-const errorText = (e) => (e?.code === "cancelled" || /^cancel+ed$/i.test(String(e?.message ?? "").trim())
-  ? NOT_YOU : e?.message || String(e));
+const errorText = (e, row) => (e?.code === "cancelled" || /^cancel+ed$/i.test(String(e?.message ?? "").trim())
+  ? NOT_YOU : installdText(e?.message || String(e), row));
+
+// B138: installd refuses an update signed for another application-identifier than the installed copy's
+// (MismatchedApplicationIdentifierEntitlement). idevice has no type for it, so it comes as its UnknownErrorType, code
+// 15, which every unnamed installd error shares: "unknown error `MismatchedApplicationIdentifierEntitlement (...)`
+// returned from device (15)". The shell words it before signing when it can tell (Sideload.swift installedAppID,
+// code appid_mismatch); this is for when it couldn't. Never the raw UnknownErrorType text.
+export const isAppIdMismatch = (text) => /MismatchedApplicationIdentifierEntitlement/.test(String(text ?? ""));
+export const appIdMismatchText = (name) => {
+  const app = name || "the app";
+  return `iOS refused the update: ${app} on this iPhone was signed for another App ID than this copy. Import the `
+    + `profile it was installed with and try again, or delete ${app} from the Home Screen and install it again (its data is lost)`;
+};
+// A row's error text with installd's raw words made plain: the App ID refusal above, and any other UnknownErrorType
+// as "iOS refused to install it" with installd's own reason (its ErrorDescription) when there is one.
+export function installdText(text, row = null) {
+  const t = String(text ?? "");
+  if (isAppIdMismatch(t)) return appIdMismatchText(row ? label(row) : "");
+  const raw = /unknown error `([^`]*)` returned from device|UnknownErrorType[:(\s]*([^)]*)/i.exec(t); // deviceError capitalises
+  if (!raw) return t;
+  const what = (raw[1] ?? raw[2] ?? "").trim();
+  const why = /\((.+)\)\s*$/.exec(what)?.[1]?.trim(); // "SomeErrorName (installd's description)"
+  return `iOS refused to install it${why ? `: ${why}` : ""}`;
+}
 
 // B151: installd refuses an app whose bundle ID has an install coordinator someone else holds: "IXErrorDomain
 // Code=46 A coordinated app install already exists for <id> (creator App Store) but request by
@@ -270,7 +295,7 @@ export function createAppRun({ rows, sign, install, discard = () => {}, reprompt
       res = await sign(r, { signal: f.ctl.signal, progress: progressOf(r, f) });
     } catch (e) {
       if (f.why || ended(r)) return; // stopped, cancelled or timed out: its row says so already
-      fail(r, errorText(e));
+      fail(r, errorText(e, r));
       return;
     }
     if (f.why || ended(r)) { if (res?.token) { try { discard({ ...r, token: res.token }); } catch { /* runs out */ } } return; }
@@ -299,7 +324,7 @@ export function createAppRun({ rows, sign, install, discard = () => {}, reprompt
         pump();
         return;
       }
-      fail(r, errorText(e));
+      fail(r, errorText(e, r));
       return;
     }
     if (f.why || ended(r)) return;

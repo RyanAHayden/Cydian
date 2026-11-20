@@ -628,6 +628,48 @@ enum IDevice {
         try watched("devmode") { try Session(watch: $0).developerMode() }
     }
 
+    /// B138: the application-identifier iOS has for the installed app `bundleID` (installation_proxy Browse, its
+    /// Entitlements), or nil when iOS lists no such user app or no entitlements. Blocking; call it on `queue`.
+    static func installedAppID(_ bundleID: String) throws -> String? {
+        try watched("appid") { (w: Watch) -> String? in
+            let s = try Session(watch: w)
+            let ip = try s.installationProxy()
+            defer { installation_proxy_client_free(ip) }
+            w.begin("asking installation_proxy for \(bundleID)", Limit.service)
+            let opts = plist_new_dict()
+            defer { plist_free(opts) } // browse copies it
+            plist_dict_set_item(opts, "ApplicationType", plist_new_string("User"))
+            let ids = plist_new_array()
+            plist_array_append_item(ids, plist_new_string(bundleID))
+            plist_dict_set_item(opts, "BundleIDs", ids)
+            let attrs = plist_new_array()
+            plist_array_append_item(attrs, plist_new_string("CFBundleIdentifier"))
+            plist_array_append_item(attrs, plist_new_string("Entitlements"))
+            plist_dict_set_item(opts, "ReturnAttributes", attrs)
+            var list: UnsafeMutablePointer<plist_t?>?
+            var n = 0
+            try check(installation_proxy_browse(ip, opts, &list, &n), "appid_failed")
+            defer { if let l = list { idevice_plist_array_free(l, UInt(n)) } }
+            func string(_ dict: plist_t?, _ key: String) -> String? {
+                guard let d = dict, plist_get_node_type(d) == PLIST_DICT, let v = plist_dict_get_item(d, key),
+                      plist_get_node_type(v) == PLIST_STRING else { return nil }
+                var p: UnsafeMutablePointer<CChar>?
+                plist_get_string_val(v, &p)
+                guard let c = p else { return nil }
+                defer { plist_mem_free(c) }
+                return String(cString: c)
+            }
+            guard let l = list else { return nil }
+            for i in 0..<n where string(l[i], "CFBundleIdentifier") == bundleID {
+                guard let app = l[i], let ents = plist_dict_get_item(app, "Entitlements") else { return nil }
+                let id = string(ents, "application-identifier")
+                ilog("installed \(bundleID): application-identifier \(id ?? "none")")
+                return id
+            }
+            return nil
+        }
+    }
+
     // ---- Installing
 
     enum Step { case connected, upload(Double), install(Double) }

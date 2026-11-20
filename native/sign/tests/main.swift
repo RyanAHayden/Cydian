@@ -300,6 +300,67 @@ test("sign with an explicit profile, bundle ID kept") {
     check(try pre.signingIDs(for: "io.other.openmx", keep: false).bundleID == "com.me.openmx", "prefix old way")
 }
 
+// B138: an update keeps the application-identifier the app was installed with (installd's error 15 otherwise).
+test("B138: the profile is picked from the installed App ID (wildcard vs explicit)") {
+    let wild = try Profile(try fixture("profile.mobileprovision"))          // TEAM.*
+    let explicit = try Profile(try fixture("profile-explicit.mobileprovision")) // TEAM.com.me.fixture
+    let pre = try Profile(try fixture("profile-prefix.mobileprovision"))    // TEAM.com.me.*
+    // what each profile can give
+    check(AppIDMatch.entitlementsID(explicit, installed: "\(team).com.me.fixture") == "com.me.fixture", "explicit, its own ID")
+    check(AppIDMatch.entitlementsID(explicit, installed: "\(team).com.me.*") == nil, "explicit can't give a wildcard")
+    check(AppIDMatch.entitlementsID(pre, installed: "\(team).com.me.*") == "com.me.*", "prefix wildcard as written")
+    check(AppIDMatch.entitlementsID(pre, installed: "\(team).com.me.youtube") == "com.me.youtube", "prefix covers it")
+    check(AppIDMatch.entitlementsID(pre, installed: "\(team).io.other.app") == nil, "prefix doesn't cover it")
+    check(AppIDMatch.entitlementsID(wild, installed: "\(team).io.other.app") == "io.other.app", "* covers any")
+    check(AppIDMatch.entitlementsID(wild, installed: "OTHERTEAM.io.other.app") == nil, "another team")
+    // the order is the preference; the first that fits signs
+    check(AppIDMatch.pick([explicit, pre], installed: "\(team).com.me.*")?.profile.appID == "com.me.*", "wildcard picked")
+    check(AppIDMatch.pick([explicit, pre], installed: "\(team).com.me.fixture")?.profile.appID == "com.me.fixture", "explicit picked")
+    check(AppIDMatch.pick([explicit], installed: "\(team).com.me.*") == nil, "none fits")
+
+    // the user's case: installed under the wildcard as written, the profile now explicit: stops before signing
+    let out = work.appendingPathComponent("b138-stop.ipa")
+    try? FileManager.default.removeItem(at: out)
+    let s = IPASigner(profile: explicit, identity: identity)
+    var asked = [String]()
+    s.installedAppID = { asked.append($0); return "\(team).com.me.*" }
+    do {
+        _ = try s.sign(fixtures.appendingPathComponent("rich.ipa"), to: out)
+        check(false, "signed although no profile gives the installed App ID")
+    } catch let e as SignError {
+        check(e.code == "appid_mismatch", "code \(e.code)")
+        check(e.message.contains("\(team).com.me.*") && e.message.contains("\(team).com.me.fixture"), "names both: \(e.message)")
+        check(e.message.contains("delete") && e.message.contains("data is lost"), "offers delete and reinstall: \(e.message)")
+        check(!e.message.contains("UnknownErrorType"), "plain words")
+    }
+    check(asked == ["dev.ifizbox.fixture"], "asked by the bundle ID it installs as: \(asked)")
+    check(!FileManager.default.fileExists(atPath: out.path), "nothing written")
+
+    // the same App ID as installed: signs as before
+    let same = IPASigner(profile: explicit, identity: identity)
+    same.installedAppID = { _ in "\(team).com.me.fixture" }
+    let a1 = try same.sign(fixtures.appendingPathComponent("rich.ipa"), to: out)
+    check(a1.appID == "\(team).com.me.fixture", "appID \(String(describing: a1.appID))")
+
+    // an own profile (autoProfile, explicit) would change it, the imported wildcard keeps it: the imported one signs,
+    // with the wildcard App ID the app was installed with
+    IPASigner.autoProfile = { _, _, _, _ in explicit }
+    defer { IPASigner.autoProfile = nil }
+    let back = IPASigner(profile: pre, identity: identity)
+    back.installedAppID = { _ in "\(team).com.me.*" }
+    let a2 = try back.sign(fixtures.appendingPathComponent("rich.ipa"), to: out)
+    check(a2.appID == "\(team).com.me.*" && a2.bundleID == "dev.ifizbox.fixture", "\(String(describing: a2.appID)) \(a2.bundleID)")
+    let f = try entries(out)
+    check(f["Payload/Fixture.app/embedded.mobileprovision"] == pre.data, "the imported profile is embedded")
+    let sig = readSignature(f["Payload/Fixture.app/Fixture"]!)!
+    let e = try PropertyListSerialization.propertyList(from: sig.ents.subdata(in: 8..<sig.ents.count), format: nil) as? [String: Any]
+    check(e?["application-identifier"] as? String == "\(team).com.me.*", "entitlements \(String(describing: e?["application-identifier"]))")
+
+    // installd's raw refusal is recognised; other installd errors aren't taken for it
+    check(AppIDMatch.isMismatch("install_failed: unknown error `MismatchedApplicationIdentifierEntitlement (x)` returned from device (15)"), "error 15")
+    check(!AppIDMatch.isMismatch("install_failed: unknown error `ApplicationVerificationFailed` returned from device (15)"), "another 15")
+}
+
 test("an unsigned binary gets LC_CODE_SIGNATURE") {
     let bin = try fixture("unsigned.macho")
     let signed = try MachO.sign(bin, CodeSignParams(identifier: "x.y", team: team), identity)

@@ -47,6 +47,7 @@ import { keepGuideHref } from "./guides.js";
 import { rowIcon, SETTING_ICONS, PAGE_ICONS } from "../icons/rowicons.js";
 import { drawInstallation, PAGE as INSTALLATION, SUB_TITLES as INSTALLATION_TITLES } from "./installroute.js";
 import { installationBlock } from "./installroute.js";
+import { ROUTE_KEY } from "../core/installroute.js";
 
 // F271: the sideload build has one Installation & Signing page (Install Apps With and This iPhone's groups on top,
 // the Certificate and Provisioning Profile below) in place of Installation and Signing; #settings/installation and
@@ -1176,11 +1177,12 @@ let watchingReturn = false;
 function watchReturn() {
   if (watchingReturn || typeof document === "undefined") return;
   watchingReturn = true;
-  returnWatcher({ doc: document, win: globalThis, redraw: redrawAll, status: deviceStatus, interval: setInterval });
+  returnWatcher({ doc: document, win: globalThis, redraw: redrawAll, status: deviceStatus, interval: setInterval,
+    back: () => { installStale = true; } }); // B140: a fresh Installation block after the background
 }
 
 // watchReturn's listeners, injectable for the tests. Returns the status check (what focus and the timer run).
-export function returnWatcher({ doc, win, redraw, status, interval }) {
+export function returnWatcher({ doc, win, redraw, status, interval, back = () => {} }) {
   let last = null;
   const onPage = () => doc.visibilityState !== "hidden" && doc.querySelector(".page.is-top .walkthrough, .page.is-top .signing-page");
   const check = async () => {
@@ -1191,7 +1193,7 @@ export function returnWatcher({ doc, win, redraw, status, interval }) {
     if (last !== null && now !== last) redraw();
     last = now;
   };
-  const again = () => { if (doc.visibilityState !== "hidden") redraw(); };
+  const again = () => { if (doc.visibilityState !== "hidden") { back(); redraw(); } };
   doc.addEventListener("visibilitychange", again);
   win.addEventListener("pageshow", again);
   win.addEventListener("focus", check);
@@ -1234,6 +1236,29 @@ function withKeepNotes(frag, profile) {
   return frag;
 }
 
+// B140: the page redraws whole each time one of its other slow calls answers (asc.key.info, signing.installed,
+// signing.status). A new installationBlock each time asked idevice.status and idevice.developerMode again and put
+// This iPhone's rows back to Checking… So the page keeps its block (which repaints itself, and goes on with its
+// reads after it moves into the new page) and builds a new one only when the Install Apps With choice changed, the
+// app came back from the background (visibilitychange/pageshow: the pairing or VPN may have changed meanwhile), or
+// the kept one is older than INSTALL_KEEP_MS. Pure, for the tests.
+export const INSTALL_KEEP_MS = 30000;
+export function keepInstallBox(kept, { choice, now, stale = false }) {
+  return Boolean(kept) && !stale && kept.choice === choice && now - kept.at < INSTALL_KEEP_MS;
+}
+const installKept = new WeakMap(); // page element → { box, choice, at }
+let installStale = false; // set by watchReturn's back-from-background redraw
+function keptInstallation(el) {
+  const choice = settings.get(ROUTE_KEY);
+  const now = Date.now();
+  const kept = installKept.get(el);
+  if (keepInstallBox(kept, { choice, now, stale: installStale })) return kept.box;
+  installStale = false;
+  const box = installationBlock({ store: settings });
+  installKept.set(el, { box, choice, at: now });
+  return box;
+}
+
 async function drawDeviceSigning(el) {
   watchReturn();
   const { id, status, failure, kept } = await deviceSigningState(el);
@@ -1254,7 +1279,7 @@ async function drawDeviceSigning(el) {
     server: () => serverGroup(el),
     status: () => signingExtras({ identity: kept, redraw: redrawAll, dates: settings.get("showExpiry") }),
     help: () => helpGroup(),
-    install: () => installationBlock({ store: settings }), // F271: Install Apps With and This iPhone's groups
+    install: () => keptInstallation(el), // F271: Install Apps With and This iPhone's groups
   };
   showSigningPage(el, mergedLayout(signingLayout({ mode: "sideload", certificate: Boolean(kept), staged, profile: split.profile.length > 0,
     options: settings.sections().some((s) => s.page === "signing") }), merged()), parts);

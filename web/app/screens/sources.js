@@ -116,10 +116,12 @@ export function nav(route, ctx) {
   }
   return {
     title: "Sources", style: "plain",
-    left: { label: "Refresh", onClick: () => refresh(ctx) },
+    // B176: pushed on Home (green tile, Help's Refresh Sources) Back takes the left: Refresh goes right, and Add
+    // stays out of that copy's bar so the three fit (Manage has its own Add).
+    left: { label: "Refresh", onClick: () => refresh(ctx), pushed: "right" },
     right: [
       // Add: the Enter APT URL alert at once; its Paste button fills it (in the app, offered only for a copied URL).
-      { label: "Add", onClick: (e) => addFromClipboard(ctx, e.currentTarget) },
+      { label: "Add", onClick: (e) => addFromClipboard(ctx, e.currentTarget), pushed: false },
       { label: "Manage", onClick: () => ctx.go({ tab: "sources", path: [manage.SEGMENT] }) },
     ],
   };

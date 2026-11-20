@@ -16,8 +16,8 @@ Like iOS 6's Settings app, the root is one list of short rows with no footers. E
 | General | all | Device and iOS Version (website only, one group); Works on My Phone and Compatibility Marks; Refresh Sources on Launch (apps only) and Return to Home After; Blocked (packages and authors); Sideloading > Open Other Apps' Links (sideload only); Website > Lock Home and Other Apps > Install on the Website (website only; Install on the Website is padlocked while Home is locked) |
 | Theme | all | Mode (Automatic / Light / Dark, a segmented control) and Themes (Light and Dark, each a checklist of themes) |
 | Updates | all | Ignored Upgrades; Upgrade Notifications (jailbreak only); Automatic Installs (jailbreak only: Install Updates Automatically, When Charging and Locked, After a Respring Update, Keep Previous Versions); Update Alerts (sideload only) |
-| Installation | sideload | Install Apps With: Signing Server (default) or This iPhone ("With LocalDevVPN. No server, updates iFizBox itself."); see "Settings > Installation" below |
-| Signing | website, sideload | the certificate's name as its detail; see "Settings > Signing" below |
+| Installation & Signing | sideload | no detail; how apps install, then the certificate: see "Settings > Installation & Signing" below |
+| Signing | website | the certificate's name as its detail; see "Settings > Signing" below |
 | Open in iFizBox App | website, not jailbroken | an action, not a setting (screens/importlink.js) |
 | Install from URL | where Install IPA works | an action (screens/ipa-install.js) |
 | Console Logs | jailbreak, or wherever there are logs | screens/queue.js |
@@ -27,12 +27,13 @@ Like iOS 6's Settings app, the root is one list of short rows with no footers. E
   Re-sign Reminder).
 - Each group's footer says what its rows do in one line. A test keeps each footer to 120 characters or fewer.
 - Routes below Settings (`#/home/settings/…`): `general`, `theme` (`display` opens it too), `updates`, `installation[/pair]`, `<page>/<key>` (a list page),
-  `<page>/holds`, `general/blocked`, `signing[/<key>]`, `signing/help` (How Signing Works), `account`, `logs[/<id>]`. The one-segment routes (`device`,
+  `<page>/holds`, `general/blocked`, `signing[/<key>]`, `signing/help` (How Signing Works), `account`, `logs[/<id>]`. In the sideload
+  build `installation` and `signing` both open Installation & Signing; `installation/pair` and `signing/help` stay their own pages. The one-segment routes (`device`,
   `iosVersion`, `holds`) open their page too. Home's device hint and a package's "Set iOS Version" use them.
 
 ## Settings > Signing
 
-Laid out like an iOS 6 settings page, with one-line footers. `SIGNING_GROUPS` (core/settings.js) sets the order and
+The website's page, and the lower half of the sideload build's Installation & Signing. Laid out like an iOS 6 settings page, with one-line footers. `SIGNING_GROUPS` (core/settings.js) sets the order and
 `signingLayout()` (screens/settings.js) picks the groups a build shows:
 
 | Group | Builds | Rows |
@@ -52,9 +53,12 @@ Laid out like an iOS 6 settings page, with one-line footers. `SIGNING_GROUPS` (c
 Show Expiry Dates is in the sideload build only: the website keeps no record of the apps it signs, so it shows no
 dates and the switch would do nothing there.
 
-## Settings > Installation
+## Settings > Installation & Signing
 
-Sideload build only, drawn by `screens/installroute.js` (rules and texts in `core/installroute.js`):
+Sideload build only: one page, the root's Installation & Signing row. Its title shrinks to fit beside the back button
+at 375pt, and the pages under it (This iPhone, How Signing Works) go back with "Back". Top to bottom: the groups
+below, drawn by `screens/installroute.js` (`installationBlock`, rules and texts in `core/installroute.js`), then
+Settings > Signing's groups from Certificate down (`mergedLayout()` in screens/settings.js):
 
 - **Install Apps With**: Signing Server (the manifest and iOS's Install prompt) or This iPhone (installd over
   LocalDevVPN or Tailscale, docs/sideload.md), each subtitle a short point per line, wrapped. This iPhone's says
@@ -62,7 +66,8 @@ Sideload build only, drawn by `screens/installroute.js` (rules and texts in `cor
   never show iOS's install prompt. Picking This iPhone before it is
   paired opens This iPhone's page.
 - With This iPhone chosen: **Pairing** (Paired / Not Paired, opens `installation/pair`), **LocalDevVPN** (On, Off or
-  Another VPN) and **Open LocalDevVPN**.
+  Another VPN) and **Open LocalDevVPN**, then **Connect With** (Automatic, LocalDevVPN, Tailscale) and **Tailscale**
+  (Sign In, or the device with Test Connection and Sign Out).
 - **This iPhone** (`installation/pair`), one page that runs by itself: a sentence on what it gives, the LocalDevVPN
   check (Turn On LocalDevVPN alert when it's off, rechecked when the app comes back), then on iOS 27 pairing starts
   on its own: the 6-digit code and where to type it, a line and a ringed Settings screenshot a step; before iOS 27,

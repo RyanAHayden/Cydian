@@ -103,7 +103,8 @@ class SwiftShare(unittest.TestCase):
                      "jailbreak ipa: install-ipa through the helper, version for I3",
                      "jailbreak deb: simulate-deb resolves dependencies, install-deb installs",
                      "F133: a downloaded .deb checked against its stanza's SHA256 or MD5sum",
-                     "http stream: Content-Length, chunked, close-delimited, any split"):
+                     "http stream: Content-Length, chunked, close-delimited, any split",
+                     "B163: a file opened in place is copied in pieces into My IPAs, big ones too, never moved"):
             self.assertIn("ok   " + name, self.out.stdout)
         self.assertIn("all passed", self.out.stdout)
 
@@ -178,6 +179,31 @@ class Wiring(unittest.TestCase):
         build = read("build.sh")
         self.assertIn("share/*.swift", build)
         self.assertIn("share/build.sh", build)
+
+    def test_in_place_file(self):
+        # B163: the sideload build opens documents in place, so a handed-over file (Safari's download preview) is
+        # read through its security scope, started as iOS hands the URL over (before the queue hop), under a file
+        # coordinator; IPAs are copied with the page's progress HUD, and every failure is an alert, never silence.
+        bridge = read("share", "App", "ShareBridge.swift")
+        receive = bridge[bridge.index("static func receive("):bridge.index("static func file(")]
+        self.assertLess(receive.index("startAccessingSecurityScopedResource()"), receive.index("queue.async"))
+        self.assertIn("stopAccessingSecurityScopedResource()", bridge)
+        self.assertIn("NSFileCoordinator(", bridge)
+        self.assertIn("ShareInbox.copyIn(", bridge)
+        self.assertIn("ShareInbox.isOurInbox(", bridge)
+        self.assertNotIn('lastPathComponent == "Inbox"', bridge)
+        myipas = read("Sources", "MyIPAs.swift")
+        recv = myipas[myipas.index("static func receive("):myipas.index("// ---- installing")]
+        self.assertLess(recv.index("startAccessingSecurityScopedResource()"), recv.index(".async"))
+        self.assertNotIn("try?", recv)
+        self.assertIn("ifizbox:receiving", read("Sources", "App.swift"))
+        with open(os.path.join(REPO, "web", "app", "incoming.js")) as f:
+            self.assertIn('"ifizbox:receiving"', f.read())
+        with open(os.path.join(NATIVE, "Info-sideload.plist"), "rb") as f:
+            side = plistlib.load(f)
+        ipa = [d for d in side["CFBundleDocumentTypes"] if "com.apple.itunes.ipa" in d["LSItemContentTypes"]][0]
+        self.assertEqual(ipa["LSHandlerRank"], "Owner")
+        self.assertTrue(side["LSSupportsOpeningDocumentsInPlace"])  # Files' On My iPhone needs it with UIFileSharingEnabled
 
     def test_page(self):
         with open(os.path.join(REPO, "web", "app", "incoming.js")) as f:

@@ -286,6 +286,67 @@ enum ShareInbox {
         return out
     }
 
+    // B163: a file another app handed over, copied into `dest` in pieces (Safari's download of a 185 MB IPA is a real
+    // copy, not a clone): `progress` (0...1, at most once per whole percent, 1 at the end) for the page's HUD. It
+    // goes to a hidden ".<name>.part" beside `dest` and is renamed at the end, so My IPAs never lists half a file;
+    // on any failure nothing is left behind. Errors are said to the user (IntentFailure): empty, too big, unreadable.
+    static func copyIn(_ src: URL, to dest: URL, max: Int64 = maxIPA, chunk: Int = 4 << 20,
+                       progress: ((Double) -> Void)? = nil) throws {
+        let fm = FileManager.default
+        let name = src.lastPathComponent
+        let size: Int64
+        do {
+            size = ((try fm.attributesOfItem(atPath: src.path))[.size] as? NSNumber)?.int64Value ?? 0
+        } catch { throw IntentFailure(unreadable(name, error)) }
+        guard size > 0 else { throw IntentFailure("\(name) is empty.") }
+        guard size <= max else { throw IntentFailure("\(name) is too big (\(size / 1_000_000) MB; at most \(max / 1_000_000) MB).") }
+        let input: FileHandle
+        do { input = try FileHandle(forReadingFrom: src) } catch { throw IntentFailure(unreadable(name, error)) }
+        defer { try? input.close() }
+        let part = dest.deletingLastPathComponent().appendingPathComponent("." + dest.lastPathComponent + ".part")
+        try? fm.removeItem(at: part)
+        guard fm.createFile(atPath: part.path, contents: nil) else {
+            throw IntentFailure("\(Brand.name) couldn't make room for \(name) (is the iPhone full?).")
+        }
+        var ok = false
+        defer { if !ok { try? fm.removeItem(at: part) } }
+        let output = try FileHandle(forWritingTo: part)
+        defer { try? output.close() }
+        var done: Int64 = 0, lastPct = -1
+        progress?(0)
+        while true {
+            let piece: Data
+            do { piece = try input.read(upToCount: chunk) ?? Data() } catch { throw IntentFailure(unreadable(name, error)) }
+            if piece.isEmpty { break }
+            do { try output.write(contentsOf: piece) } catch {
+                throw IntentFailure("\(Brand.name) couldn't keep a copy of \(name) (is the iPhone full?): \(error.localizedDescription)")
+            }
+            done += Int64(piece.count)
+            guard done <= max else { throw IntentFailure("\(name) is too big (at most \(max / 1_000_000) MB).") }
+            let pct = Int(Double(done) * 100 / Double(Swift.max(size, done)))
+            if pct != lastPct, pct < 100 { lastPct = pct; progress?(Double(pct) / 100) }
+        }
+        guard done > 0 else { throw IntentFailure("\(name) is empty.") }
+        try output.close()
+        try? fm.removeItem(at: dest)
+        try fm.moveItem(at: part, to: dest)
+        ok = true
+        progress?(1)
+    }
+
+    // B163: what the user reads when a handed-over file can't be read (no permission to it, Safari's download gone).
+    static func unreadable(_ name: String, _ error: Error? = nil) -> String {
+        let why = error.map { " (\($0.localizedDescription))" } ?? ""
+        return "\(Brand.name) couldn't read \(name)\(why). Save it to Files first (Share > Save to Files), then open it from there or add it in Install IPAs."
+    }
+
+    // B163: iOS's own Documents/Inbox copy (handed over without opening in place) is ours to move and remove; a file
+    // in any other folder, an "Inbox" of the user's in iCloud Drive included, is theirs and only copied.
+    static func isOurInbox(_ file: URL, documents: URL) -> Bool {
+        let dir = file.standardizedFileURL.resolvingSymlinksInPath().deletingLastPathComponent().path
+        return dir == documents.standardizedFileURL.resolvingSymlinksInPath().appendingPathComponent("Inbox").path
+    }
+
     // A staged file's name, back to its path: only a plain name in that directory.
     static func path(_ name: String, kind: SharedItem.Kind, dirs: ShareDirs = ShareDirs()) -> String? {
         let ext = kind == .ipa ? ".ipa" : kind == .deb ? ".deb" : nil

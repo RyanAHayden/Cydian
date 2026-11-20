@@ -71,32 +71,78 @@ enum SharedInbox {
             let docs = MyIPAs.library.root.standardizedFileURL.resolvingSymlinksInPath().path
             if url.standardizedFileURL.resolvingSymlinksInPath().deletingLastPathComponent().path == docs { return false }
         }
-        queue.async { file(url, host) }
+        // B163: the sideload build opens documents in place (Info-sideload.plist), so a file from Safari's download
+        // preview or Files is the other app's, reachable only through the URL's security scope. Start it here, on
+        // the main thread, as iOS hands the URL over; file() ends it once the copy is made.
+        let scoped = url.startAccessingSecurityScopedResource()
+        queue.async { file(url, host, scoped: scoped) }
         return true
     }
 
-    // A file another app handed over.
-    static func file(_ url: URL, _ host: PhoneShareHost) {
-        let scoped = url.startAccessingSecurityScopedResource()
+    // A file another app handed over. B163: never silent: whatever fails ends in a "Couldn't Open" alert.
+    static func file(_ url: URL, _ host: PhoneShareHost, scoped: Bool = false) {
         defer { if scoped { url.stopAccessingSecurityScopedResource() } }
-        let head = (try? FileHandle(forReadingFrom: url)).map { h -> Data in defer { try? h.close() }; return h.readData(ofLength: 512) } ?? Data()
+        let name = url.lastPathComponent
+        // B163: a file provider's file (iCloud Drive's Downloads, where Safari saves) is read under a file
+        // coordinator, which also brings it down when only its placeholder is on the phone.
+        var coordError: NSError?
+        var handled = false
+        NSFileCoordinator(filePresenter: nil).coordinate(readingItemAt: url, options: .withoutChanges, error: &coordError) { u in
+            handled = true
+            read(u, original: url, host)
+        }
+        if !handled {
+            Incoming.receiving(name, progress: nil)
+            refuse(ShareInbox.unreadable(name, coordError))
+        }
+    }
+
+    private static func read(_ url: URL, original: URL, _ host: PhoneShareHost) {
+        let name = original.lastPathComponent
+        let head: Data
+        do {
+            let h = try FileHandle(forReadingFrom: url)
+            defer { try? h.close() }
+            head = h.readData(ofLength: 512)
+        } catch { return refuse(ShareInbox.unreadable(name, error)) }
         let item = ShareClassifier.classify(file: url, head: head)
         let route = ShareRouter.route(item, host)
-        // iOS's Documents/Inbox copy is ours: moved, or removed once handled.
-        let inbox = url.deletingLastPathComponent().lastPathComponent == "Inbox"
-        defer { if inbox { try? FileManager.default.removeItem(at: url) } }
+        // iOS's Documents/Inbox copy is ours: moved, or removed once handled. B163: only our own Inbox, never a
+        // folder of the user's that happens to be called Inbox.
+        let inbox = ShareInbox.isOurInbox(original, documents: MyIPAs.library.root)
+        defer { if inbox { try? FileManager.default.removeItem(at: original) } }
         var staged: String?
         do {
             switch route {
             case .helperIPA: staged = (try ShareInbox.stage(url, kind: .ipa, dirs: dirs, move: inbox) as NSString).lastPathComponent
             case .confirmDeb: staged = (try ShareInbox.stage(url, kind: .deb, dirs: dirs, move: inbox) as NSString).lastPathComponent
-            case .signIPA: staged = try MyIPAs.library.add(url, name: url.lastPathComponent, move: inbox)
+            case .signIPA: staged = try keep(url, name: name, move: inbox)
             default: break
             }
         } catch {
-            return hand(ShareRouter.link(.refuse(title: "Couldn't Open", message: "\(Brand.name) couldn't keep a copy of \(item.name): \(error.localizedDescription)")))
+            Incoming.receiving(name, progress: nil)
+            let why = (error as? IntentFailure)?.message ?? "\(Brand.name) couldn't keep a copy of \(item.name): \(error.localizedDescription)"
+            return refuse(why)
         }
         hand(ShareRouter.link(route, file: staged))
+    }
+
+    // B163: an IPA into My IPAs: iOS's Inbox copy is moved (instant); anything else is copied in pieces with the
+    // page's "Copying" HUD (Incoming.receiving), as a big download takes a while. -> its name in My IPAs.
+    static func keep(_ url: URL, name: String, move: Bool) throws -> String {
+        let lib = MyIPAs.library
+        if move, let f = try? lib.add(url, name: name, move: true) { return f }
+        let file = lib.uniqueName(name)
+        try FileManager.default.createDirectory(at: lib.root, withIntermediateDirectories: true)
+        let label = String(name.prefix(60))
+        try ShareInbox.copyIn(url, to: lib.root.appendingPathComponent(file)) { p in
+            Incoming.receiving(label, progress: p >= 1 ? nil : p)
+        }
+        return file
+    }
+
+    static func refuse(_ message: String) {
+        hand(ShareRouter.link(.refuse(title: "Couldn't Open", message: message)))
     }
 
     // ifizbox://share?url=<link> or ?text=<text>, from the share extension.

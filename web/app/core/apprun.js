@@ -14,7 +14,9 @@
 //                              prompt; progress("copying", f) then ("installing", installd's f), the row's `here`
 //                              turns true and its words say Copying to iPhone / Installing. handedOff: true (the
 //                              shell's word that iOS had the whole IPA, or iFizBox was in the background) turns a
-//                              false into "sent" too (B76, below). dismissed: true (B85: iOS's prompt closed and
+//                              false into "sent" too (B76, below). later (B200): a promise for the install's
+//                              real end when the call answered at the handoff; true turns the "Sent" row Installed.
+//                              dismissed: true (B85: iOS's prompt closed and
 //                              iOS never asked for the IPA) ends the row Failed ("Failed: iOS didn't download it":
 //                              B91, the user's Cancel and a frozen server look the same) and the next app goes on.
 //                              hooks.again (B91): that row's Try Again: no new signing; the shell's IPA (still
@@ -352,6 +354,15 @@ export function createAppRun({ rows, sign, install, discard = () => {}, reprompt
     if (r.mode === "resign") log(r, "step", `Re-signed ${label(r)}${expires ? `, expires ${dateText(expires)}` : ""}`);
     else if (r.mode === "remove") log(r, "step", `Removed ${label(r)}`);
     else log(r, "step", unsure ? `Sent ${label(r)} to iOS` : `Installed ${label(r)}`);
+    // B200: answered once iOS had the whole IPA: the watch goes on, and its true later makes the row Installed
+    if (unsure && typeof res?.later?.then === "function") {
+      const row = r;
+      res.later.then((v) => {
+        if (v !== true || row.state !== "installed" || !row.unsure) return;
+        set(row, { unsure: false });
+        if (row.mode !== "resign") log(row, "step", `Installed ${label(row)}`);
+      }, () => {});
+    }
     pump();
   }
 

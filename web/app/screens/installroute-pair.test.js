@@ -82,7 +82,7 @@ test("neither installed: Install LocalDevVPN opens its App Store page, Tailscale
   const asked = [];
   const box = make("div");
   await drawInstallation(box, "pair", { store: store(), native, alert: async (a) => { asked.push(a.title); return { index: 0 }; } });
-  assert.deepEqual(labels(box), ["LocalDevVPN", "Install LocalDevVPN"]);
+  assert.deepEqual(labels(box), ["LocalDevVPN", "Install LocalDevVPN", "Install Tailscale"]); // F317: Tailscale's own group
   assert.match(box.textContent, /Not Installed/);
   assert.match(box.textContent, /Tailscale/);
   assert.match(box.textContent, /checks again when you come back/);

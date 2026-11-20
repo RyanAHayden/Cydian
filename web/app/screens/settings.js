@@ -584,24 +584,26 @@ export function holdsLayout({ held = [], versions = {}, footer = "", unhold = ()
 // F226: Settings > General > Blocked (Zebra #1037, #998): the packages blocked from their page and the authors
 // (F104's hidden authors), each with a check; a tap unblocks it. Pure: the groups for nav/ui.js grouped(), for the
 // tests. `entries` [{ id, name }], `authors` [name].
+// F317 (AGENTS.md, Hints): the sentence that depends on the mode (kept on this device / held with dpkg) is a group of
+// its own at the end, about the whole page, never mid-footer under Packages.
 export function blockedLayout({ entries = [], authors = [], mode = "site" } = {}) {
-  const where = mode === "jailbreak"
+  const where = { footer: mode === "jailbreak"
     ? "An installed package you block is also held with dpkg, so other package managers leave it alone."
-    : "Kept on this device.";
+    : "Blocks are kept on this device." };
   if (!entries.length && !authors.length) {
-    return [{ footer: `Nothing is blocked. Block a package or its author on the package's page: it leaves Browse, Search, Sections and Changes. ${where}` }];
+    return [{ footer: "Nothing is blocked. Block a package or its author on the package's page: it leaves Browse, Search, Sections and Changes." }, where];
   }
   const groups = [];
   if (entries.length) {
     groups.push({ header: "Packages", key: "packages",
       rows: entries.map((e) => ({ id: e.id, label: e.name, subtitle: e.name !== e.id ? e.id : undefined, checked: true })),
-      footer: `Left out of Browse, Search, Sections and Changes. ${where} Tap a package to unblock it.` });
+      footer: "Left out of Browse, Search, Sections and Changes. Tap a package to unblock it." });
   }
   if (authors.length) {
     groups.push({ header: "Authors", key: "authors", rows: authors.map((a) => ({ author: a, label: a, checked: true })),
       footer: "Every package by these authors is left out the same way. Tap an author to unblock them." });
   }
-  return groups;
+  return [...groups, where];
 }
 
 // The General page's row: how many are blocked, pushing the list.

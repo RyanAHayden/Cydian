@@ -89,9 +89,9 @@ export async function preparedItems(items, { ellekit = loadElleKit } = {}) {
 export async function preparedFor(bundleId, opts) { return preparedItems(await savedTweaks(bundleId, opts), opts); }
 
 const sizeText = (n) => (n < 1024 * 1024 ? `${Math.max(1, Math.round(n / 1024))} KB` : `${(n / 1048576).toFixed(1)} MB`);
-const FOOTER = "Add .dylib, .deb or zipped .framework tweaks: they go into the app's Frameworks and load with it. "
-  + `A tweak that uses CydiaSubstrate gets ${ELLEKIT.name} too, unless you add your own. Kept for this app when it's signed again.`;
-const WITH_ELLEKIT = `${ELLEKIT.name} ${ELLEKIT.version} goes in too, for CydiaSubstrate (bundled; BSD licence). `
+// F317: one or two short sentences (AGENTS.md, Hints); the ElleKit note shows only once a tweak needs it.
+export const FOOTER = "A .dylib, .deb or zipped .framework tweak loads with the app. Kept for this app when it's signed again.";
+export const WITH_ELLEKIT = `${ELLEKIT.name} ${ELLEKIT.version} goes in too, for CydiaSubstrate. `
   + "Add ElleKit's .deb to use another version.";
 
 function style() { loadStyle("tweaks.css"); }

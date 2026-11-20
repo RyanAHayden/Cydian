@@ -970,6 +970,16 @@ function header(entry) {
 
 const hostOf = (u) => { try { return new URL(u).host; } catch { return ""; } };
 
+// F317: a website IPA kept in this browser, in the iOS 6 hint style (AGENTS.md, Hints): the Install hint under an
+// Install row (the nav bar's Install, here too, as the app page has), Details as status rows with no footer, and
+// where the file is kept under Delete, the row it's about.
+export const SITE_IPA_INSTALL_FOOTER = "Signs it here with your certificate (Settings > Signing), then iOS installs it.";
+export const SITE_KEPT_FOOTER = "Kept in this browser until you delete it.";
+export function siteIpaSections(details, onInstall = () => {}) {
+  return [{ rows: [{ label: "Install", onClick: onInstall }], footer: SITE_IPA_INSTALL_FOOTER },
+    { header: "Details", rows: details }];
+}
+
 async function renderIpa(body, route, file) {
   body.append(placeholder("page"));
   let entry, identity;
@@ -994,17 +1004,14 @@ async function renderIpa(body, route, file) {
       { label: "Size", detail: formatBytes(entry.size) || "—", chevron: false },
     ];
     if (entry.minimumOS) details.push({ label: "Requires", detail: `iOS ${entry.minimumOS}`, chevron: false });
-    body.append(grouped([
-      { header: "Details", rows: details,
-        footer: "Kept in this browser. Install signs it here with your certificate (Settings > Signing) and iOS installs it." },
-    ]));
+    body.append(grouped(siteIpaSections(details, () => install(entry.file))));
     // F288: Inject Tweaks, kept for this app in this browser as soon as they change; Install injects them
     if (entry.bundleId) {
       const { tweaksGroup } = await import("./tweaks.js");
       const tg = tweaksGroup({ bundleId: entry.bundleId, onChange: () => { tg.save(); } });
       body.append(tg.el);
     }
-    body.append(grouped([{ rows: [{ label: "Delete", onClick: () => confirmDelete(entry) }] }]));
+    body.append(grouped([{ rows: [{ label: "Delete", onClick: () => confirmDelete(entry) }], footer: SITE_KEPT_FOOTER }]));
     markDelete(body);
     return;
   }

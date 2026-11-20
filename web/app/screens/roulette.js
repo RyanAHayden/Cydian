@@ -60,6 +60,8 @@ export function currentStreak(state, today = dayKey()) {
 }
 
 export const ROULETTE_SUBTITLE = "Spin for something new";
+// F317: the intro in two short sentences (AGENTS.md, Hints); the wheels show their own type and price.
+export const ROULETTE_INTRO = "Each spin lands on a real free package from your sources. Spin once a day and your streak grows.";
 export const rouletteTitle = (jailbroken = true) => (jailbroken ? "Tweak Roulette" : "App Roulette");
 
 // Browse's row for it (nav/ui.js grouped section): the subtitle and, once there is one, the day streak.
@@ -119,7 +121,7 @@ export function render(body, route, { jailbroken = true, storage = globalThis.lo
   const spin = el("button", "roulette-spin", "Spin");
   spin.type = "button";
   const result = el("div", "roulette-result");
-  result.append(grouped([{ footer: "Each spin lands on a real free package from your sources. Or turn the wheels yourself: you get a package of the type and price they show. Spin once a day and your streak grows." }]));
+  result.append(grouped([{ footer: ROULETTE_INTRO }]));
   body.append(stats, picker, spin, result);
 
   let pool = null;

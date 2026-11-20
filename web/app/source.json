@@ -19,6 +19,14 @@
       "category": "utilities",
       "versions": [
         {
+          "version": "0.11.0",
+          "date": "2026-11-20T01:16:25Z",
+          "localizedDescription": "Apple Developer Account: add an App Store Connect API key and iFizBox makes each app's App ID and Ad Hoc profile itself, with Push.\nSettings > Installation & Signing is one page in the app; Remove Certificate sits beside Replace Certificate.\nA hint shows how to see the install queue while apps wait in it.\nClearer wording on how signed apps get their own notifications.\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.11.0",
+          "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.11.0/iFizBox.ipa",
+          "size": 15615508,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "0.10.0",
           "date": "2026-11-19T23:52:46Z",
           "localizedDescription": "Install apps right on your iPhone: pair once, then This iPhone installs over LocalDevVPN or Tailscale.\nFree Apple ID route: sign in with a free account and keep apps going with LiveContainer.\nOne-command computer setup for the free route (curl \u2026 | sh), no Docker and no GUI.\nPull to refresh on Sources, Changes and Home, and one search bar everywhere.\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.10.0",

@@ -11,7 +11,7 @@ import { recommendedRows } from "./sourcelist.js";
 import { RECOMMENDED_SOURCES } from "./recommended.js";
 import { siteJailbroken } from "../backend.js";
 import { NAME } from "../brand.js";
-import { fakeIndexedDB } from "../test-fakes.js";
+import { fakeIndexedDB } from "../fakes.test-helper.js";
 
 const ALT = "https://example.dev/apps.json";
 const ALT_JSON = JSON.stringify({ name: "Example Apps", identifier: "dev.example", apps: [

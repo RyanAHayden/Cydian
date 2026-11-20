@@ -5,7 +5,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { iconCache, iconType, openIconStore, ICON_MAX_AGE, ICON_MAX_BYTES } from "./iconcache.js";
 import { sourceIconUrls, loadTweakSources } from "./sources.js";
-import { fakeIndexedDB } from "../test-fakes.js";
+import { fakeIndexedDB } from "../fakes.test-helper.js";
 
 const DEFAULT_SOURCES = await loadTweakSources(); // web/app/tweak-sources.json
 

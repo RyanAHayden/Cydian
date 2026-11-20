@@ -10,7 +10,7 @@ import {
   TWEAK_SOURCES_FILE, APP_SOURCES_FILE,
 } from "./sources.js";
 import { withAltSources } from "./altstore.js";
-import { fakeIndexedDB } from "../test-fakes.js";
+import { fakeIndexedDB } from "../fakes.test-helper.js";
 
 const raw = (file) => JSON.parse(readFileSync(new URL(`../${file}`, import.meta.url), "utf8"));
 

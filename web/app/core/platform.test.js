@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { memStorage as storage } from "../test-fakes.js";
+import { memStorage as storage } from "../fakes.test-helper.js";
 import { notIphoneKind, notIphonePage, dismissNotIphone, notIphoneText, DISMISS_KEY } from "./platform.js";
 import { NAME } from "../brand.js";
 

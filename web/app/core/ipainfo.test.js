@@ -2,7 +2,7 @@
 // IPA says into compat (the source's fields win), what is kept on the device, the fallbacks, and the catalog's rows.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { memStorage as memoryStore } from "../test-fakes.js";
+import { memStorage as memoryStore } from "../fakes.test-helper.js";
 import { needsCheck, ipaInfoUrl, textMinOS, withIpaInfo, ipaRaises, savedInfo, allSaved, checkIpa, createQueue, clearIpaMemory,
   UNKNOWN_TTL, GUESS_TTL } from "./ipainfo.js";
 import { compat, compatCode, markOf, isIncompatible, badge, needText } from "./compat.js";

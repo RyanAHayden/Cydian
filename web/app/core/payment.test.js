@@ -1,6 +1,6 @@
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
-import { memStorage } from "../test-fakes.js";
+import { memStorage } from "../fakes.test-helper.js";
 import http from "node:http";
 import {
   isCommercial, paymentEndpointUrl, parseEndpoint, buildRequest, authenticateUrl, parseCallback, parseReply,

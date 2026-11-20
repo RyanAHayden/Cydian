@@ -2,7 +2,7 @@
 // how ours merge with a depiction's and the App Store's.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { memStorage as memStore } from "../test-fakes.js";
+import { memStorage as memStore } from "../fakes.test-helper.js";
 import { checkDraft, deviceToken, reviewsApi, mergeReviews, reviewDate, ourReview, reviewsBase, TOKEN_KEY, LIMITS,
   buildRating, storeRating, pageRating, compactCount } from "./reviews.js";
 

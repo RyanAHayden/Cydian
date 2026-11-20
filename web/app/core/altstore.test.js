@@ -11,7 +11,7 @@ import { sourceFilter } from "./sources.js";
 import { createCatalog, ALL } from "./catalog.js";
 import { newRecords, changeGroups, recordKey } from "./changes.js";
 import { compat } from "./compat.js";
-import { fakeIndexedDB } from "../test-fakes.js";
+import { fakeIndexedDB } from "../fakes.test-helper.js";
 
 const FIXTURE = readFileSync(new URL("./fixtures/altstore-source.json", import.meta.url), "utf8");
 const URL_ = "https://example.dev/apps.json";

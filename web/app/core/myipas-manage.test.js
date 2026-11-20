@@ -2,7 +2,7 @@
 // edit, swipe and selection states, and a held row's sheet.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { memStorage } from "../test-fakes.js";
+import { memStorage } from "../fakes.test-helper.js";
 import { totalSize, libraryFooter, deleteLabel, deleteButtonText, deleteSheetTitle, listState, listStep, tapOpens,
   allSelected, holdActions, HOLD, deleteEntries, addSiteUrl, siteEntries, memoryIpaStore, formatBytes } from "./myipas.js";
 

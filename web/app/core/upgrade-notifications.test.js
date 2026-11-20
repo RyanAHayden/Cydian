@@ -2,7 +2,7 @@
 // `ifizbox-helper notifications on|off`.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { memStorage } from "../test-fakes.js";
+import { memStorage } from "../fakes.test-helper.js";
 import { createSettings } from "./settings.js";
 
 const fakeHelper = (code = 0) => {

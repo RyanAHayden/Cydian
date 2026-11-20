@@ -72,7 +72,7 @@ test("changes: no IndexedDB is a rejection, not a throw", async () => {
 // ---- F51: by day, the last 7 days ----
 import { dayGroups, dayTitle, dayOf, filterRows, filterGroups, defaultScope, WINDOW_DAYS } from "./changes.js";
 import { installedIds } from "./installed.js";
-import { fakeIndexedDB } from "../test-fakes.js";
+import { fakeIndexedDB } from "../fakes.test-helper.js";
 
 const at = (d, h = 12) => new Date(2026, 10, d, h).getTime(); // November 2026, local time
 const rec = (id, version, first, date) => ({ k: recordKey("r1", id, version), key: "r1", id, version, first, ...(date != null ? { date } : {}) });

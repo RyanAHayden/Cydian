@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { memStorage } from "../test-fakes.js";
+import { memStorage } from "../fakes.test-helper.js";
 import { createSettings, detectMode, themeFor, SETTINGS, FEATURES, bridgeArch, DAEMON_KEYS, DAEMON_LISTS, RETIRED,
   RETIRED_DAEMON_KEYS, dropRetired, PAGES, SECTIONS } from "./settings.js";
 import { autoMarkShown } from "./automark.js";

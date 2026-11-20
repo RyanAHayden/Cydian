@@ -1,7 +1,7 @@
 // F122: an app's or package's links, and every kind of preview picture a source offers, into one gallery.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { memStorage as memStore } from "../test-fakes.js";
+import { memStorage as memStore } from "../fakes.test-helper.js";
 import {
   githubRepoOf, githubOf, appLinks, appGithub, packageLinks, packageGithub, sileoLinks,
   altShots, rawAltShots, aptShots, sileoShots, htmlShots, readmeShots, releaseShots, dedupeShots, isScreenshotUrl,

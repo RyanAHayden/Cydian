@@ -1,7 +1,7 @@
 // F280: core/push.js, with a fake shell and a fake server.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { memStorage as memory } from "../test-fakes.js";
+import { memStorage as memory } from "../fakes.test-helper.js";
 import { offReason, registration, expiresOf, enablePush, disablePush, syncPush, pushInfo, pushRows, pushState,
   storedWatch, RENAMED_TEXT, NO_APS_TEXT, DENIED_TEXT, PUSH_KEY } from "./push.js";
 import { BUNDLE_ID, NAME } from "../brand.js";

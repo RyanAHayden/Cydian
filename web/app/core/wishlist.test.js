@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { memStorage as fakeStorage } from "../test-fakes.js";
+import { memStorage as fakeStorage } from "../fakes.test-helper.js";
 import { createWishlist, wishLabel, wishRows, WISHLIST_KEY, WISH_ADD, WISH_REMOVE } from "./wishlist.js";
 
 test("add and remove, kept on the device in the order added", () => {

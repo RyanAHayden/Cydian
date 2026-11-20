@@ -9,7 +9,7 @@ import { exportText, parseImport, reviewImport, filterSources } from "./sourceli
 import { sourceWarning, inputHost, SOURCE_WARNINGS, warningAlert } from "./warnings.js";
 import { RECOMMENDED_SOURCES, detectJailbreak, jailbreakFromMarkers, recommendedFor, savedJailbreak, saveJailbreak, recommendedSeen, markRecommendedSeen } from "./recommended.js";
 import { createHttpBackend, BackendError } from "../backend-http.js";
-import { fakeIndexedDB, memStorage } from "../test-fakes.js";
+import { fakeIndexedDB, memStorage } from "../fakes.test-helper.js";
 
 
 // ---- (1) export and import ---------------------------------------------------------------------------------------

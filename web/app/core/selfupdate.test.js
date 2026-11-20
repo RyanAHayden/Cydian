@@ -2,7 +2,7 @@
 // and Reload runs (against fakes for the bridge and the alerts: it must never call one).
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { memStorage } from "../test-fakes.js";
+import { memStorage } from "../fakes.test-helper.js";
 import {
   parseVersion, compareVersions, isNewer, noteLines, parseRelease, debFor, installPath, loadState, saveState,
   newerRelease, fetchRelease, checkForUpdates, STORE_KEY, RELEASES_URL,

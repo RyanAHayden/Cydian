@@ -2,7 +2,7 @@
 // page), the week-long cache, and where the website and the app ask.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { memStorage as memStore } from "../test-fakes.js";
+import { memStorage as memStore } from "../fakes.test-helper.js";
 import { lookupUrl, workerLookupUrl, regionOf, parseLookup, lookupNeed, mergeDetails, pageLinks, pageKey, lookupApp,
   clearLookupMemory, LOOKUP_TTL } from "./applookup.js";
 import { appLinks } from "./previews.js";

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { memStorage } from "../test-fakes.js";
+import { memStorage } from "../fakes.test-helper.js";
 import { readFileSync } from "node:fs";
 import { parseFeatured, parseSize, featuredUrl, createFeaturedStore, DEFAULT_ITEM_SIZE } from "./featured.js";
 

@@ -1,7 +1,7 @@
 // N4: the install queue's model (core/queue.js).
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { memStorage } from "../test-fakes.js";
+import { memStorage } from "../fakes.test-helper.js";
 import { createQueue, modeOf, queueWords, parseSimulation, parseStatusLine, consoleText, finishOf, needsRestart,
   createRunLog, trimLog, runTitle, changeCount, queuedFor, LOG_KEY } from "./queue.js";
 

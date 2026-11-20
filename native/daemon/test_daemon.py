@@ -10,10 +10,14 @@ import subprocess
 import tempfile
 import unittest
 
+from test_auto import SAN_ENV, SAN_FLAGS, SAN_SKIP  # T45's ASan/UBSan probe: flags, or [] and why not
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 NATIVE = os.path.dirname(HERE)
 CC = shutil.which(os.environ.get("CC", "cc")) or shutil.which("clang") or shutil.which("gcc")
 DAY = 86400
+if SAN_FLAGS:
+    os.environ.update(SAN_ENV)  # the driver inherits it: leak checks off, an ASan report aborts
 
 PLAN = """\
 NOTE: This is only a simulation!
@@ -62,9 +66,15 @@ class Rules(unittest.TestCase):
         cls.addClassCleanup(shutil.rmtree, cls.tmp, True)  # also when the build below fails
         cls.driver = os.path.join(cls.tmp, "test_driver")
         # -pipe and TMPDIR: cc's scratch files stay out of the shared /tmp, which other gates can fill (EDQUOT).
-        subprocess.run([CC, "-pipe", "-std=c11", "-Wall", "-Wextra", "-Werror", "-O1", "-o", cls.driver,
+        # SAN_FLAGS: built with ASan/UBSan where the probe in test_auto.py found them working (SAN_SKIP says why not).
+        subprocess.run([CC, "-pipe", "-std=c11", "-Wall", "-Wextra", "-Werror", "-O1", *SAN_FLAGS, "-o", cls.driver,
                         os.path.join(HERE, "test_driver.c"), os.path.join(HERE, "upgrades.c")],
                        check=True, capture_output=True, env=dict(os.environ, TMPDIR=cls.tmp))
+
+    @unittest.skipUnless(SAN_FLAGS, SAN_SKIP or "")
+    def test_driver_is_sanitized(self):
+        with open(self.driver, "rb") as f:
+            self.assertIn(b"__asan_init", f.read())  # every test below then runs under ASan/UBSan
 
     def file(self, name, text):
         if text is None:

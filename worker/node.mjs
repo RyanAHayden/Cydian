@@ -10,6 +10,7 @@ import { readFile, stat } from "node:fs/promises";
 import { extname, join, normalize, resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import worker from "./src/index.js";
+import { guardedFetch } from "./src/ssrf-node.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const WEB = resolve(process.env.WEB ?? join(here, "../web/app"));
@@ -63,7 +64,9 @@ const LOOKUP_CACHE = {
 };
 setInterval(() => { const now = Date.now(); for (const [k, e] of looked) if (e.until < now) looked.delete(k); }, 3_600_000).unref();
 
-const env = { HOSTED, ASSETS, LOOKUP_CACHE, HOST_IDS: process.env.HOST_IDS ?? "*.ifizbox", TTL: process.env.TTL ?? "600", MAX_UPLOAD_MB: process.env.MAX_UPLOAD_MB };
+// B190: every fetch the proxy routes make (/api/fetch, /api/ipainfo, /api/applookup, /api/appreviews) goes through
+// the SSRF guard Cloudflare gives the Worker for free: hosts resolved and checked, redirects followed by hand.
+const env = { FETCH: guardedFetch(), HOSTED, ASSETS, LOOKUP_CACHE, HOST_IDS: process.env.HOST_IDS ?? "*.ifizbox", TTL: process.env.TTL ?? "600", MAX_UPLOAD_MB: process.env.MAX_UPLOAD_MB };
 
 // F187: F182's reviews in a SQLite file (node:sqlite, Node 22.5+) with D1's API, kept across restarts. Without
 // node:sqlite, or with REVIEWS_DB=off, /reviews/* answers as a Worker with no D1 binding does.

@@ -1242,4 +1242,133 @@ import { setup, normalCode, newCode, showCode, containerPath, SETUP_ALPHABET, PA
   assert.equal((await s("/sign/setup.sh", env, { method: "POST" })).status, 404);
   console.log("worker setup: ok");
 }
+// B190: the SSRF guard. Cloudflare's fetch refuses private addresses; the self-hosted server (node.mjs) can reach
+// them, so its fetch (src/ssrf-node.js) resolves and checks every host and redirect, and both runtimes refuse
+// literal private hosts before fetching.
+import { blockedIp, blockedHost } from "./src/ssrf.js";
+import { guardedFetch } from "./src/ssrf-node.js";
+import { cappedBody, FETCH_MAX_BYTES } from "./src/index.js";
+import http from "node:http";
+import { spawn } from "node:child_process";
+import { fileURLToPath } from "node:url";
+{
+  for (const ip of ["127.0.0.1", "127.255.0.9", "10.1.2.3", "172.16.0.1", "172.31.255.255", "192.168.1.1", "169.254.169.254",
+    "100.64.0.1", "100.127.255.255", "0.0.0.0", "224.0.0.1", "255.255.255.255", "198.18.0.1", "::1", "::", "fe80::1", "fc00::1",
+    "fd12:3456::1", "ff02::1", "fec0::1", "::ffff:127.0.0.1", "::ffff:7f00:1", "::ffff:8.8.8.8", "::127.0.0.1",
+    "64:ff9b::7f00:1", "64:ff9b::10.0.0.1", "2002:7f00:1::", "2001:db8::1", "not an ip", ""]) assert.ok(blockedIp(ip), ip);
+  for (const ip of ["8.8.8.8", "1.1.1.1", "100.128.0.1", "172.32.0.1", "2606:4700::1111", "64:ff9b::808:808", "2002:808:808::"])
+    assert.ok(!blockedIp(ip), ip);
+  const hostOf = (u) => new URL(u).hostname;
+  for (const u of ["http://localhost/", "http://LOCALHOST./", "http://a.localhost/", "http://2130706433/", "http://0x7f.1/",
+    "http://0177.0.0.1/", "http://127.1/", "http://[::1]/", "http://[::ffff:127.0.0.1]/", "http://[0:0:0:0:0:0:0:1]/", "http://10.0.0.1/",
+    "http://169.254.169.254/latest/meta-data/"]) assert.ok(blockedHost(hostOf(u)), u);
+  for (const u of ["https://repo.example/", "https://8.8.8.8/", "https://[2606:4700::1111]/"]) assert.ok(!blockedHost(hostOf(u)), u);
+
+  // an inner server the guard must never reach: /secret counts its hits, /hop?to= redirects, /public answers
+  let hits = 0;
+  const inner = http.createServer((req, res) => {
+    const u = new URL(req.url, "http://x");
+    if (u.pathname === "/secret") { hits++; res.end("SECRET"); return; }
+    if (u.pathname === "/hop") { res.writeHead(302, { Location: u.searchParams.get("to") }); res.end(); return; }
+    res.writeHead(200, { "Content-Type": "text/plain" }); res.end("ok");
+  });
+  await new Promise((ok) => inner.listen(0, "127.0.0.1", ok));
+  const P = inner.address().port;
+  const refusedCode = async (p) => { await assert.rejects(p, (e) => e.code === "SSRF_REFUSED"); };
+  try {
+    const gf = guardedFetch({ lookup: async (h) => (h === "inward.test" ? [{ address: "127.0.0.1", family: 4 }] : [{ address: "10.9.9.9", family: 4 }]) });
+    for (const u of [`http://127.0.0.1:${P}/secret`, `http://localhost:${P}/secret`, `http://2130706433:${P}/secret`, `http://[::1]:${P}/secret`,
+      `http://[::ffff:127.0.0.1]:${P}/secret`, `http://inward.test:${P}/secret`, `http://other.test:${P}/secret`]) await refusedCode(gf(u));
+
+    // "outer.test" stands for a public host (it resolves to the inner server, and only it is let through), so a
+    // redirect inward is what the guard sees
+    const lookup = async (h) => [{ address: h === "outer.test" ? "127.0.0.1" : "10.0.0.1", family: 4 }];
+    const gf2 = guardedFetch({ lookup, blocked: (ip, host) => host !== "outer.test" && blockedIp(ip) });
+    let r = await gf2(`http://outer.test:${P}/public`);
+    assert.equal(await r.text(), "ok"); // connected to the resolved address: outer.test is in no DNS
+    r = await gf2(`http://outer.test:${P}/hop?to=${encodeURIComponent(`http://outer.test:${P}/public`)}`);
+    assert.equal(r.status, 200);
+    assert.ok(r.redirected && r.url.endsWith("/public"));
+    r = await gf2(`http://outer.test:${P}/hop?to=/public`, { redirect: "manual" });
+    assert.equal(r.status, 302);
+    for (const to of [`http://127.0.0.1:${P}/secret`, `http://localhost:${P}/secret`, `http://[::1]:${P}/secret`, `http://2130706433:${P}/secret`, `http://inward.test:${P}/secret`])
+      await refusedCode(gf2(`http://outer.test:${P}/hop?to=${encodeURIComponent(to)}`));
+    await assert.rejects(gf2(`http://outer.test:${P}/hop?to=${encodeURIComponent("file:///etc/passwd")}`));
+
+    // through the routes, as node.mjs runs them (env.FETCH)
+    const nodeEnv = { ...env, FETCH: gf };
+    const at = (path, e = nodeEnv) => w.fetch(new Request("https://ifizbox.example" + path), e);
+    const q = (u) => encodeURIComponent(u);
+    for (const u of [`http://127.0.0.1:${P}/secret`, `http://localhost:${P}/secret`, `http://2130706433:${P}/secret`, `http://[::1]:${P}/secret`, `http://inward.test:${P}/secret`]) {
+      for (const path of [`/api/fetch?url=${q(u)}`, `/api/fetch?url=${q(u)}&kind=ipa`, `/api/fetch?url=${q(u)}&kind=packages`, `/api/ipainfo?url=${q(u)}`]) {
+        r = await at(path);
+        assert.equal(r.status, 403, path);
+        assert.equal((await r.json()).code, "refused", path);
+      }
+    }
+    const viaOuter = { ...env, FETCH: gf2 };
+    r = await at(`/api/fetch?url=${q(`http://outer.test:${P}/hop?to=${q(`http://127.0.0.1:${P}/secret`)}`)}`, viaOuter);
+    assert.equal(r.status, 403);
+    assert.equal((await r.json()).code, "refused");
+    r = await at(`/api/ipainfo?url=${q(`http://outer.test:${P}/hop?to=${q(`http://localhost:${P}/secret`)}`)}`, viaOuter);
+    assert.equal(r.status, 403);
+    r = await at(`/api/fetch?url=${q(`http://outer.test:${P}/public`)}`, viaOuter);
+    assert.equal(await r.text(), "ok");
+    assert.equal(hits, 0, "the inner server's /secret was reached");
+
+    // /api/applookup and /api/appreviews ask Apple through env.FETCH too
+    const asked = [];
+    const spy = async (u) => { asked.push(String(u)); return Response.json({ results: [] }); };
+    await at("/api/applookup?bundleId=com.a.b&country=us", { ...env, FETCH: spy });
+    await at("/api/appreviews?id=1&country=us", { ...env, FETCH: spy });
+    assert.deepEqual(asked.map((u) => new URL(u).host), ["itunes.apple.com", "itunes.apple.com"]);
+
+    // the Worker (no env.FETCH): literal private hosts refused before any fetch
+    const realFetch = globalThis.fetch;
+    let fetched = 0;
+    globalThis.fetch = async () => { fetched++; return new Response("x"); };
+    try {
+      for (const u of [`http://127.0.0.1:${P}/`, "http://localhost/", "http://2130706433/", "http://[::1]/", "http://169.254.169.254/"]) {
+        assert.equal((await at(`/api/fetch?url=${q(u)}`, env)).status, 403, u);
+        assert.equal((await at(`/api/ipainfo?url=${q(u)}`, env)).status, 403, u);
+      }
+      assert.equal(fetched, 0);
+      // the plain path's byte cap: a Content-Length over it is refused up front
+      globalThis.fetch = async () => new Response("x", { headers: { "Content-Length": String(FETCH_MAX_BYTES + 1) } });
+      r = await at(`/api/fetch?url=${q("https://repo.example/big.json")}`, env);
+      assert.equal(r.status, 413);
+      assert.equal((await r.json()).code, "too_large");
+    } finally { globalThis.fetch = realFetch; }
+
+    // cappedBody: over the cap, or slower than the overall time, the body errors; under both it comes whole
+    const chunks = (n, size) => new ReadableStream({ pull(c) { n-- > 0 ? c.enqueue(new Uint8Array(size)) : c.close(); } });
+    assert.equal((await new Response(cappedBody(chunks(3, 4), 12)).arrayBuffer()).byteLength, 12);
+    await assert.rejects(new Response(cappedBody(chunks(3, 4), 11)).arrayBuffer(), /over/);
+    let cancelled = false;
+    const stuck = new ReadableStream({ pull: () => new Promise(() => {}), cancel() { cancelled = true; } });
+    await assert.rejects(new Response(cappedBody(stuck, 100, 50)).arrayBuffer(), /longer than/);
+    assert.ok(cancelled, "the upstream body is cancelled when the time runs out");
+  } finally { inner.close(); }
+
+  // node.mjs itself, as the audit found it: /api/fetch on its own port, localhost and the decimal form, refused
+  const free = http.createServer();
+  await new Promise((ok) => free.listen(0, "127.0.0.1", ok));
+  const port = free.address().port;
+  await new Promise((ok) => free.close(ok));
+  const child = spawn(process.execPath, [fileURLToPath(new URL("./node.mjs", import.meta.url))],
+    { env: { ...process.env, PORT: String(port), HOST: "127.0.0.1", REVIEWS_DB: "off" }, stdio: ["ignore", "pipe", "inherit"] });
+  try {
+    await new Promise((ok, no) => {
+      const deadline = setTimeout(() => no(new Error("node.mjs didn't start in 15 s")), 15000);
+      child.stdout.on("data", (d) => { if (String(d).includes("ifizbox:")) { clearTimeout(deadline); ok(); } });
+      child.on("exit", (c) => { clearTimeout(deadline); no(new Error(`node.mjs exited ${c}`)); });
+    });
+    for (const u of [`http://127.0.0.1:${port}/`, `http://localhost:${port}/`, `http://2130706433:${port}/`, `http://[::1]:${port}/`]) {
+      const r = await fetch(`http://127.0.0.1:${port}/api/fetch?url=${encodeURIComponent(u)}`, { signal: AbortSignal.timeout(15000) });
+      assert.equal(r.status, 403, u);
+      assert.equal((await r.json()).code, "refused", u);
+    }
+  } finally { child.kill(); }
+  console.log("worker ssrf: ok");
+}
 await import("./test-push.mjs"); // F280

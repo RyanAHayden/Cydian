@@ -6,6 +6,10 @@
 //
 // A row with an href is a link (pushes when it points deeper into the tab); `chevron` defaults to on for links.
 // All text goes in through textContent.
+// `live`: () => detail (or a promise of it): the detail is filled from it now and again each time its page comes back
+// into view (B148, nav/pagestate.js liveText), so a sub-page's change shows on the page below after Back.
+
+import { liveText } from "./pagestate.js";
 
 export function el(tag, cls, text) {
   const e = document.createElement(tag);
@@ -47,7 +51,11 @@ function cell(row) {
   text.append(el("span", "cell-label", row.label));
   if (row.subtitle) text.append(el("span", "cell-subtitle", row.subtitle));
   inner.append(text);
-  if (row.detail != null) inner.append(el("span", "cell-detail", row.detail));
+  if (row.detail != null || row.live) {
+    const detail = el("span", "cell-detail", row.detail ?? "");
+    inner.append(detail);
+    if (row.live) liveText(detail, row.live); // B148: follows its state each time its page comes back (nav/pagestate.js)
+  }
   if (row.badge != null) inner.append(el("span", "cell-count", row.badge));
   if (row.checked) inner.append(el("span", "cell-check"));
   if (row.chevron ?? Boolean(row.href)) inner.classList.add("chevron");

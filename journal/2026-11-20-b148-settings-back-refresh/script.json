@@ -1,0 +1,12 @@
+[
+  { "nav": "#/home/settings", "ms": 4000 },
+  { "eval": "(()=>{const c=[...document.querySelectorAll('.page.is-top .cell-inner')].find(c=>/Account$/.test(c.querySelector('.cell-label')?.textContent||'')); c.dataset.b148='kept'; return 'root before: '+c.querySelector('.cell-detail').textContent})()" },
+  { "shot": "1-root-off" },
+  { "click": ".page.is-top a.cell-inner[href$='/account']", "ms": 1500 },
+  { "clicktext": "Create Account", "ms": 800 },
+  { "clicktext": "Create", "ms": 3000 },
+  { "shot": "2-account-signed-in" },
+  { "click": ".nav-item.is-top .bar-button.back", "ms": 1500 },
+  { "eval": "(()=>{const c=[...document.querySelectorAll('.page.is-top .cell-inner')].find(c=>/Account$/.test(c.querySelector('.cell-label')?.textContent||'')); return 'root after Back: '+c.querySelector('.cell-detail').textContent+' same cell: '+(c.dataset.b148==='kept')+' hash: '+location.hash})()" },
+  { "shot": "3-root-on" }
+]

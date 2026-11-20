@@ -11,6 +11,7 @@ import { keptTweakParams, installTweaksChoice, addTweaksGroup, openAddTweaks, ad
 import { memoryIpaStore } from "../core/myipas.js";
 import { HOW_TO_GET_ONE } from "../core/tweaks.js";
 import { addTweakPill } from "./installed.js";
+import { tick } from "../fakes.test-helper.js";
 
 const fx = (n) => new Uint8Array(readFileSync(new URL(`../core/fixtures/tweaks/${n}`, import.meta.url)));
 const storage = () => { const m = new Map(); return { getItem: (k) => m.get(k) ?? null, setItem: (k, v) => m.set(k, String(v)), m }; };
@@ -45,7 +46,6 @@ async function withDoc(f) {
   globalThis.document = doc;
   try { return await f(); } finally { globalThis.document = saved; }
 }
-const tick = () => new Promise((r) => setTimeout(r, 0));
 
 test("keptTweakParams: a plain install from a source takes the app's kept tweaks, ElleKit with them, a log line each", async () => {
   const store = memStore();

@@ -1,7 +1,7 @@
 // Shared fakes for the frontend's node --test files: a small DOM, the native bridge, a Storage and an IndexedDB.
 // Import from here instead of copying one into a test. Test-only: nothing in the app imports this file.
 // SPDX-License-Identifier: GPL-3.0-or-later
-export { fakeDocument, fakePage, tick, withDocument } from "./nav/fakedom.test-helper.js";
+export { fakeDocument, fakePage, tick } from "./nav/fakedom.test-helper.js";
 
 // The native bridge (backend-native.js's `native`): answers[method] is the reply, an Error to throw, or a
 // function (params, onEvent) => reply. Every call is recorded in `calls` as { method, params }.

@@ -9,8 +9,7 @@ function matches(n, sel) {
   if (!n || n.tagName === "#text") return false;
   const m = /^([\w-]*)((?:\.[\w-]+)*)$/i.exec(sel.trim());
   if (!m) return false;
-  // A bare word matches the tag or, as the first copy of this DOM read every selector, a class.
-  if (m[1] && n.tagName !== m[1].toUpperCase() && !n._cls.has(m[1])) return false;
+  if (m[1] && n.tagName !== m[1].toUpperCase()) return false;
   return m[2].split(".").filter(Boolean).every((c) => n._cls.has(c));
 }
 
@@ -40,7 +39,7 @@ function fakeNode(tag) {
     get lastChild() { return n.children.at(-1) ?? null; },
     get firstElementChild() { return n.children.find((c) => c.tagName !== "#text") ?? null; },
     setAttribute(k, v) { n.attrs[k] = String(v); }, getAttribute(k) { return n.attrs[k] ?? null; },
-    removeAttribute(k) { delete n.attrs[k]; }, hasAttribute(k) { return k in n.attrs; },
+    removeAttribute(k) { delete n.attrs[k]; },
     addEventListener(t, f) { (n.listeners[t] ??= []).push(f); },
     removeEventListener(t, f) { n.listeners[t] = (n.listeners[t] ?? []).filter((g) => g !== f); },
     // Runs the listeners for `t` with a stand-in event (fields in `more` added); resolves when async ones end.
@@ -90,8 +89,7 @@ function fakeNode(tag) {
     },
     querySelector(sel) { return n.querySelectorAll(sel)[0] ?? null; },
     animate: () => ({ finished: Promise.resolve(), cancel: noop }),
-    focus: noop, blur: noop, setPointerCapture: noop, releasePointerCapture: noop,
-    getBoundingClientRect: () => ({ top: 0, left: 0, right: 0, bottom: 0, width: 0, height: 0 }),
+    focus: noop, blur: noop, setPointerCapture: noop,
   };
   return n;
 }
@@ -121,9 +119,3 @@ export function fakePage() {
   return p;
 }
 export const tick = () => new Promise((r) => setTimeout(r, 0));
-// Swaps `globalThis.document` for `doc` (a fresh fakeDocument() if none) while `fn` runs, sync or async.
-export async function withDocument(fn, doc = fakeDocument()) {
-  const saved = globalThis.document;
-  globalThis.document = doc;
-  try { return await fn(doc); } finally { globalThis.document = saved; }
-}

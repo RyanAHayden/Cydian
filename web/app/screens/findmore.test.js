@@ -156,12 +156,12 @@ test("Find More: Popular on Canister, Add on each row, ios-repo-updates under Ot
   assert.match(text, new RegExp(NOT_CHECKED));
   assert.match(text, /canister\.me/);
   assert.match(text, /Piracy repos are never shown/);
-  const rows = f.el.querySelectorAll("find-row");
+  const rows = f.el.querySelectorAll(".find-row");
   assert.ok(rows.length > 5);
   const havoc = rows.find((li) => li.dataset.slug === "havoc");
-  assert.equal(havoc.querySelector("find-add").textContent, "Added", "a repo already in the list says Added");
+  assert.equal(havoc.querySelector(".find-add").textContent, "Added", "a repo already in the list says Added");
   const ch = rows.find((li) => li.dataset.slug === "chariz");
-  assert.equal(ch.querySelector("find-add").textContent, "Add");
+  assert.equal(ch.querySelector(".find-add").textContent, "Add");
   assert.match(ch.textContent, /Known Safe/);
   const poom = rows.find((li) => li.dataset.slug === "poomsmart");
   assert.match(poom.textContent, /Unknown · /, "a tier 2 repo on no list is Unknown");
@@ -193,7 +193,7 @@ test("a repo's page: Trust (Label, Why, HTTPS, Signed Releases) and Packages; Tw
   assert.match(text, /HTTPSNo/);
   assert.match(text, /without encryption/);
   for (let i = 0; i < 5; i++) await tick();
-  assert.equal(page.querySelector("find-tweaks").querySelector("cell-detail").textContent, "1", "only the injectable tweak counts");
+  assert.equal(page.querySelector(".find-tweaks").querySelector(".cell-detail").textContent, "1", "only the injectable tweak counts");
   const jb = fakePage();
   await renderRepo(jb, "bigboss", null, { api, sources: async () => [], sideload: () => false });
   assert.doesNotMatch(jb.textContent, /Tweaks for Sideloaded Apps/);

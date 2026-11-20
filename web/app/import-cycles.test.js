@@ -12,9 +12,7 @@ import { fileURLToPath } from "node:url";
 
 const root = dirname(fileURLToPath(import.meta.url));
 
-const KNOWN = [
-  "screens/browse.js screens/manage.js screens/roulette.js",
-];
+const KNOWN = [];
 
 const STATIC = /^[ \t]*(?:import|export)\s+(?:[^'"`;()]*?\s+from\s+)?["']([^"']+)["']/gm;
 

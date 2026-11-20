@@ -1,0 +1,10 @@
+[
+  { "nav": "#/home", "ms": 6000 },
+  { "eval": "localStorage.getItem('ifizbox.push')" },
+  { "nav": "#/home/settings/updates", "ms": 5000 },
+  { "eval": "[...document.querySelectorAll('.page.is-top .group, .page.is-top h3, .page.is-top li, .page.is-top p')].map(e => e.tagName + ': ' + e.textContent.trim().replace(/\\s+/g, ' ').slice(0, 160)).join('\\n')" },
+  { "shot": "updates-top" },
+  { "eval": "(() => { const s = document.querySelector('.page.is-top .scroll, .page.is-top') ; const el = [...document.querySelectorAll('.page.is-top *')].find(e => e.scrollHeight > e.clientHeight + 20 && getComputedStyle(e).overflowY !== 'visible'); if (el) el.scrollTop = 99999; return el ? el.className : 'none'; })()" },
+  { "wait": 800 },
+  { "shot": "updates-bottom" }
+]

@@ -47,16 +47,50 @@ test("applyTheme posts app.theme to the bridge once per change", () => {
 
 test("Update Alerts: what iOS allows, the last background check, and a way to Settings when something is off", async () => {
   const { notifyRows } = await import("./settings.js");
+  const { NAME } = await import("../brand.js");
   const now = Date.parse("2026-11-18T12:00:00Z");
-  const off = notifyRows({ badges: false, alerts: true, backgroundRefresh: true, lastCheck: null }, now);
-  assert.deepEqual(off.rows.map((r) => [r.label, r.detail ?? ""]), [["Check in the Background", "On"], ["Icon Badge", "Off"], ["Notifications", "On"],
-    ["Background App Refresh", "On"], ["Last Background Check", "Not yet"], ["Turn On in Settings", ""]]);
-  const on = notifyRows({ badges: true, alerts: true, backgroundRefresh: true, lastCheck: "2026-11-18T09:00:00Z" }, now);
+  const rows = (g) => g.rows.map((r) => [r.label, r.detail ?? ""]);
+  const [alerts, off] = notifyRows({ badges: false, alerts: true, backgroundRefresh: true, lastCheck: null }, now);
+  assert.equal(alerts.header, "Update Alerts");
+  assert.deepEqual(rows(alerts), [["Notifications", "On"], ["Icon Badge", "Off"], [`${NAME} Updates`, "On"]]);
+  assert.deepEqual(alerts.rows.map((r) => r.toggle), ["ios", "ios", "self"]);
+  assert.match(alerts.footer, new RegExp(`^Off, only your apps' updates alert you; ${NAME}'s own update still shows in Changes\\.$`));
+  assert.equal(off.header, "Checking for Updates");
+  assert.deepEqual(rows(off), [["Check in the Background", "On"], ["Background App Refresh", "On"], ["Last Background Check", "Not yet"],
+    ["Turn On in Settings", ""]]);
+  assert.match(off.footer, /^iOS asks only once/);
+  const [, on] = notifyRows({ badges: true, alerts: true, backgroundRefresh: true, lastCheck: "2026-11-18T09:00:00Z" }, now);
   assert.equal(on.rows.at(-1).detail, "3 h ago");
-  assert.equal(on.rows.length, 5);
-  const quiet = notifyRows({ backgroundOn: false, badges: false, alerts: false, backgroundRefresh: false }, now);
+  assert.equal(on.rows.length, 3);
+  const [quietAlerts, quiet] = notifyRows({ backgroundOn: false, badges: false, alerts: false, backgroundRefresh: false }, now, { selfAlerts: false });
   assert.equal(quiet.rows[0].detail, "Off"); // turned off here: no nudge to Settings
   assert.equal(quiet.rows.some((r) => r.open), false);
+  assert.deepEqual(quietAlerts.rows[2], { label: `${NAME} Updates`, detail: "Off", on: false, toggle: "self" });
+  assert.equal(notifyRows(null), null);
+});
+
+// F285: Push's rows (core/push.js pushRows) join Checking for Updates: Push first, Last Push before the last
+// background check, Test Push after it, then Turn On in Settings; Push's footer before the check's.
+test("Checking for Updates: Push's rows woven in, its footer first", async () => {
+  const { notifyRows } = await import("./settings.js");
+  const { pushRows } = await import("../core/push.js");
+  const now = Date.parse("2026-11-19T12:00:00Z");
+  const st = { badges: false, alerts: true, backgroundRefresh: true, lastCheck: "2026-11-19T11:00:00Z" };
+  const live = pushRows({ state: { on: true }, status: { registered: true, lastPush: "2026-11-19T11:50:00Z" }, reason: null }, now);
+  const [, g] = notifyRows(st, now, { push: live });
+  assert.deepEqual(g.rows.map((r) => [r.label, r.detail ?? ""]), [["Push", ""], ["Check in the Background", "On"],
+    ["Background App Refresh", "On"], ["Last Push", "10 min ago"], ["Last Background Check", "1 h ago"], ["Test Push", ""],
+    ["Turn On in Settings", ""]]);
+  assert.equal(g.rows[0].toggle, "push");
+  assert.equal(g.rows[0].on, true);
+  assert.ok(g.rows[5].test);
+  assert.ok(g.footer.startsWith(live.footer + " iOS asks only once"), g.footer);
+  // push can't work: only its switch, and its why-footer kept
+  const why = pushRows({ state: { on: false }, reason: { code: "no_key", text: "sign.example has no APNs key." } }, now);
+  const [, g2] = notifyRows({ ...st, badges: true }, now, { push: why });
+  assert.deepEqual(g2.rows.map((r) => r.label), ["Push", "Check in the Background", "Background App Refresh", "Last Background Check"]);
+  assert.equal(g2.rows[0].on, false);
+  assert.match(g2.footer, /^sign\.example has no APNs key\. Update alerts still come from the background check/);
 });
 
 // F128: Settings' pages and their titles, like iOS 6's (the root, General, Theme, Updates, a list page under one),

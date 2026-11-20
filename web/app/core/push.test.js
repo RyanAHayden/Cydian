@@ -130,3 +130,47 @@ test("an update on a renamed copy: said once, Cancel stops it", async () => {
   const old = { call: async () => { throw new Error("unknown call push.status"); } };
   assert.equal(await renamedUpdateNotice({ native: old, alert: alert(0), storage: memory() }), "install", "an older shell");
 });
+
+// F285: on by default, once the server can push; never again after the user's Off; not while the server has no key.
+test("Push turns itself on once the server can push, and never after an explicit Off", async () => {
+  const { autoEnablePush, userTurnedOff, setUserTurnedOff, USER_OFF_KEY } = await import("./push.js");
+  const store = () => { const m = memory(); m.removeItem = (k) => m.m.delete(k); return m; };
+  // the server has no key yet: stays off, nothing asked of iOS beyond the status
+  let storage = store(), native = fakeNative(), srv = fakeServer({ info: { enabled: false, reason: "no_key", topics: [BUNDLE_ID] } });
+  assert.deepEqual(await autoEnablePush({ native, server, fetcher: srv.fetcher, storage, watch: WATCH }), { enabled: false });
+  assert.equal(pushState(storage).on, false);
+  assert.equal(pushState(storage).lastError, null, "no error left behind");
+  assert.deepEqual(native.calls, ["push.status"]);
+  // the key arrives (no app update): the next launch turns it on
+  srv = fakeServer();
+  assert.deepEqual(await autoEnablePush({ native, server, fetcher: srv.fetcher, storage, watch: WATCH }), { enabled: true });
+  assert.equal(pushState(storage).on, true);
+  assert.equal(srv.posts[0].path, "/api/push/register");
+  // on already: nothing more
+  assert.deepEqual(await autoEnablePush({ native, server, fetcher: srv.fetcher, storage, watch: WATCH }), { enabled: false });
+  assert.equal(srv.posts.length, 1);
+  // the user turns it off: remembered, never on again by itself
+  setUserTurnedOff(true, storage);
+  await disablePush({ native, server, fetcher: srv.fetcher, storage });
+  assert.equal(storage.getItem(USER_OFF_KEY), "1");
+  assert.equal(userTurnedOff(storage), true);
+  assert.deepEqual(await autoEnablePush({ native, server, fetcher: srv.fetcher, storage, watch: WATCH }), { enabled: false });
+  assert.equal(pushState(storage).on, false);
+  setUserTurnedOff(false, storage);
+  assert.equal(userTurnedOff(storage), false, "turned on again by hand clears it");
+  // something blocks it (no aps-environment, notifications not allowed yet, a renamed copy): stays off quietly
+  for (const st of [{ ...ST, environment: null }, { ...ST, authorization: "notDetermined" }, { ...ST, authorization: "denied" },
+    { ...ST, bundleId: "com.you.ifizbox" }]) {
+    storage = store(); srv = fakeServer();
+    assert.deepEqual(await autoEnablePush({ native: fakeNative({ st }), server, fetcher: srv.fetcher, storage, watch: WATCH }), { enabled: false });
+    assert.equal(srv.posts.length, 0);
+    assert.equal(pushState(storage).on, false);
+  }
+  // iOS gives no token: left off with no error, tried again next launch
+  storage = store(); srv = fakeServer();
+  const r = await autoEnablePush({ native: fakeNative({ fail: "no token" }), server, fetcher: srv.fetcher, storage, watch: WATCH });
+  assert.equal(r.enabled, false);
+  assert.deepEqual(pushState(storage), { on: false, token: null, sent: null, lastError: null });
+  // an older shell without push.status
+  assert.deepEqual(await autoEnablePush({ native: { call: async () => { throw new Error("unknown"); } }, server, fetcher: srv.fetcher, storage: store() }), { enabled: false });
+});

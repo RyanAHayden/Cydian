@@ -4,7 +4,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { ROW_ICONS, GLYPHS, SETTING_ICONS, PAGE_ICONS, tileSvg, rowIcon } from "./rowicons.js";
-import { SETTINGS, PAGES } from "../core/settings.js";
+import { SETTINGS, PAGES, SECTIONS } from "../core/settings.js";
 
 test("every row icon has a colour and a glyph, and draws a 29pt tile with 6pt corners", () => {
   for (const [name, [colour, glyph]] of Object.entries(ROW_ICONS)) {
@@ -36,7 +36,8 @@ test("SETTING_ICONS and PAGE_ICONS name real settings, pages and icons", () => {
   }
   // every setting a row shows has a tile, except choices (their options are the rows) and Theme's (F199): Mode is a
   // segmented control with no row, and Themes' Light and Dark rows are its tones, bare as Appearance's options were
-  const bare = (d) => d.kind === "choice" || d.kind === "segmented" || d.tone;
+  // F285: nor a setting no SECTIONS group draws (selfUpdateAlerts sits among the bare Update Alerts rows)
+  const bare = (d) => d.kind === "choice" || d.kind === "segmented" || d.tone || !SECTIONS.some((s) => s.id === d.section);
   for (const d of SETTINGS) if (d.modes.length && !bare(d)) assert.ok(SETTING_ICONS[d.key], d.key);
   for (const p of PAGES) assert.ok(ROW_ICONS[PAGE_ICONS[p.id]], p.id);
 });

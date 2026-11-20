@@ -32,7 +32,7 @@ test("defaults with nothing stored", () => {
 // F128: the settings audit. What's left, and the ones that went (docs/settings.md).
 test("F128: exactly these settings remain, and the retired ones are gone", () => {
   assert.deepEqual(SETTINGS.map((d) => d.key), ["appearance", "lightTheme", "darkTheme", "device", "arch", "worksOnMyPhone", "compatMarks",
-    "iosVersion", "refreshOnLaunch", "returnHome", "holds", "upgradeNotifications", "autoInstall", "autoInstallIdle", "respring",
+    "iosVersion", "refreshOnLaunch", "returnHome", "holds", "selfUpdateAlerts", "upgradeNotifications", "autoInstall", "autoInstallIdle", "respring",
     "keepVersions", "showExpiry", "resignReminder", "keepBundleId", "showExpiryWarning", "expiryWarning", "installRoute"]);
   assert.deepEqual(RETIRED, ["sideloader", "checkUpdates", "cellular", "notifications", "badge", "allowZoom"]);
   const s = createSettings({ storage: memStorage(), mode: "jailbreak" });
@@ -43,7 +43,8 @@ test("F128: exactly these settings remain, and the retired ones are gone", () =>
   for (const k of RETIRED_DAEMON_KEYS) assert.ok(RETIRED.includes(k) && !DAEMON_KEYS.includes(k), k);
   // every section is on a page, every setting in a section
   for (const sec of SECTIONS) assert.ok(PAGES.some((p) => p.id === sec.page), sec.id);
-  for (const d of SETTINGS) if (d.modes.length) assert.ok(SECTIONS.some((x) => x.id === d.section), d.key);
+  // (F285: "alerts", selfUpdateAlerts, is drawn by screens/settings.js notifySection among iOS's rows, not as a section)
+  for (const d of SETTINGS) if (d.modes.length && d.section !== "alerts") assert.ok(SECTIONS.some((x) => x.id === d.section), d.key);
 });
 
 test("F128: the migration drops the retired settings' stored values and keeps everything else", () => {
@@ -256,7 +257,7 @@ test("rows each mode shows once every feature exists", () => {
     ["appearance", "lightTheme", "darkTheme", "worksOnMyPhone", "compatMarks", "refreshOnLaunch", "returnHome", "holds",
       "upgradeNotifications", "autoInstall", "autoInstallIdle", "respring", "keepVersions"]);
   assert.deepEqual(show("sideload"),
-    ["appearance", "lightTheme", "darkTheme", "worksOnMyPhone", "compatMarks", "refreshOnLaunch", "returnHome", "holds", "showExpiry", "resignReminder", "keepBundleId",
+    ["appearance", "lightTheme", "darkTheme", "worksOnMyPhone", "compatMarks", "refreshOnLaunch", "returnHome", "holds", "selfUpdateAlerts", "showExpiry", "resignReminder", "keepBundleId",
       "showExpiryWarning", "expiryWarning", "installRoute"]);
 });
 

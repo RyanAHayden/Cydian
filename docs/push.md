@@ -3,10 +3,31 @@
 The sideload app's update alerts come from two places:
 
 - **the background check** (`native/Sources/BackgroundCheck.swift`): iOS runs it when it likes, often hours apart;
-- **push** (optional, Settings > Updates > Push Notifications): the signing server checks the same list every 30
+- **push** (Settings > Updates > Checking for Updates > Push): the signing server checks the same list every 30
   minutes and sends the alert through Apple's push service (APNs) at once.
 
 Both stay on together; push only makes the alert come sooner. The jailbreak build has neither: its daemon checks apt.
+
+## Settings > Updates
+
+The sideload app's Updates page, what you get first, how it's checked after:
+
+| Group | Rows |
+|---|---|
+| **Update Alerts** | Notifications and Icon Badge (iOS's; flipping opens iOS Settings), iFizBox Updates |
+| **Checking for Updates** | Push, Check in the Background, Background App Refresh (iOS's), Last Push, Last Background Check, Test Push, Turn On in Settings (when iOS has something off) |
+| **Ignored Upgrades** | the held apps |
+
+**iFizBox Updates** (on by default): off, iFizBox's own entry leaves the list the background check and the push
+server follow, so only your apps' updates alert you. iFizBox's own update still shows in Changes, and the
+Signature Expiring push still comes. The jailbreak build's Updates page is unchanged.
+
+**Push is on by default.** At launch, when the signing server says it can push (`GET /api/push` answers
+`enabled: true`), nothing below blocks it, iOS notifications are already allowed for iFizBox and the user never
+turned Push off, the app turns Push on by itself. While the server has no APNs key it stays off, and turns on by
+itself at the first launch after the key is added, with no app update. Turning Push off by hand is remembered
+(`ifizbox.push.userOff`): it never turns itself on again; turning it on by hand clears that. An automatic try that
+fails (no token, the server refused) leaves Push off and tries again next launch.
 
 ## What travels
 
@@ -16,7 +37,8 @@ Turning Push on asks iOS for notification permission (once) and a device token, 
 - the token, the APNs environment (`production` or `development`, from the app's embedded profile's
   `aps-environment`), the bundle ID (the APNs topic), the signing team, the app version and iOS version;
 - what the background check follows: each app's ID, name, installed version and AltStore source URL, iFizBox
-  itself through its own source, and the updates already counted on screen (so they don't push);
+  itself through its own source (unless iFizBox Updates is off), and the updates already counted on screen (so they
+  don't push);
 - when iFizBox's own signature ends (from its embedded profile), for one "Signature Expiring" push two days before.
 
 It is sent again whenever that list changes (`web/app/app-updates.js`), only while Push is on. Turning Push off
@@ -36,7 +58,7 @@ Each version is pushed once. A tap opens Changes.
 
 ## When push can't work
 
-Settings shows only the Push switch and says why:
+Checking for Updates shows the Push switch without Last Push or Test Push, and its footer says why:
 
 - **The copy was renamed by its signer.** APNs delivers by topic = the app's **Info.plist bundle ID**, whichever team
   signed the copy. The key on ifizbox.com reaches `com.ryha.ifizbox` (an explicit App ID with Push Notifications on

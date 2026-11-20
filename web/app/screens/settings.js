@@ -37,7 +37,8 @@ import { accountSection, drawAccount, startAccountSync } from "./account.js";
 import { signingExtras } from "./signed-apps.js";
 import { syncReminder } from "../core/signing.js";
 import { websiteSection } from "./website-settings.js";
-import { pushSection } from "./push-settings.js";
+import { pushActions } from "./push-settings.js";
+import { pushRows } from "../core/push.js";
 import { versionLines } from "./version-foot.js";
 import { ipaSection } from "./ipa-install.js";
 import { otherLinksOn, setOtherLinks } from "../core/otherlinks.js";
@@ -175,8 +176,8 @@ function groupPage(id) {
   if (id === "general") frag.append(blockedSection()); // F226: Blocked packages and authors, every mode
   if (id === "general") frag.append(sideloadingSection()); // F83, sideload build
   if (id === "general") frag.append(websiteSection()); // F145: Lock Home, Install on the Website; website only
-  if (id === "updates") frag.append(notifySection()); // Update Alerts, sideload build
-  if (id === "updates") frag.append(pushSection()); // F280: Push Notifications, sideload build (push-settings.js)
+  // F285: the sideload build's Update Alerts and Checking for Updates, above Ignored Upgrades
+  if (id === "updates" && detectMode() === "sideload") frag.prepend(notifySection());
   return frag;
 }
 
@@ -1448,7 +1449,31 @@ function showSigningPage(el, layout, parts) {
 
 // The sideload app: what iOS lets iFizBox do for update alerts (badges, notifications, Background App Refresh) and
 // when the background check last ran. A "no" given once can only be changed in iOS Settings: the row opens it.
-export function notifyRows(st, now = Date.now()) {
+// F285: two groups, iOS 6 Settings style, what you get first, how it's checked after:
+//   Update Alerts          Notifications (iOS), Icon Badge (iOS), <NAME> Updates (selfUpdateAlerts)
+//   Checking for Updates   Push, Check in the Background, Background App Refresh (iOS), Last Push,
+//                          Last Background Check, Test Push, Turn On in Settings; Push's footer, then the check's
+// `push`: core/push.js pushRows (null: no Push rows, as when its state can't be read). Switch rows carry `toggle`:
+// "ours" (Check in the Background), "ios" (opens iOS Settings), "push", "self".
+export function notifyRows(st, now = Date.now(), { push = null, selfAlerts = true } = {}) {
+  const g = checkRows(st, now);
+  if (!g) return null;
+  const row = (label) => g.rows.find((r) => r.label === label);
+  const pushRow = (label) => push?.rows.find((r) => r.label === label);
+  const self = SETTINGS.find((d) => d.key === "selfUpdateAlerts");
+  const alerts = { header: "Update Alerts", rows: [row("Notifications"), row("Icon Badge"),
+    { label: self.label, detail: selfAlerts ? "On" : "Off", on: selfAlerts, toggle: "self" }], footer: self.footer };
+  const checking = { header: "Checking for Updates", rows: [
+    ...(push ? [{ ...push.rows[0], toggle: "push" }] : []),
+    row("Check in the Background"), row("Background App Refresh"),
+    ...(pushRow("Last Push") ? [pushRow("Last Push")] : []),
+    row("Last Background Check"),
+    ...(pushRow("Test Push") ? [pushRow("Test Push")] : []),
+    ...(row("Turn On in Settings") ? [row("Turn On in Settings")] : [])],
+  footer: [push?.footer, g.footer].filter(Boolean).join(" ") };
+  return [alerts, checking];
+}
+function checkRows(st, now) {
   if (!st) return null;
   const onOff = (v) => (v ? "On" : "Off");
   const ago = (iso) => {
@@ -1473,28 +1498,33 @@ function notifySection() {
   const box = document.createElement("div");
   const n = globalThis.ifizboxNative;
   if (detectMode() !== "sideload" || !n?.call) return box;
-  Promise.resolve(n.call("app.notifyStatus", {})).then((st) => {
-    const g = notifyRows(st);
-    if (!g) return;
+  const push = pushActions({ native: n });
+  const redraw = () => box.replaceWith(notifySection());
+  Promise.all([Promise.resolve(n.call("app.notifyStatus", {})), push.info().then(pushRows, () => null)]).then(([st, pg]) => {
+    const groups = notifyRows(st, Date.now(), { push: pg, selfAlerts: settings.get("selfUpdateAlerts") });
+    if (!groups) return;
     const openIOS = () => {
       n.call("app.openSettings", {});
       // back from iOS Settings: show what was changed there
-      const back = () => { if (document.visibilityState !== "visible") return; document.removeEventListener("visibilitychange", back); box.replaceWith(notifySection()); };
+      const back = () => { if (document.visibilityState !== "visible") return; document.removeEventListener("visibilitychange", back); redraw(); };
       document.addEventListener("visibilitychange", back);
     };
-    const switches = g.rows.map((r) => r.toggle);
-    g.rows = g.rows.map((r) => (r.open ? { label: r.label, chevron: true, onClick: openIOS }
-      : r.toggle ? { label: r.label } : r));
-    const frag = grouped([g]);
+    const flip = {
+      ours: (on) => Promise.resolve(n.call("updates.background", { on })).then(redraw, () => {}),
+      ios: () => openIOS(),
+      push: (on) => push.toggle(on).then(redraw),
+      self: (on) => { settings.set("selfUpdateAlerts", on); import("../app-updates.js").then((m) => m.selfAlertsChanged()).catch(() => {}); },
+    };
+    const frag = grouped(groups.map((g) => ({ ...g, rows: g.rows.map((r) => (r.open ? { label: r.label, chevron: true, onClick: openIOS }
+      : r.test ? { label: r.label, onClick: () => push.test().then(redraw) }
+        : r.toggle ? { label: r.label } : r)) })));
     // Our iOS 6 switch in each switch row, in place of an On/Off text.
-    frag.querySelectorAll(".cell").forEach((li, i) => {
-      const kind = switches[i];
-      if (!kind) return;
-      const r = notifyRows(st).rows[i];
-      const sw = createSwitch({ label: r.label, checked: r.on, onToggle: (on) => {
-        if (kind === "ours") Promise.resolve(n.call("updates.background", { on })).then(() => box.replaceWith(notifySection()), () => {});
-        else openIOS();
-      } });
+    const cells = [...frag.querySelectorAll(".cell")];
+    const rows = groups.flatMap((g) => g.rows);
+    cells.forEach((li, i) => {
+      const r = rows[i];
+      if (!r?.toggle) return;
+      const sw = createSwitch({ label: r.label, checked: r.on, onToggle: (on) => flip[r.toggle](on) });
       li.querySelector(".cell-inner").append(sw);
       li.querySelector(".cell-inner").classList.add("has-switch");
     });

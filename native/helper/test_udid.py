@@ -5,10 +5,14 @@ import os
 import plistlib
 import shutil
 import subprocess
-import tempfile
+import sys
 import unittest
+from unittest import mock
 
 from test_helper import CC, HERE, build
+
+sys.path.insert(0, os.path.dirname(HERE))
+import disktmp  # noqa: E402
 
 
 class Entitlement(unittest.TestCase):
@@ -28,17 +32,18 @@ class Entitlement(unittest.TestCase):
 class Udid(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.tmp = tempfile.mkdtemp()
+        # Off the shared /tmp tmpfs: the other slots' gates fill its per-user quota, and then cc can't write its
+        # temporary .s/.o files there and the build fails (see native/disktmp.py). The directory is on the disk and
+        # cc's TMPDIR points inside it for the two builds only.
+        cls.tmp = disktmp.build_dir("ifizbox-udidtest-")
+        cls.addClassCleanup(shutil.rmtree, cls.tmp, True)  # also when a build fails (tearDownClass wouldn't run)
         p = cls.tmp
         os.makedirs(os.path.join(p, "Applications/iFizBox.app"))
         cls.ifizbox = os.path.join(p, "Applications/iFizBox.app/iFizBox")
-        build(cls.ifizbox, ["test_driver.c", "policy.c", "spawn.c"])
         cls.helper = os.path.join(p, "ifizbox-helper")
-        build(cls.helper, ["main.c", "policy.c"], [f'-DIFIZBOX_PREFIX="{p}"', f"-DIFIZBOX_ROOT_UID={os.getuid()}"])
-
-    @classmethod
-    def tearDownClass(cls):
-        shutil.rmtree(cls.tmp)
+        with mock.patch.dict(os.environ, disktmp.swift_env({}, p)):
+            build(cls.ifizbox, ["test_driver.c", "policy.c", "spawn.c"])
+            build(cls.helper, ["main.c", "policy.c"], [f'-DIFIZBOX_PREFIX="{p}"', f"-DIFIZBOX_ROOT_UID={os.getuid()}"])
 
     def spawn(self, *words):
         r = subprocess.run([self.ifizbox, "spawn", self.helper, *words], capture_output=True, text=True, timeout=30)

@@ -58,15 +58,15 @@ test("addToApp: checks under a HUD, offers the apps it's made for, names the res
   const seen = { huds: 0, sheets: [], alerts: [] };
   const app = await addToApp(st({ version: "9" }), {
     hud: () => { seen.huds++; return () => {}; },
-    sheet: async (o) => { seen.sheets.push(o); return 0; },
+    pick: async (o) => { seen.sheets.push(o); return o.made[0]; }, // F302a: Made For / Can't Take Tweaks / Not Targeted
     alert: async (o) => { seen.alerts.push(o); return 0; },
     apps: async () => [{ bundleId: "com.me.fixture", name: "Fixture" }, { bundleId: "com.x.other", name: "Other" }],
     fetchDeb: async () => fx("tweak-xz.deb"), storage: storage(), store,
   });
   assert.equal(app.bundleId, "com.me.fixture");
   assert.equal(seen.huds, 1);
-  assert.deepEqual(seen.sheets[0].buttons, ["Fixture"]);
-  assert.match(seen.sheets[0].title, /Not targeted: Other/);
+  assert.deepEqual(seen.sheets[0].made.map((a) => a.name), ["Fixture"]);
+  assert.deepEqual(seen.sheets[0].not.map((a) => a.name), ["Other"]);
   assert.equal(seen.alerts.at(-1).title, "Tweak Added");
   assert.deepEqual((await savedTweaks("com.me.fixture", { store })).map((x) => x.name), ["com.me.fixture_9.deb"]);
   // nobody's app: says which apps it works in, adds nothing

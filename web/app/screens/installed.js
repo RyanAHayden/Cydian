@@ -95,6 +95,8 @@ import { scanRequest, malwareFindings, removalIds, orphanFiles, malwareAlert, de
 import { installQueue } from "../queue.js";
 import { rowIcon } from "../icons/rowicons.js";
 import { siteEntries, libraryCounts, ipaCountText } from "../core/myipas.js";
+import { tweakPill, tweakUpdateApps, runTweakUpdates } from "./tweaks.js"; // F302a
+import { tweakCountText } from "../core/tweaks.js"; // F302a
 
 // B46: Delete means what it says (user 2026-11-18: "I swiped and deleted an app in Installed and it just got rid of the
 // icon, I had to remove it again"). In the jailbreak app, an app the helper sees in installd's containers (`actual`, I4)
@@ -651,6 +653,7 @@ async function loadApps() {
   if (!recordsApps()) rows = rows.filter((r) => !r?.self); // iFizBox's own row is dpkg's there
   appView.signed = signed; // F91
   if (signed && recordsApps()) restoreSourceRecords(signed, rows).catch(() => {}); // B156
+  if (signed && recordsApps()) loadTweakUpdates(signed, seq); // F302a
   drawApps(appListRows(rows, () => null), new Map(), site, hasStatus);
   const ids = await installedIds;
   if (seq !== appView.seq) return;
@@ -717,6 +720,7 @@ function drawAppList() {
   }
   // F269: the Install IPAs row heads the list (it replaced the footer's link; the empty state keeps its own).
   if (recordsApps()) appView.tail.unshift(installIpasTable(route));
+  if (recordsApps() && appView.tweakUps?.length) appView.tail.unshift(tweakUpdatesTable()); // F302a
   if (recordsApps() && appView.managing) appView.tail.unshift(manageSummaryLine());
   (appView.results?.parentNode === body ? appView.results : body).append(...appView.tail);
   syncManage();
@@ -745,10 +749,42 @@ export function appListElement(appSecs, extra, { route, cands = new Map(), signe
   const index = signedIndex(signed);
   [...rows, ...extra].forEach((r, i) => decorateApp(cells[i], withSigned(r, index)));
   [...rows, ...extra].forEach((r, i) => { if (r.sig && !r.upgrade) sigPill(cells[i], r.sig); });
+  [...rows, ...extra].forEach((r, i) => addTweakPill(cells[i], index.get(r.id))); // F302a
   if (manage) [...rows, ...extra].forEach((r, i) => { if (manageKinds(r)) selectCircle(cells[i], selected.has(r.id)); });
   attachRowGestures(ul);
   attachRowHold(ul, hold);
   return ul;
+}
+
+// F302a: a signed app's tweaks ("2 Tweaks", signing.installed's names) after its subtitle; "Tweak Update" when one of
+// them is newer on a Tweak Source (appView.tweakUps).
+export function addTweakPill(li, rec, ups = appView.tweakUps) {
+  const n = Array.isArray(rec?.tweaks) ? rec.tweaks.length : 0;
+  if (!li || !n) return null;
+  const sub = li.querySelector?.(".cell-subtitle");
+  if (!sub) return null;
+  const up = (ups ?? []).some((f) => f.app?.bundleId === rec.bundleId);
+  const pill = tweakPill(up ? "Tweak Update" : tweakCountText(n), { up });
+  sub.append(pill);
+  return pill;
+}
+
+// F302a: the Tweak Updates row above the list (the sideload app), when a signed app's tweak has a newer version.
+function tweakUpdatesTable() {
+  const found = appView.tweakUps ?? [];
+  const ul = plain([{ rows: [{ label: "Tweak Updates", subtitle: found.map((f) => f.app.name).join(", "), badge: String(found.length),
+    onClick: guarded(async () => { if (await runTweakUpdates(found)) { appView.tweakUps = []; redrawApps(); } }) }] }]);
+  ul.classList.add("tweak-updates-top");
+  return ul;
+}
+
+// F302a: which signed apps' tweaks a Tweak Source has newer; the list is drawn again with the row and pills.
+async function loadTweakUpdates(signed, seq) {
+  const found = await tweakUpdateApps(signed?.apps ?? []).catch(() => []);
+  if (seq !== appView.seq) return;
+  const had = appView.tweakUps?.length ?? 0;
+  appView.tweakUps = found;
+  if (found.length || had) redrawApps();
 }
 
 // F221: a marked app's subtitle: "Version x · Marked as installed".

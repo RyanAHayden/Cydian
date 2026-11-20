@@ -63,7 +63,12 @@ enum SignAhead {
                     return Apt.reply(c, nil, "not_signed: \(Brand.name) has no record of signing \(bid)")
                 }
                 source = r.url
-                options = SignOptions(r.options)
+                var o = SignOptions(r.options)
+                // F302a: a tweak update re-signs from the record with the tweaks the page sends (the newer .deb)
+                if let t = c.params["tweaks"] {
+                    do { o.tweaks = try SignOptions(json: ["tweaks": t]).tweaks } catch { return fail(error) }
+                }
+                options = o
             } else {
                 var o: SignOptions
                 do { o = try SignOptions(json: c.params) } catch { return fail(error) }

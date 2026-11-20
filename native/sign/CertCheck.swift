@@ -146,6 +146,7 @@ struct SignedRecord: Codable, Equatable {
         var j: [String: Any] = ["bundleId": bundleID, "originalBundleId": originalBundleID, "name": name, "version": version,
                                 "url": url, "signed": ISO8601DateFormatter().string(from: signed)]
         if let x = expires { j["expires"] = ISO8601DateFormatter().string(from: x) }
+        if let t = options.tweaks, !t.names.isEmpty { j["tweaks"] = t.names } // F302a: Installed's "N Tweaks"
         return j
     }
 }

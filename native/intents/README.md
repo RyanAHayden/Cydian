@@ -1,16 +1,16 @@
-# native/intents/: App Intents (N8)
+# native/intents/: App Intents
 
 iFizBox's actions for Shortcuts, Siri, Spotlight and the Action button, with nothing built by hand. How to use them:
 `docs/shortcuts.md`. The widget and the Control Center controls are in `../widget/`.
 
 | intent | modes | does | returns |
 |---|---|---|---|
-| Check for Updates | both | jailbreak: `ifizbox-helper update`, then installed (dpkg status) vs the newest in apt's lists, holds left out; sideload: the apps Install remembered (I3's list) against their sources | one line per update (`Name 1.0 → 1.1`), dialog "3 Updates: …" |
+| Check for Updates | both | jailbreak: `ifizbox-helper update`, then installed (dpkg status) vs the newest in apt's lists, holds left out; sideload: the apps Install remembered against their sources | one line per update (`Name 1.0 → 1.1`), dialog "3 Updates: …" |
 | Add Source (URL) | both | opens iFizBox (`openAppWhenRun`) and hands the page `ifizbox://add?url=…`: the Add Source alert, filled in | – |
 | Restore My Packages (file) | both | opens iFizBox; jailbreak: adds the file's sources (`addsource`), `update`, installs what isn't installed and some source has (`apply`, newest versions), holds; sideload: its sources as a `ifizbox://import` link (Import's review alert) | dialog with what happened |
 | Install All Updates | jailbreak | the check, then `apply` of every upgrade (pulls new dependencies in, unlike `upgrade`) | the installed `Name version` lines; dialog says "Respring to finish" on `finish:` |
 | Respring | jailbreak | `ifizbox-helper respring` | – |
-| Userspace Reboot | jailbreak | `ifizbox-helper userspace-reboot` (`launchctl reboot userspace`, N8's helper verb) | – |
+| Userspace Reboot | jailbreak | `ifizbox-helper userspace-reboot` (`launchctl reboot userspace`) | – |
 | Export My Packages | jailbreak | sources (sources.list, `*.list`, `*.sources`), packages not Auto-Installed (apt's extended_states), holds | a JSON file, `ifizbox-backup` version 1 |
 
 - `Core.swift`: what each does, Foundation only, tested on Linux (`test_intents.py` builds `tests/main.swift` with it
@@ -34,8 +34,8 @@ jailbreak-only intents and their App Shortcuts never show there; `mkipa.py check
 
 The format follows Xcode's own output: sweetpad's capture from Xcode 27B52 (`fixtures/`, MIT; `test_intents.py`
 checks byte-for-byte equality after sorting) and the llios sample from Xcode 17F113
-(https://github.com/qyang-nj/llios, `building/app_intents/`, no licence, so not copied here; it matched too when
-checked by hand on 2026-11-17). Two choices worth knowing:
+(https://github.com/qyang-nj/llios, `building/app_intents/`, no licence, so not copied here; it matches too,
+checked by hand). Two choices worth knowing:
 
 - `outputFlags`: ProvidesDialog is 4 (llios' dialog-only intent), ShowsSnippetView 2 (sweetpad's dialog + snippet
   is 6). sweetpad's own writer has them the other way round, without a capture of dialog alone.
@@ -45,5 +45,3 @@ checked by hand on 2026-11-17). Two choices worth knowing:
 
 `metadata.py` refuses anything it doesn't write (entities, enums, queries, parameter defaults, explicit
 `supportedModes`, more than 10 App Shortcuts) rather than writing something iOS would skip silently.
-
-None of this has run on an iPhone yet: see the journal (`journal/2026-11-17-n8-app-intents/`).

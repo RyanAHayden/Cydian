@@ -1,4 +1,4 @@
-# native/widget/: the widget extension (N8)
+# native/widget/: the widget extension
 
 `iFizBox.app/PlugIns/iFizBoxWidget.appex`, bundle id `com.ryha.ifizbox.widget`, arm64, iOS 17+ (the app stays iOS 15+;
 on 15 and 16 iOS just doesn't load the extension). `build.sh <jailbreak|sideload> <app>` builds it; `native/build.sh`
@@ -7,7 +7,7 @@ calls it for each bundle.
 - `Widget.swift`: Updates, a small Home Screen widget and circular/inline Lock Screen ones showing the update count.
   The count is the App Group's snapshot (`group.com.ryha.ifizbox`, `WidgetShare` in `../intents/Core.swift`), written
   by the app (`../intents/App/WidgetStore.swift`: Check for Updates, Install All Updates, and every count the page
-  shows in Changes through `app.badge`); the jailbreak build also reads N5's daemon state
+  shows in Changes through `app.badge`); the jailbreak build also reads the upgrade daemon's state
   (`/var/jb/var/lib/ifizbox/upgrades.state`) and shows the newer. The timeline reloads hourly and when the app's count
   changes.
 - `Controls.swift` (jailbreak build only, `-D IFIZBOX_JAILBREAK`): Respring and Userspace Reboot as Control Center

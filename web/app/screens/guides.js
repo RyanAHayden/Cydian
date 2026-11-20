@@ -329,15 +329,20 @@ const opens = (id, lite) => guideIds(lite).includes(id) || Boolean(GUIDES[id]?.l
 
 // ---- F237: Notifications for Signed Apps (core/keepid.js, Keep Bundle IDs) ----------------------------------
 // R25's steps made simple (journal/2026-11-18-r25-keep-bundle-id): with Keep Bundle IDs on, an app signed with an Ad
-// Hoc profile whose explicit App ID has Push keeps its own ID and gets its own notifications.
-export const KEEP_INTRO = "A signed app keeps its own bundle ID, so it replaces the original. For its notifications, "
-  + "your profile needs Push: Apple gives it only to an explicit App ID (not a wildcard like com.you.*), in an Ad Hoc "
-  + "profile. You need a paid Apple Developer account and its Apple Distribution certificate.";
+// Hoc profile whose explicit App ID has Push keeps its own ID and gets its own notifications. The push goes to the
+// Info.plist bundle ID, so the signing team doesn't matter, and one such App ID covers every app.
+export const KEEP_INTRO = "A signed app keeps its own bundle ID, so it replaces the original and gets its own "
+  + "server's notifications: they go to the ID in the app, whoever signed it. Your profile only needs Push, which "
+  + "Apple gives to an explicit App ID (not a wildcard like com.you.*) in an Ad Hoc profile; a development profile "
+  + "gets test pushes only. One such App ID covers every app. You need a paid Apple Developer account and its Apple "
+  + "Distribution certificate, or a signing service's .p12 and Push profile (then skip to Import It). With Keep Bundle "
+  + "IDs off, an app becomes a renamed copy and gets no notifications.";
 export const DEVELOPER_URL = "https://developer.apple.com/account/resources/identifiers/list";
 STEPS[KEEP_GUIDE] = [
   { title: "Make an App ID with Push", text: "On developer.apple.com, Certificates, IDs & Profiles > Identifiers > +: "
-    + "App IDs, App. Choose Explicit and type an ID of your own, such as com.yourname.youtube. Tick Push Notifications, "
-    + "then Register. One App ID per app: two apps on one share their sign-ins.",
+    + "App IDs, App. Choose Explicit and type an ID of your own, such as com.yourname.apps. Tick Push Notifications, "
+    + "then Register. This one App ID is enough for every app's notifications. An App ID per app only keeps apps' "
+    + "keychains and App Groups apart, so their sign-ins don't mix.",
     rows: [{ label: "Identifiers", subtitle: "developer.apple.com", chevron: true,
       onClick: () => globalThis.open?.(DEVELOPER_URL, "_blank", "noopener") }] },
   { title: "Register Your iPhones", text: "Devices > +: a name and the iPhone's UDID. A Mac's Finder shows it: click "

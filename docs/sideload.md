@@ -216,8 +216,10 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
 - **Certificate**: Settings > Signing imports the `.p12`, its password and the `.mobileprovision` (Files picker
   and document types). The identity and the password go in the Keychain. There is no export route.
 - **Signing** on the phone with iFizBox's own Swift signer (`native/sign/`, no OpenSSL, no zsign): the key stays
-  in Security.framework. A wildcard profile keeps the app's bundle ID; an explicit one renames the app and leaves
-  out its extensions and Watch apps. Feather's arm64e fix-up (via LiveContainer) runs on every Mach-O.
+  in Security.framework. With Keep Bundle IDs on (the default) the app keeps its bundle ID with any profile, and
+  only the entitlements carry the profile's App ID; with a profile that has Push it gets its own server's
+  notifications, whoever signed it (docs/signing.md, "Keep Bundle IDs"). Off, an explicit profile renames the app
+  into a copy without notifications. Feather's arm64e fix-up (via LiveContainer) runs on every Mach-O.
 - **Installing**: Feather's Semi Local split, with iFizBox's own Signing Server (`worker/`, sign.ifizbox.com by
   default, or the user's own) in api.palera.in's place: the manifest comes from the server over HTTPS, the signed
   IPA from a plain HTTP server on 127.0.0.1. The server sees the app's bundle ID, name and version. A hand-trusted

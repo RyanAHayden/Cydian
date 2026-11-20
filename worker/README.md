@@ -24,9 +24,9 @@ npx wrangler login
 npx wrangler deploy        # makes the KV storage on the first deploy and prints your https://….workers.dev address
 ```
 
-<img src="../docs/img/crop-signing-server.png" alt="Settings > Signing > Signing Server" width="300" align="right">
+<img src="../docs/img/crop-signing-server.png" alt="Settings > Installation & Signing > Signing Server" width="300" align="right">
 
-Then in iFizBox: **Settings > Signing > Signing Server**, paste that address, and **Check Server**.
+Then in iFizBox: **Settings > Installation & Signing > Signing Server**, paste that address, and **Check Server**.
 
 <br clear="right">
 
@@ -54,7 +54,7 @@ iOS takes the install manifest **only over HTTPS with a trusted certificate**, s
 - **Tailscale** (phone on your tailnet): `tailscale serve --bg 8787` gives `https://<machine>.<tailnet>.ts.net`;
 - **Cloudflare Tunnel** (`cloudflared tunnel --url http://localhost:8787`) or **Caddy** with your own domain.
 
-Then put that `https://` address in **Settings > Signing > Signing Server**.
+Then put that `https://` address in **Settings > Installation & Signing > Signing Server**.
 
 ### Settings (`wrangler.toml`)
 
@@ -70,8 +70,14 @@ Then put that `https://` address in **Settings > Signing > Signing Server**.
 - `APPLE_RELAY` (off unless `"1"`): the `/apple/<host>/<path>` relay for a free Apple ID sign-in in the browser
   (`src/apple-relay.js`, used by `web/app/core/gsa.js`). It forwards only to gsa.apple.com's sign-in paths,
   developerservices2.apple.com's Xcode API and a few public anisette servers, from this site's own pages, with size
-  and time caps, and it never logs or keeps what passes through. No product page uses it yet, so ifizbox.com leaves
-  it off. Self-hosted with `node.mjs`, gsa.apple.com needs Apple Root CA (`NODE_EXTRA_CA_CERTS`).
+  and time caps, and it never logs or keeps what passes through. Off, `/apple/status` and those paths are a 404, and
+  the website hides Use a Free Apple ID; ifizbox.com leaves it off. Self-hosted with `node.mjs`, gsa.apple.com needs
+  Apple Root CA (`NODE_EXTRA_CA_CERTS`).
+  `/apple/api.appstoreconnect.apple.com/v1/{devices,certificates,bundleIds,bundleIdCapabilities,profiles}` is not
+  part of it and passes through **even with `APPLE_RELAY` off**: the website's own provisioning profiles with your
+  App Store Connect API key (`web/app/core/asc.js`; Apple sends no CORS headers). Only for that host the
+  Authorization header (your JWT) goes out and DELETE is allowed (an old profile, before its new one). The caps and
+  the same-origin rule apply as above, and nothing is logged or kept.
 
 ## Routes
 
@@ -82,6 +88,8 @@ Then put that `https://` address in **Settings > Signing > Signing Server**.
 | `POST /sign/host?bundleid=&version=&title=` (body: the IPA) | `{itms, manifest, expiresIn}` |
 | `GET /sign/host/<token>/manifest.plist`, `/app.ipa` | what that link fetches (each looks again for a few seconds before a 404, as KV is eventually consistent) |
 | `GET /sign/host/<token>/status` | `{manifest, started, finished}`: what iOS has fetched; the app closes for iOS to install over it only once `finished` |
+| `GET /apple/status` | `{"on":true}` with `APPLE_RELAY` on, else a 404 |
+| `/apple/<host>/<path>` | the Apple relay above: the free Apple ID hosts with `APPLE_RELAY` on, App Store Connect always |
 | `GET /repo/<file>` | iFizBox's own APT repo (`Release`, `Packages`, `Packages.gz`, `*.deb`): the latest GitHub release's asset, fetched here so clients get no redirect (Zebra can't take GitHub's). `IFIZBOX_REPO` (owner/name) for another repo's releases |
 
 `node test.mjs` checks them against an in-memory KV. ifizbox.com's own deploy: `npx wrangler deploy -c wrangler.ifizbox.toml` (Workers Builds runs it on every push to main).

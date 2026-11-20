@@ -89,7 +89,10 @@ It should say `production`.
 
 ## 6. Use it in iFizBox
 
-Import the `.p12`, the `.mobileprovision` and the password in **Settings > Signing**, and leave **Keep Bundle IDs** on.
+Import the `.p12`, the `.mobileprovision` and the password in **Settings > Signing** (the website) or **Settings >
+Installation & Signing** (the sideload app), and leave **Keep Bundle IDs** on. With an App Store Connect API key
+added under **Apple Developer Account** on the same page, iFizBox makes each app's App ID and profile itself and adds
+this iPhone to the account ([signing.md](signing.md#own-provisioning-profiles-app-store-connect-api-key)).
 Delete the App Store copy of the app first (iOS won't sign over it), install, and allow notifications.
 
 <p align="center"><img src="img/crop-web-certificate.png" alt="Settings > Signing: Import Certificate" width="320"></p>
@@ -104,4 +107,4 @@ Delete the App Store copy of the app first (iOS won't sign over it), install, an
   profile), Keep Bundle IDs was off when the app was signed, or the app was never allowed to send notifications.
 - **Every app stops opening at once**: the certificate expired or was revoked. Make a new one (step 2) and a new
   profile (step 5), then re-sign. In the sideload app, Home shows a tile when the certificate or profile is about to
-  expire (Settings > Signing > Show Expiry Warning sets how early).
+  expire (Settings > Installation & Signing > Show Expiry Warning sets how early).

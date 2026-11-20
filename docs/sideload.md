@@ -79,8 +79,8 @@ What this means for a profile:
 - **Explicit App ID**: the main app must be re-IDed to exactly that ID, and extensions get IDs the profile
   doesn't cover. iOS refuses the install, so either delete `PlugIns/` (zsign's `m_bRemoveExtensions`) or sign
   each extension with its own profile.
-- **Free Apple ID profiles** are explicit, 7-day, 3 apps, and need Apple's servers to make. iFizBox doesn't make
-  them: it doesn't log in to Apple.
+- **Free Apple ID profiles** are explicit, 7-day, 3 apps, and need Apple's servers to make. Feather doesn't make
+  them: it doesn't log in to Apple. (iFizBox's website can: docs/signing.md, "Free Apple ID".)
 
 ### 3. Install modes
 
@@ -213,8 +213,11 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
 
 **Sideload build** (details in docs/signing.md):
 
-- **Certificate**: Settings > Signing imports the `.p12`, its password and the `.mobileprovision` (Files picker
-  and document types). The identity and the password go in the Keychain. There is no export route.
+- **Certificate**: Settings > Installation & Signing imports the `.p12`, its password and the `.mobileprovision`
+  (Files picker and document types). The identity and the password go in the Keychain. There is no export route.
+- **Own profiles**: with an App Store Connect API key (Apple Developer Account on the same page,
+  `native/Sources/ASC.swift`), each app signed with Keep Bundle IDs gets its own explicit App ID and Ad Hoc profile,
+  made at sign time, and this iPhone is registered in the account (docs/signing.md, "Own provisioning profiles").
 - **Signing** on the phone with iFizBox's own Swift signer (`native/sign/`, no OpenSSL, no zsign): the key stays
   in Security.framework. With Keep Bundle IDs on (the default) the app keeps its bundle ID with any profile, and
   only the entitlements carry the profile's App ID; with a profile that has Push it gets its own server's
@@ -224,7 +227,7 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
   default, or the user's own) in api.palera.in's place: the manifest comes from the server over HTTPS, the signed
   IPA from a plain HTTP server on 127.0.0.1. The server sees the app's bundle ID, name and version. A hand-trusted
   root CA on the phone doesn't work for this: iOS's installer ignores it. There's no backloop.dev mode.
-- **This iPhone** (Settings > Installation > Install Apps With; `native/sideload/idevice/`, its README): idevice
+- **This iPhone** (Settings > Installation & Signing > Install Apps With; `native/sideload/idevice/`, its README): idevice
   built from source on Linux and linked statically. The signed IPA goes to this phone's installd over LocalDevVPN
   (AFC upload to PublicStaging, then installation_proxy), so nothing reaches the Signing Server, no install sheet has
   to stay up, it works offline, and iFizBox updates itself (installd closes and replaces it). Choosing This iPhone
@@ -245,7 +248,7 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
 - **This iPhone over Tailscale** (`native/sideload/tailscale/`, its README): for Tailscale users, who can't run
   LocalDevVPN at the same time. The sideload app embeds tsnet (tailscale.com, BSD-3-Clause, a Go c-archive built on
   Linux with a pinned Go; not in the jailbreak executable) and joins the tailnet as its own device ("iFizBox on
-  <device>"). Settings > Installation > This iPhone has Connect With: Automatic (Tailscale when the Tailscale VPN is
+  <device>"). Settings > Installation & Signing, with This iPhone chosen, has Connect With: Automatic (Tailscale when the Tailscale VPN is
   on and iFizBox is signed in, else LocalDevVPN), LocalDevVPN or Tailscale, and a Tailscale group: Sign In (the
   login page opens in the app; approval is waited for), the device's name, Test Connection (RemotePairing's
   handshake to this phone's own Tailscale address through the tailnet; on failure it names the fix: an access rule

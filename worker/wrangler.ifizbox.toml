@@ -46,9 +46,10 @@ simple = { limit = 12, period = 60 }
 binding = "REVIEWS"
 database_name = "ifizbox-reviews"
 
-# F280: push notifications (src/push.js, docs/push.md) in their own D1 database (made on the first deploy). Off until
-# a person adds the APNs Auth Key of team S8NFX3A2LT (developer.apple.com > Keys > + > Apple Push Notifications
-# service): `npx wrangler secret put APNS_KEY -c wrangler.ifizbox.toml` (the .p8's text) and APNS_KEY_ID.
+# Push notifications (src/push.js, docs/push.md) in their own D1 database (made on the first deploy). The APNs Auth
+# Key of team S8NFX3A2LT (developer.apple.com > Keys > + > Apple Push Notifications service) is set as secrets:
+# `npx wrangler secret put APNS_KEY -c wrangler.ifizbox.toml` (the .p8's text) and APNS_KEY_ID. Keep the `-c`:
+# without it wrangler uses wrangler.toml and makes a separate Worker.
 [[d1_databases]]
 binding = "PUSH"
 database_name = "ifizbox-push"

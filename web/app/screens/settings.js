@@ -1566,8 +1566,8 @@ function showSigningPage(el, layout, parts) {
 // F285: two groups, iOS 6 Settings style, what you get first, how it's checked after:
 //   Update Alerts          Notifications (iOS), Icon Badge (iOS), <NAME> Updates (selfUpdateAlerts)
 //   Checking for Updates   Push, Check in the Background, Background App Refresh (iOS), Last Push,
-//                          Last Background Check, Test Push, Turn On in Settings; Push's footer, then the check's
-// `push`: core/push.js pushRows (null: no Push rows, as when its state can't be read). Switch rows carry `toggle`:
+//                          Last Background Check, Turn On in Settings; Push's footer, then the check's
+// `push`: core/push.js pushRows (null: no Push rows, as when push can't work here or its state can't be read). Switch rows carry `toggle`:
 // "ours" (Check in the Background), "ios" (opens iOS Settings), "push", "self".
 export function notifyRows(st, now = Date.now(), { push = null, selfAlerts = true } = {}) {
   const g = checkRows(st, now);
@@ -1582,7 +1582,6 @@ export function notifyRows(st, now = Date.now(), { push = null, selfAlerts = tru
     row("Check in the Background"), row("Background App Refresh"),
     ...(pushRow("Last Push") ? [pushRow("Last Push")] : []),
     row("Last Background Check"),
-    ...(pushRow("Test Push") ? [pushRow("Test Push")] : []),
     ...(row("Turn On in Settings") ? [row("Turn On in Settings")] : [])],
   footer: [push?.footer, g.footer].filter(Boolean).join(" ") };
   return [alerts, checking];
@@ -1630,8 +1629,7 @@ function notifySection() {
       self: (on) => { settings.set("selfUpdateAlerts", on); import("../app-updates.js").then((m) => m.selfAlertsChanged()).catch(() => {}); },
     };
     const frag = grouped(groups.map((g) => ({ ...g, rows: g.rows.map((r) => (r.open ? { label: r.label, chevron: true, onClick: openIOS }
-      : r.test ? { label: r.label, onClick: () => push.test().then(redraw) }
-        : r.toggle ? { label: r.label } : r)) })));
+      : r.toggle ? { label: r.label } : r)) })));
     // Our iOS 6 switch in each switch row, in place of an On/Off text.
     const cells = [...frag.querySelectorAll(".cell")];
     const rows = groups.flatMap((g) => g.rows);

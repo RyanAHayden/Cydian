@@ -85,7 +85,7 @@ Then put that `https://` address in **Settings > Installation & Signing > Signin
   `npx wrangler secret put APNS_KEY` (paste the `AuthKey_<id>.p8` file's text), then `APNS_KEY_ID` and
   `APNS_TEAM_ID`, and `APNS_TOPICS` if your iFizBox runs under another bundle ID than `com.ryha.ifizbox`. The
   devices are kept in the `PUSH` D1 database (made on the first deploy) and checked every 30 minutes (the Cron
-  Trigger in `[triggers]`). Without the key push stays off on your server, the app's Settings says so, and update
+  Trigger in `[triggers]`). Without the key push stays off on your server, the app's Settings shows no Push switch, and update
   alerts come from the app's own background check. `node.mjs` has no push.
 
 ## Routes

@@ -1,7 +1,7 @@
 // F280: core/push.js, with a fake shell and a fake server.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { offReason, registration, expiresOf, enablePush, disablePush, syncPush, testPush, pushInfo, pushRows, pushState,
+import { offReason, registration, expiresOf, enablePush, disablePush, syncPush, pushInfo, pushRows, pushState,
   storedWatch, RENAMED_TEXT, NO_APS_TEXT, DENIED_TEXT, PUSH_KEY } from "./push.js";
 import { BUNDLE_ID, NAME } from "../brand.js";
 
@@ -73,8 +73,6 @@ test("enable registers with the server; sync sends only changes; disable forgets
   assert.deepEqual(await syncPush({ native, server, fetcher: srv.fetcher, storage, watch: more }), { sent: true });
   assert.equal(srv.posts.at(-1).body.apps.length, 2);
   assert.equal(storedWatch(storage).apps.length, 2, "remembered for the next Push on");
-  assert.equal((await testPush({ server, fetcher: srv.fetcher, storage })).ok, true);
-  assert.equal(srv.posts.at(-1).path, "/api/push/test");
   await disablePush({ native, server, fetcher: srv.fetcher, storage });
   assert.deepEqual(srv.posts.at(-1), { path: "/api/push/unregister", body: { token: TOKEN } });
   assert.equal(native.calls.at(-1), "push.unregister");
@@ -107,10 +105,9 @@ test("Settings' rows", async () => {
   assert.match(g.footer, /push token and the apps/);
   await enablePush({ native, server, fetcher: srv.fetcher, storage, watch: WATCH });
   g = pushRows(await pushInfo({ native, server, fetcher: srv.fetcher, storage }), Date.parse("2026-11-19T12:00:00Z"));
-  assert.deepEqual(g.rows.map((r) => [r.label, r.detail ?? null]), [["Push", null], ["Last Push", "10 min ago"], ["Test Push", null]]);
+  assert.deepEqual(g.rows.map((r) => [r.label, r.detail ?? null]), [["Push", null], ["Last Push", "10 min ago"]]);
   g = pushRows(await pushInfo({ native: fakeNative({ st: { ...ST, environment: null } }), server, fetcher: srv.fetcher, storage }));
-  assert.equal(g.rows.length, 1);
-  assert.ok(g.footer.startsWith(NO_APS_TEXT) && /background check/.test(g.footer), "says why, and what still alerts");
+  assert.equal(g, null, "push can't work: no switch, no explanation");
   storage.setItem(PUSH_KEY, "{bad");
   assert.equal(pushState(storage).on, false);
 });
@@ -158,8 +155,17 @@ test("Push turns itself on once the server can push, and never after an explicit
   assert.equal(pushState(storage).on, false);
   setUserTurnedOff(false, storage);
   assert.equal(userTurnedOff(storage), false, "turned on again by hand clears it");
-  // something blocks it (no aps-environment, notifications not allowed yet, a renamed copy): stays off quietly
-  for (const st of [{ ...ST, environment: null }, { ...ST, authorization: "notDetermined" }, { ...ST, authorization: "denied" },
+  // never asked: push.register shows iOS's prompt; Allow turns it on, Don't Allow leaves it off quietly
+  storage = store(); srv = fakeServer();
+  native = fakeNative({ st: { ...ST, authorization: "notDetermined" } });
+  assert.deepEqual(await autoEnablePush({ native, server, fetcher: srv.fetcher, storage, watch: WATCH }), { enabled: true });
+  assert.deepEqual(native.calls, ["push.status", "push.status", "push.register"]);
+  storage = store(); srv = fakeServer();
+  const r0 = await autoEnablePush({ native: fakeNative({ st: { ...ST, authorization: "notDetermined" }, fail: "denied" }), server, fetcher: srv.fetcher, storage, watch: WATCH });
+  assert.equal(r0.enabled, false);
+  assert.deepEqual(pushState(storage), { on: false, token: null, sent: null, lastError: null });
+  // something blocks it (no aps-environment, notifications denied, a renamed copy): stays off quietly
+  for (const st of [{ ...ST, environment: null }, { ...ST, authorization: "denied" },
     { ...ST, bundleId: "com.you.ifizbox" }]) {
     storage = store(); srv = fakeServer();
     assert.deepEqual(await autoEnablePush({ native: fakeNative({ st }), server, fetcher: srv.fetcher, storage, watch: WATCH }), { enabled: false });

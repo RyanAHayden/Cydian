@@ -41,8 +41,9 @@ class Quiet(unittest.TestCase):
             src, exe = os.path.join(tmp, "q.c"), os.path.join(tmp, "q")
             with open(src, "w") as f:
                 f.write(DRIVER)
-            subprocess.run([CC, "-std=c11", "-Wall", "-Wextra", "-Werror", "-I", HERE, "-o", exe, src], check=True,
-                           capture_output=True)
+            # -pipe and TMPDIR: cc's scratch files stay out of the shared /tmp, which other gates can fill (EDQUOT).
+            subprocess.run([CC, "-pipe", "-std=c11", "-Wall", "-Wextra", "-Werror", "-I", HERE, "-o", exe, src],
+                           check=True, capture_output=True, env=dict(os.environ, TMPDIR=tmp))
             out = subprocess.run([exe], capture_output=True, text=True, timeout=30, check=True).stdout.splitlines()
         h = read(os.path.join(HERE, "auto.h"))
         kinds = re.search(r"enum \{ (AUTO_NOTE_UPGRADES[^}]*)\}", h).group(1).replace(" ", "").split(",")

@@ -20,8 +20,15 @@ def build(out, sources, defs=()):
     # F57: main.c calls paid.c's install-paid.
     if "main.c" in sources and "paid.c" not in sources:
         sources = [*sources, "paid.c"]
-    subprocess.run([CC, *FLAGS, *defs, "-o", out, *(os.path.join(HERE, s) for s in sources)], check=True,
-                   capture_output=True)
+    subprocess.run([CC, "-pipe", *FLAGS, *defs, "-o", out, *(os.path.join(HERE, s) for s in sources)], check=True,
+                   capture_output=True, env=cc_env(os.path.dirname(out)))
+
+
+def cc_env(tmp):
+    # The compiler keeps its own scratch files in $TMPDIR, else /tmp, which the other gates on this machine share and
+    # can fill up (EDQUOT once failed these builds). With -pipe the stages pass through pipes, and TMPDIR sends what
+    # the compiler or linker still writes to the test's own directory (every output here lies in one).
+    return dict(os.environ, TMPDIR=tmp)
 
 
 @unittest.skipUnless(CC, "no C compiler on this machine")
@@ -29,12 +36,9 @@ class Helper(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.tmp = tempfile.mkdtemp()
+        cls.addClassCleanup(shutil.rmtree, cls.tmp, True)  # also when the build below fails
         cls.driver = os.path.join(cls.tmp, "test_driver")
         build(cls.driver, ["test_driver.c", "policy.c", "spawn.c"])
-
-    @classmethod
-    def tearDownClass(cls):
-        shutil.rmtree(cls.tmp)
 
     def run_driver(self, *args, driver=None):
         r = subprocess.run([driver or self.driver, *args], capture_output=True, text=True, timeout=30)
@@ -735,9 +739,9 @@ class Helper(unittest.TestCase):
         out = os.path.join(self.tmp, "ios")
         os.makedirs(out, exist_ok=True)
         for src, args in (("main.c", ["-c"]), ("policy.c", ["-c"]), ("spawn.c", ["-c"]), ("ipa.c", ["-c"])):
-            r = subprocess.run(["clang", "-target", "arm64-apple-ios15.0", "-isysroot", sdk, *FLAGS[:4], *args,
-                                os.path.join(HERE, src), "-o", os.path.join(out, src + ".o")],
-                               capture_output=True, text=True)
+            r = subprocess.run(["clang", "-pipe", "-target", "arm64-apple-ios15.0", "-isysroot", sdk, *FLAGS[:4],
+                                *args, os.path.join(HERE, src), "-o", os.path.join(out, src + ".o")],
+                               capture_output=True, text=True, env=cc_env(out))
             self.assertEqual(r.returncode, 0, r.stderr)
 
 IPA_DIR = "/var/mobile/Library/Caches/com.ryha.ifizbox/ipa"
@@ -770,12 +774,9 @@ class InstallIpa(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.tmp = tempfile.mkdtemp()
+        cls.addClassCleanup(shutil.rmtree, cls.tmp, True)  # also when the build below fails
         cls.driver = os.path.join(cls.tmp, "test_driver")
         build(cls.driver, ["test_driver.c", "policy.c", "spawn.c"])
-
-    @classmethod
-    def tearDownClass(cls):
-        shutil.rmtree(cls.tmp)
 
     def run_driver(self, *args, driver=None):
         r = subprocess.run([driver or self.driver, *args], capture_output=True, text=True, timeout=60)
@@ -1166,13 +1167,10 @@ class Rollback(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.tmp = tempfile.mkdtemp()
+        cls.addClassCleanup(shutil.rmtree, cls.tmp, True)  # also when the build below fails
         cls.uid = str(os.getuid())
         cls.driver = os.path.join(cls.tmp, "test_driver")
         build(cls.driver, ["test_driver.c", "policy.c", "spawn.c"], [f"-DIFIZBOX_ROOT_UID={os.getuid()}"])
-
-    @classmethod
-    def tearDownClass(cls):
-        shutil.rmtree(cls.tmp)
 
     def run_driver(self, *args, driver=None):
         r = subprocess.run([driver or self.driver, *args], capture_output=True, text=True, timeout=30)
@@ -1398,12 +1396,9 @@ class InstallPaid(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.tmp = tempfile.mkdtemp()
+        cls.addClassCleanup(shutil.rmtree, cls.tmp, True)  # also when the build below fails
         cls.driver = os.path.join(cls.tmp, "test_driver")
         build(cls.driver, ["test_driver.c", "policy.c", "spawn.c"])
-
-    @classmethod
-    def tearDownClass(cls):
-        shutil.rmtree(cls.tmp)
 
     def run_driver(self, *args, driver=None):
         r = subprocess.run([driver or self.driver, *args], capture_output=True, text=True, timeout=30)
@@ -1544,12 +1539,9 @@ class LocalDeb(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.tmp = tempfile.mkdtemp()
+        cls.addClassCleanup(shutil.rmtree, cls.tmp, True)  # also when the build below fails
         cls.driver = os.path.join(cls.tmp, "test_driver")
         build(cls.driver, ["test_driver.c", "policy.c", "spawn.c"])
-
-    @classmethod
-    def tearDownClass(cls):
-        shutil.rmtree(cls.tmp)
 
     def run_driver(self, *args, driver=None):
         r = subprocess.run([driver or self.driver, *args], capture_output=True, text=True, timeout=30)

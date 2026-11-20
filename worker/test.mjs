@@ -1107,6 +1107,21 @@ import { appleRelay, relayTarget, MAX_REQUEST, MAX_REPLY } from "./src/apple-rel
   assert.equal(calls.length, before);
   assert.equal((await w.fetch(req("/apple/status"), env)).status, 404);
   assert.equal((await relay("/apple/status", { headers: { "Sec-Fetch-Site": "cross-site" } })).status, 403);
+
+  // App Store Connect pass-through (core/asc.js): on even with APPLE_RELAY off, Authorization goes out only there,
+  // DELETE only there, and only the provisioning paths.
+  assert.equal(tgt("/apple/api.appstoreconnect.apple.com/v1/devices?filter%5Budid%5D=X"), "https://api.appstoreconnect.apple.com/v1/devices?filter%5Budid%5D=X");
+  assert.equal(tgt("/apple/api.appstoreconnect.apple.com/v1/bundleIds/ABC123/bundleIdCapabilities"), "https://api.appstoreconnect.apple.com/v1/bundleIds/ABC123/bundleIdCapabilities");
+  for (const bad of ["/apple/api.appstoreconnect.apple.com/v1/apps", "/apple/api.appstoreconnect.apple.com/v1/users",
+    "/apple/api.appstoreconnect.apple.com/v2/devices", "/apple/api.appstoreconnect.apple.com/v1/profiles/a/b"]) assert.equal(tgt(bad), null, bad);
+  const off = (path, init) => appleRelay(req(path, init), {}, { fetcher });
+  r = await off("/apple/api.appstoreconnect.apple.com/v1/profiles/P1", { method: "DELETE", headers: { Authorization: "Bearer jwt", Cookie: "c=1" } });
+  assert.equal(r.status, 401); // the fake's answer, passed through
+  assert.equal(calls.at(-1).url, "https://api.appstoreconnect.apple.com/v1/profiles/P1");
+  assert.equal(calls.at(-1).init.method, "DELETE");
+  assert.deepEqual([...calls.at(-1).init.headers.keys()].sort(), ["authorization"]);
+  assert.equal((await off("/apple/gsa.apple.com/grandslam/GsService2", { method: "POST", body: "x" })).status, 404); // the rest stays off
+  assert.equal((await off("/apple/api.appstoreconnect.apple.com/v1/devices", { headers: { Origin: "https://evil.example" } })).status, 403);
   console.log("worker apple relay: ok");
 }
 

@@ -6,6 +6,11 @@ browser (below). That
 server is the Signing Server: `https://sign.ifizbox.com` by default, a Cloudflare Worker anyone can deploy for
 themselves (`worker/`, `worker/README.md`). [On the phone](#on-the-phone) has the whole picture.
 
+The page's signing code lives in `web/app/signing/`, one module a part (`common.js`, `identity.js`, `install.js`,
+`device.js`, `route.js`, `selfupdate.js`, `queue.js`, `library.js`, `browser.js`, `early.js`, `toobig.js`,
+`watch.js`, `prompt.js`, `password.js`); `web/app/signing-client.js` re-exports all of it, so a name this page gives
+as `signing-client.js <name>` is found through that file's export list.
+
 ## The website signs in the browser
 
 ifizbox.com is one Cloudflare Worker with no server of its own, and a Worker can't run zsign. So the website signs

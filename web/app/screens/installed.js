@@ -82,7 +82,7 @@ import { NAME } from "../brand.js";
 import { showActionSheet } from "../nav/actionsheet.js";
 import { longPress } from "../nav/menu.js";
 import { guarded } from "../nav/tapguard.js";
-import { libraryCall } from "../signing-client.js";
+import { libraryCall } from "../signing/library.js";
 import { resignJob, appJob, markedResignJob, markedVersionOnSource, markedResignProblem } from "../core/appqueue.js";
 import { hudLine } from "../core/progress.js";
 import { deviceError } from "../core/signing.js";

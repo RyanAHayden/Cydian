@@ -24,7 +24,7 @@
 //                                          openSigning); once ready, offerInstall first goes back to it (the IPA's
 //                                          page with its file), then asks Install Now there. Never Home.
 //   siteReady(id)                          the website's saved certificate is ready (.p12, profile, password not wrong)
-import { statusReady } from "../signing-client.js";
+import { statusReady } from "../signing/device.js";
 import { normalizeServer } from "../core/signing.js";
 import { NAME, SIGN_HOST } from "../brand.js";
 import { loadStyle } from "../nav/motion.js";

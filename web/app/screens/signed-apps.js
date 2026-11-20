@@ -12,7 +12,8 @@ import { liveHUD } from "../nav/hud.js";
 import { certificateWarnings, revocationLabel, resignLabel, signedAppRows, deviceError, callWithStall } from "../core/signing.js";
 import { resignJob } from "../core/appqueue.js";
 import { signedAppsNamed } from "../core/installed.js"; // B150
-import { getServer, chooseRoute } from "../signing-client.js";
+import { getServer } from "../signing/identity.js";
+import { chooseRoute } from "../signing/route.js";
 import { loadStyle } from "../nav/motion.js";
 
 function style() { loadStyle("signsheet.css"); }

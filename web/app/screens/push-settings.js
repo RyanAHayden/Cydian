@@ -5,7 +5,7 @@
 //               turns itself on again (core/push.js autoEnablePush)
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { showHUD } from "../nav/hud.js";
-import { getServer } from "../signing-client.js";
+import { getServer } from "../signing/identity.js";
 import { pushInfo, enablePush, disablePush, setUserTurnedOff } from "../core/push.js";
 
 export function pushActions({ native = globalThis.ifizboxNative } = {}) {

@@ -630,7 +630,7 @@ if (globalThis.ifizboxNative) {
   // user turned it off (core/push.js autoEnablePush). iOS's permission prompt shows here the first time; each launch
   // tries until it's on.
   if (detectMode() === "sideload") {
-    setTimeout(() => Promise.all([import("./core/push.js"), import("./signing-client.js")])
+    setTimeout(() => Promise.all([import("./core/push.js"), import("./signing/identity.js")])
       .then(([p, s]) => p.autoEnablePush({ server: s.getServer() })).catch(() => {}), 3000);
   }
   // The first launch after iFizBox updated itself (iOS closed the old one as it installed this one). F183: no note

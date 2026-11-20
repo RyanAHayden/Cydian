@@ -20,7 +20,7 @@ import { exportLine } from "../core/sourcelist.js";
 import { encodeLink, decodeLink, reviewLink, toB64url, fromB64url } from "../core/transfer.js";
 import { toBase64 } from "../core/signing.js";
 import { getBackend } from "../backend.js";
-import { loadIdentity, saveIdentity } from "../signing-client.js";
+import { loadIdentity, saveIdentity } from "../signing/identity.js";
 import { settings } from "./settings.js";
 import { NAME } from "../brand.js";
 import { rowIcon } from "../icons/rowicons.js";

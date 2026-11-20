@@ -18,7 +18,7 @@ test("a banner that waits for iOS has no timer", () => {
 });
 
 test("the banners that tell the user which button to press in iOS's prompt wait for it", () => {
-  for (const f of ["../screens/importlink.js", "../signing-client.js"]) {
+  for (const f of ["../screens/importlink.js", "../signing/route.js"]) {
     const src = readFileSync(new URL(f, import.meta.url), "utf8");
     const calls = [...src.matchAll(/showBanner\(\{[^\n]*?Press (Open|Install)[^\n]*?\}\);/g)];
     assert.ok(calls.length, `${f}: the Press banner`);

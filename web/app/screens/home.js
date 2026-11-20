@@ -27,7 +27,10 @@ const browse = lazyNs("browse");
 const roulette = lazyNs("roulette");
 import { catalog } from "../catalog.js";
 import { footLine, versionLines, buildInfo } from "./version-foot.js";
-import { signAndInstall, signingReady, getBring, deviceStatus, getServer, statusReady, serverReachable } from "../signing-client.js";
+import { signAndInstall } from "../signing/install.js";
+import { signingReady, getBring, getServer } from "../signing/identity.js";
+import { deviceStatus, statusReady } from "../signing/device.js";
+import { serverReachable } from "../signing/library.js";
 import { expiryWarning, expiryWarningDays, resignWindow, signingTile } from "../core/signing.js";
 import { rememberInstall } from "./signing.js";
 const featuredRefs = () => load("extras").then((m) => m.featuredRefs()); // F313: loaded with the Featured list

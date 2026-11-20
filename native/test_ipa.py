@@ -87,9 +87,11 @@ class Ipa(unittest.TestCase):
         self.assertEqual(first, open(self.ipa, "rb").read())
 
     def test_launch_screen_checked(self):
-        """N10: the IPA has the launch screen's images too."""
-        os.remove(os.path.join(self.app, "LaunchLoading@2x.png"))
-        self.assertIn("launch image LaunchLoading@2x.png missing", self.problems())
+        """B180: the IPA has the launch storyboard and its images too."""
+        os.remove(os.path.join(self.app, "LaunchStripes@2x.png"))
+        self.assertIn("launch image LaunchStripes@2x.png missing", self.problems())
+        shutil.rmtree(os.path.join(self.app, "LaunchScreen.storyboardc"))
+        self.assertTrue(any("LaunchScreen.storyboardc missing" in p for p in self.problems()))
 
     def test_helper_flagged(self):
         self.write("ifizbox-helper", b"x", 0o755)

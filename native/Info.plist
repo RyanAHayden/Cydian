@@ -37,10 +37,8 @@
 			</dict></array>
 		</dict>
 	</dict>
-	<key>UILaunchScreen</key><dict>
-		<key>UIImageName</key><string>LaunchLoading</string>
-		<key>UIImageRespectsSafeAreaInsets</key><false/>
-	</dict>
+	<!-- B180: launch/LaunchScreen.storyboard, compiled on a Mac (launch/storyboard.sh): bars pinned to the safe area -->
+	<key>UILaunchStoryboardName</key><string>LaunchScreen</string>
 	<key>UIStatusBarStyle</key><string>UIStatusBarStyleLightContent</string>
 	<key>UISupportedInterfaceOrientations</key><array><string>UIInterfaceOrientationPortrait</string></array>
 	<key>CADisableMinimumFrameDurationOnPhone</key><true/>

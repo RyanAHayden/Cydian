@@ -1,35 +1,31 @@
-"""N10: the launch screen's part of mkdeb.py/mkipa.py check: Info.plist's UILaunchScreen and the images it names.
+"""The launch screen's part of mkdeb.py/mkipa.py check (docs/native.md, "Launch screen").
 
-UILaunchScreen names images without a compiled asset catalog, so they must be loose PNGs in the app's top folder at
-@2x and @3x (docs/native.md, "Launch screen"). UIColorName can only name an asset catalog colour, and the app has no
-Assets.car, so it must not be there (an empty one is what the app had before N10: a black launch). The app's own
-cover until the page draws (App.swift, LaunchCover) reads the website's per-screen launch images from web/icons/launch/.
+B180: Info.plist names a launch storyboard (UILaunchStoryboardName LaunchScreen), compiled on a Mac by
+native/launch/storyboard.sh, whose bars are pinned to the safe area so the splash lines up with the page's first
+frame on every screen. The storyboard names loose PNGs (native/launch/make.py) in the app's top folder at @2x and @3x.
+UILaunchScreen (N10) can't do that: its bar images are stretched and its image is drawn centred at its own size.
 """
 
-# One image: a plain fill in the pinstripes' colour, bigger than any iPhone, so drawn centred at its own size (as iOS
-# draws launch images) it fills every screen; no bars or title, which only fit screens whose size is known.
-WANT = {"UIImageName": "LaunchLoading"}
+STORYBOARD = "LaunchScreen"
+# Every image LaunchScreen.storyboard names (its <resources>).
+IMAGES = ("LaunchStripes", "LaunchNavTop", "LaunchNavBottom", "LaunchTabGloss", "LaunchNavShadow", "LaunchTabShadow")
 
 
 def problems(info, files, app):
-    """Problems with info's UILaunchScreen; files maps bundle paths to bytes, app is the iFizBox.app/ prefix."""
+    """Problems with info's launch screen; files maps bundle paths to bytes, app is the iFizBox.app/ prefix."""
     out = []
-    ls = info.get("UILaunchScreen")
-    if not isinstance(ls, dict):
-        return ["Info.plist has no UILaunchScreen dict (without one iOS letterboxes the app)"]
-    names = [ls.get("UIImageName")]
-    if "UINavigationBar" in ls or "UITabBar" in ls:
-        out.append("Info.plist UILaunchScreen has bar images: they only fit screens whose size is known")
-    for key, name in zip(WANT, names):
-        if name != WANT[key]:
-            out.append("Info.plist UILaunchScreen %s image is %r, want %r" % (key, name, WANT[key]))
-            continue
+    name = info.get("UILaunchStoryboardName")
+    if name != STORYBOARD:
+        out.append("Info.plist UILaunchStoryboardName is %r, want %r (without a launch screen iOS letterboxes the app)"
+                   % (name, STORYBOARD))
+    if "UILaunchScreen" in info:
+        out.append("Info.plist has UILaunchScreen as well as the storyboard: its bars only fit screens whose size is known")
+    sbc = app + STORYBOARD + ".storyboardc/"
+    if not files.get(sbc + "Info.plist") or not any(n.startswith(sbc) and n.endswith(".nib") for n in files):
+        out.append("launch storyboard %s.storyboardc missing or not compiled (native/launch/storyboard.sh)" % STORYBOARD)
+    for img in IMAGES:
         for scale in ("@2x", "@3x"):
-            png = files.get(app + name + scale + ".png")
+            png = files.get(app + img + scale + ".png")
             if not png or not png.startswith(b"\x89PNG"):
-                out.append("launch image %s%s.png missing" % (name, scale))
-    if "UIColorName" in ls:
-        out.append("Info.plist UILaunchScreen has UIColorName, but the app has no asset catalog to name a colour in")
-    if ls.get("UIImageRespectsSafeAreaInsets") is not False:
-        out.append("Info.plist UILaunchScreen UIImageRespectsSafeAreaInsets must be false (the pinstripes fill the screen)")
+                out.append("launch image %s%s.png missing" % (img, scale))
     return out

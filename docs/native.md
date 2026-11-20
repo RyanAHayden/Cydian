@@ -274,52 +274,64 @@ folder in the Files app. Paste the table here when it exists.
 
 ## Launch screen
 
-What opening the app shows before the page draws: a plain fill in the pinstripes' light colour, then the page's own
-loading screen (`index.html` `#boot`: the bars, the pinstripes and Loading).
+What opening the app shows before the page draws: the page's first frame without its text. That is `index.html`'s
+`#boot` under the app's bars (`web/app/ios6.css` with `data-shell="app"`): the nav bar's gloss runs up through the
+status-bar strip, the pinstripes fill the middle, and the tab bar's black runs down over the home indicator. It has
+no title, tab icons or Loading. Both builds use it.
 
-**Constraints.** The app is built on Linux: no storyboard (no `ibtool`), and no asset catalog compiled in the build
-(no `actool`; the one `Assets.car` holds only the app icon, compiled once on a Mac by `native/icon/assets.sh` and
-committed). That leaves Info.plist's `UILaunchScreen` dictionary (iOS 14+). Keeping one at all matters: without
-`UILaunchScreen` or `UILaunchStoryboardName` iOS runs the app letterboxed at an old screen size.
+**Why a storyboard.** Keeping a launch screen at all matters: without `UILaunchStoryboardName` or `UILaunchScreen`
+iOS runs the app letterboxed at an old screen size. Info.plist's `UILaunchScreen` dictionary can't draw these strips.
+Its bar images are stretched to bars whose height depends on the phone (64 to 106 pt with the strip), and its one
+image is drawn centred at its own size, so anything but a plain fill lines up only on screens whose size is known. A
+launch storyboard lays its views out with Auto Layout against the safe area, so the strips fit every screen.
 
-**What `UILaunchScreen` accepts** (Apple's Information Property List reference): `UIColorName` (background),
-`UIImageName` (an image shown at its natural size, centred), `UIImageRespectsSafeAreaInsets`, and `UINavigationBar`,
-`UITabBar`, `UIToolbar`, each a dict with an optional `UIImageName` for the bar's background. There is no title, no
-bar items and no per-screen image.
+**What iFizBox ships** (`native/launch/`, copied into both the .deb's and the IPA's `iFizBox.app/` by `build.sh`):
 
-- `UIColorName` names a colour set in an asset catalog. A colour has no loose-file form, so without `Assets.car`
-  there is no background colour: leave the key out (an empty one gives a black launch).
-- `UIImageName` is looked up by name in the bundle as `UIImage(named:in:)` does, and that finds loose
-  `Name@2x.png`/`Name@3x.png` files in the app's top folder as well as catalog images. Apple's docs only say "an
-  image in your asset catalog", but SpringBoard's launch-screen renderer takes the loose PNGs.
-- A bar image is stretched to the bar, and an image is drawn centred at its own size, so bars, a title or a
-  pictured screen only line up on screens whose size is known. iFizBox uses none of them.
+- `LaunchScreen.storyboard`, the source, and `LaunchScreen.storyboardc`, compiled and committed. Only Apple's
+  `ibtool` compiles a storyboard, so `native/launch/storyboard.sh <mac-host>` copies the sources to a Mac over ssh
+  and compiles them there, as `native/icon/assets.sh` does for the icon. `storyboard.sources` records what it was
+  compiled from, and `native/test_native.py` fails when the storyboard or an image changed without a recompile.
+- The images it names, loose `@2x`/`@3x` PNGs from `native/launch/make.py` (stdlib only, colours from ios6.css),
+  which a storyboard finds in the app's top folder with no asset catalog:
 
-**What iFizBox ships** (`native/Info.plist`, images in `native/launch/`, copied into both the .deb's and the IPA's
-`iFizBox.app/` by `build.sh`):
+  | view | image | laid out |
+  |---|---|---|
+  | pinstripes | `LaunchStripes` (600x1 pt) | screen top to bottom from the left edge, at 600 pt wide, so it is only stretched down; the screen clips the rest |
+  | nav gloss, top half | `LaunchNavTop` | screen top to safe area top + 22 pt (as `.navbar::before` stretches it) |
+  | nav gloss, bottom half | `LaunchNavBottom` | the bar's last 22 pt |
+  | nav highlight / bottom edge | colour views `#eff2f7` / `#2d3642` | 1 pt at the screen's top / the bar's last 1 pt |
+  | shadows | `LaunchNavShadow`, `LaunchTabShadow` | 2.5 pt below the nav bar / above the tab bar |
+  | tab bar | black view, `LaunchTabGloss` (48 pt) | safe area bottom − 49 pt to the screen's bottom; the gloss from 1 pt down, a white 10 % line at 1 pt |
 
-| key | image | what it is |
-|---|---|---|
-| `UIImageName` | `LaunchLoading@2x/@3x.png` | a plain fill in `--pin-light` (`#ced3dc`), 1800x3600 px, bigger than any iPhone screen, so centred it fills every screen |
-| `UIImageRespectsSafeAreaInsets` | `false` | centred on the whole screen, so the fill goes edge to edge |
+- `Info.plist`: `UILaunchStoryboardName` `LaunchScreen`, and no `UILaunchScreen`.
 
-`native/launch/make.py` writes the two PNGs (stdlib only).
+**Keep the images small.** SplashBoard refuses a launch screen whose estimated size is over 25,000,000 bytes, and
+the app then launches to black. The estimate is about width × height × 4 of the images, summed. A full-screen
+1800x3600 px stripes image came to 25,924,736 (`splashboardd`: "Estimated size … is over limit"). That is why the
+stripes are one point tall. `test_native.py` keeps the images' total far under the limit.
 
-**No black flash after the launch screen** (`native/Sources/App.swift`):
+**The hand-over** (`native/Sources/App.swift`):
 
-- The window's background is the pinstripes (an 8x1 pt pattern colour of `--pin-dark`/`--pin-light`), not black.
-- The WKWebView stays `isOpaque = false` with the pinstripes as its and its scroll view's background, and
+- `SceneDelegate` puts `Launch.cover()`, the same storyboard's view, on the window right after
+  `makeKeyAndVisible`. When the app's window replaces iOS's splash, nothing moves. `WebController.dropCover` fades
+  it out (opacity, 0.2 s) 0.1 s after the page's load event, by when `#boot` is on screen under the same bars. The
+  cover goes on the window, not in the web view, because a `WKWebView`'s subviews get no safe area: there the nav
+  bar came out 44 pt tall and the tab bar had no strip.
+- Behind it, as before: the window's background is the pinstripes (an 8x1 pt pattern colour of
+  `--pin-dark`/`--pin-light`), the WKWebView stays `isOpaque = false` on the same pinstripes, and
   `underPageBackgroundColor` (iOS 15+) is the light pinstripe colour.
-- There is no native cover over the web view: a per-screen picture would only fit screens whose size is known. The
-  window's pinstripes show until the page draws `#boot`.
 - The shell keeps the last `app.theme` (`{style, darkPalette}`, UserDefaults `ifizbox.shellTheme`). When that
   was dark (Dark, or Automatic on a dark iPhone), the window and web view start on the palette's ground (black for
   OLED Black, the dark pinstripes for Gunmetal) instead of the light pinstripes. `Theme.apply` repaints them on every
-  change. The system launch screen itself is still light.
+  change. The launch screen and the cover are still light, so a dark run fades from them to the dark page.
 
 **Checked by the builds:** `mkdeb.py check` and `mkipa.py check` (through `native/launch_check.py`) refuse a bundle
-whose `UILaunchScreen` doesn't name `LaunchLoading`, lacks its @2x or @3x PNG, has bar images or a `UIColorName`, or
-doesn't set `UIImageRespectsSafeAreaInsets` to false.
+whose Info.plist doesn't name the `LaunchScreen` storyboard or still has `UILaunchScreen`, or that lacks the
+compiled `LaunchScreen.storyboardc` or any image it names at @2x or @3x.
+
+**Checking it without a phone.** `journal/2026-11-20-b180-launch-strips/sim/` has a Simulator harness for the Mac.
+It holds iOS's splash up, then shows `#boot` in a WKWebView set up like the app's, and screenshots both, plus the
+cover, on a Dynamic Island phone, a notched one and an SE (20 pt strip, like the iPhone 7).
 
 **Testing on a phone.** iOS caches launch screens per app (SplashBoard snapshots) and may keep showing the old one
 after an update. If the launch still looks old, delete and reinstall the app, or reboot.

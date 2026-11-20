@@ -153,7 +153,9 @@ bundle() {
     for x in @2x @3x; do cp "icon/${icon/60x60/${pt}x${pt}}$x.png" "$app/AppIcon${pt}x${pt}$x.png"; done
   done
   cp "icon/$car" "$app/Assets.car"
-  # N10: the launch screen's images, loose PNGs that Info.plist's UILaunchScreen names (launch/make.py).
+  # B180: the launch screen, Info.plist's UILaunchStoryboardName (compiled on a Mac by launch/storyboard.sh), and
+  # the loose PNGs it names (launch/make.py).
+  cp -R launch/LaunchScreen.storyboardc "$app/"
   cp launch/Launch*@2x.png launch/Launch*@3x.png "$app/"
   cp bridge.js "$app/bridge.js"
   # Apple's WWDR intermediates and roots, public certificates the on-device signer puts in each CMS (I6).

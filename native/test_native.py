@@ -1,7 +1,9 @@
 """N1: the .deb writer/checker (mkdeb.py) and the shell's plists. The real build (build.sh) needs the Swift toolchain
 and the iOS SDK; tools/check.sh runs it when they are set up, and mkdeb.py checks what it made."""
+import hashlib
 import os
 import plistlib
+import re
 import shutil
 import struct
 import sys
@@ -44,13 +46,12 @@ def plist(version="0.1.0", build="7"):
 
 
 def copy_launch(app):
-    """N10: the launch screen's loose PNGs (native/launch/) and one of the website's per-screen launch images."""
+    """B180: the launch screen as build.sh lays it out: the compiled storyboard and its loose PNGs (native/launch/)."""
     for name in sorted(os.listdir(os.path.join(HERE, "launch"))):
         if name.endswith(".png"):
             shutil.copy(os.path.join(HERE, "launch", name), app)
-    os.makedirs(os.path.join(app, "web/icons/launch"), exist_ok=True)
-    with open(os.path.join(app, "web/icons/launch/launch-1179x2556.png"), "wb") as f:
-        f.write(b"\x89PNG\r\n\x1a\n")
+    shutil.copytree(os.path.join(HERE, "launch", "LaunchScreen.storyboardc"),
+                    os.path.join(app, "LaunchScreen.storyboardc"))
 
 
 def copy_icons(app, lite=False):
@@ -123,8 +124,13 @@ class Deb(unittest.TestCase):
         self.assertIn("0.1.0-7 (iphoneos-arm64)", summary)
 
     def test_launch_image_missing_flagged(self):
-        os.remove(os.path.join(self.app, "LaunchLoading@3x.png"))
-        self.assertIn("launch image LaunchLoading@3x.png missing", self.problems())
+        os.remove(os.path.join(self.app, "LaunchNavTop@3x.png"))
+        self.assertIn("launch image LaunchNavTop@3x.png missing", self.problems())
+
+    def test_launch_storyboard_missing_flagged(self):
+        """B180: the .deb carries the compiled launch storyboard."""
+        shutil.rmtree(os.path.join(self.app, "LaunchScreen.storyboardc"))
+        self.assertTrue(any("LaunchScreen.storyboardc missing" in p for p in self.problems()))
 
     def test_relations_flagged(self):
         """F66: install-ipa needs unzip (Depends) and wants ldid (Recommends)."""
@@ -233,23 +239,50 @@ class Deb(unittest.TestCase):
 
 class Plists(unittest.TestCase):
     def test_launch_screen_keys(self):
-        """N10: UILaunchScreen names the three images, no asset-catalog colour, and the images are in launch/."""
+        """B180: Info.plist names the launch storyboard (no UILaunchScreen), compiled, with every image it names."""
         info = plistlib.loads(plist())
         import launch_check
-        self.assertEqual(launch_check.problems(info, {}, "")[:1], ["launch image LaunchLoading@2x.png missing"])
+        self.assertIn("storyboardc missing", launch_check.problems(info, {}, "")[0])
+        launch = os.path.join(HERE, "launch")
         files = {}
-        for name in os.listdir(os.path.join(HERE, "launch")):
-            if name.endswith(".png"):
-                with open(os.path.join(HERE, "launch", name), "rb") as f:
-                    files[name] = f.read()
-        files["web/icons/launch/launch-750x1334.png"] = b"\x89PNG"
+        for root, _, names in os.walk(launch):
+            for name in names:
+                if name.endswith(".png") or ".storyboardc" in root:
+                    with open(os.path.join(root, name), "rb") as f:
+                        files[os.path.relpath(os.path.join(root, name), launch)] = f.read()
         self.assertEqual(launch_check.problems(info, files, ""), [])
-        info["UILaunchScreen"]["UIColorName"] = ""
-        self.assertIn("UIColorName", launch_check.problems(info, files, "")[0])
-        self.assertIn("no UILaunchScreen", launch_check.problems({}, files, "")[0])
+        info["UILaunchScreen"] = {}
+        self.assertIn("UILaunchScreen", launch_check.problems(info, files, "")[0])
+        self.assertIn("UILaunchStoryboardName", launch_check.problems({}, files, "")[0])
+
+    def test_launch_storyboard_names_checked_images(self):
+        """B180: launch_check.IMAGES is every image LaunchScreen.storyboard names, and make.py writes each one."""
+        import launch_check
+        sys.path.insert(0, os.path.join(HERE, "launch"))
+        import make
+        with open(os.path.join(HERE, "launch", "LaunchScreen.storyboard")) as f:
+            sb = f.read()
+        named = set(re.findall(r'image="([^"]+)"', sb))
+        self.assertEqual(named, set(launch_check.IMAGES))
+        self.assertEqual(set(re.findall(r'<image name="([^"]+)"', sb)), named)
+        made = {n.rsplit("@", 1)[0] for n in make.images()}
+        self.assertEqual(made, named)
+
+    def test_launch_storyboard_compiled_from_sources(self):
+        """B180: LaunchScreen.storyboardc was compiled from the storyboard and images as they are now (rerun
+        native/launch/storyboard.sh <mac> after changing either, and commit what it writes)."""
+        launch = os.path.join(HERE, "launch")
+        with open(os.path.join(launch, "storyboard.sources")) as f:
+            recorded = dict(reversed(line.split()) for line in f if line.strip())
+        now = {}
+        for name in sorted(os.listdir(launch)):
+            if name == "LaunchScreen.storyboard" or (name.startswith("Launch") and name.endswith(".png")):
+                with open(os.path.join(launch, name), "rb") as f:
+                    now[name] = hashlib.sha256(f.read()).hexdigest()
+        self.assertEqual(recorded, now)
 
     def test_launch_images_match_make(self):
-        """native/launch/*.png are what launch/make.py makes from the website's launch images (rerun it if not)."""
+        """native/launch/*.png are what launch/make.py makes (rerun it if not)."""
         sys.path.insert(0, os.path.join(HERE, "launch"))
         import make
         tmp = tempfile.mkdtemp()
@@ -259,9 +292,18 @@ class Plists(unittest.TestCase):
             if name.endswith(".png"):
                 with open(os.path.join(tmp, name), "rb") as a, open(os.path.join(HERE, "launch", name), "rb") as b:
                     self.assertEqual(a.read(), b.read(), name)
-        with open(os.path.join(HERE, "launch", "LaunchLoading@3x.png"), "rb") as f:
+        # B180: SplashBoard refuses a launch screen whose images' estimated size (w x h x 4 bytes, summed) is over
+        # 25,000,000 bytes; a full-screen stripes image at 1800x3600 px was over it. Keep them all far below.
+        total = 0
+        for name in os.listdir(os.path.join(HERE, "launch")):
+            if name.endswith(".png"):
+                with open(os.path.join(HERE, "launch", name), "rb") as f:
+                    w, h = struct.unpack(">II", f.read(24)[16:24])
+                total += w * h * 4
+        self.assertLess(total, 2_500_000)
+        with open(os.path.join(HERE, "launch", "LaunchStripes@3x.png"), "rb") as f:
             w, h = struct.unpack(">II", f.read(24)[16:24])
-        self.assertGreaterEqual((w, h), (1800, 3600))  # bigger than any iPhone, so centred it fills the screen
+        self.assertEqual(w, 1800)  # 600 pt: wider than any iPhone (the storyboard pins it at that width)
 
     def test_info_plist(self):
         p = plistlib.loads(plist())

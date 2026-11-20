@@ -456,10 +456,20 @@ enum Sideload {
         emit?("here", 0)
         if isSelf {
             saveRecords(SignedRecords.adding(record, to: records()))
-            log?("\(app.name) replaces this app: iOS closes it while it installs; open it again once it's done")
+            log?("\(app.name) replaces this app: it closes once iOS has the new one, so iOS can finish; open it again once it's done")
             // B124: installd ends this process mid-install, so the icon badge stops counting this update now
             BackgroundCheck.selfHandedOff(ids: [app.bundleID, app.originalBundleID], version: app.version)
         }
+        // B159: iOS 17.4+ installd waits for this copy to go instead of ending it, so iFizBox closes itself once
+        // installd has the IPA and stands still (SelfCloseClock): the call answers first (the page follows
+        // signing.selfUpdate to "Closing iFizBox"), then CloseForUpdate.hereReady exits.
+        let closer: HereClose? = isSelf ? HereClose(job: job) {
+            IDevice.ilog("This iPhone: installd is waiting for \(Brand.name) to close; closing it")
+            log?("iOS has the new \(app.name) and waits for this copy to close: closing \(Brand.name) so iOS can finish installing it")
+            SignBridge.queue.async { opened(.success((app, record))); served?(true) }
+            CloseForUpdate.hereReady()
+        } : nil
+        if isSelf { DispatchQueue.main.async { CloseForUpdate.hereBegan(app: app) } }
         DispatchQueue.main.async { KeepAlive.shared.begin() }
         IDevice.queue.async {
             let result: Result<Void, Error>
@@ -469,8 +479,8 @@ enum Sideload {
                 try IDevice.install(output, note: { log?($0) }) { st in
                     switch st {
                     case .connected: emit?("here", 0.02); step?("copying", 0)
-                    case .upload(let p): emit?("here", 0.02 + p * 0.28); step?("copying", p)
-                    case .install(let p): emit?("here", 0.3 + p * 0.7); step?("installing", p)
+                    case .upload(let p): emit?("here", 0.02 + p * 0.28); step?("copying", p); if p >= 1 { closer?.copied() }
+                    case .install(let p): emit?("here", 0.3 + p * 0.7); step?("installing", p); closer?.installd(p)
                     }
                 }
                 result = .success(())
@@ -479,6 +489,9 @@ enum Sideload {
             DispatchQueue.main.async { KeepAlive.shared.end() }
             SignBridge.queue.async {
                 job?.end()
+                // B159: iFizBox already answered and is closing; installd's late answer changes nothing
+                if closer?.end() == true { return }
+                if isSelf { DispatchQueue.main.async { CloseForUpdate.hereEnded() } }
                 switch result {
                 case .failure(let e):
                     var text = (e as? IDevice.Failure)?.errorDescription ?? SignBridge.text(e)
@@ -1342,7 +1355,41 @@ enum CloseForUpdate {
         closeWith(c, after: 8)
     }
 
-    private static func closeWith(_ c: UNMutableNotificationContent, after: TimeInterval) {
+    // ---- B159: the This iPhone route (Sideload.installHere, installd over LocalDevVPN / Tailscale RemotePairing)
+
+    // iFizBox's own IPA is going to installd: a run of its own (an older hosted run's polls stop), followed as
+    // `waiting` until installd stands still (hereReady) or answers (hereEnded). Main queue.
+    static func hereBegan(app: SignedApp) {
+        handing = ([app.bundleID, app.originalBundleID], app.version)
+        run += 1
+        for t in [token, resignToken, backgroundToken] { t.map(NotificationCenter.default.removeObserver) }
+        token = nil; resignToken = nil; backgroundToken = nil
+        set(.waiting)
+    }
+
+    // How long after finished iFizBox exits on this route: the install call has just answered, and the page needs
+    // a moment to ask signing.selfUpdate and draw "Closing iFizBox".
+    static let hereExit: TimeInterval = 2.5
+
+    // installd has the new IPA and waits for this copy to go: finished, the notification, and out. Main queue.
+    static func hereReady() {
+        guard state == .waiting else { return }
+        set(.finished)
+        let c = UNMutableNotificationContent()
+        c.title = "Finishing the \(Brand.name) Update"
+        c.body = "iOS has the new version and is installing it. Tap to open it."
+        closeWith(c, after: 3, exitAfter: hereExit)
+    }
+
+    // installd answered (installed it, or refused it) while iFizBox was still here: nothing is closing. A watch
+    // gets nil (the page's "close it from the app switcher" ends). Main queue.
+    static func hereEnded() {
+        guard state == .waiting else { return }
+        state = nil
+        sinks = sinks.filter { $0(nil) }
+    }
+
+    private static func closeWith(_ c: UNMutableNotificationContent, after: TimeInterval, exitAfter: TimeInterval = 0.6) {
         // B124: the icon badge counted this very update and iOS keeps it through the install: drop it now (other
         // updates stay counted), and the notification carries the same count so it can't put the old one back.
         let n = BackgroundCheck.selfHandedOff(ids: handing?.ids ?? [], version: handing?.version ?? "")
@@ -1350,7 +1397,7 @@ enum CloseForUpdate {
         let req = UNNotificationRequest(identifier: "ifizbox.updating", content: c,
                                         trigger: UNTimeIntervalNotificationTrigger(timeInterval: after, repeats: false))
         UNUserNotificationCenter.current().add(req) { _ in
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { exit(0) }
+            DispatchQueue.main.asyncAfter(deadline: .now() + exitAfter) { exit(0) }
         }
     }
 
@@ -1363,6 +1410,42 @@ enum CloseForUpdate {
         c.title = s == .stalled ? "The \(Brand.name) Update Didn't Finish" : "The \(Brand.name) Update Didn't Start"
         c.body = "Open \(Brand.name) to try again."
         UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: "ifizbox.updating", content: c, trigger: nil))
+    }
+}
+
+// B159: installHere's timer for iFizBox's own update: copied() and installd(p) from IDevice.queue feed SelfCloseClock
+// on the main queue; when it is due (and the job wasn't cancelled, and installd hasn't answered) `fire` runs once on
+// the main queue. end() (any queue) stops it and says whether it fired already.
+final class HereClose {
+    private var clock = SelfCloseClock() // main queue
+    private let lock = NSLock()
+    private var fired = false, ended = false // under lock
+    private let job: SignJob?
+    private let fire: () -> Void
+
+    init(job: SignJob?, fire: @escaping () -> Void) { self.job = job; self.fire = fire }
+
+    func copied() { DispatchQueue.main.async { self.clock.copied(at: Date()); self.arm() } }
+    func installd(_ p: Double) {
+        DispatchQueue.main.async { if self.clock.installd(Int((min(max(p, 0), 1) * 100).rounded()), at: Date()) { self.arm() } }
+    }
+
+    func end() -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        ended = true
+        return fired
+    }
+
+    private func arm() {
+        guard let at = clock.closeAt else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + max(0, at.timeIntervalSinceNow) + 0.05) {
+            guard self.clock.due(Date()), self.job?.cancelled != true else { return }
+            self.lock.lock()
+            let go = !self.fired && !self.ended
+            if go { self.fired = true }
+            self.lock.unlock()
+            if go { self.fire() }
+        }
     }
 }
 

@@ -37,7 +37,7 @@ import { openProgress, openOn, RETURN_LABEL, CLOSING_LABEL, WAITING_LABEL, TRY_A
 import { fitFileNames } from "../core/midtrunc.js";
 import { appRows, createAppRun, rowStatus, summaryLine, runStatus, runPercent, ended, isSelf, DIDNT_DOWNLOAD, barOf } from "../core/apprun.js";
 import { recordWhen } from "../core/apprun.js"; // B136
-import { SELF_UPDATE_LINES, SELF_UPDATE_FAILED } from "../signing-client.js";
+import { SELF_UPDATE_LINES, SELF_UPDATE_FAILED, HERE_CLOSING_LINE } from "../signing-client.js";
 
 // The phone's side of a run, from signing-client.js (prepareOnDevice, openPrepared, discardPrepared). Each attempt of a
 // row gets its own tag, so signing.cancel {tag} stops that try only.
@@ -361,10 +361,7 @@ export async function runAppRun(jobs, deps) {
     if (!self) return page.finish({ label: RETURN_LABEL, status: text, action: () => false });
     if (following === self && selfEnd) return page.finish({ ...selfEnd, status: text });
     following = self;
-    if (self.here) {
-      line("step", RESTART_BY_HAND, self.id);
-      return selfFinish({ label: RETURN_LABEL, status: text, action: () => false });
-    }
+    if (self.here) return followHere(self, text);
     selfFinish({ label: WAITING_LABEL, status: text, locked: true });
     const watch = deps.selfUpdate ?? lanes.selfUpdate;
     let closing = false;
@@ -402,6 +399,32 @@ export async function runAppRun(jobs, deps) {
     };
     if (typeof watch !== "function") return onState("guessed"); // no shell to follow: Closing, then by hand if it didn't
     Promise.resolve().then(() => watch(onState)).then(over, () => over(null));
+  }
+
+  // B159: This iPhone: on iOS 17.4+ installd waits for the running iFizBox to go, so the shell answered once installd
+  // stood still and is closing itself (signing.selfUpdate "finished"): locked on "Closing iFizBox", and close it by
+  // hand if it is still here CLOSE_GRACE later. Any other answer (installd installed it while iFizBox lived, an older
+  // shell): the new version is in place, close it by hand (RESTART_BY_HAND).
+  function followHere(self, text) {
+    const restart = () => {
+      line("step", RESTART_BY_HAND, self.id);
+      selfFinish({ label: RETURN_LABEL, status: text, action: () => false });
+    };
+    const watch = deps.selfUpdate ?? lanes.selfUpdate;
+    if (typeof watch !== "function") return restart();
+    const live = () => following === self && !page.closed;
+    selfFinish({ label: CLOSING_LABEL, status: text, locked: true });
+    const over = (s) => {
+      if (!live()) return;
+      if (s !== "finished") return restart();
+      line("step", HERE_CLOSING_LINE, self.id);
+      later(() => {
+        if (!live()) return;
+        line("error", CLOSE_BY_HAND, self.id);
+        selfFinish({ label: RETURN_LABEL, status: text, action: () => false });
+      }, CLOSE_GRACE);
+    };
+    Promise.resolve().then(() => watch(() => {})).then(over, () => over(null));
   }
 
   // every row starts drawn

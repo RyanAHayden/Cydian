@@ -68,6 +68,7 @@
 import { runOrder, sizeText, SELF_ID } from "./appqueue.js";
 import { VPN_WAIT } from "./installroute.js";
 import { NAME } from "../brand.js";
+import { isNewer } from "./selfupdate.js"; // B159: staleSelf
 
 // B136: an install that failed must not leave the app recorded as installed (Installed's record decides the Search
 // row's swipe: a recorded, up-to-date app has none). recordWhen(row, onPhone) says when a row's app goes into that
@@ -302,6 +303,8 @@ export function createAppRun({ rows, sign, install, discard = () => {}, reprompt
     if (f.timer != null) clear(f.timer);
     flights.delete(r.id);
     if (!res?.token) { fail(r, "nothing was signed"); return; }
+    const stale = staleSelf(r, res);
+    if (stale) { try { discard({ ...r, token: res.token }); } catch { /* runs out */ } fail(r, stale); return; }
     set(r, { state: "signed", phase: null, fraction: 1, token: res.token, bundleId: res.bundleId ?? r.bundleId,
       expires: res.expires ?? r.expires, name: r.job?.name ? r.name : res.name || r.name });
     if (!helperRow(r)) log(r, "step", `Signed ${label(r)}`);
@@ -584,6 +587,17 @@ export function runPercent(rows) {
 }
 
 export const isSelf = (row) => row?.id === SELF_ID;
+
+// B159: iFizBox's own upgrade (job.version newer than job.installed, the running version) whose signed IPA
+// (signing.prepare's version, its CFBundleShortVersionString) isn't newer than the running app: the update must
+// install the version it offered (user 2026-11-20: 0.13.0 offered, the source's 0.12.0 IPA signed and installed).
+// -> the row's error, or null (not iFizBox, not an upgrade, a re-sign, no version to compare, or newer).
+export function staleSelf(row, res) {
+  const j = row?.job;
+  if (!isSelf(row) || row.mode === "resign" || !j?.installed || !j.version || !res?.version) return null;
+  if (!isNewer(j.version, j.installed) || isNewer(res.version, j.installed)) return null;
+  return `the downloaded IPA is ${NAME} ${res.version}, not newer than this ${NAME} ${j.installed} (${j.version} was offered), so it wasn't installed`;
+}
 
 // B137: whether an "asking" row has iOS's Install prompt to tap. A row on the This iPhone route (`local`, from
 // createAppRun's local(row)) has none while its route is settled (idevice.status, the LocalDevVPN alert); it says

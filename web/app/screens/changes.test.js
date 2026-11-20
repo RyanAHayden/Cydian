@@ -90,6 +90,22 @@ test("sideload Upgrade (N) (F80): every app upgrade with an IPA queued for Confi
   assert.deepEqual(await queueUpgrades(undefined, { add: () => assert.fail("nothing to queue") }), []);
 });
 
+test("B159: iFizBox's row from GitHub's release installs that IPA even while its source still lists the older one", async () => {
+  const { queueUpgrades } = await import("./changes.js");
+  const source = { key: "alt:self", row: { id: "com.ryha.ifizbox", name: "iFizBox" }, stanza: { kind: "ipa", ipa: {
+    bundleIdentifier: "com.ryha.ifizbox", name: "iFizBox", sourceUrl: "https://ifizbox.com/repo/source.json",
+    versions: [{ version: "0.12.0", downloadURL: "https://ifizbox.com/repo/iFizBox-0.12.0.ipa", size: 15 }] } } };
+  const gh = "https://github.com/x/releases/download/v0.13.0/iFizBox.ipa";
+  const [job] = await queueUpgrades([{ id: "com.ryha.ifizbox", name: "iFizBox", version: "0.13.0", installed: "0.12.0", ipa: gh }],
+    { pkgOf: async () => source, add: () => {} });
+  assert.deepEqual([job.version, job.url, job.installed, job.size], ["0.13.0", gh, "0.12.0", null]);
+  assert.equal(job.key, "alt:self", "still the source's package for its page");
+  // the source's own newest (the row's version is listed): the source's IPA, as before
+  const [same] = await queueUpgrades([{ id: "com.ryha.ifizbox", version: "0.12.0", installed: "0.11.0", ipa: gh }],
+    { pkgOf: async () => source, add: () => {} });
+  assert.deepEqual([same.version, same.url], ["0.12.0", "https://ifizbox.com/repo/iFizBox-0.12.0.ipa"]);
+});
+
 test("F87: Upgrade in the jailbreak app queues dpkg's rows, not the remembered apps' (apt has no such package)", () => {
   assert.deepEqual(upgradeJobs([{ id: "tweak", version: "2", installed: "1", name: "Tweak" },
     { id: "com.rileytestut.Delta", version: "1.7", installed: "1.6", name: "Delta", remembered: true }]).map((j) => j.id), ["tweak"]);

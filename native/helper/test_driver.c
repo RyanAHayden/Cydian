@@ -27,6 +27,7 @@
 #include "policy.h"
 #include "spawn.h"
 
+#include <errno.h>
 #include <poll.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -51,14 +52,18 @@ static int spawn(int argc, char **argv, const char *ask) {
         if (a && *a && write(in, "\n", 1) != 1) { /* the helper is gone */ }
         if (!strcmp(ask, "close")) close(in), in = -1;
     }
-    /* Read the three pipes as they come, like the app's console will; lines tagged by fd. */
+    /* Read the three pipes as they come, like the app's console will; lines tagged by fd. The run ends when the
+     * helper's ends of all three close, never on a clock: a silent helper on a loaded machine (the gate beside other
+     * slots, swapping) is slow, not hung. A real hang is the caller's subprocess timeout to catch (T22). */
     char buf[3][8192];
     size_t used[3] = {0, 0, 0};
     struct pollfd pf[3];
     for (int i = 0; i < 3; i++) pf[i] = (struct pollfd){fds[i], POLLIN, 0};
     int open_fds = 3;
     while (open_fds) {
-        if (poll(pf, 3, 10000) <= 0) { printf("timeout\n"); return 1; }
+        int ready = poll(pf, 3, -1);
+        if (ready < 0 && errno == EINTR) continue;
+        if (ready <= 0) { printf("poll error: %s\n", strerror(errno)); return 1; }
         for (int i = 0; i < 3; i++) {
             if (pf[i].fd < 0 || !pf[i].revents) continue;
             ssize_t n = read(pf[i].fd, buf[i] + used[i], sizeof buf[i] - 1 - used[i]);

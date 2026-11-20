@@ -357,8 +357,17 @@ function navInfo(route, view) {
   return routeOf(pageKind(route)).nav(route, view);
 }
 
-export function render(body, route, ctx) {
+export function render(body, route, ctx, page = null) {
   routeOf(pageKind(route)).render(body, route, ctx);
+  if (isRoot(route)) handRootPage(page);
+}
+
+// The root page's handle to screens/queue.js, which keeps the Queue button on its nav bar; only where a queue shows
+// one (the IPA queue's here, apt's in the jailbreak app), so the site never loads queue.js for it.
+function handRootPage(page) {
+  if (!page || typeof document === "undefined") return;
+  if (!recordsApps() && typeof safeBackend()?.queue !== "function") return;
+  import("./queue.js").then((q) => q.setInstalledRoot(page), () => {});
 }
 
 export function emptyText(source) {

@@ -4,13 +4,11 @@
 // The icon goes after the page's button in the DOM, so every `querySelector(".nav-right .bar-button:not(.share-button)")`
 // (browse.js setRightLabel) still finds Install first; CSS `order` (style.css .nav-icon-left) draws it on the left.
 
-// Same index in its tab's stack (as browse.js setRightLabel and sharesheet.js find it).
+import { handleOf } from "./go.js";
+
+// The page's own nav item, from its handle (nav/go.js pageHandle); null for a body no page holds.
 export function navItemOf(body) {
-  const page = body?.closest?.(".page");
-  const stack = page?.parentElement;
-  if (!stack) return null;
-  const i = [...stack.children].filter((c) => c.classList.contains("page")).indexOf(page);
-  return document.querySelectorAll(`.nav-stack[data-tab="${stack.dataset.tab}"] > .nav-item`)[i] ?? null;
+  return handleOf(body)?.item ?? null;
 }
 
 // Puts `button` (class nav-icon-left) left of the page's own right button, in place of an earlier one with the same

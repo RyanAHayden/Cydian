@@ -123,6 +123,7 @@ struct SignedRecord: Codable, Equatable {
     var signed: Date
     var expires: Date?            // the earlier of the certificate's and the profile's expiry
     var options: StoredOptions
+    var appID: String? = nil      // B138: the application-identifier it was signed with; nil in older records
 
     struct StoredOptions: Codable, Equatable {
         var name: String?

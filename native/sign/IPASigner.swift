@@ -14,6 +14,7 @@ struct SignedApp {
     var fixedArm64e: [String] = [] // binaries whose old-ABI arm64e slice was fixed up (F14, SignOptions.swift)
     var skipped: [String] = []     // B21: nested bundles whose executable is missing, sealed as resources;
                                    // B162: loose 32-bit-only Mach-Os, also sealed as resources
+    var appID: String? = nil       // B138: the application-identifier it was signed with (TEAM.id)
 }
 
 final class IPASigner {
@@ -37,6 +38,10 @@ final class IPASigner {
     var level: Int32 = 1
     // R41: read the IPA on this many threads at once (inflating and hashing every file); 1 for one at a time.
     var readers = max(1, min(ProcessInfo.processInfo.activeProcessorCount, 4))
+    // B138: the application-identifier the app with this bundle ID was installed with (TEAM.id), or nil when it isn't
+    // installed or that can't be told. An update must keep it (installd's error 15 otherwise): signing uses a
+    // profile that gives it (AppIDMatch), or stops before signing anything with code "appid_mismatch".
+    var installedAppID: ((String) -> String?)?
 
     init(profile: Profile, identity: SigningIdentity) {
         self.profile = profile
@@ -143,10 +148,24 @@ final class IPASigner {
         }
         // F237: kept, Info.plist keeps the ID and only the entitlements carry the profile's App ID (entID).
         let keep = options.keeps(options.bundleID ?? oldID)
+        let imported = profile
         if keep, let auto = IPASigner.autoProfile, let made = try auto(options.bundleID ?? oldID, profile, identity.certificate, log) {
             profile = made
         }
-        let (newID, entID) = try profile.signingIDs(for: options.bundleID ?? oldID, keep: keep)
+        let (newID, firstEntID) = try profile.signingIDs(for: options.bundleID ?? oldID, keep: keep)
+        var entID = firstEntID
+        // B138: an app on the phone keeps the application-identifier it was installed with
+        if let have = installedAppID?(newID), have != "\(profile.team).\(entID)" {
+            let others = [profile, imported].reduce(into: [Profile]()) { l, p in if !l.contains(where: { $0.data == p.data }) { l.append(p) } }
+            guard let m = AppIDMatch.pick(others, installed: have) else {
+                let name = main.plist["CFBundleDisplayName"] as? String ?? main.plist["CFBundleName"] as? String ?? options.name ?? ""
+                log("Installed under App ID \(have); no profile here gives it (this one gives \(profile.team).\(entID))")
+                throw AppIDMatch.mismatch(name: options.name ?? name, installed: have, profile: profile, wouldBe: "\(profile.team).\(entID)")
+            }
+            log("Installed under App ID \(have): signed with that (profile \(m.profile.name))")
+            profile = m.profile
+            entID = m.entitlementsID // the bundle ID stays the one it is installed as
+        }
 
         // An explicit profile covers one app ID: extensions (and Watch apps) would need their own, so they go. Kept
         // IDs keep them (R25): each extension keeps its own Info.plist ID, prefixed by the app's as iOS requires,
@@ -272,7 +291,7 @@ final class IPASigner {
                 guard files[exe] != nil else { throw SignError("bad_ipa", "\(exe.dropFirst(appDir.count)) is missing.") }
                 let data = fixed(exe, try contents(exe, files, zip))
                 let params = CodeSignParams(identifier: id, team: profile.team,
-                                            entitlements: isApp ? profile.entitlements(for: keep ? entID : id) : nil,
+                                            entitlements: isApp ? profile.entitlements(for: keep || id == newID ? entID : id) : nil,
                                             infoPlist: infoData, codeResources: resources)
                 let m = mode(exe, files)
                 files[exe] = try hold(try MachO.sign(consume data, params, identity, time: time), mode: m, sealed: dir != appDir)
@@ -313,7 +332,8 @@ final class IPASigner {
         return SignedApp(bundleID: newID, originalBundleID: oldID,
                          name: main.plist["CFBundleDisplayName"] as? String ?? main.plist["CFBundleName"] as? String ?? "",
                          version: main.plist["CFBundleShortVersionString"] as? String ?? main.plist["CFBundleVersion"] as? String ?? "",
-                         removed: removed.sorted(), fixedArm64e: fixedArm64e.sorted(), skipped: skipped.sorted())
+                         removed: removed.sorted(), fixedArm64e: fixedArm64e.sorted(), skipped: skipped.sorted(),
+                         appID: "\(profile.team).\(entID)")
     }
 
     private struct Read { let sha1: Data, sha256: Data, macho: Bool }

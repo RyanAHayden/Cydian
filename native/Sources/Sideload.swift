@@ -413,6 +413,7 @@ enum Sideload {
             if let job = job { signer.stop = { job.cancelled } }
             if let log = log { let nslog = signer.log; signer.log = { nslog($0); log($0) } }
             if servers.host != nil { signer.level = 6 } // R41: uploaded to the server (25 MB cap): small beats fast
+            signer.installedAppID = { installedAppID($0, log: log) } // B138: an update keeps its App ID
             app = try signer.sign(input, to: output) { emit($0, $1) }
             log?("Signed \(app.name) \(app.version) as \(app.bundleID), \(Sideload.size(output))")
             try job?.check()
@@ -423,7 +424,8 @@ enum Sideload {
         }
         let record = SignedRecord(bundleID: app.bundleID, originalBundleID: app.originalBundleID, name: app.name,
                                   version: app.version, url: url, signed: Date(),
-                                  expires: profile.signatureExpiry(certificate: identity.certificate), options: options.stored)
+                                  expires: profile.signatureExpiry(certificate: identity.certificate), options: options.stored,
+                                  appID: app.appID)
         if servers.local { // "Installing on this iPhone" (phase "here"), not iOS's own install
             installHere(output, app: app, record: record, emit: emit, log: log, job: job, opened: opened, served: served, step: step)
             return
@@ -479,7 +481,12 @@ enum Sideload {
                 job?.end()
                 switch result {
                 case .failure(let e):
-                    let text = (e as? IDevice.Failure)?.errorDescription ?? SignBridge.text(e)
+                    var text = (e as? IDevice.Failure)?.errorDescription ?? SignBridge.text(e)
+                    // B138: installd's error 15 (another App ID than the installed copy) in plain words
+                    if AppIDMatch.isMismatch(text) {
+                        IDevice.ilog("This iPhone: \(app.bundleID) refused by installd: \(text)")
+                        text = "appid_mismatch: " + AppIDMatch.installdText(name: app.name)
+                    }
                     IDevice.ilog("This iPhone: \(app.bundleID) failed: \(text)")
                     log?("This iPhone's install failed: \(text)")
                     opened(.failure(job?.cancelled == true ? SignJob.cancelledError : Failed(text: text))); served?(false)
@@ -961,6 +968,28 @@ enum Sideload {
     static func records() -> [SignedRecord] { (try? Data(contentsOf: recordsURL)).map(SignedRecords.decode) ?? [] }
     static func saveRecords(_ list: [SignedRecord]) {
         try? SignedRecords.encode(list).write(to: recordsURL, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+    }
+
+    // B138: the application-identifier the installed app `bid` carries, so an update keeps it (IPASigner): our record of
+    // signing it, else installd's own answer through the pairing (records from before B138 don't have it, nor apps
+    // another signer installed). nil when it isn't installed or can't be told (no pairing, LocalDevVPN off, or no
+    // answer within 25 s: the IDevice queue may be busy pairing); installd's error 15 then still reads plainly.
+    static func installedAppID(_ bid: String, log: ((String) -> Void)? = nil) -> String? {
+        let rec = records().first { $0.bundleID == bid }
+        guard rec != nil || Workspace.isInstalled(bid) == true else { return nil }
+        if let a = rec?.appID, !a.isEmpty { return a }
+        guard IDevice.pairing() != nil else { return nil }
+        final class Box { var id: String? }
+        let box = Box(), lock = NSLock(), sem = DispatchSemaphore(value: 0)
+        IDevice.queue.async {
+            let id: String? = (try? IDevice.installedAppID(bid)) ?? nil
+            lock.lock(); box.id = id; lock.unlock()
+            sem.signal()
+        }
+        guard sem.wait(timeout: .now() + 25) == .success else { log?("iOS didn't say which App ID \(bid) has"); return nil }
+        lock.lock(); defer { lock.unlock() }
+        if let a = box.id { log?("\(bid) is installed under App ID \(a)") }
+        return box.id
     }
 
     // B136: the record is written when iOS is handed the link (serveChecked), before iOS installs anything. An install

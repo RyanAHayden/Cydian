@@ -97,6 +97,31 @@ def macho_entitlements(data):
     return None
 
 
+def ipa_type_problems(info):
+    """B174: how the Lite app types .ipa, as Feather does: its own exported UTType for the extension (conforming to
+    com.apple.itunes.ipa and public.data, never public.zip-archive, or Files unzips an IPA on a tap), opened by a
+    document type of rank Owner, in place. -> problems (empty = good)."""
+    problems = []
+    decls = info.get("UTExportedTypeDeclarations", []) + info.get("UTImportedTypeDeclarations", [])
+    by_ext = [t for t in decls if "ipa" in t.get("UTTypeTagSpecification", {}).get("public.filename-extension", [])]
+    exported = [t for t in info.get("UTExportedTypeDeclarations", []) if t in by_ext]
+    if not exported:
+        problems.append("Info.plist exports no UTType for the .ipa extension")
+    for t in by_ext:
+        conforms = t.get("UTTypeConformsTo", [])
+        if "public.zip-archive" in conforms or "public.archive" in conforms:
+            problems.append("UTType %s for .ipa conforms to an archive type (Files would unzip it)" % t.get("UTTypeIdentifier"))
+        if "public.data" not in conforms:
+            problems.append("UTType %s for .ipa does not conform to public.data" % t.get("UTTypeIdentifier"))
+    ids = {t.get("UTTypeIdentifier") for t in exported}
+    owners = [d for d in info.get("CFBundleDocumentTypes", []) if ids & set(d.get("LSItemContentTypes", []))]
+    if not owners or owners[0].get("LSHandlerRank") != "Owner":
+        problems.append("the .ipa document type is not LSHandlerRank Owner")
+    if info.get("LSSupportsOpeningDocumentsInPlace") is not True:
+        problems.append("Info.plist does not open documents in place")
+    return problems
+
+
 def check(path):
     """Problems with the IPA at path (empty list = good), and a short summary."""
     problems = []
@@ -131,6 +156,7 @@ def check(path):
     types = [u for d in info.get("CFBundleDocumentTypes", []) for u in d.get("LSItemContentTypes", [])]
     if "com.apple.itunes.ipa" not in types:
         problems.append("Info.plist does not open .ipa files")
+    problems += ipa_type_problems(info)
     for name in info.get("CFBundleIcons", {}).get("CFBundlePrimaryIcon", {}).get("CFBundleIconFiles", []) or ["?"]:
         for scale in ("@2x", "@3x"):
             png = files.get(APP + name + scale + ".png")

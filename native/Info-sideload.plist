@@ -12,11 +12,18 @@
 	<key>CFBundleDocumentTypes</key><array>
 		<dict>
 			<!-- B163: Owner, as the other sideloaders declare .ipa, so iFizBox is offered for an IPA (Quick Look's open
-			     button, the share sheet's app row) like them, not only as an alternate. -->
+			     button, the share sheet's app row) like them, not only as an alternate. B174: as Feather does, its own
+			     exported type (below, by the .ipa extension), plus com.apple.itunes.ipa for an IPA another app typed. -->
 			<key>CFBundleTypeName</key><string>iOS App</string>
-			<key>CFBundleTypeRole</key><string>Viewer</string>
+			<key>CFBundleTypeRole</key><string>Editor</string>
 			<key>LSHandlerRank</key><string>Owner</string>
-			<key>LSItemContentTypes</key><array><string>com.apple.itunes.ipa</string></array>
+			<key>LSItemContentTypes</key><array><string>com.ryha.ifizbox.ipa</string><string>com.apple.itunes.ipa</string></array>
+		</dict>
+		<dict>
+			<key>CFBundleTypeName</key><string>iOS App (TrollStore)</string>
+			<key>CFBundleTypeRole</key><string>Editor</string>
+			<key>LSHandlerRank</key><string>Alternate</string>
+			<key>LSItemContentTypes</key><array><string>com.ryha.ifizbox.tipa</string></array>
 		</dict>
 		<dict>
 			<key>CFBundleTypeName</key><string>Signing certificate</string>
@@ -50,16 +57,30 @@
 			<key>CFBundleURLSchemes</key><array><string>altstore</string><string>altstore-classic</string><string>sidestore</string><string>feather</string><string>ksign</string><string>esign</string><string>scarlet</string><string>gbox</string><string>trollapps</string><string>stikstore</string></array>
 		</dict>
 	</array>
-	<!-- No system type for .mobileprovision: declare it, so the document type above has something to match. -->
-	<key>UTImportedTypeDeclarations</key><array>
+	<!-- B174: .ipa and .tipa as iFizBox's own exported types, as Feather declares them (thewonderofyou.Feather.ipa):
+	     data and content, never public.zip-archive. Typed as a zip (the imported com.apple.itunes.ipa this replaces),
+	     Files unzipped an IPA on a tap instead of handing it to iFizBox. No MIME type: Feather's
+	     application/octet-stream would claim every untyped download. -->
+	<key>UTExportedTypeDeclarations</key><array>
 		<dict>
-			<key>UTTypeIdentifier</key><string>com.apple.itunes.ipa</string>
+			<key>UTTypeIdentifier</key><string>com.ryha.ifizbox.ipa</string>
 			<key>UTTypeDescription</key><string>iOS App</string>
-			<key>UTTypeConformsTo</key><array><string>public.data</string><string>public.zip-archive</string></array>
+			<key>UTTypeConformsTo</key><array><string>com.apple.itunes.ipa</string><string>public.data</string><string>public.content</string></array>
 			<key>UTTypeTagSpecification</key><dict>
-				<key>public.filename-extension</key><array><string>ipa</string><string>tipa</string></array>
+				<key>public.filename-extension</key><array><string>ipa</string></array>
 			</dict>
 		</dict>
+		<dict>
+			<key>UTTypeIdentifier</key><string>com.ryha.ifizbox.tipa</string>
+			<key>UTTypeDescription</key><string>iOS App (TrollStore)</string>
+			<key>UTTypeConformsTo</key><array><string>com.apple.itunes.ipa</string><string>public.data</string><string>public.content</string></array>
+			<key>UTTypeTagSpecification</key><dict>
+				<key>public.filename-extension</key><array><string>tipa</string></array>
+			</dict>
+		</dict>
+	</array>
+	<!-- No system type for .mobileprovision: declare it, so the document type above has something to match. -->
+	<key>UTImportedTypeDeclarations</key><array>
 		<dict>
 			<key>UTTypeIdentifier</key><string>com.apple.mobileprovision</string>
 			<key>UTTypeDescription</key><string>Provisioning profile</string>

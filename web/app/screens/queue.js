@@ -46,8 +46,7 @@ import { storedRoute } from "../core/installroute.js"; // B137
 import { rowIcon } from "../icons/rowicons.js";
 import { runQueue, markNeededBy } from "./queuerun.js";
 import { createQueueHint } from "../nav/queuehint.js";
-
-const EASE = "cubic-bezier(.25,.1,.25,1)";
+import { showSheet } from "../nav/sheet.js";
 
 let ctxRef = null;
 let confirm = null;   // the open Confirm sheet: { refresh(), close() }
@@ -105,37 +104,12 @@ function updateChrome() {
 
 // ---- a modal sheet with Cancel on the left and a Done-style button on the right ----------------------------------
 
+// nav/sheet.js's showSheet with a scroll body; Escape does nothing (Cancel clears the queue, so closing is the
+// buttons' job).
 export function modal({ title, left = null, right = null, cls = "" }) {
-  const sheet = el("div", `sheet ${cls}`.trim());
-  sheet.setAttribute("role", "dialog");
-  sheet.setAttribute("aria-modal", "true");
-  sheet.setAttribute("aria-label", title);
-  const bar = el("header", "navbar sheet-bar");
-  const row = el("div", "sheet-bar-row");
-  const l = el("div", "sheet-left");
-  const h1 = el("h1", "nav-title", title);
-  const r = el("div", "sheet-right");
-  if (left) l.append(left);
-  if (right) r.append(right);
-  row.append(l, h1, r);
-  bar.append(row);
-  const body = el("div", "sheet-body");
   const scroll = el("div", "sheet-scroll page-body grouped"); // page-body: clears the sheet's nav bar
-  body.append(scroll);
-  sheet.append(bar, body);
-  document.body.append(sheet);
-  sheet.animate([{ transform: "translateY(100%)" }, { transform: "none" }], { duration: 350, easing: EASE });
-  let closed = false;
-  return {
-    sheet, scroll, h1, left: l, right: r,
-    setTitle(t) { h1.textContent = t; sheet.setAttribute("aria-label", t); },
-    close() {
-      if (closed) return Promise.resolve();
-      closed = true;
-      const a = sheet.animate([{ transform: "none" }, { transform: "translateY(100%)" }], { duration: 300, easing: EASE, fill: "forwards" });
-      return a.finished.then(() => sheet.remove(), () => sheet.remove());
-    },
-  };
+  const s = showSheet({ title, body: scroll, left, right, cls, escape: false });
+  return { sheet: s.sheet, scroll, h1: s.h1, left: s.left, right: s.right, setTitle: s.setTitle, close: () => s() };
 }
 
 // ---- Confirm ---------------------------------------------------------------------------------------------------

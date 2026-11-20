@@ -45,6 +45,7 @@
 //                                          answer); every later set/done/fail is ignored. Done replaces it at the end.
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { el, barButton } from "./ui.js";
+import { showSheet } from "./sheet.js";
 import { createFollow, hudLine } from "../core/progress.js";
 import { NAME } from "../brand.js";
 import { FINISH_LABEL } from "../core/queue.js";
@@ -86,25 +87,11 @@ export const CLOSE_BY_HAND = `${NAME} didn't close by itself: close it from the 
 export const RESTART_BY_HAND = `The new ${NAME} is installed. Close ${NAME} from the app switcher and open it again to use it.`;
 
 export function openProgress({ title = "Running", onCancel = null } = {}) {
-  const sheet = el("div", "sheet console progress-page");
-  sheet.setAttribute("role", "dialog");
-  sheet.setAttribute("aria-modal", "true");
-  sheet.setAttribute("aria-label", title);
-  const bar = el("header", "navbar sheet-bar");
-  const row = el("div", "sheet-bar-row");
-  const left = el("div", "sheet-left");
-  const h1 = el("h1", "nav-title", title);
-  const right = el("div", "sheet-right");
   const cancel = barButton("Cancel");
   cancel.hidden = true;
   const close = barButton("Close");
   close.hidden = true;
-  left.append(cancel);
-  right.append(close);
-  row.append(left, h1, right);
-  bar.append(row);
 
-  const body = el("div", "sheet-body progress-body");
   const scroll = el("div", "progress-scroll");
   const out = el("div", "progress-out");
   out.setAttribute("role", "log");
@@ -130,10 +117,10 @@ export function openProgress({ title = "Running", onCancel = null } = {}) {
   alsoButton.style.order = "1"; // drawn above the finish button, after it in the DOM (the finish button stays first)
   finishButton.style.order = "2";
   foot.append(statusText, track, finishButton, alsoButton);
-  body.append(scroll, jump, foot);
-  sheet.append(bar, body);
-  document.body.append(sheet);
-  sheet.animate([{ transform: "translateY(100%)" }, { transform: "none" }], { duration: 350, easing: EASE });
+  // nav/sheet.js's scaffold; Escape does nothing (the page closes through its own buttons, which know the run)
+  const shell = showSheet({ title, body: [scroll, jump, foot], left: cancel, right: close, cls: "console progress-page",
+    bodyCls: "progress-body", escape: false });
+  const { sheet, h1, left, right } = shell;
 
   // ---- auto-scroll ----
   const follow = createFollow();
@@ -368,8 +355,7 @@ export function openProgress({ title = "Running", onCancel = null } = {}) {
       log.cancel();
       doc?.removeEventListener?.("selectionchange", onSelection);
       for (const f of closers.splice(0)) { try { f(); } catch { /* the page goes anyway */ } }
-      const a = sheet.animate([{ transform: "none" }, { transform: "translateY(100%)" }], { duration: 300, easing: EASE, fill: "forwards" });
-      return a.finished.then(() => sheet.remove(), () => sheet.remove());
+      return shell();
     },
   };
   close.addEventListener("click", () => {

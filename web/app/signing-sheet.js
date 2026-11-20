@@ -354,10 +354,8 @@ function openSignSheet(info, { onSign, onClose = () => {}, fallbackName = "" } =
     box.append(eg);
   }
 
-  const close = showSheet({ title: edits.name || "Install", body: box, onClose });
-  const sheetEl = box.closest(".sheet");
-  // nav/sheet.js's bar row is [spacer, title, right]: the spacer is the left side
-  signSheetButtons({ right: sheetEl?.querySelector(".sheet-right"), left: sheetEl?.querySelector(".sheet-bar-row")?.firstElementChild, box,
+  const close = showSheet({ title: edits.name || "Install", body: box, onClose, cls: "sign-sheet-modal" });
+  signSheetButtons({ right: close.right, left: close.left, box,
     onInstall: async () => {
       let tweaks = null; // F288: prepared here (the .debs unpacked), sent to the signer as files
       try { const p = await tg.prepared(); tweaks = p ? tweakParams(p, toBase64) : null; } catch (e) {
@@ -367,7 +365,6 @@ function openSignSheet(info, { onSign, onClose = () => {}, fallbackName = "" } =
       await tg.save();
       onSign?.({ ...edits, removeExtensions: [...edits.removeExtensions], ...(tweaks ? { tweaks } : {}) });
     }, onCancel: () => close() });
-  sheetEl?.classList.add("sign-sheet-modal");
   return close;
 }
 

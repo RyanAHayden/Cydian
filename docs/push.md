@@ -46,7 +46,9 @@ Settings shows only the Push switch and says why:
   before signing, and the old copy is deleted by hand.
 - **The profile has no Push** (no `aps-environment`): iOS gives no token. Wildcard profiles never have it; an explicit
   App ID with Push Notifications does (RSideload's and SideDrop's profiles do). `development` profiles push through
-  APNs's sandbox host, `production` (Ad Hoc, distribution) through the production one.
+  APNs's sandbox host, `production` (Ad Hoc, distribution) through the production one. Other re-signed apps can need
+  more than Push (App Groups with groups assigned, Communication and Time Sensitive Notifications):
+  docs/developer-account.md.
 - **Notifications are off** for iFizBox in iOS Settings.
 - **The server has no APNs key** (or no push database). A self-hosted Worker needs its own key from the team that
   owns its iFizBox's App ID: worker/README.md.

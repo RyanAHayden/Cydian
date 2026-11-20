@@ -123,9 +123,10 @@ The app arrives with your certificate, sources and settings, and updates itself.
 
 No certificate? [docs/developer-account.md](docs/developer-account.md).
 
-Signed apps keep their own bundle ID, so they replace the originals. With a profile that has Push (one explicit App ID
-in an Ad Hoc profile covers every app, your own or a signing service's), they get their own notifications:
-**Home > User Guides > Notifications for Signed Apps**.
+Signed apps keep their own bundle ID, so they replace the originals. With a profile that has Push, App Groups with
+groups assigned, and Communication and Time Sensitive Notifications (one explicit App ID in an Ad Hoc profile covers
+every app, your own or a signing service's), they get their own notifications:
+**Home > User Guides > Notifications for Signed Apps** and [docs/developer-account.md](docs/developer-account.md).
 
 With a paid account's App Store Connect API key (**Apple Developer Account**, in Settings > Installation & Signing
 in the app or Settings > Signing on the website), iFizBox makes each app's App ID and Ad Hoc profile itself and adds

@@ -46,21 +46,38 @@ Turn it into a `.p12`:
 
 Keep the `.p12` and its password safe: anyone with both can sign as you. The certificate lasts a year.
 
-## 3. Make an App ID with Push
+## 3. Make an App ID with Push and groups
 
 [Identifiers](https://developer.apple.com/account/resources/identifiers/list) > **+** > App IDs > App:
 
-- **Explicit**, an ID of your own such as `com.yourname.youtube`. Not a wildcard (`com.yourname.*`): Apple gives
+- **Explicit**, an ID of your own such as `com.yourname.apps`. Not a wildcard (`com.yourname.*`): Apple gives
   wildcards no Push.
-- Tick **Push Notifications**. App Groups and Associated Domains are worth ticking too, since many apps ask for them.
+- On the Capabilities tab tick **Push Notifications**, **App Groups**, **Communication Notifications** and **Time
+  Sensitive Notifications**. Associated Domains is worth ticking too. For the same coverage as a paid signing
+  service's profile, also tick App Attest, Fonts, Extended Virtual Addressing, Increased Memory Limit, Increased
+  Debugging Memory Limit and, on the App Services tab, WeatherKit. Skip the ones the Account Holder has to request
+  from Apple (Multitasking Camera Access, HealthKit's recalibrate estimates): notifications don't need them.
 - Continue, Register.
 
-One App ID with Push covers every app's notifications: iOS registers each app for push under its own Info.plist ID,
-not the App ID. Apps signed with the same App ID do share a keychain and App Groups, so they can see each other's
-sign-ins; make an App ID (and a profile) per app only if you want those kept apart.
+Then give it App Groups. Ticking the capability isn't enough: without groups assigned, the profile's
+`com.apple.security.application-groups` is an empty list.
 
-If you add a capability to an App ID later, make its profile again (step 5): a profile holds the capabilities the
-App ID had when it was made.
+1. Identifiers > **+** > **App Groups**: a description and an ID such as `group.com.yourname.apps.1`. Make five
+   (`.1` to `.5`).
+2. Open the App ID > App Groups > **Configure**, select them all, Save.
+
+Push alone isn't enough for every app. Apps that hand notifications to an extension (a modded Discord, for one) use
+whatever groups the profile gives them: with Push but an empty group list, and without Communication and Time
+Sensitive Notifications, such an app gets no notifications at all. With the groups and both notification capabilities
+it gets them. Set up all three together.
+
+One App ID set up like this covers every app's notifications: iOS registers each app for push under its own
+Info.plist ID, not the App ID. Apps signed with the same App ID do share a keychain and App Groups, so they can see
+each other's sign-ins; make an App ID (and a profile) per app only if you want those kept apart.
+
+Any change to an App ID's capabilities or groups makes every profile made from it invalid. Make the profile again
+(step 5), import the new one into iFizBox (step 6: iFizBox keeps using the identity it holds until you do) and re-sign
+the apps with it.
 
 ## 4. Register your iPhones
 
@@ -78,21 +95,28 @@ Pick the App ID, your Apple Distribution certificate and your iPhones, name it, 
 Ad Hoc, not Development: a development profile gets only Apple's sandbox push, which apps' own servers don't send to.
 Make the profile again whenever you add an iPhone.
 
-Check it has Push:
+Check what it holds:
 
 ```sh
-security cms -D -i profile.mobileprovision | grep -A1 aps-environment                          # Mac
-openssl smime -inform der -verify -noverify -in profile.mobileprovision | grep -A1 aps-environment   # elsewhere
+security cms -D -i profile.mobileprovision > profile.plist                                  # Mac
+openssl smime -inform der -verify -noverify -in profile.mobileprovision > profile.plist     # elsewhere
+grep -A3 -E 'aps-environment|application-groups|usernotifications' profile.plist
 ```
 
-It should say `production`.
+It should show `aps-environment` = `production`, `com.apple.security.application-groups` with your `group.` IDs in
+it (not an empty `<array/>`), and `com.apple.developer.usernotifications.communication` and
+`com.apple.developer.usernotifications.time-sensitive`.
 
 ## 6. Use it in iFizBox
 
 Import the `.p12`, the `.mobileprovision` and the password in **Settings > Signing** (the website) or **Settings >
 Installation & Signing** (the sideload app), and leave **Keep Bundle IDs** on. With an App Store Connect API key
 added under **Apple Developer Account** on the same page, iFizBox makes each app's App ID and profile itself and adds
-this iPhone to the account ([signing.md](signing.md#own-provisioning-profiles-app-store-connect-api-key)).
+this iPhone to the account ([signing.md](signing.md#own-provisioning-profiles-app-store-connect-api-key)). Apple's
+API can switch App Groups on but can't make or assign groups, and can't turn on Communication or Time Sensitive
+Notifications, so those App IDs get an empty group list. For an app that needs them (often one with a notification
+extension), assign groups and tick those two on its App ID on the website, or leave the API key out and sign with the
+one App ID from step 3.
 Delete the App Store copy of the app first (iOS won't sign over it), install, and allow notifications.
 
 <p align="center"><img src="img/crop-web-certificate.png" alt="Settings > Signing: Import Certificate" width="320"></p>
@@ -104,7 +128,10 @@ Delete the App Store copy of the app first (iOS won't sign over it), install, an
 - **The app installs but won't open**: Developer Mode is off (Settings > Privacy & Security > Developer Mode, iOS 16
   and later), or the certificate or profile expired.
 - **No notifications**: the profile has no `aps-environment` (Push wasn't on when it was made, or it's a development
-  profile), Keep Bundle IDs was off when the app was signed, or the app was never allowed to send notifications.
+  profile), its group list is empty or it lacks Communication and Time Sensitive Notifications (step 3), it was made
+  before the App ID last changed (invalid: make it again and re-sign), Keep Bundle IDs was off when the app was
+  signed, or the app was never allowed to send notifications. Some services push only while you're away elsewhere:
+  Discord sends to the phone only while its desktop and web clients are inactive, so quit those when testing.
 - **Every app stops opening at once**: the certificate expired or was revoked. Make a new one (step 2) and a new
   profile (step 5), then re-sign. In the sideload app, Home shows a tile when the certificate or profile is about to
   expire (Settings > Installation & Signing > Show Expiry Warning sets how early).

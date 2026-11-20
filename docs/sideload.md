@@ -218,10 +218,12 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
 - **Own profiles**: with an App Store Connect API key (Apple Developer Account on the same page,
   `native/Sources/ASC.swift`), each app signed with Keep Bundle IDs gets its own explicit App ID and Ad Hoc profile,
   made at sign time, and this iPhone is registered in the account (docs/signing.md, "Own provisioning profiles").
+  The API turns App Groups on but can't assign groups, so apps that need one (and their notification extensions)
+  need groups assigned on developer.apple.com, or the one shared App ID route (docs/developer-account.md).
 - **Signing** on the phone with iFizBox's own Swift signer (`native/sign/`, no OpenSSL, no zsign): the key stays
   in Security.framework. With Keep Bundle IDs on (the default) the app keeps its bundle ID with any profile, and
-  only the entitlements carry the profile's App ID; with a profile that has Push it gets its own server's
-  notifications, whoever signed it (docs/signing.md, "Keep Bundle IDs"). Off, an explicit profile renames the app
+  only the entitlements carry the profile's App ID; with a profile that has Push (and, for some apps, App Groups
+  and Communication and Time Sensitive Notifications) it gets its own server's notifications, whoever signed it (docs/signing.md, "Keep Bundle IDs"). Off, an explicit profile renames the app
   into a copy without notifications. Feather's arm64e fix-up (via LiveContainer) runs on every Mach-O.
 - **Installing**: Feather's Semi Local split, with iFizBox's own Signing Server (`worker/`, sign.ifizbox.com by
   default, or the user's own) in api.palera.in's place: the manifest comes from the server over HTTPS, the signed

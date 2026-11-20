@@ -184,7 +184,11 @@ re-sign; on the website, Install) asks for the app's profile first:
 
 1. The App ID: `<prefix>.<last component of the app's bundle ID>`, explicit, one per app so keychains and App Groups
    don't mix. The prefix comes from the imported profile's App ID (else `ifizbox.<team>`; `core/asc.js appIdFor`,
-   `appIdPrefix`; two apps whose IDs end the same share one). Made when missing, with Push, App Groups and Associated Domains turned on.
+   `appIdPrefix`; two apps whose IDs end the same share one). Made when missing, with Push and every other capability
+   the API can turn on (`APP_ID_CAPS`). App Groups is switched on but holds no groups (the API can't make or assign
+   them), and Communication and Time Sensitive Notifications aren't in the API, so an app that needs those (and its
+   notification extension) needs them added to its App ID on developer.apple.com, or the one shared App ID route
+   ("Keep Bundle IDs" below).
 2. This iPhone is registered in the account when its UDID is known and it isn't there yet. Without a UDID the
    profile still gets every enabled iPhone.
 3. The profile: `IOS_APP_ADHOC`, named `iFizBox <App ID>`, with every enabled iOS device and the imported
@@ -498,12 +502,21 @@ Notifications:
 - An app signed with Keep Bundle IDs on and a profile that has Push (`aps-environment`) gets its own server's
   notifications, whoever signed it. iOS registers the app for push under the bundle ID in its Info.plist, and the
   app's server sends to that ID with its own key, so the signing team doesn't matter.
-- One explicit App ID with Push in an Ad Hoc profile covers every app's notifications. A signing service's `.p12`
-  and Push profile work as well as your own account's. One App ID per app is not needed for push: it only keeps
+- Push is needed but not always enough. Apps that hand notifications to an extension (a modded Discord, for one) use
+  the profile's App Groups: with an empty `com.apple.security.application-groups` and without Communication and Time
+  Sensitive Notifications they get none. An App ID with Push, groups created and assigned on developer.apple.com, and
+  both notification capabilities works (which of the three is decisive isn't known; set up all of them).
+  docs/developer-account.md has the steps and how to check a profile.
+- One explicit App ID set up like that in an Ad Hoc profile covers every app's notifications. A signing service's
+  `.p12` and profile work as well as your own account's. One App ID per app is not needed for push: it only keeps
   apps' keychains and App Groups apart.
+- Changing an App ID's capabilities or groups makes its profiles invalid: make the profile again, import it (iFizBox
+  keeps the identity it holds until a new one is imported) and re-sign.
 - With an App Store Connect API key (Settings > Signing > Apple Developer Account, see "Own provisioning profiles"
-  above), iFizBox makes one App ID per app, with Push turned on, and an Ad Hoc profile for it. That gives each app its
-  own keychain and App Groups; for notifications alone the one Push App ID above is already enough.
+  above), iFizBox makes one App ID per app and an Ad Hoc profile for it. That gives each app its own keychain, but its
+  group list is empty and it lacks Communication and Time Sensitive Notifications (the API can't set them), so apps
+  that need groups get their notifications through the one shared App ID above, or once groups are assigned to their
+  App ID on the website.
 - Wildcard profiles never get Push (Apple doesn't allow it on a wildcard App ID). Development profiles get
   sandbox push only, which apps' own servers don't send to.
 - A renamed copy (Keep Bundle IDs off) has a bundle ID the app's server doesn't know, so it gets no notifications.
@@ -531,7 +544,7 @@ Notifications:
   Install a Copy (this time the old way, beside the original) or Cancel. My IPAs' Sign Options says it under its switch.
 - The guide: Home > User Guides > Notifications for Signed Apps (`screens/guides.js`, route `guides/keep-bundle-id`),
   linked from those warnings: an explicit App ID with Push (one for every app), the iPhones' UDIDs, an Ad Hoc
-  profile, import it. With a signing service's `.p12` and Push profile, only the last two steps apply.
+  profile, import it. (docs/developer-account.md adds the App Groups and notification capabilities some apps need.) With a signing service's `.p12` and Push profile, only the last two steps apply.
 
 ### Is this iPhone in the profile?
 

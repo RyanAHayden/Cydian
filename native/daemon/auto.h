@@ -34,13 +34,21 @@ struct auto_settings {
 
 /* Settings text: one "key=value" per line, the F13 keys without "ifizbox." (checkUpdates=off|launch|6h|daily,
  * cellular=true|false, autoInstall=off|marked|all, autoInstallIdle=true|false, respring=notify|locked,
- * keepVersions=0|1|2), plus any number of "marked=<id>" (Only Packages I Mark) and "hold=<id>" (Ignored Upgrades)
- * lines. A missing key, or a value that isn't one of its options, reads as the default (settings.js does the same).
+ * keepVersions=0|1|2), plus any number of "marked=<id>" (Only Packages I Mark), "hold=<id>" (Ignored Upgrades)
+ * and "ignore=<id>=<version>" (Ignore This Version, F282) lines. A missing key, or a value that isn't one of its options, reads as the default (settings.js does the same).
  * text NULL: all defaults. */
 void auto_settings_parse(const char *text, struct auto_settings *s);
 
 /* 1 if text has the line "<key>=<id>" (marked=, hold=). */
 int auto_listed(const char *text, const char *key, const char *id);
+
+/* F282: Ignore This Version (the app's ifizbox.ignoredVersions, {id: version}), as "ignore=<id>=<version>" settings
+ * lines. auto_ignored: 1 if settings ignores id at version, the versions equal by dpkg's order (epoch 0 = none,
+ * "01" = "1", no revision = "-0"), as core/appupdates.js splitIgnoredVersions compares them. auto_drop_ignored takes
+ * those upgrades out of list (n and kept both), so they neither count for N5 nor install for N7; returns how many. */
+int auto_same_version(const char *a, const char *b);
+int auto_ignored(const char *settings, const char *id, const char *version);
+int auto_drop_ignored(struct upd_list *list, const char *settings);
 
 /* Seconds between checks for the setting, 0 when the daemon doesn't check by itself. */
 long auto_interval(const struct auto_settings *s);

@@ -228,17 +228,23 @@ enum SelfUpdate {
 // F70: N7's daemon (native/daemon/main.m e_settings) reads the automatic-install settings from iFizBox's preferences,
 // com.ryha.ifizbox for user mobile through cfprefsd, not from the web view's localStorage. web/app/settings.js
 // createPrefsMirror sends them here at launch and on every change:
-//   prefs.set {values: {"ifizbox.<key>": string | bool | number | [string] | null}} -> nil   null removes the key
+//   prefs.set {values: {"ifizbox.<key>": string | bool | number | [string] | {string: string} | null}} -> nil
+//   null removes the key; the {string: string} map is ifizbox.ignoredVersions (F282)
 // Only the daemon's keys (core/settings.js DAEMON_KEYS, DAEMON_LISTS) are taken; anything else is refused.
 enum Prefs {
     static let domain = "com.ryha.ifizbox" as CFString
     static let scalars: Set<String> = ["ifizbox.checkUpdates", "ifizbox.cellular", "ifizbox.autoInstall",
                                        "ifizbox.autoInstallIdle", "ifizbox.respring", "ifizbox.keepVersions"]
     static let lists: Set<String> = ["ifizbox.holds", "ifizbox.autoMarked"]
+    static let maps: Set<String> = ["ifizbox.ignoredVersions"] // F282: Ignore This Version, {id: version}
 
     // The value to store, or nil to remove the key; .none when the value isn't one this key takes.
     static func value(_ key: String, _ v: Any) -> CFPropertyList?? {
         if v is NSNull { return .some(nil) }
+        if maps.contains(key) {
+            guard let d = v as? [String: Any], d.values.allSatisfy({ $0 is String }) else { return .none }
+            return .some((d as NSDictionary) as CFDictionary)
+        }
         if lists.contains(key) {
             guard let a = v as? [Any], a.allSatisfy({ $0 is String }) else { return .none }
             return .some((a as NSArray) as CFArray)

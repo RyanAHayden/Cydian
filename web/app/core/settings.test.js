@@ -447,6 +447,7 @@ test("F70: daemonPrefs: the daemon's keys with their typed values, unpicked ones
   for (const k of [...DAEMON_KEYS, ...RETIRED_DAEMON_KEYS]) assert.equal(first["ifizbox." + k], null, k);
   assert.deepEqual(first["ifizbox.holds"], []);
   assert.deepEqual(first["ifizbox.autoMarked"], []);
+  assert.deepEqual(first["ifizbox.ignoredVersions"], {}); // F282
   s.set("autoInstall", "marked");
   s.set("autoInstallIdle", false);
   s.set("keepVersions", 2);
@@ -456,8 +457,11 @@ test("F70: daemonPrefs: the daemon's keys with their typed values, unpicked ones
   assert.deepEqual(s.daemonPrefs(), {
     "ifizbox.autoInstall": "marked", "ifizbox.autoInstallIdle": false,
     "ifizbox.respring": "locked", "ifizbox.keepVersions": 2, "ifizbox.holds": ["com.h", "com.z"], "ifizbox.autoMarked": ["com.a"],
-    "ifizbox.checkUpdates": null, "ifizbox.cellular": null,
+    "ifizbox.ignoredVersions": {}, "ifizbox.checkUpdates": null, "ifizbox.cellular": null,
   });
+  // F282: Ignore This Version travels as its { id: version } object, on its own after a change.
+  s.ignoredVersions.set("com.t", "1.2");
+  assert.deepEqual(s.daemonPrefs(["ignoredVersions"]), { "ifizbox.ignoredVersions": { "com.t": "1.2" } });
   assert.deepEqual(s.daemonPrefs(["keepVersions"]), { "ifizbox.keepVersions": 2 });
   assert.deepEqual(s.daemonPrefs(["holds", "appearance"]), { "ifizbox.holds": ["com.h", "com.z"] }); // not the daemon's: left out
 });

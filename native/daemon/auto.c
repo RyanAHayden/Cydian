@@ -101,6 +101,7 @@ int auto_pick(const struct upd_list *list, const struct auto_settings *s, const 
         const struct upd_item *it = &list->items[i];
         int go = s->install == AUTO_INSTALL_ALL || (s->install == AUTO_INSTALL_MARKED && auto_listed(settings, "marked", it->id));
         if (go && (auto_listed(settings, "hold", it->id) || has_line(held, it->id, "", ""))) go = 0;
+        if (go && auto_ignored(settings, it->id, it->to)) go = 0; /* F282: Ignore This Version */
         if (go) {
             char key[2 * UPD_FIELD + 2];
             snprintf(key, sizeof key, "%s=%s", it->id, it->to);
@@ -352,6 +353,95 @@ int auto_state_waiting(const char *state) {
         p = next;
     }
     return 0;
+}
+
+/* F282: dpkg's version order (lib/dpkg/version.c verrevcmp), for one part: letters before other characters, '~'
+ * before everything (the end included), digit runs compared as numbers. */
+static int ver_order(int c) {
+    if (c >= '0' && c <= '9') return 0;
+    if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')) return c;
+    if (c == '~') return -1;
+    if (c) return c + 256;
+    return 0;
+}
+
+static int ver_part_cmp(const char *a, size_t la, const char *b, size_t lb) {
+    size_t i = 0, j = 0;
+    while (i < la || j < lb) {
+        int diff = 0;
+        while ((i < la && !(a[i] >= '0' && a[i] <= '9')) || (j < lb && !(b[j] >= '0' && b[j] <= '9'))) {
+            int ac = i < la ? ver_order((unsigned char)a[i]) : 0;
+            int bc = j < lb ? ver_order((unsigned char)b[j]) : 0;
+            if (ac != bc) return ac - bc;
+            i++;
+            j++;
+        }
+        while (i < la && a[i] == '0') i++;
+        while (j < lb && b[j] == '0') j++;
+        while (i < la && j < lb && a[i] >= '0' && a[i] <= '9' && b[j] >= '0' && b[j] <= '9') {
+            if (!diff) diff = a[i] - b[j];
+            i++;
+            j++;
+        }
+        if (i < la && a[i] >= '0' && a[i] <= '9') return 1;
+        if (j < lb && b[j] >= '0' && b[j] <= '9') return -1;
+        if (diff) return diff;
+    }
+    return 0;
+}
+
+/* A version's epoch (the digits before ':', 0 without one), upstream part and revision (after the last '-'). */
+struct ver_parts { unsigned long epoch; const char *up; size_t lup; const char *rev; size_t lrev; };
+static void ver_split(const char *v, size_t len, struct ver_parts *p) {
+    const char *colon = memchr(v, ':', len);
+    p->epoch = 0;
+    if (colon) {
+        for (const char *q = v; q < colon; q++) p->epoch = p->epoch * 10 + (unsigned long)(*q >= '0' && *q <= '9' ? *q - '0' : 0);
+        len -= (size_t)(colon + 1 - v);
+        v = colon + 1;
+    }
+    const char *dash = NULL;
+    for (size_t i = 0; i < len; i++) if (v[i] == '-') dash = v + i;
+    p->up = v;
+    p->lup = dash ? (size_t)(dash - v) : len;
+    p->rev = dash ? dash + 1 : v + len;
+    p->lrev = dash ? len - p->lup - 1 : 0;
+}
+
+static int same_version_n(const char *a, size_t la, const char *b, size_t lb) {
+    struct ver_parts x, y;
+    ver_split(a, la, &x);
+    ver_split(b, lb, &y);
+    return x.epoch == y.epoch && !ver_part_cmp(x.up, x.lup, y.up, y.lup) && !ver_part_cmp(x.rev, x.lrev, y.rev, y.lrev);
+}
+
+int auto_same_version(const char *a, const char *b) {
+    return a && b && same_version_n(a, strlen(a), b, strlen(b));
+}
+
+int auto_ignored(const char *settings, const char *id, const char *version) {
+    size_t li = strlen(id);
+    if (!li || !version || !version[0]) return 0;
+    for (const char *p = settings; p && *p; ) {
+        size_t n;
+        const char *next = line(p, &n);
+        if (n > 7 + li + 1 && !memcmp(p, "ignore=", 7) && !memcmp(p + 7, id, li) && p[7 + li] == '=')
+            if (same_version_n(p + 8 + li, n - 8 - li, version, strlen(version))) return 1;
+        p = next;
+    }
+    return 0;
+}
+
+int auto_drop_ignored(struct upd_list *list, const char *settings) {
+    int k = 0, dropped = 0;
+    for (int i = 0; i < list->kept; i++) {
+        if (auto_ignored(settings, list->items[i].id, list->items[i].to)) { dropped++; continue; }
+        if (k != i) list->items[k] = list->items[i];
+        k++;
+    }
+    list->kept = k;
+    list->n -= dropped;
+    return dropped;
 }
 
 int auto_safe_id(const char *id) {
@@ -644,6 +734,16 @@ static char *file_list(const char *info, const char *id) {
 }
 
 /* Simulate dist-upgrade into list (names from dpkg's status). 0 when apt failed. */
+/* F282: plan() less the upgrades at a version the user chose Ignore This Version for ("ignore=" settings lines): they
+ * neither count (badge, notification, state) nor install by themselves; a newer version does both again. */
+static int plan(const struct auto_env *env, struct upd_list *list);
+static int plan_kept(const struct auto_env *env, struct upd_list *list, const char *settings) {
+    if (!plan(env, list)) return 0;
+    int k = auto_drop_ignored(list, settings);
+    if (k) say(env, "%d upgrade%s at an ignored version left out", k, k == 1 ? "" : "s");
+    return 1;
+}
+
 static int plan(const struct auto_env *env, struct upd_list *list) {
     char *out = NULL;
     int st = env->simulate(env->ctx, NULL, 0, &out);
@@ -702,7 +802,7 @@ int auto_step(const struct auto_env *env, int force, int update, int dry, struct
     if (!want) goto save;
     if (checked && update && env->update(env->ctx) != 0)
         say(env, "apt-get update failed; counting from the lists there are");
-    if (!plan(env, before)) goto save;
+    if (!plan_kept(env, before, settings)) goto save;
     struct upd_list *now_list = before;
 
     /* 4. Automatic installs. */
@@ -790,7 +890,7 @@ int auto_step(const struct auto_env *env, int force, int update, int dry, struct
             free(out);
         }
         /* What's left to upgrade, for the badge and the state. */
-        if (!dry && (installed || failed) && plan(env, after)) now_list = after;
+        if (!dry && (installed || failed) && plan_kept(env, after, settings)) now_list = after;
     }
 
     int action = installed ? auto_respring_action(&s, need, env->locked(env->ctx)) : AUTO_DO_NOTHING;

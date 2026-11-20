@@ -9,7 +9,7 @@ const store = new Map();
 Object.defineProperty(globalThis, "localStorage", { configurable: true, writable: true,
   value: { getItem: (k) => store.get(k) ?? null, setItem: (k, v) => store.set(k, String(v)), removeItem: (k) => store.delete(k) } });
 
-const { followSelfUpdate, installOnDevice, SELF_UPDATE_LINES, forgetRoute } = await import("./signing-client.js");
+const { followSelfUpdate, installOnDevice, SELF_UPDATE_LINES, forgetRoute, HERE_CLOSING_LINE } = await import("./signing-client.js");
 const { lockSelfUpdate, WAITING_LABEL, CLOSING_LABEL, RETURN_LABEL, CLOSE_GRACE, CLOSE_BY_HAND, RESTART_BY_HAND } = await import("./nav/progress.js");
 const { BUNDLE_ID } = await import("./brand.js");
 
@@ -78,11 +78,37 @@ test("installOnDevice on This iPhone: iFizBox still open after installd answered
     } };
     assert.equal(await installOnDevice({ url: "https://e.example/x.ipa", name: "X", host: true }, { native: n, hud: () => h,
       later: () => assert.fail("no timer"), follow: () => assert.fail("not followed") }), true);
-    assert.ok(!calls.includes("signing.selfUpdate"));
+    assert.ok(calls.includes("signing.selfUpdate"), "B159: asks whether the shell is closing (it isn't: null)");
     assert.ok(lines.some(([k, t]) => k === "step" && t === RESTART_BY_HAND));
     assert.equal(finishes.length, 1);
     assert.ok(!finishes[0].locked);
     assert.notEqual(finishes[0].label, CLOSING_LABEL);
+  } finally { store.delete("ifizbox.installRoute"); forgetRoute(); }
+});
+
+test("installOnDevice on This iPhone (B159): the shell answered for installd and is closing: locked Closing, then by hand", async () => {
+  store.set("ifizbox.installRoute", "iphone");
+  forgetRoute();
+  try {
+    const { h, lines, finishes } = fakeHUD();
+    const timers = [];
+    const n = { mode: "sideload", async call(m, p, onEvent) {
+      if (m === "idevice.status") return { paired: "rp", localDevVPN: true };
+      if (m === "signing.install") { assert.equal(p.route, "idevice"); return { bundleId: BUNDLE_ID, version: "2.0" }; }
+      if (m === "signing.selfUpdate") { onEvent?.({ state: "finished" }); return { state: "finished" }; }
+      return null;
+    } };
+    assert.equal(await installOnDevice({ url: "https://e.example/x.ipa", name: "X", host: true }, { native: n, hud: () => h,
+      later: (f, ms) => timers.push({ f, ms }), follow: () => assert.fail("not followed") }), true);
+    assert.ok(lines.some(([k, t]) => k === "step" && t === HERE_CLOSING_LINE));
+    assert.ok(!lines.some(([, t]) => t === RESTART_BY_HAND));
+    assert.deepEqual([finishes.at(-1).label, finishes.at(-1).locked], [CLOSING_LABEL, true]);
+    const grace = timers.find((t) => t.ms === CLOSE_GRACE);
+    assert.ok(grace, "a grace timer");
+    grace.f();
+    assert.deepEqual(lines.at(-1), ["error", CLOSE_BY_HAND]);
+    assert.equal(finishes.at(-1).label, RETURN_LABEL);
+    assert.ok(!finishes.at(-1).locked);
   } finally { store.delete("ifizbox.installRoute"); forgetRoute(); }
 });
 

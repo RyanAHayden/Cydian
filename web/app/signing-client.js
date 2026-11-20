@@ -492,6 +492,8 @@ async function installOnDeviceOnce({ url, name = "", onInstalled = () => {}, par
     // didn't. The new version is in place: say to close it by hand (no locked "Closing" that never closes)
     onInstalled(result);
     if (typeof h.finish === "function") {
+      // B159: unless the shell answered because installd stood waiting for it, and is closing itself now
+      if (await followHereSelf(h, { native, later })) return true;
       h.page?.step?.(RESTART_BY_HAND);
       h.finish({ label: RETURN_LABEL, status: "Installed" });
     } else later(() => (h.done ? h.done("Done") : h.hide()), 1200);
@@ -567,6 +569,25 @@ export async function followSelfUpdate(h, { native, retry = null, waiting = fals
   if (SELF_UPDATE_FAILED[s]) unlockSelfUpdate(h, { message: SELF_UPDATE_FAILED[s], retry });
   else if (waiting && !s) byHand();
   return s;
+}
+
+// B159: This iPhone, iFizBox itself: on iOS 17.4+ installd waits for the running copy to go instead of ending it, so
+// the shell answers the install once installd stands still and then closes itself (native CloseForUpdate.hereReady,
+// signing.selfUpdate "finished"). Then the page locks on "Closing iFizBox" with the shell's line, as the hosted route
+// does, and says to close it by hand if iFizBox is still here CLOSE_GRACE later. -> true when it is closing; false
+// (installd answered while iFizBox lived, or an older shell) leaves the caller's "close it by hand" end.
+export const HERE_CLOSING_LINE = `iOS has the new ${NAME} and is waiting for this one to close. Closing so it can finish installing it`;
+export async function followHereSelf(h, { native, later = setTimeout } = {}) {
+  const s = await watchSelfUpdate(() => {}, native);
+  if (s !== "finished" || typeof h?.finish !== "function") return false;
+  h.page?.step?.(HERE_CLOSING_LINE);
+  h.finish({ label: CLOSING_LABEL, status: "Done", locked: true });
+  later(() => {
+    if (h?.page?.closed) return;
+    h.page?.error?.(CLOSE_BY_HAND);
+    h.finish({ label: RETURN_LABEL, status: "Done" });
+  }, CLOSE_GRACE);
+  return true;
 }
 
 // B123: signing.selfUpdate's states as they come (onState(state)) -> the last one, or null (an older shell without the

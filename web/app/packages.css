@@ -386,7 +386,7 @@ html[data-theme="dark"] .search-field::after { background-color: var(--dk-clear)
 
 /* Search's root page: the bar and scope row fixed at the top, the results their own scroller below. C10: every page
    with the shared search bar (nav/searchbar.js pinned): Sources, Changes, Installed, My IPAs. Whatever a page pins
-   (Sources' refresh strip too) keeps its height; only while the scroller is there (a page redrawn without its bar,
+   keeps its height; only while the scroller is there (a page redrawn without its bar,
    an error note, scrolls as any page). */
 .page-body.search-root:has(> .search-results) { overflow: hidden; display: flex; flex-direction: column; }
 .search-root > :not(.search-results) { flex: none; }
@@ -862,20 +862,8 @@ html.has-manage-toolbar .page-body::after { content: ""; display: block; flex: n
 html[data-theme="dark"] .dep-piracy .dep-review-title { color: var(--dk-bad); }
 .dep-piracy .dep-label { margin: 4px 0; }
 
-/* F233: Sources' refresh, one row per source. The strip under the nav bar ("Refreshing 5 of 8…", then "6 refreshed,
-   2 failed"): the dark translucent band of the reload bar (nav/reloadbar.js), 24px, bold white with the kit's -1px
-   emboss; it sticks under the nav bar and the category bars stick under it. */
-.refresh-strip {
-  position: sticky; top: 0; z-index: 3; height: 24px; padding: 0 12px;
-  font-size: 13px; font-weight: bold; line-height: 24px; color: #fff; text-align: center; text-shadow: 0 -1px 0 rgba(0,0,0,.8);
-  background: rgba(0,0,0,.72); overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
-}
-.refresh-strip[hidden] { display: none; }
-/* The strip only pushes headers that scroll in the same box as it. On the pinned layout (nav/searchbar.js pinned) the
-   strip sits above the list's own scroller (.search-results), so its headers keep top: 0 and follow the strip and the
-   bar as they come and go (B126: a 24px offset there hung the header over the first row). */
-.page-body:not(.search-root):has(> .refresh-strip:not([hidden])) .section-header { top: 24px; }
-/* A row the run hasn't reached: grey "Waiting" where its count goes; no count, no chevron yet. */
+/* F233: Sources' refresh, one row per source (no count strip over the list: the reload bar says what is happening).
+   A row the run hasn't reached: grey "Waiting" where its count goes; no count, no chevron yet. */
 .row-waiting { flex: none; font-size: 14px; color: var(--subtitle); }
 .source-row.is-waiting .cell-count { display: none; }
 .source-row.is-waiting .cell-inner.chevron::after { display: none; }

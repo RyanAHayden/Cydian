@@ -7,7 +7,7 @@
 //   rows.fail(key, reason)                   // failed before its record came (apt's Err line, live)
 //   rows.get(key) -> { state, count, reason } | null      rows.counts() -> { total, done, failed, waiting, loading }
 //   rows.finish()                            // the run is over: rows still waiting or loading count as done
-//   stripText(rows.counts(), running)        // "Refreshing 5 of 8…" / "6 refreshed, 2 failed"
+//   tabBadge(rows.counts(), running)         // the Sources tab's badge: "spinner", then the failure count or null
 //
 // States: waiting (grey "Waiting", the run hasn't reached it), loading (spinner), done (its package count),
 // failed (red badge, the reason in red under its name; a tap refreshes only that source).
@@ -70,16 +70,6 @@ export function refreshRows(keys = []) {
 }
 
 const numberOr = (n) => (typeof n === "number" && Number.isFinite(n) ? n : null);
-
-// The strip under the nav bar. While running, the source being worked on: one past those that have landed, at most
-// the total ("Refreshing 5 of 8…"). Afterwards what came of it ("6 refreshed, 2 failed", "8 refreshed").
-export function stripText(counts, running) {
-  const total = counts?.total ?? 0;
-  const done = counts?.done ?? 0;
-  const failed = counts?.failed ?? 0;
-  if (running) return `Refreshing ${Math.min(total, done + failed + 1)} of ${total}…`;
-  return failed ? `${done} refreshed, ${failed} failed` : `${done} refreshed`;
-}
 
 // The Sources tab's badge: a spinner while a refresh runs, then how many sources failed (none: no badge).
 export function tabBadge(counts, running) {

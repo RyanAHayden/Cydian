@@ -1,7 +1,7 @@
 // F233: the Sources rows while a refresh runs, the strip's words and the tab badge (core/refreshrows.js).
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { refreshRows, stripText, tabBadge, coalesce, ROW } from "./refreshrows.js";
+import { refreshRows, tabBadge, coalesce, ROW } from "./refreshrows.js";
 
 test("F233: rows start Waiting, spin when started, land with their count or fail with a reason", () => {
   const rows = refreshRows(["a", "b", "c", "a"]);
@@ -44,14 +44,6 @@ test("F233: finish() lands rows never heard of; retry() spins one failed row aga
   rows.land({ key: "c", count: 7 });
   rows.finish();
   assert.deepEqual(rows.counts(), { total: 3, done: 3, failed: 0, waiting: 0, loading: 0 });
-});
-
-test("F233: the strip says which source of how many, then what came of it", () => {
-  assert.equal(stripText({ total: 8, done: 3, failed: 1 }, true), "Refreshing 5 of 8…");
-  assert.equal(stripText({ total: 8, done: 7, failed: 1 }, true), "Refreshing 8 of 8…", "never past the total");
-  assert.equal(stripText({ total: 8, done: 0, failed: 0 }, true), "Refreshing 1 of 8…");
-  assert.equal(stripText({ total: 8, done: 6, failed: 2 }, false), "6 refreshed, 2 failed");
-  assert.equal(stripText({ total: 8, done: 8, failed: 0 }, false), "8 refreshed");
 });
 
 test("F233: the Sources badge spins while running, then counts failures", () => {

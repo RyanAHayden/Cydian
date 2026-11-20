@@ -26,16 +26,15 @@ import { pullToRefresh } from "../nav/pullrefresh.js";
 import { reloadSteps } from "../core/reloadsteps.js";
 import { showBanner } from "../nav/banner.js";
 import { failedBanner, FAILED_BANNER_MS } from "../core/aptupdate.js";
-import { refreshRows, stripText, tabBadge, coalesce, ROW } from "../core/refreshrows.js";
+import { refreshRows, tabBadge, coalesce, ROW } from "../core/refreshrows.js";
 
 export const title = "Sources";
 
 // F233: while a refresh runs, every row shows where its source is (core/refreshrows.js): grey Waiting, the spinner,
 // then its package count, or a red badge with the reason in red under its name. A tap on a failed row refreshes that
-// source alone (retry). The strip under the nav bar counts ("Refreshing 5 of 8…", then "6 refreshed, 2 failed"),
-// the Sources tab's badge spins and then counts the failures, and the page can be left while it runs. Each source's
-// packages go to the catalog (Changes, Search) as soon as it has landed, not after the last one.
-const STRIP_HIDE_MS = 4000; // a summary with nothing failed goes after this; one with failures stays
+// source alone (retry). The reload bar (nav/reloadbar.js) says what is happening, the Sources tab's badge spins and
+// then counts the failures, and the page can be left while it runs. No count strip over the list: Cydia has none.
+// Each source's packages go to the catalog (Changes, Search) as soon as it has landed, not after the last one.
 
 const state = {
   sources: null,   // the list as last loaded, sorted
@@ -48,9 +47,6 @@ const state = {
   box: null,        // F19: where the list goes, under the search box
   rows: null,       // F233: the last refresh's rows (core/refreshrows.js), kept after it ends for the failed ones
   running: false,   // F233: a refresh (or a row's retry) is under way
-  retrying: null,   // F233: the key a retry runs for
-  strip: null,      // F233: the strip under the nav bar
-  stripTimer: null,
 };
 
 const byKey = (key) => state.sources?.find((s) => s.key === key);
@@ -133,7 +129,6 @@ export function render(el, route, ctx) {
   state.body = el;
   state.ctx = ctx; // F233: a failed row's retry, from the list's click handler
   draw();
-  paintStrip();
   load(ctx);
 }
 
@@ -237,7 +232,6 @@ function markLoading(ctx, keys) {
     if (i >= 0) state.sources[i] = done;
     state.rows?.land(done);
     paintKey(done?.key);
-    paintStrip();
     feedCatalog(ctx);
     // every source has answered: the badge stops spinning and counts the failures (the catalog load may go on)
     if (!state.loading.size) { ctx?.setBadge?.("sources", tabBadge(state.rows?.counts(), false)); announce(); }
@@ -250,7 +244,6 @@ function clearLoading(ctx) {
   state.running = false;
   ctx?.setBadge?.("sources", tabBadge(state.rows?.counts(), false));
   paintAll();
-  paintStrip();
 }
 
 // F233: apt's live lines (backend-native) and the pools (core/sources.js, core/altstore.js) say when a source starts,
@@ -260,7 +253,6 @@ function rowEvent(key, rowState, reason) {
   if (rowState === ROW.failed) state.rows.fail(key, reason);
   else state.rows.set(key, rowState);
   paintKey(key);
-  paintStrip();
 }
 
 // F233: a landed source's packages into the catalog at once (ctx.loadData: catalog.ensure, which reads only the
@@ -277,7 +269,7 @@ function feedCatalog(ctx) {
   feeding();
 }
 
-// ---- F233: the rows' states, the strip and the retry --------------------------------------------------------
+// ---- F233: the rows' states and the retry --------------------------------------------------------------------
 
 const rowOf = (key) => document.querySelector(`.source-row[data-key="${CSS.escape(String(key))}"]`);
 function paintKey(key) { const li = key == null ? null : rowOf(key); if (li) paintRow(li); }
@@ -326,43 +318,17 @@ function paintRow(li) {
   else inner.removeAttribute("aria-description");
 }
 
-function stripEl() {
-  if (state.strip) return state.strip;
-  const el = document.createElement("div");
-  el.className = "refresh-strip";
-  el.setAttribute("role", "status");
-  el.setAttribute("aria-live", "polite");
-  el.hidden = true;
-  return (state.strip = el);
-}
-
-function paintStrip() {
-  if (!state.strip && !state.body) return; // Sources hasn't been drawn: draw() makes the strip and paints it then
-  const el = stripEl();
-  clearTimeout(state.stripTimer);
-  state.stripTimer = null;
-  const rows = state.rows;
-  if (!rows || !rows.counts().total) { el.hidden = true; return; }
-  const counts = state.retrying != null ? { total: 1, done: 0, failed: 0 } : rows.counts();
-  el.textContent = stripText(counts, state.running);
-  el.classList.toggle("has-failed", !state.running && counts.failed > 0);
-  el.hidden = false;
-  if (!state.running && !counts.failed) state.stripTimer = setTimeout(() => { el.hidden = true; }, STRIP_HIDE_MS);
-}
-
 // F233: a tap on a failed row: that source alone refreshes (the app runs apt-get update for its list only, through
-// refreshSources' `retry`), its row spinning, the strip saying so; afterwards the strip and the badge count again.
+// refreshSources' `retry`), its row spinning; afterwards the badge counts the failures again.
 export async function retrySource(ctx, key) {
   if (state.busy || !state.rows?.has(key)) return false;
   state.busy = true;
   state.running = true;
-  state.retrying = key;
   state.rows.retry(key);
   state.loading.add(key);
   announce();
   ctx?.setBadge?.("sources", "spinner");
   paintKey(key);
-  paintStrip();
   let landed = false;
   try {
     await getBackend().refreshSources((d) => {
@@ -378,7 +344,6 @@ export async function retrySource(ctx, key) {
     state.rows?.fail(key, e?.message || String(e));
   } finally {
     state.loading.delete(key);
-    state.retrying = null;
     state.running = false;
     state.busy = false;
     runAgain(ctx); // B75
@@ -386,7 +351,6 @@ export async function retrySource(ctx, key) {
     announce();
     ctx?.setBadge?.("sources", tabBadge(state.rows?.counts(), false));
     paintKey(key);
-    paintStrip();
   }
   return true;
 }
@@ -462,7 +426,7 @@ export function startRun(ctx, keys) {
   const cancel = () => {
     if (ac.signal.aborted) return;
     ac.abort();
-    state.rows = null; // F233: cancelled: no rows, strip or failure count from a run that didn't finish
+    state.rows = null; // F233: cancelled: no rows or failure count from a run that didn't finish
     clearLoading(ctx);
     bar?.hide();
     stop();
@@ -506,13 +470,12 @@ function draw() {
     return;
   }
   const bar = sourcesSearchBar();
-  const strip = stripEl(); // F233: under the nav bar, above the search box
-  // C10: the strip and the bar stay put; the list scrolls under them (nav/searchbar.js pinned).
+  // C10: the bar stays put; the list scrolls under it (nav/searchbar.js pinned).
   const results = state.box?.parentNode;
-  if (!state.box || results?.parentNode !== el || bar.parentNode !== el || strip.parentNode !== el) {
+  if (!state.box || results?.parentNode !== el || bar.parentNode !== el) {
     state.box = document.createElement("div");
     el.replaceChildren();
-    pinned(el, strip, bar).append(state.box);
+    pinned(el, bar).append(state.box);
   }
   // F270: pull the list down past its top: Refresh, as the nav button.
   pullToRefresh(state.box.parentNode, { onRefresh: () => refresh(state.ctx), busy: () => state.busy || state.running, settings });

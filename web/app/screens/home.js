@@ -236,26 +236,61 @@ export function browsePage(path) {
   return { page: "browse" };
 }
 
+// The tab's routes, one entry each: `match` is the route's first path segment (null: the tab's root, also anything
+// unknown), `nav` its bar, `render` its page. nav() and render() below only look the route up here.
+const ROUTES = [
+  { match: "credits", nav: () => ({ title: "Credits" }), render: (body) => renderCredits(body) },
+  { match: "guides", nav: (route) => guides.nav(route, guidesLite()), render: (body, route) => { guides.render(body, route, { lite: guidesLite() }); } }, // F157
+  { match: "help", nav: () => ({ title: "Help" }), render: (body) => renderHelp(body) },
+  { match: "why", nav: () => why.nav(), render: (body) => { why.render(body, { mode: settings.mode, install: () => installiFizBox() }); } }, // F303
+  { match: "featured", nav: () => ({ title: "Featured" }), render: (body) => renderFeatured(body) },
+  { match: "sources", nav: () => ({ title: "More Sources" }), render: (body, route, ctx) => renderSources(body, ctx) },
+  { match: "browse", nav: (route) => browseRoute(route).nav(route), render: (body, route, ctx) => browseRoute(route).render(body, route, ctx) },
+  // F102; F125 moved its row to Installed, the route stays for old links
+  { match: "wishlist",
+    nav: (route) => route.path.length === 1 ? { title: "Wish List", style: "plain" } : browse.nav(route),
+    render: (body, route, ctx) => route.path.length === 1 ? browse.renderWishlist(body, route) : browse.render(body, route, ctx) },
+  { match: null, nav: (route, ctx) => homeNav(ctx), render: (body) => renderRoot(body) },
+];
+
+// Browse's pages (F46, browsePage's `page`), the same way: `match` is the page, null for browse.js's own pages.
+const BROWSE_ROUTES = [
+  { match: "root", nav: () => browse.browseHomeNav(), // F154: "Browse", the Featured / New / Top 25 drop-down as its title
+    render: (body, route) => browse.renderBrowseHome(body, route, { jailbroken: showsThemes(settings.deviceType()), featured: featuredRows, headers: dayHeaders }) },
+  { match: "roulette", nav: () => roulette.nav(), render: (body, route) => roulette.render(body, route, { jailbroken: showsThemes(settings.deviceType()) }) },
+  { match: "categories", nav: () => ({ title: "All Categories" }), render: (body) => renderCategories(body) },
+  { match: "collection", nav: (route, b) => ({ title: collection(b.value).title, style: "plain" }),
+    render: (body, route, ctx, b) => {
+      const c = collection(b.value);
+      return browse.renderSearchableList(body, route, () => catalog.collection(c.id), { letters: true, label: `Search ${c.title}`,
+        empty: `None of your sources' packages fit ${c.title} yet.` });
+    } },
+  { match: "list", nav: (route, b) => ({ title: browseList(b.value).title, style: "plain" }),
+    render: (body, route, ctx, b) => {
+      const v = LIST_VIEW[b.value];
+      return browse.renderSearchableList(body, route, v.rows, { letters: Boolean(v.letters), headers: v.headers ?? null,
+        empty: v.empty, label: `Search ${browseList(b.value).title}` });
+    } },
+  { match: "category", nav: (route, b) => ({ title: b.value || "Browse", style: "plain" }),
+    render: (body, route, ctx, b) => browse.renderSearchableList(body, route, () => catalog.browse(b.value), { letters: true, label: `Search ${b.value}` }) },
+  { match: null, nav: (route) => browse.nav(route), render: (body, route, ctx) => browse.render(body, route, ctx) },
+];
+
+const lookUp = (table, key) => table.find((r) => r.match === key) ?? table.find((r) => r.match === null);
+const homeRoute = (route) => lookUp(ROUTES, route.path[0]);
+// The Browse entry for a browse/... route, its nav/render bound to browsePage's result.
+function browseRoute(route) {
+  const b = browsePage(route.path);
+  const r = lookUp(BROWSE_ROUTES, b.page);
+  return { nav: (rt) => r.nav(rt, b), render: (body, rt, ctx) => r.render(body, rt, ctx, b) };
+}
+
 export function nav(route, ctx) {
-  if (route.path[0] === "browse") {
-    const b = browsePage(route.path);
-    if (b.page === "root") return browse.browseHomeNav(); // F154: "Browse", the Featured / New / Top 25 drop-down as its title
-    if (b.page === "roulette") return roulette.nav();
-    if (b.page === "categories") return { title: "All Categories" };
-    if (b.page === "collection") return { title: collection(b.value).title, style: "plain" };
-    if (b.page === "list") return { title: browseList(b.value).title, style: "plain" };
-    if (b.page === "category") return { title: b.value || "Browse", style: "plain" };
-    return browse.nav(route);
-  }
-  switch (route.path[0]) {
-    case "credits": return { title: "Credits" };
-    case "guides": return guides.nav(route, guidesLite()); // F157
-    case "help": return { title: "Help" };
-    case "why": return why.nav(); // F303
-    case "featured": return { title: "Featured" };
-    case "sources": return { title: "More Sources" };
-    case "wishlist": return route.path.length === 1 ? { title: "Wish List", style: "plain" } : browse.nav(route); // F102; F125 moved its row to Installed, the route stays for old links
-  }
+  return homeRoute(route).nav(route, ctx);
+}
+
+// Home's own bar, at the tab's root.
+function homeNav(ctx) {
   return {
     title: NAME,
     back: "Home", // the back button above it reads Home, as Cydia's
@@ -960,27 +995,6 @@ const LIST_VIEW = {
   "free-themes": { rows: () => catalog.free("themes"), letters: true },
 };
 
-function renderBrowseRoute(body, route, ctx) {
-  const b = browsePage(route.path);
-  if (b.page === "root") {
-    return browse.renderBrowseHome(body, route, { jailbroken: showsThemes(settings.deviceType()), featured: featuredRows, headers: dayHeaders });
-  }
-  if (b.page === "roulette") return roulette.render(body, route, { jailbroken: showsThemes(settings.deviceType()) });
-  if (b.page === "categories") return renderCategories(body);
-  if (b.page === "collection") {
-    const c = collection(b.value);
-    return browse.renderSearchableList(body, route, () => catalog.collection(c.id), { letters: true, label: `Search ${c.title}`,
-      empty: `None of your sources' packages fit ${c.title} yet.` });
-  }
-  if (b.page === "list") {
-    const v = LIST_VIEW[b.value];
-    return browse.renderSearchableList(body, route, v.rows, { letters: Boolean(v.letters), headers: v.headers ?? null,
-      empty: v.empty, label: `Search ${browseList(b.value).title}` });
-  }
-  if (b.page === "category") return browse.renderSearchableList(body, route, () => catalog.browse(b.value), { letters: true, label: `Search ${b.value}` });
-  return browse.render(body, route, ctx);
-}
-
 // Recommended Sources: one row per curated repo; a tap asks, checks the repo and adds it. Listed ones are ticked.
 function renderSources(body, ctx) {
   const box = el("div");
@@ -1028,17 +1042,7 @@ function renderSources(body, ctx) {
 }
 
 export function render(el, route, ctx) {
-  switch (route.path[0]) {
-    case "credits": return renderCredits(el);
-    case "guides": guides.render(el, route, { lite: guidesLite() }); return; // F157
-    case "help": return renderHelp(el);
-    case "why": why.render(el, { mode: settings.mode, install: () => installiFizBox() }); return; // F303
-    case "featured": return renderFeatured(el);
-    case "sources": return renderSources(el, ctx);
-    case "browse": return renderBrowseRoute(el, route, ctx);
-    case "wishlist": return route.path.length === 1 ? browse.renderWishlist(el, route) : browse.render(el, route, ctx);
-    default: return renderRoot(el);
-  }
+  return homeRoute(route).render(el, route, ctx);
 }
 
 // I7: iFizBox's .deb for a jailbroken visitor's arch: the latest release's asset for it (GitHub's API, which answers

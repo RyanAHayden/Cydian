@@ -145,8 +145,7 @@ test("its styles go in once and use the theme's tokens, no literal text colours"
 test("Home links it high and keeps it open while locked; the Not-an-iPhone page offers it", () => {
   const home = read("./home.js");
   assert.match(home, /OPEN_WHILE_LOCKED = new Set\(\[[^\]]*"why"/);
-  assert.match(home, /case "why": return why\.nav\(\)/);
-  assert.match(home, /case "why": why\.render\(/);
+  assert.match(home, /\{ match: "why", nav: \(\) => why\.nav\(\), render: \(body\) => \{ why\.render\(/);
   assert.match(home, /whyRow\.hidden = !why\.showsWhyTile\(settings\.mode, why\.whyOpened\(\)\)/);
   // right under the welcome and hint, above GitHub | Discord
   assert.match(home, /hintBox,\n\s+whyRow,\n\s+tileRow\("pair",/);

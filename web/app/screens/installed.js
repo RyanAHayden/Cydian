@@ -87,6 +87,7 @@ import { resignJob, appJob, markedResignJob, markedVersionOnSource, markedResign
 import { hudLine } from "../core/progress.js";
 import { deviceError } from "../core/signing.js";
 import { getBackend } from "../backend.js";
+import { nativeBridge, hasNativeCall } from "../native.js"; // C30
 import { liveHUD } from "../nav/hud.js";
 import { onPageOpen } from "../nav/pagestate.js";
 import { pageViews } from "../nav/pageviews.js"; // C25
@@ -155,7 +156,7 @@ const appsLive = () => appViews.all();
 // ---- F127: modes, kinds and search -----------------------------------------------------------------------------
 
 // Whether install dates can be read (the jailbreak app: apt.installDates), so Recent can be offered.
-export function canReadDates(native = globalThis.ifizboxNative) {
+export function canReadDates(native = nativeBridge()) {
   return typeof native?.call === "function" && typeof native?.dpkgStatus === "function";
 }
 
@@ -193,7 +194,7 @@ export function appSections(rows, { mode = "user", query = "", locale } = {}) {
 }
 
 // { package: seconds } from apt.installDates (the jailbreak app), or null where it can't be read.
-export async function installDates(native = globalThis.ifizboxNative) {
+export async function installDates(native = nativeBridge()) {
   if (!canReadDates(native)) return null;
   try {
     const d = await native.call("apt.installDates", {});
@@ -203,7 +204,7 @@ export async function installDates(native = globalThis.ifizboxNative) {
 
 // F130: a Set of the packages apt marked Auto-Installed (apt.autoInstalled, the jailbreak app), or null where the
 // marks can't be read: no dpkg (the site, the sideload build), an older shell, or no extended_states file.
-export async function autoInstalled(native = globalThis.ifizboxNative) {
+export async function autoInstalled(native = nativeBridge()) {
   if (!canReadDates(native)) return null;
   try {
     const list = await native.call("apt.autoInstalled", {});
@@ -392,7 +393,7 @@ async function load(view) {
 // ---- F228: known malware (core/known-malware.js), in the jailbreak app ----------------------------------------
 
 // What malware.scan (Apt.swift) found, as findings; [] where it can't look (the site, the sideload build, an older shell).
-export async function scanMalware(native = globalThis.ifizboxNative, mode = detectMode()) {
+export async function scanMalware(native = nativeBridge(), mode = detectMode()) {
   if (mode !== "jailbreak" || typeof native?.call !== "function") return [];
   try { return malwareFindings(await native.call("malware.scan", scanRequest())); } catch { return []; }
 }
@@ -645,7 +646,7 @@ export function withSignatures(rows, installed, { now = new Date(), window, show
 }
 
 // signing.installed in the sideload app; null anywhere else or when the call fails.
-async function signedApps(native = globalThis.ifizboxNative) {
+async function signedApps(native = nativeBridge()) {
   if (detectMode() !== "sideload" || typeof native?.call !== "function") return null;
   try { return await signedAppsNamed(native); } catch { return null; } // B150: a source app keeps its source name
 }
@@ -1074,7 +1075,7 @@ export function deleteAction(r, { mode = detectMode() } = {}) {
 
 // The sideload app's rows with `installed` from the shell (signing.isInstalled): true, false or left out where it
 // can't say. Anywhere else, or when the call fails, the rows as they were.
-export async function withInstalled(rows, { mode = detectMode(), native = globalThis.ifizboxNative } = {}) {
+export async function withInstalled(rows, { mode = detectMode(), native = nativeBridge() } = {}) {
   if (mode !== "sideload" || typeof native?.call !== "function" || !rows?.length) return rows;
   const ids = rows.filter((r) => r?.id && !r.self).map((r) => r.id);
   if (!ids.length) return rows;
@@ -1152,13 +1153,13 @@ export function keptIpaOf(r, entries) {
 }
 
 async function keptIpa(r) {
-  if (detectMode() !== "sideload" || typeof globalThis.ifizboxNative?.call !== "function") return null;
+  if (detectMode() !== "sideload" || !hasNativeCall()) return null;
   try { return keptIpaOf(r, (await libraryCall("list", {}))?.ipas); } catch { return null; }
 }
 
 // Forgets the row's app: a signed app the list doesn't remember through signing.forget (it stays installed, as on
 // Settings > Signed Apps; the list draws again), a remembered one through removeInstall (onAppsChange redraws).
-export async function forgetApp(r, native = globalThis.ifizboxNative, remove = async (id) => removeInstall(await apps(), id)) {
+export async function forgetApp(r, native = nativeBridge(), remove = async (id) => removeInstall(await apps(), id)) {
   if (r.signedOnly) {
     await native.call("signing.forget", { bundleId: r.id });
     loadAllApps();
@@ -1172,7 +1173,7 @@ export async function forgetApp(r, native = globalThis.ifizboxNative, remove = a
 
 // What a sheet button does. `li`: the row, when the sheet came from the list (Remove fades it out).
 async function runAppAction(label, r, { ipa = null, li = null, after = null } = {}) {
-  const native = globalThis.ifizboxNative;
+  const native = nativeBridge();
   try {
     if (label === OPEN) {
       const res = await native.call("signing.openApp", { bundleId: r.signed?.bundleId ?? r.id });

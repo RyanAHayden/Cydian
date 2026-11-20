@@ -1,0 +1,126 @@
+<title>Signing Needs Setup Tile</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout: one narrow column, phone first: what you see today, three tile options, the open questions, the pick. */
+:root {
+  --bg: #c5ccd4; --page: #f4f5f7; --fg: #1d2129; --muted: #5b6370; --line: #d5d9df;
+  --tile: #fff; --tile-edge: #b4b8bf; --pick: #2f6fd0;
+  --soon-bg: #fff6e0; --soon-edge: #e0b65a; --soon-ink: #d98a00;
+  --close-bg: #ffe9e6; --close-edge: #e08a80; --close-ink: #d1281b;
+  --stripes: repeating-linear-gradient(90deg, #c5ccd4 0 5px, #cbd2d9 5px 9px);
+  --ui: "Helvetica Neue", Helvetica, Arial, sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #15181c; --page: #1d2126; --fg: #e8eaee; --muted: #9aa3ae; --line: #323840;
+  --tile: #2a2f36; --tile-edge: #444b55; --pick: #6ea2ff;
+  --soon-bg: #3a3122; --soon-edge: #7a6230; --soon-ink: #f0b545;
+  --close-bg: #3c2626; --close-edge: #834038; --close-ink: #ff7a6e;
+  --stripes: repeating-linear-gradient(90deg, #1b1f24 0 5px, #20252b 5px 9px); color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #15181c; --page: #1d2126; --fg: #e8eaee; --muted: #9aa3ae; --line: #323840;
+  --tile: #2a2f36; --tile-edge: #444b55; --pick: #6ea2ff;
+  --soon-bg: #3a3122; --soon-edge: #7a6230; --soon-ink: #f0b545;
+  --close-bg: #3c2626; --close-edge: #834038; --close-ink: #ff7a6e;
+  --stripes: repeating-linear-gradient(90deg, #1b1f24 0 5px, #20252b 5px 9px); color-scheme: dark }
+body { background: var(--page); color: var(--fg); font-family: var(--ui); font-size: 15px; line-height: 1.45; }
+main { max-width: 640px; margin: 0 auto; padding-block: 20px 40px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 22px; }
+h1 { font-size: 22px; margin: 0; text-wrap: balance; }
+h2 { font-size: 17px; margin: 0 0 8px; text-wrap: balance; }
+p { margin: 0; }
+.lede { color: var(--muted); }
+section { display: grid; gap: 10px; }
+.opt { border: 1px solid var(--line); border-radius: 10px; padding: 14px; display: grid; gap: 10px; background: var(--page); }
+.opt.rec { border-color: var(--pick); box-shadow: 0 0 0 1px var(--pick) inset; }
+.badge { display: inline-block; font-size: 11px; font-weight: bold; letter-spacing: .06em; text-transform: uppercase; color: #fff; background: var(--pick); border-radius: 4px; padding: 2px 6px; margin-left: 6px; vertical-align: 2px; }
+.meta { font-size: 13px; color: var(--muted); }
+.meta b { color: var(--fg); }
+/* phone strip: iOS 6 pinstripe ground with Home's tiles */
+.phone { background: var(--stripes); border-radius: 8px; padding: 10px; display: grid; gap: 8px; }
+.row { display: flex; gap: 8px; }
+.t { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; background: var(--tile); border: 1px solid var(--tile-edge); border-radius: 8px; padding: 9px 10px; box-shadow: 0 1px 2px rgba(0,0,0,.12); }
+.g { flex: none; width: 29px; height: 29px; border-radius: 6px; background: #8a96a6; color: #fff; display: grid; place-items: center; font-weight: bold; font-size: 17px; }
+.tx { flex: 1; min-width: 0; display: grid; }
+.l { font-weight: bold; font-size: 15px; }
+.s { font-size: 13px; color: var(--muted); }
+.chev { color: var(--muted); font-size: 18px; }
+.dim { opacity: .45; }
+.gone { text-decoration: line-through; opacity: .5; }
+.soon { background: var(--soon-bg); border-color: var(--soon-edge); } .soon .g { background: var(--soon-ink); } .soon .s { color: var(--soon-ink); font-weight: bold; }
+.close { background: var(--close-bg); border-color: var(--close-edge); } .close .g { background: var(--close-ink); } .close .s { color: var(--close-ink); font-weight: bold; }
+.red { background: linear-gradient(#e4473b, #c4261b); border-color: #a01c13; } .red .g { background: #8f1a12; } .red .l, .red .s { color: #fff; text-shadow: 0 -1px 0 rgba(0,0,0,.35); } .red .s { font-weight: bold; } .red .chev { color: #fff; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+td, th { text-align: left; padding: 6px 4px; border-top: 1px solid var(--line); vertical-align: top; }
+th { color: var(--muted); font-weight: normal; }
+.pick { border-left: 3px solid var(--pick); padding-left: 12px; }
+</style>
+
+<main>
+  <header style="display:grid;gap:6px">
+    <h1>Signing Needs Setup tile</h1>
+    <p class="lede">Lite app and website, Home: with no certificate and no Apple login, the plain Signing half-tile goes away. A warning tile takes the certificate-expiry tile's place (full width, under the welcome, above GitHub | Discord) and opens Settings › Signing.</p>
+  </header>
+
+  <section>
+    <h2>Today</h2>
+    <div class="phone">
+      <div class="row"><div class="t"><span class="g">⌂</span><div class="tx"><span class="l">Browse</span></div></div><div class="t"><span class="g">✎</span><div class="tx"><span class="l">Signing</span></div></div></div>
+      <div class="row"><div class="t"><span class="g">G</span><div class="tx"><span class="l">GitHub</span></div></div><div class="t"><span class="g">D</span><div class="tx"><span class="l">Discord</span></div></div></div>
+    </div>
+    <p class="meta">The grey Signing tile looks like any other shortcut, so nothing says the app can't install anything yet.</p>
+  </section>
+
+  <section>
+    <h2>A · Red tint, fixed wording</h2>
+    <div class="opt">
+      <div class="phone">
+        <div class="row"><div class="t close"><span class="g">!</span><div class="tx"><span class="l">Signing Needs Setup</span><span class="s">Apps can't be installed · Set Up in Signing</span></div><span class="chev">›</span></div></div>
+        <div class="row"><div class="t"><span class="g">⌂</span><div class="tx"><span class="l">Browse</span></div></div><div class="t dim gone"><span class="g">✎</span><div class="tx"><span class="l">Signing</span></div></div></div>
+      </div>
+      <p>Uses the cert tile's "close" stage as it is. One message for every case.</p>
+      <p class="meta"><b>Trade-off:</b> loud, and on first launch it looks like something broke, when the user just hasn't started yet. Every half-done state shows the same text.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>B · Amber, names the next step<span class="badge">Recommended</span></h2>
+    <div class="opt rec">
+      <div class="phone">
+        <div class="row"><div class="t soon"><span class="g">!</span><div class="tx"><span class="l">Signing Needs Setup</span><span class="s">Step 1 of 2: Import Your Certificate</span></div><span class="chev">›</span></div></div>
+        <div class="row"><div class="t soon"><span class="g">!</span><div class="tx"><span class="l">Signing Needs Setup</span><span class="s">Step 2 of 2: Signing Server</span></div><span class="chev">›</span></div></div>
+        <div class="row"><div class="t"><span class="g">⌂</span><div class="tx"><span class="l">Browse</span></div></div><div class="t dim gone"><span class="g">✎</span><div class="tx"><span class="l">Signing</span></div></div></div>
+      </div>
+      <p>Uses the "soon" stage: a to-do, not a failure. The subtitle names Signing's first missing step (<code>missingStep</code>), and the tap opens Signing at that step (<code>openAt</code>). On the website the subtitle reads "Import Your Certificate or Use a Free Apple ID".</p>
+      <p class="meta"><b>Trade-off:</b> a little more code, since the subtitle needs <code>missingStep</code> rather than a yes/no. Red stays for "Expired", so the colours keep their meaning.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>C · Solid red, as Expired</h2>
+    <div class="opt">
+      <div class="phone">
+        <div class="row"><div class="t red"><span class="g">!</span><div class="tx"><span class="l">Signing Needs Setup</span><span class="s">Nothing can be installed yet</span></div><span class="chev">›</span></div></div>
+      </div>
+      <p>The "gone" stage: the loudest tile on Home.</p>
+      <p class="meta"><b>Trade-off:</b> it reads the same as Certificate Expired. That's alarming on a fresh install, and it's the first thing a new user sees.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Rules for every option</h2>
+    <table>
+      <tr><th>Case</th><th>Home shows</th></tr>
+      <tr><td>Nothing set up</td><td>Warning tile. No Signing half-tile, so Browse fills the row.</td></tr>
+      <tr><td>Certificate in, server missing (Lite)</td><td>Warning tile (B: "Step 2 of 2").</td></tr>
+      <tr><td>Apple login (App Store Connect key) only, no certificate</td><td>Warning tile (B: "Make or Import a Certificate"). A login alone can't sign.</td></tr>
+      <tr><td>Signing ready</td><td>No tile. The expiry tile takes the spot when the certificate nears its end. The two never show together.</td></tr>
+      <tr><td>Website</td><td>Same tile (it has the same Signing half-tile today). Recommended: yes.</td></tr>
+      <tr><td>Jailbreak app</td><td>Nothing changes (it shows Themes there).</td></tr>
+    </table>
+    <p class="meta"><b>Files:</b> <code>web/app/screens/home.js</code> (the cert tile and the Signing half-tile become one slot), <code>web/app/home.css</code> (no new colours), <code>web/app/screens/signing.js</code> (<code>missingStep</code>, already there), and tests next to <code>home-certwarning.test.js</code>.</p>
+  </section>
+
+  <section class="pick">
+    <h2>Recommendation: B</h2>
+    <p>It goes where the user wanted, says "needs setup", and tells them exactly what's left. Amber marks it as a step still to do, which is what a fresh install is. Red stays for a certificate that has actually expired.</p>
+  </section>
+</main>

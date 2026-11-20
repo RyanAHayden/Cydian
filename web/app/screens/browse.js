@@ -1792,7 +1792,9 @@ function openSileoSheet(url, title) {
   }).catch((e) => box.replaceChildren(note(e.message)));
 }
 
-// HTML depictions open in a sheet, in a sandboxed iframe with no bridge to us (docs/cydia.md). An http
+// HTML depictions open in a sheet, in a sandboxed iframe (docs/cydia.md). The sandbox keeps it off our origin and
+// storage but not off the bridge: WebKit shows window.webkit.messageHandlers to every frame, so the app's Bridge.swift
+// (fromApp) refuses any call that isn't from the main frame on ifizbox://app. An http
 // depiction on the https site would be blocked as mixed content, so it comes through the proxy instead, as
 // srcdoc with scripts off; everything else loads directly from its own origin.
 function openHtmlDepiction(url, title) {

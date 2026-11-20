@@ -75,8 +75,18 @@ final class Bridge: NSObject, WKScriptMessageHandlerWithReply {
 
     func on(_ method: String, _ h: @escaping Handler) { methods[method] = h }
 
+    // B189: WebKit hands window.webkit.messageHandlers.ifizbox to every frame, sandboxed iframes included (checked on
+    // the iPhone 7: a repo's HTML depiction got ping's answer). Only the app's own page, the main frame on
+    // ifizbox://app, may call: a repo page in an iframe could otherwise reach helper.run, signing.*, account.key.*
+    // or asc.*. An opaque origin (sandbox, data:) reports no scheme or host and is refused too.
+    static func fromApp(_ frame: WKFrameInfo) -> Bool {
+        let origin = frame.securityOrigin
+        return frame.isMainFrame && origin.protocol.lowercased() == AppScheme.scheme && origin.host.lowercased() == "app"
+    }
+
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage,
                                replyHandler: @escaping (Any?, String?) -> Void) {
+        guard Bridge.fromApp(message.frameInfo) else { return replyHandler(nil, "refused: not the app's page") }
         guard let body = message.body as? [String: Any], let method = body["method"] as? String else {
             return replyHandler(nil, "bad message")
         }

@@ -229,7 +229,8 @@ const VIEWS = {
     cell.append(body);
     return cell;
   },
-  // An embedded page in a sandboxed iframe (scripts, no same-origin: it can't reach the app or its storage), at the
+  // An embedded page in a sandboxed iframe (scripts, no same-origin: it can't reach the page or its storage; the
+  // native bridge is still visible to it, and Bridge.swift's fromApp refuses every call not from the app's page), at the
   // width/height aspect, no wider than the column. https as it is; http through the backend (the app loads it
   // direct). The site's proxy serves no HTML (worker/src/index.js PASS: it is not an open web proxy), so where http
   // would go through it the page is offered as a link row instead.

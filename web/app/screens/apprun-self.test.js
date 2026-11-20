@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import { runAppRun, phoneLanes } from "./apprun.js";
 import { createAppQueue, SELF_ID } from "../core/appqueue.js";
 import { createAppRun, appRows, rowStatus } from "../core/apprun.js";
-import { SELF_UPDATE_LINES, SELF_UPDATE_FAILED, watchSelfUpdate } from "../signing-client.js";
+import { SELF_UPDATE_LINES, SELF_UPDATE_FAILED, watchSelfUpdate, HERE_CLOSING_LINE } from "../signing-client.js";
 import { WAITING_LABEL, CLOSING_LABEL, TRY_AGAIN_LABEL, RETURN_LABEL, CLOSE_BY_HAND, RESTART_BY_HAND, CLOSE_GRACE } from "../nav/progress.js";
 
 function fakeDom() {
@@ -176,13 +176,32 @@ test("self row, hosted: a shell that can't be followed (older, or none running) 
   }
 }));
 
-test("self row, This iPhone: the run ending means installd didn't close iFizBox: Return and the instruction", () => withDom(async () => {
-  let watched = 0;
-  const s = setup([self()], { selfUpdate: () => { watched++; return new Promise(() => {}); } }, { here: true });
+test("self row, This iPhone: installd answered while iFizBox lived (shell: none closing): Return and the instruction", () => withDom(async () => {
+  for (const watch of [async () => null, async () => { throw new Error("unknown method"); }, undefined]) {
+    const s = setup([self()], { selfUpdate: watch }, { here: true });
+    await s.done;
+    await settle();
+    assert.ok(steps(s.page).includes(RESTART_BY_HAND));
+    assert.ok(!steps(s.page).includes(HERE_CLOSING_LINE));
+    assert.equal(s.page.finished.label, RETURN_LABEL);
+    assert.ok(!s.page.finished.locked);
+  }
+}));
+
+test("self row, This iPhone (B159): the shell closing for installd locks on Closing iFizBox, then by hand if still here", () => withDom(async () => {
+  const w = selfWatch();
+  const s = setup([self()], { selfUpdate: w.fn }, { here: true });
   await s.done;
   await settle();
-  assert.equal(watched, 0, "no prompt to follow");
-  assert.ok(steps(s.page).includes(RESTART_BY_HAND));
+  assert.equal(w.calls, 1, "the page follows signing.selfUpdate");
+  assert.deepEqual([s.page.finished.label, s.page.finished.locked], [CLOSING_LABEL, true]);
+  w.end("finished");
+  await settle();
+  assert.ok(steps(s.page).includes(HERE_CLOSING_LINE));
+  assert.ok(!steps(s.page).includes(RESTART_BY_HAND));
+  assert.deepEqual([s.page.finished.label, s.page.finished.locked], [CLOSING_LABEL, true]);
+  s.timers.find((t) => t.ms === CLOSE_GRACE).f();
+  assert.ok(errors(s.page).includes(CLOSE_BY_HAND));
   assert.equal(s.page.finished.label, RETURN_LABEL);
   assert.ok(!s.page.finished.locked);
 }));

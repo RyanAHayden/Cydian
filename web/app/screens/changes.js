@@ -238,6 +238,11 @@ export async function queueUpgrades(available = [], { pkgOf = (id) => catalog.pa
       job = { id: r.id, name: r.name ?? null, version: r.version ?? null, installed: r.installed ?? null, url: r.ipa, size: null,
         icon: r.icon ?? null, key: r.key ?? null };
     }
+    // B159: a row whose version the package doesn't list (iFizBox's own row from GitHub's release while its source
+    // still lists the old one) installs the row's own IPA, not the package's newest (an older) one
+    if (job && typeof r.ipa === "string" && /^https?:\/\//.test(r.ipa) && r.version && job.version !== r.version) {
+      job = { ...job, version: r.version, url: r.ipa, size: null };
+    }
     if (!job) continue;
     job = { ...job, id: r.id, name: job.name || r.name || null };
     jobs.push(job);

@@ -20,11 +20,14 @@
 //   loadCommands(bin), dylibsOf(bin)   reading a Mach-O's load commands (the tests' otool -L)
 //   F302 (APT tweaks in the sideload build): injectableFromFields, countInjectable, inspectTweakDeb, filterBundles,
 //   targetsApp, worksInText: see the section at the end of the file.
+//   F302a (the app side): debOf, tweakTitle, tweakCountText, withTweaksText, tweakSteps, madeFor, tweakUpdates,
+//   machoEncrypted, ipaEncrypted: the last section.
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { readAr, readTar, readZip, decompress, UnpackError } from "./unpack.js";
 import { sha256Hex } from "./sha256.js";
 import { parseControl, parseRelations } from "./apt.js"; // F302
+import { compareVersions } from "./apt.js"; // F302a
 
 export { UnpackError };
 export const TWEAK_ACCEPT = ".dylib,.deb,.zip,.framework";
@@ -681,3 +684,198 @@ export function readBplist(b) {
   };
   return obj(top);
 }
+
+// ---- F302a: tweaks on the app side ---------------------------------------------------------------------------------
+// The words and rules of the app-side flow (screens/tweaks.js draws them):
+//
+//   debOf(name) -> { package, version } | null       a kept tweak's file name as addDebTo writes it (pkg_version.deb)
+//   tweakTitle(item) -> "YTLite"                      a kept tweak's name for people: its title, else the file's
+//   tweakCountText(n) -> "2 Tweaks"                   Installed's pill, the install popup's row
+//   withTweaksText(titles) -> "with A, B and C"       the install popup's line under the app's name
+//   tweakSteps(prepared) -> ["Adding A", …, "Adding ElleKit 1.2"]   one progress line per tweak, then ElleKit's
+//   madeFor(rows, bundleId, infoOf) -> rows           the source tweaks whose checked filter names that app
+//   tweakUpdates(kept, rows) -> [{ package, title, from, to, row }]   kept .debs a Tweak Source has a newer version of
+//   machoEncrypted(bytes) -> true | false | null      the App Store's encryption (LC_ENCRYPTION_INFO cryptid) on the
+//                                                     first slice; null when the bytes aren't a Mach-O header
+//   await ipaEncrypted(src) -> { encrypted, bundleId, name } | null   an IPA (File/Blob/bytes): the main executable's
+//                                                     head only is read and inflated; null when it can't be read
+//   ENCRYPTED_ALERT(name), HOW_TO_GET_ONE              the "<App> Is Locked" alert's words
+
+export function debOf(name) {
+  const m = /^(.+?)_([^_]+)\.deb$/i.exec(String(name ?? ""));
+  return m ? { package: m[1], version: m[2] } : null;
+}
+
+export function tweakTitle(item) {
+  if (item?.title) return String(item.title);
+  const n = String(item?.name ?? "");
+  const d = debOf(n);
+  if (d) return d.package.split(".").pop() || d.package;
+  return n.replace(/\.(deb|dylib|zip|framework)$/i, "").replace(/\.framework$/i, "") || n;
+}
+
+export const tweakCountText = (n) => `${n} ${n === 1 ? "Tweak" : "Tweaks"}`;
+
+export function withTweaksText(titles) {
+  const t = [...new Set((titles ?? []).filter(Boolean).map(String))];
+  if (!t.length) return "";
+  if (t.length === 1) return `with ${t[0]}`;
+  return `with ${t.slice(0, -1).join(", ")} and ${t.at(-1)}`;
+}
+
+// prepared: prepareTweaks / withElleKit's; `titles` the kept items' titles in the same order as prepared.names.
+export function tweakSteps(prepared, titles = null) {
+  if (!prepared) return [];
+  const names = (prepared.names ?? []).map((n, i) => titles?.[i] || tweakTitle({ name: n }));
+  return [...names.map((n) => `Adding ${n}`), ...(prepared.bundled ?? []).map((b) => `Adding ${b}`)];
+}
+
+// rows: [{ id (the package), version, … }]; infoOf(row) -> the cached check or null.
+export function madeFor(rows, bundleId, infoOf) {
+  if (!bundleId) return [];
+  return (rows ?? []).filter((r) => targetsApp(infoOf(r), bundleId));
+}
+
+export function tweakUpdates(kept, rows) {
+  const newest = new Map();
+  for (const r of rows ?? []) {
+    const id = r?.id ?? r?.package;
+    if (!id || !r.version) continue;
+    const had = newest.get(id);
+    if (!had || compareVersions(r.version, had.version) > 0) newest.set(id, r);
+  }
+  const out = [];
+  for (const it of kept ?? []) {
+    const d = debOf(it?.name);
+    const r = d && newest.get(d.package);
+    if (r && compareVersions(r.version, d.version) > 0) {
+      out.push({ package: d.package, title: it.title || r.name || tweakTitle(it), from: d.version, to: r.version, row: r });
+    }
+  }
+  return out;
+}
+
+const LC_ENCRYPTION_INFO = 0x21, LC_ENCRYPTION_INFO_64 = 0x2c;
+export function machoEncrypted(bytes) {
+  const b = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes ?? []);
+  if (!isMachO(b)) return null;
+  let off;
+  try { off = slices(b)[0][0]; } catch { return null; }
+  if (off + 32 > b.length) return null;
+  const dv = view(b), m = dv.getUint32(off, true);
+  if (m !== MH_MAGIC_64 && m !== MH_MAGIC) return null;
+  const ncmds = dv.getUint32(off + 16, true);
+  let p = off + (m === MH_MAGIC_64 ? 32 : 28);
+  for (let i = 0; i < ncmds; i++) {
+    if (p + 8 > b.length) return null; // the head read wasn't long enough
+    const cmd = dv.getUint32(p, true), size = dv.getUint32(p + 4, true);
+    if (size < 8) return null;
+    if (cmd === LC_ENCRYPTION_INFO || cmd === LC_ENCRYPTION_INFO_64) {
+      if (p + 20 > b.length) return null;
+      return dv.getUint32(p + 16, true) !== 0;
+    }
+    p += size;
+  }
+  return false;
+}
+
+function ipaSource(src) {
+  if (src && typeof src.slice === "function" && typeof src.size === "number" && !(src instanceof Uint8Array) && !(src instanceof ArrayBuffer)) {
+    return { size: src.size, read: async (a, b) => new Uint8Array(await src.slice(a, b).arrayBuffer()) };
+  }
+  const b = src instanceof Uint8Array ? src : src instanceof ArrayBuffer ? new Uint8Array(src) : null;
+  return b ? { size: b.length, read: async (a, c) => b.subarray(a, c) } : null;
+}
+
+async function ipaDirectory({ size, read }) {
+  const tailLen = Math.min(size, 65557);
+  const tail = await read(size - tailLen, size);
+  const tv = view(tail);
+  let eocd = -1;
+  for (let i = tail.length - 22; i >= 0; i--) if (tv.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+  if (eocd < 0) return null;
+  const dirSize = tv.getUint32(eocd + 12, true), dirAt = tv.getUint32(eocd + 16, true);
+  if (dirAt + dirSize > size) return null;
+  const d = await read(dirAt, dirAt + dirSize);
+  const v = view(d), out = [];
+  for (let p = 0; p + 46 <= d.length && v.getUint32(p, true) === 0x02014b50;) {
+    const nameLen = v.getUint16(p + 28, true), extraLen = v.getUint16(p + 30, true), commentLen = v.getUint16(p + 32, true);
+    out.push({ name: new TextDecoder().decode(d.subarray(p + 46, p + 46 + nameLen)), flags: v.getUint16(p + 8, true),
+      method: v.getUint16(p + 10, true), csize: v.getUint32(p + 20, true), size: v.getUint32(p + 24, true), local: v.getUint32(p + 42, true) });
+    p += 46 + nameLen + extraLen + commentLen;
+  }
+  return out;
+}
+
+// The first `want` bytes of a zip entry (stored or deflated), or null.
+async function ipaEntryHead({ read }, e, want) {
+  if (e.flags & 1) return null;
+  const head = await read(e.local, e.local + 30);
+  if (head.length < 30 || view(head).getUint32(0, true) !== 0x04034b50) return null;
+  const start = e.local + 30 + view(head).getUint16(26, true) + view(head).getUint16(28, true);
+  if (e.method === 0) return (await read(start, start + Math.min(e.csize, want))).slice();
+  if (e.method !== 8 || typeof DecompressionStream !== "function") return null;
+  // compressed bytes in steps until enough comes out: a big executable is never read whole
+  const out = [];
+  let got = 0;
+  const ds = new DecompressionStream("deflate-raw");
+  const writer = ds.writable.getWriter();
+  const reader = ds.readable.getReader();
+  const pump = (async () => {
+    for (let at = 0; at < e.csize && got < want; at += 256 * 1024) {
+      await writer.ready;
+      await writer.write(await read(start + at, start + Math.min(e.csize, at + 256 * 1024)));
+    }
+  })().catch(() => {});
+  while (got < want) {
+    const { value, done } = await reader.read().catch(() => ({ done: true }));
+    if (done) break;
+    out.push(value);
+    got += value.length;
+  }
+  reader.cancel().catch(() => {});
+  writer.abort().catch(() => {});
+  await pump;
+  const all = new Uint8Array(Math.min(got, want));
+  let p = 0;
+  for (const c of out) { if (p >= all.length) break; all.set(c.subarray(0, all.length - p), p); p += Math.min(c.length, all.length - p); }
+  return all;
+}
+
+export async function ipaEncrypted(src) {
+  try {
+    const s = ipaSource(src);
+    if (!s) return null;
+    const dir = await ipaDirectory(s);
+    const info = dir?.find((e) => /^Payload\/[^/]+\.app\/Info\.plist$/.test(e.name));
+    if (!info || info.size > 4 << 20) return null;
+    const raw = await ipaEntryHead(s, info, info.size);
+    if (!raw) return null;
+    const p = new TextDecoder().decode(raw.subarray(0, 6)) === "bplist" ? readBplist(raw) : readTextPlist(new TextDecoder().decode(raw));
+    const app = info.name.slice(0, -"Info.plist".length);
+    const exeName = typeof p?.CFBundleExecutable === "string" && p.CFBundleExecutable ? p.CFBundleExecutable : app.slice(8, -5);
+    const exe = dir.find((e) => e.name === app + exeName);
+    if (!exe) return null;
+    // a fat binary's first slice starts at 16 KB or so; its load commands follow its header
+    let head = await ipaEntryHead(s, exe, 64 * 1024);
+    let enc = machoEncrypted(head);
+    if (enc === null && head && isMachO(head)) {
+      const off = slices(head)[0]?.[0] ?? 0;
+      if (off > 0 && off < 8 << 20) { head = await ipaEntryHead(s, exe, off + 64 * 1024); enc = machoEncrypted(head); }
+    }
+    if (enc === null) return null;
+    const bundleId = typeof p?.CFBundleIdentifier === "string" ? p.CFBundleIdentifier : "";
+    const name = String(p?.CFBundleDisplayName || p?.CFBundleName || bundleId || exeName);
+    return { encrypted: enc, bundleId, name };
+  } catch { return null; }
+}
+
+export const HOW_TO_GET_ONE = "How to Get One";
+export const ENCRYPTED_ALERT = (name) => ({
+  title: `${name || "This App"} Is Locked`,
+  message: "This IPA came from the App Store and is still encrypted, so tweaks can't go in and it can't be signed. A decrypted copy works.",
+  buttons: [HOW_TO_GET_ONE, "OK"], cancel: 1,
+});
+// What "How to Get One" says (the concept's list; sites that hand out other people's decrypted App Store apps left out).
+export const HOW_TO_TEXT = "Decrypt your own copy: TrollDecrypt on a TrollStore phone, or bagbak / frida-ios-dump from a "
+  + "computer to a jailbroken phone. Free and open-source apps on AltStore sources aren't encrypted in the first place.";

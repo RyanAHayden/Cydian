@@ -208,6 +208,8 @@ test("a stop sends signing.cancel with that app's tag and nothing else", async (
   const logs = [];
   const p = prepareOnDevice({ id: "a", name: "Alpha", mode: "install", url: "u" }, { tag: "a#1", signal: ctl.signal, native,
     progress: (ph, f) => seen.push([ph, f]), log: (t) => logs.push(t) });
+  // F302a: the kept tweaks are looked up first, so the call starts a few ticks later
+  for (let i = 0; i < 50 && !native.calls.length; i++) await new Promise((r) => setTimeout(r, 0));
   ctl.abort();
   await assert.rejects(p, (e) => e.code === "cancelled");
   assert.deepEqual(native.calls, [["signing.prepare", { url: "u", tag: "a#1" }], ["signing.cancel", { tag: "a#1" }]]);

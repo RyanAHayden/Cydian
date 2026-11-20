@@ -52,6 +52,7 @@ import { showUndoBar } from "../nav/undobar.js"; // F242a
 import { APP_MODE_LABEL } from "../core/appqueue.js"; // F242a
 import { installedOnPhone } from "../core/appqueue.js"; // B136
 import { whereFromGroup, reportBanner, reports, reportMalicious } from "./safety.js"; // F291
+import { addTweaksGroup, installTweaksChoice } from "./tweaks.js"; // F302a
 
 function img(url, cls) {
   const src = mediaUrl(url);
@@ -455,7 +456,7 @@ export function queueToggle(pkg, source, { queue = appQueue, store = apps, buzz 
 export async function appPageAction(pkg, source, { queue = appQueue, ask = showActionSheet, add = queueApp,
   mode = detectMode(), ready = async () => true, store = apps, version = null, signedOf = (id) => signedRecordOf(id, { mode }),
   forget = async (id) => removeInstall(await store(), id), siteInstall = siteInstallVersion, warn = originalWarning,
-  iv = settings.ignoredVersions } = {}) {
+  iv = settings.ignoredVersions, tweaks = installTweaksChoice } = {}) {
   const app = pkg?.stanza?.ipa;
   if (mode === "site" && app && !version) return siteModify(pkg, source, { ask, store, forget, siteInstall, iv });
   if (mode !== "sideload" || !app) return false; // F89: the website queues nothing
@@ -465,6 +466,8 @@ export async function appPageAction(pkg, source, { queue = appQueue, ask = showA
   if (!job || !(await ready())) return false;
   // F246: a fresh install (no record) asks F243's once-per-app question before it is queued; Cancel queues nothing.
   const addFresh = async () => {
+    // F302a: the install popup, when the app has tweaks added or made for it: what goes in, Tweaks, Install
+    if (!(await Promise.resolve().then(() => tweaks({ bundleId: job.id, name: job.name || app.name, version: job.version || "", ask })).catch(() => true))) return true;
     const j = rec ? job : await queueOriginalCheck(job, warn);
     if (j) add(j, { queue });
     return true;
@@ -727,6 +730,9 @@ export function renderApp(body, route, pkg, source, { related = null } = {}) {
 
   // F122: the source's screenshots, or (when it lists none) its GitHub repo's README and release pictures.
   // F161: when the source lists none, the App Store's screenshots come before the GitHub ones.
+  // F302a: Add Tweaks, directly under the header's Install and above the screenshots (the sideload build)
+  // (imported up front, so the row is there with the page and doesn't pop in; its count fills in when known)
+  if (detectMode() === "sideload" && app.bundleIdentifier) details.append(addTweaksGroup({ bundleId: app.bundleIdentifier, name: app.name }).el);
   const previewKey = `app:${pkg.key}:${pkg.row?.id ?? app.bundleIdentifier}`;
   const shots = altShots(app);
   if (shots.length || need !== "full") details.append(previewSlot(previewKey, { shots, gh: appGithub(app) }));

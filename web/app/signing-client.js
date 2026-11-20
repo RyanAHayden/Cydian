@@ -677,7 +677,11 @@ const rowError = (e, name) => {
 };
 
 export async function prepareOnDevice(job, { tag, signal = null, progress = () => {}, log = () => {}, native, alert = showAlert } = {}) {
-  const params = prepareParams(job);
+  let params = prepareParams(job);
+  // F302a: the app's kept tweaks go with a plain install, an update and a tweak update (screens/tweaks.js), a line each
+  try { params = await (await import("./screens/tweaks.js")).keptTweakParams(params, job, { log }); } catch (e) {
+    throw Object.assign(new Error(`Can't inject the tweaks: ${String(e?.message ?? e)}`), { code: "tweaks" });
+  }
   try {
     // B104: an http link with no https twin asks first (askInsecure); Cancel ends the row as its stop does
     const r = await askInsecure((extra) => abortable(native, "signing.prepare", { ...params, ...refusing(), ...extra }, (ev) => {
@@ -687,7 +691,13 @@ export async function prepareOnDevice(job, { tag, signal = null, progress = () =
     }, { tag, signal }), { alert, url: params?.url ?? null });
     keepIpaHash(storageOf(), r, { bundleId: job?.bundleId ?? (typeof job?.id === "string" && !job.id.startsWith("library:") ? job.id : null), version: job?.version ?? null }); // F292
     return r;
-  } catch (e) { throw rowError(e, job?.name || job?.id || ""); }
+  } catch (e) {
+    // F302a: an App Store copy: remembered, so Add to App lists it under Can't Take Tweaks
+    if (e?.code === "encrypted" && typeof job?.id === "string" && !job.id.startsWith("library:")) {
+      import("./screens/tweaks.js").then((t) => t.markEncrypted(job.id), () => {});
+    }
+    throw rowError(e, job?.name || job?.id || "");
+  }
 }
 
 export async function openPrepared(row, { tag, signal = null, progress = () => {}, log = () => {}, host = false, wait = ASK_WAIT, native, again = false } = {}) {

@@ -874,8 +874,37 @@ export async function addPickedFile(file, { store, read = readIpaFile, room = si
   if (hide.done) hide.done("Added"); else hide();
   known.set(entry.file, entry);
   refresh();
+  // F302a: an App Store copy (still encrypted) is flagged now, not at signing: "<App> Is Locked", How to Get One
+  await (await import("./tweaks.js")).checkPickedIpa(file, { alert }).catch(() => null);
   open(ipaPath(entry.file));
   return entry;
+}
+
+// F302a: the IPA page's tweak rows under its header: "<App> Is Locked" for an App Store copy (How to Get One), else
+// in the sideload app Add Tweaks (screens/tweaks.js), whose changes go into the file's Sign Options too, so Sign Now
+// and Save Signed IPA inject them as Install does.
+async function ipaTweakRows(entry) {
+  const t = await import("./tweaks.js");
+  if (t.isEncrypted(entry.bundleId)) {
+    return grouped([{ header: "Tweaks", rows: [{ label: `${entry.name || "This App"} Is Locked`, detail: "App Store copy", chevron: false },
+      { label: "How to Get One", onClick: () => t.lockedAlert(entry.name || entry.file) }],
+    footer: "This IPA came from the App Store and is still encrypted, so tweaks can't go in and it can't be signed. A decrypted copy works." }]);
+  }
+  if (site() || jailbreak() || entry.error) return null;
+  return t.addTweaksGroup({ bundleId: entry.bundleId, name: entry.name || entry.file,
+    open: async (o) => { let changed = false; await t.openAddTweaks({ ...o, onChange: () => { changed = true; } }); if (changed) await syncLibraryTweaks(entry); } }).el;
+}
+
+async function syncLibraryTweaks(entry) {
+  try {
+    const [t, { tweakParams }, { toBase64 }] = await Promise.all([import("./tweaks.js"), import("../core/tweaks.js"), import("../core/signing.js")]);
+    const p = await t.preparedFor(entry.bundleId);
+    const o = entry.options ?? {};
+    await libraryCall("options", { ...optionsParams(entry, { ...o, tweaks: p ? tweakParams(p, toBase64) : null }),
+      ...(typeof o.keepBundleId === "boolean" ? { keepBundleId: o.keepBundleId } : {}) });
+  } catch (e) {
+    await showAlert({ title: "Can't Inject These Tweaks", message: String(e?.message ?? e), buttons: ["OK"] });
+  }
 }
 
 // Install for a kept IPA: signed in this browser from its bytes (no download), with the same early itms link,
@@ -979,6 +1008,10 @@ async function renderIpa(body, route, file) {
   }
   setTitle(body, entry.name || file);
   body.replaceChildren(header(entry));
+  if (entry.bundleId) { // F302a: directly under the header (Install is the nav bar's)
+    const tw = await ipaTweakRows(entry).catch(() => null);
+    if (tw) body.append(tw);
+  }
   if (site() && entry.stored) {
     const details = [
       { label: "Version", detail: entry.version || "—", chevron: false },

@@ -50,45 +50,80 @@ test("Update Alerts: what iOS allows, the last background check, and a way to Se
   const { NAME } = await import("../brand.js");
   const now = Date.parse("2026-11-18T12:00:00Z");
   const rows = (g) => g.rows.map((r) => [r.label, r.detail ?? ""]);
-  const [alerts, off] = notifyRows({ badges: false, alerts: true, backgroundRefresh: true, lastCheck: null }, now);
+  // Icon Badge off is a choice shown in Update Alerts, not something the check needs fixed
+  const [alerts, check, extra] = notifyRows({ badges: false, alerts: true, backgroundRefresh: true, lastCheck: null }, now);
+  assert.equal(extra, undefined, "no push: two groups");
   assert.equal(alerts.header, "Update Alerts");
   assert.deepEqual(rows(alerts), [["Notifications", "On"], ["Icon Badge", "Off"], [`${NAME} Updates`, "On"]]);
   assert.deepEqual(alerts.rows.map((r) => r.toggle), ["ios", "ios", "self"]);
   assert.match(alerts.footer, new RegExp(`^Off, only your apps' updates alert you; ${NAME}'s own update still shows in Changes\\.$`));
-  assert.equal(off.header, "Checking for Updates");
-  assert.deepEqual(rows(off), [["Check in the Background", "On"], ["Background App Refresh", "On"], ["Last Background Check", "Not yet"],
-    ["Turn On in Settings", ""]]);
-  assert.match(off.footer, /^iOS asks only once/);
+  assert.equal(check.header, "Checking for Updates");
+  assert.deepEqual(rows(check), [["Background Check", "On"], ["Last Check", "Not yet"]]);
+  assert.equal(check.rows[0].toggle, "ours");
+  assert.equal(check.footer, "iOS decides when this runs, usually every few hours.");
   const [, on] = notifyRows({ badges: true, alerts: true, backgroundRefresh: true, lastCheck: "2026-11-18T09:00:00Z" }, now);
-  assert.equal(on.rows.at(-1).detail, "3 h ago");
-  assert.equal(on.rows.length, 3);
+  assert.deepEqual(rows(on), [["Background Check", "On"], ["Last Check", "3 h ago"]]);
+  assert.ok(on.rows.every((r) => !("check" in r)), "no internal flags leak to the page");
+  // iOS has something off: its row (Off) and the fix in this group, the footer says what's off
+  const [, noRefresh] = notifyRows({ badges: true, alerts: true, backgroundRefresh: false, lastCheck: null }, now);
+  assert.deepEqual(rows(noRefresh), [["Background Check", "On"], ["Background App Refresh", "Off"], ["Last Check", "Not yet"],
+    ["Turn On in Settings", ""]]);
+  assert.equal(noRefresh.rows[1].toggle, "ios");
+  assert.equal(noRefresh.rows[3].open, true);
+  assert.equal(noRefresh.footer, "Background App Refresh is off in iOS, so this check can't run.");
+  const [, noAlerts] = notifyRows({ badges: true, alerts: false, backgroundRefresh: true, lastCheck: null }, now);
+  assert.deepEqual(rows(noAlerts).map(([l]) => l), ["Background Check", "Notifications", "Last Check", "Turn On in Settings"]);
+  assert.equal(noAlerts.footer, "Notifications are off in iOS, so this check can't alert you.");
+  const [, both] = notifyRows({ badges: true, alerts: false, backgroundRefresh: false, lastCheck: null }, now);
+  assert.deepEqual(rows(both).map(([l]) => l), ["Background Check", "Background App Refresh", "Notifications", "Last Check", "Turn On in Settings"]);
+  assert.match(both.footer, /^Background App Refresh and Notifications are off in iOS/);
+  // turned off here: no nudge to Settings, the footer says it's off
   const [quietAlerts, quiet] = notifyRows({ backgroundOn: false, badges: false, alerts: false, backgroundRefresh: false }, now, { selfAlerts: false });
-  assert.equal(quiet.rows[0].detail, "Off"); // turned off here: no nudge to Settings
-  assert.equal(quiet.rows.some((r) => r.open), false);
+  assert.deepEqual(rows(quiet), [["Background Check", "Off"], ["Last Check", "Not yet"]]);
+  assert.match(quiet.footer, new RegExp(`^Off, updates are found only while ${NAME} is open\\.$`));
   assert.deepEqual(quietAlerts.rows[2], { label: `${NAME} Updates`, detail: "Off", on: false, toggle: "self" });
   assert.equal(notifyRows(null), null);
 });
 
-// F285: Push's rows (core/push.js pushRows) join Checking for Updates: Push first, Last Push before the last
-// background check, then Turn On in Settings; Push's footer before the check's.
-test("Checking for Updates: Push's rows woven in, its footer first", async () => {
+// F311: iOS 6 hints, as the 4S's Mail > Fetch New Data: Push gets a group of its own with its own footer, the
+// background check another with its own; never two hints joined in one footer.
+test("Checking for Updates: a Push group and a Background Check group, one footer each", async () => {
   const { notifyRows } = await import("./settings.js");
   const { pushRows } = await import("../core/push.js");
   const now = Date.parse("2026-11-19T12:00:00Z");
   const st = { badges: false, alerts: true, backgroundRefresh: true, lastCheck: "2026-11-19T11:00:00Z" };
+  const rows = (g) => g.rows.map((r) => [r.label, r.detail ?? ""]);
   const live = pushRows({ state: { on: true }, status: { registered: true, lastPush: "2026-11-19T11:50:00Z" }, reason: null }, now);
-  const [, g] = notifyRows(st, now, { push: live });
-  assert.deepEqual(g.rows.map((r) => [r.label, r.detail ?? ""]), [["Push", ""], ["Check in the Background", "On"],
-    ["Background App Refresh", "On"], ["Last Push", "10 min ago"], ["Last Background Check", "1 h ago"],
-    ["Turn On in Settings", ""]]);
-  assert.equal(g.rows[0].toggle, "push");
-  assert.equal(g.rows[0].on, true);
-  assert.ok(g.footer.startsWith(live.footer + " iOS asks only once"), g.footer);
-  // push can't work: no Push row and no explanation, only the background check's
+  const [, pushGroup, check] = notifyRows(st, now, { push: live });
+  assert.equal(pushGroup.header, "Checking for Updates");
+  assert.deepEqual(rows(pushGroup), [["Push", ""], ["Last Push", "10 min ago"]]);
+  assert.equal(pushGroup.rows[0].toggle, "push");
+  assert.equal(pushGroup.rows[0].on, true);
+  assert.equal(pushGroup.footer, "Alerts arrive within half an hour of an update.");
+  assert.equal(check.header, undefined, "one header over the two groups");
+  assert.deepEqual(rows(check), [["Background Check", "On"], ["Last Check", "1 h ago"]]);
+  assert.equal(check.footer, "Used when Push can't reach this iPhone. iOS decides when it runs, usually every few hours.");
+  // Push off: its own footer says what it does; the check's no longer calls itself the fallback
+  const off = pushRows({ state: { on: false }, status: null, reason: null }, now);
+  const [, offGroup, offCheck] = notifyRows(st, now, { push: off });
+  assert.deepEqual(rows(offGroup), [["Push", ""]]);
+  assert.match(offGroup.footer, /^Push sends this iPhone's push token and the apps you follow/);
+  assert.equal(offCheck.footer, "iOS decides when this runs, usually every few hours.");
+  // a Push error replaces only Push's footer
+  const broken = pushRows({ state: { on: true }, status: { registered: false }, reason: null }, now);
+  const [, brokenGroup, brokenCheck] = notifyRows(st, now, { push: broken });
+  assert.equal(brokenGroup.footer, "The server no longer knows this iPhone. Turn Push off and on again.");
+  assert.match(brokenCheck.footer, /^Used when Push can't reach/);
+  // push can't work: no Push group, the Background Check group takes the header
   const why = pushRows({ state: { on: false }, reason: { code: "no_key", text: "sign.example has no APNs key." } }, now);
-  const [, g2] = notifyRows({ ...st, badges: true }, now, { push: why });
-  assert.deepEqual(g2.rows.map((r) => r.label), ["Check in the Background", "Background App Refresh", "Last Background Check"]);
-  assert.match(g2.footer, /^iOS decides when the background check runs/);
+  const groups = notifyRows({ ...st, badges: true }, now, { push: why });
+  assert.equal(groups.length, 2);
+  assert.equal(groups[1].header, "Checking for Updates");
+  assert.deepEqual(groups[1].rows.map((r) => r.label), ["Background Check", "Last Check"]);
+  // no footer anywhere is two hints glued together: at most two sentences
+  for (const g of [pushGroup, check, offGroup, offCheck, brokenGroup, brokenCheck, ...groups]) {
+    assert.ok((g.footer.match(/[.!?](\s|$)/g) ?? []).length <= 2, g.footer);
+  }
 });
 
 // F128: Settings' pages and their titles, like iOS 6's (the root, General, Theme, Updates, a list page under one),

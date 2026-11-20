@@ -11,6 +11,7 @@
 
 import { DOMAIN, SIGN_HOST } from "../brand.js";
 import { isAts, ATS_TITLE, atsText, INSECURE_IPA_ALERT, insecureText } from "./insecureipa.js"; // B104
+import { signingPage } from "./signingpage.js"; // C15: the sideload build's page is Installation & Signing
 
 const bytesOf = (b) => (b instanceof Uint8Array ? b : new Uint8Array(b));
 
@@ -429,10 +430,10 @@ export function deviceError(err, name = "") {
   const raw = String(err?.message ?? err ?? "").trim();
   const message = raw ? raw[0].toUpperCase() + raw.slice(1) : "Something went wrong.";
   if (code === "no_server") {
-    return { title: "No Signing Server", open: "signing", message: "Installing needs a Signing Server: set one in Settings > Signing." };
+    return { title: "No Signing Server", open: "signing", message: `Installing needs a Signing Server: set one in ${signingPage()}.` };
   }
   if (code === "no_identity") {
-    return { title: "No Certificate", open: "signing", message: "Add your certificate and provisioning profile in Settings > Signing." };
+    return { title: "No Certificate", open: "signing", message: `Add your certificate and provisioning profile in ${signingPage()}.` };
   }
   if (code === "device_not_in_profile") {
     // F236: the shell checked the profile against this phone before signing (DeviceCheck.swift): its own sentence.
@@ -446,7 +447,7 @@ export function deviceError(err, name = "") {
     // B30: the app fetched the install manifest itself before handing iOS the link (iOS shows nothing when it can't).
     // The native text names the host and why; a Signing Server set by hand may be the cause, so say where it is.
     return { title: name ? `Couldn't Install ${name}` : "Couldn't Install", open: null,
-      message: `${message} Check the connection, or the Signing Server in Settings > Signing.` };
+      message: `${message} Check the connection, or the Signing Server in ${signingPage()}.` };
   }
   // B104: an http link nothing asked about, and any other ATS refusal: our words, never iOS's raw sentence
   if (code === "insecure") return { title: INSECURE_IPA_ALERT.title, open: null, message: insecureText(name) };

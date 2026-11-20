@@ -269,3 +269,24 @@ test("F237: Notifications for Signed Apps: R25's steps, opened from Settings > S
   assert.match(page.textContent, /delete it first/);
   assert.ok(page.textContent.includes("Settings > Signing"));
 });
+
+// C15: the sideload build merged the page into Installation & Signing: its texts and Next rows say so; the website
+// and the jailbreak app keep "Settings > Signing". The links stay #settings/signing either way.
+test("C15: the signing page is named the build's way in answers, steps and rows", () => {
+  const was = globalThis.ifizboxNative;
+  globalThis.ifizboxNative = { mode: "sideload" };
+  try {
+    const answer = draw(["guides", "faq", "app"], { lite: true });
+    assert.ok(answer.textContent.includes("Settings > Installation & Signing: check the certificate"));
+    assert.equal(answer.textContent.includes("Settings > Signing"), false);
+    const guide = draw(["guides", "keep-bundle-id"], { lite: true, store: { getItem: () => null, setItem: () => {} } });
+    assert.ok(guide.textContent.includes("Settings > Installation & Signing: Replace Certificate"));
+    assert.equal(guide.textContent.includes("Settings > Signing"), false);
+    assert.equal(g.linkRow("signing").label, "Settings > Installation & Signing");
+    assert.equal(g.linkRow("signing").href, "#/home/settings/signing");
+  } finally {
+    globalThis.ifizboxNative = was;
+  }
+  assert.equal(g.linkRow("signing").label, "Settings > Signing", "website");
+  assert.equal(g.linkRow("signing", "jailbreak").label, "Settings > Signing");
+});

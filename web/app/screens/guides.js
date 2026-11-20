@@ -17,6 +17,7 @@ import { format, settingsRoute } from "../router.js";
 import { NAME } from "../brand.js";
 import { GUIDE_ID as KEEP_GUIDE } from "../core/keepid.js";
 import { UDID_HOW } from "../core/signing.js";
+import { pageName } from "../core/signingpage.js";
 
 export const JAILBREAK_INFO_URL = "https://jailbreakme.dev/";
 
@@ -38,7 +39,8 @@ export const LINKS = {
   openssh: { label: "OpenSSH Access How-To", href: () => format({ tab: "home", path: ["guides", "openssh"] }) },
   password: { label: "Root Password How-To", href: () => format({ tab: "home", path: ["guides", "password"] }) },
 };
-export const linkRow = (id) => ({ label: LINKS[id].label, href: LINKS[id].href() });
+// C15: labels and texts name the signing page the build's way (Installation & Signing in the sideload build)
+export const linkRow = (id, mode) => ({ label: pageName(LINKS[id].label, mode), href: LINKS[id].href() });
 
 // ---- FAQ ----------------------------------------------------------------------------------------------------
 // Each answer: { q, a } (one paragraph) or { q, steps: [...] }, `next`: LINKS ids, `group`, and where it shows:
@@ -398,20 +400,20 @@ function answerView(f) {
     f.steps.forEach((s, i) => {
       const li = el("li", "cell");
       const inner = el("div", "cell-inner guide-step");
-      inner.append(el("span", "guide-num", String(i + 1)), el("span", "guide-text", s));
+      inner.append(el("span", "guide-num", String(i + 1)), el("span", "guide-text", pageName(s)));
       li.append(inner);
       ul.append(li);
     });
   } else {
     const li = el("li", "cell");
     const inner = el("div", "cell-inner");
-    inner.append(el("p", "guide-text", f.a));
+    inner.append(el("p", "guide-text", pageName(f.a)));
     li.append(inner);
     ul.append(li);
   }
   g.append(ul);
   frag.append(g);
-  if (f.next?.length) frag.append(grouped([{ header: "Next", rows: f.next.map(linkRow) }]));
+  if (f.next?.length) frag.append(grouped([{ header: "Next", rows: f.next.map((id) => linkRow(id)) }]));
   return frag;
 }
 
@@ -483,7 +485,7 @@ function stepsView(id, { store = globalThis.localStorage, copy = defaultCopy } =
     mark(done.has(n));
     badge.addEventListener("click", () => mark(toggleStep(id, n, store)));
     const text = el("span", "guide-step-text");
-    text.append(el("span", "guide-step-title", s.title), el("span", "guide-text", s.text));
+    text.append(el("span", "guide-step-title", s.title), el("span", "guide-text", pageName(s.text)));
     inner.append(badge, text);
     li.append(inner);
     ul.append(li);
@@ -493,7 +495,7 @@ function stepsView(id, { store = globalThis.localStorage, copy = defaultCopy } =
       ul.append(tli);
     }
     // the rows (Install, Still alpine?) as cells of the same table, below the step
-    for (const r of s.rows ?? []) ul.append(row(r));
+    for (const r of s.rows ?? []) ul.append(row({ ...r, label: pageName(r.label) }));
     g.append(ul);
     frag.append(g);
   });

@@ -121,28 +121,20 @@ const errorText = (e) => (e?.code === "cancelled" || /^cancel+ed$/i.test(String(
 
 // B151: installd refuses an app whose bundle ID has an install coordinator someone else holds: "IXErrorDomain
 // Code=46 A coordinated app install already exists for <id> (creator App Store) but request by
-// mobile_installation_proxy had scope requirement ...". The App Store's (a download, update or placeholder that never
-// finished) outlives deleting the app and restarting the iPhone, and nothing installation_proxy or lockdown offers
-// lists or cancels it. A different bundle ID has no coordinator, so the row offers that (ownIdRetry): its tap
-// signs and installs the app again with Keep Bundle IDs off for this app only.
+// mobile_installation_proxy had scope requirement ...". The user's case (2026-11-20): the App Store's copy of the app
+// was still installed; once they deleted it, the same IPA installed fine on both routes. So the row says that, and
+// Retry is the way out. A different bundle ID has no coordinator either, so a row that can still offers that
+// (ownIdRetry): its tap signs and installs the app again with Keep Bundle IDs off for this app only.
 export const coordinatorBusy = (text) => {
   const s = String(text ?? "");
   return /coordinated app install already exists/i.test(s) || /IXErrorDomain\b[\s\S]{0,40}\bCode[ =]*46\b/i.test(s);
 };
-export const BUSY_ROW = "the App Store holds this app's install. Tap to install it with its own bundle ID";
-export const BUSY_ROW_KEPT = "the App Store holds this app's install. Cancel its download, then Retry";
+export const BUSY_ROW_KEPT = "the App Store version is installed. Delete it, then Retry";
+export const BUSY_ROW = `${BUSY_ROW_KEPT}, or tap to install it with its own bundle ID`;
 // The coordinator's bundle ID, as installd names it ("... already exists for com.atebits.Tweetie2 (creator ...").
 export function busyBundleId(text) {
   const m = /already exists for ([A-Za-z0-9.-]+)/.exec(String(text ?? ""));
   return m ? m[1] : null;
-}
-// The Log's line under the app: what happened and both ways out.
-export function busyText(row, raw = "", { own = true } = {}) {
-  const id = busyBundleId(raw) || row?.bundleId || row?.id || "";
-  return `the App Store holds an install of ${id || "this app"} (a download or update that never finished), so iOS ` +
-    "won't take another app with that bundle ID; deleting the app or restarting the iPhone doesn't clear it. " +
-    (own ? "Tap the app's row to install it with its own bundle ID (Keep Bundle IDs off for this app), or cancel"
-      : "Cancel") + " the App Store's download (long-press its icon on the Home Screen, or in the App Store), then Retry.";
 }
 // Whether a row can go again under its own bundle ID: an install with an IPA (a link or My IPAs), not iFizBox
 // itself, not the jailbreak app's helper, not a re-sign of a recorded app, and not already off.
@@ -240,10 +232,12 @@ export function createAppRun({ rows, sign, install, discard = () => {}, reprompt
   const fail = (r, why) => {
     if (ended(r)) return;
     const text = String(why || "failed");
-    if (coordinatorBusy(text)) { // B151: our words, never installd's dump, as the row's line
+    if (coordinatorBusy(text)) { // our one short line as the row's and the Log's red line; installd's dump grey below
       const own = ownIdOk(r);
-      finishRow(r, "failed", { error: own ? BUSY_ROW : BUSY_ROW_KEPT, busy: own });
-      log(r, "error", `${label(r)}: ${busyText(r, text, { own })}`);
+      const why = own ? BUSY_ROW : BUSY_ROW_KEPT;
+      finishRow(r, "failed", { error: why, busy: own });
+      log(r, "error", `${label(r)}: ${why}`);
+      log(r, "raw", text);
       pump();
       return;
     }

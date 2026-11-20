@@ -1,5 +1,5 @@
 // F280: push notifications (src/push.js) against Node's SQLite with D1's API and a fake APNs that checks the provider
-// token's signature, the topic, the host and the payload. Run from worker/test.mjs.
+// token's signature, the topic, the host and the payload. tools/check.sh runs it with the other worker/test*.mjs.
 import assert from "node:assert/strict";
 import w from "./src/index.js";
 import { push, runPushCheck, parseRegistration, offers, updatesFor, expiringFor, alertFor, keepNotified, pushConfig,

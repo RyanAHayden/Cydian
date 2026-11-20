@@ -1488,4 +1488,3 @@ import { fileURLToPath } from "node:url";
   } finally { s.child.kill(); await rm(root, { recursive: true, force: true }); }
   console.log("worker node static/host: ok");
 }
-await import("./test-push.mjs"); // F280

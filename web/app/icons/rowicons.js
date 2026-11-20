@@ -5,6 +5,7 @@
 //   rowIcon("general")  -> { cls: "row-icon", src: "data:image/svg+xml,…" }   a grouped()/plain() row's `icon`
 //   tileSvg("general")  -> the SVG text
 //   SETTING_ICONS       core/settings.js keys -> icon names (screens/settings.js draws them)
+//   ICON_SETS           the per-style icon map: these tiles and every other SVG the screens draw (below, C51)
 //
 // Measured off the 4S (Preferences.app's Settings icons, 58x58 @2x, and a screenshot of Settings' root):
 //   tile      29 x 29pt, corners ~5pt (the first opaque pixel 9px in on the top row @2x)
@@ -139,26 +140,113 @@ export const SETTING_ICONS = {
 export const PAGE_ICONS = { general: "general", theme: "theme", updates: "updates", installation: "installation", signing: "signing" };
 
 
+// F176: Copying Files' app and system tiles (screens/guides.js): our own glyphs on a 58-unit tile, never Apple's,
+// Microsoft's or LocalSend's artwork (AGENTS.md): a folder, radio waves, swap arrows, a monitor, a window, a penguin
+// of our own. Name -> [light colour, tile colour, the white glyph's SVG body].
+const GUIDE_TILES = {
+  files: ["#7cc0fb", "#1a6fd8", "<path d='M11 18h13l4 4h19v22H11z'/><path d='M11 25h36' stroke='#1a6fd8' stroke-width='2' fill='none' opacity='.35'/>"],
+  airdrop: ["#7fd0f7", "#1f8fd6", "<circle cx='29' cy='38' r='4.5'/><g fill='none' stroke='#fff' stroke-width='4' stroke-linecap='round'><path d='M20 31a12 12 0 0 1 18 0'/><path d='M14 25a20 20 0 0 1 30 0'/><path d='M9 19a28 28 0 0 1 40 0'/></g>"],
+  localsend: ["#6fe0bf", "#14916f", "<g fill='none' stroke='#fff' stroke-width='4.5' stroke-linecap='round' stroke-linejoin='round'><path d='M21 44V15m-8 8 8-8 8 8'/><path d='M37 14v29m-8-8 8 8 8-8'/></g>"],
+  pairdrop: ["#b9a3f7", "#5b3fc9", "<rect x='9' y='15' width='16' height='28' rx='3'/><rect x='33' y='15' width='16' height='28' rx='3'/><g fill='none' stroke='#5b3fc9' stroke-width='3' stroke-linecap='round'><path d='M17 37h0M41 37h0'/></g><path d='M27 29h4' stroke='#fff' stroke-width='3.5' stroke-linecap='round'/>"],
+  mac: ["#d9dde3", "#7c8592", "<rect x='9' y='12' width='40' height='27' rx='3'/><rect x='12' y='15' width='34' height='21' fill='#5e7fa8'/><path d='M24 39h10l2 7H22z'/><rect x='18' y='45' width='22' height='3' rx='1.5'/>"],
+  windows: ["#74b6f2", "#1d5fc0", "<rect x='9' y='13' width='40' height='32' rx='3'/><rect x='12' y='20' width='34' height='22' fill='#2f74d0'/><g fill='#1d5fc0'><circle cx='14' cy='16.5' r='1.5'/><circle cx='19' cy='16.5' r='1.5'/></g><path d='M15 24h12v7H15zM30 24h13v15H30zM15 34h12v5H15z' fill='#bcd8f6'/>"],
+  linux: ["#5d5d5d", "#1d1d1d", "<ellipse cx='29' cy='34' rx='13' ry='15'/><ellipse cx='29' cy='35' rx='8.5' ry='11' fill='#1d1d1d'/><circle cx='29' cy='19' r='9'/><g fill='#1d1d1d'><circle cx='25.5' cy='18' r='1.6'/><circle cx='32.5' cy='18' r='1.6'/></g><path d='M25 22h8l-4 4z' fill='#f6b73c'/><path d='M17 48h9l-2-4h-6zM32 48h9l-1-4h-6z' fill='#f6b73c'/>"],
+  filza: ["#ffc66b", "#e07e14", "<path d='M11 16h12l4 4h20v24H11z'/><g fill='none' stroke='#e07e14' stroke-width='3' stroke-linecap='round'><path d='M19 27v11h8M19 32h8'/></g><rect x='29' y='25' width='10' height='5' rx='1' fill='#e07e14'/><rect x='29' y='35' width='10' height='5' rx='1' fill='#e07e14'/>"],
+};
+
+// Home tiles a screen styles itself (home.css .home-glyph): the tile's colour, its gradient, the glyph SVG.
+const HOME_TILES = {
+  why: { colour: "#d8820f", gradient: ["#f4b03f", "#d8820f"], // screens/why.js: the Why tile's star
+    svg: "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path fill='#fff' d='M12 3.2l2.6 5.5 6 .7-4.4 4.1 1.2 5.9L12 16.5l-5.4 2.9 1.2-5.9-4.4-4.1 6-.7z'/></svg>" },
+};
+
+// The tab bar's glyphs: masks over the tab's fill (ios6.css .tab-icon::before), reaching CSS as the `--glyph` token
+// of `.tab[data-tab="<tab>"]`. ios6.css holds them as tabGlyphTokens("ios6") prints them (rowicons.test.js).
+const TAB_GLYPHS = {
+  home: "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'><path d='M14 3 1.5 14H5v11h7v-7h4v7h7V14h3.5z'/></svg>",
+  sources: "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'><rect x='3' y='3' width='22' height='6' rx='2'/><rect x='3' y='11' width='22' height='6' rx='2'/><rect x='3' y='19' width='22' height='6' rx='2'/></svg>",
+  changes: "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'><path fill-rule='evenodd' d='M14 2a12 12 0 1 0 0 24 12 12 0 1 0 0-24zm0 3a9 9 0 1 1 0 18 9 9 0 1 1 0-18z'/><path d='M12.6 7h2.8v6.3l4.4 3.1-1.6 2.3-5.6-4z'/></svg>",
+  installed: "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'><path d='M11 2h6v8h5l-8 8-8-8h5z'/><path d='M2 17h6l2 3h8l2-3h6v9H2z'/></svg>",
+  search: "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'><path fill-rule='evenodd' d='M11.5 2a9.5 9.5 0 1 0 0 19 9.5 9.5 0 1 0 0-19zm0 3a6.5 6.5 0 1 1 0 13 6.5 6.5 0 1 1 0-13z'/><path d='m17.6 19.7 2.1-2.1 6.6 6.6-2.1 2.1z'/></svg>",
+  // our gear: a ring and eight teeth
+  settings: "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28' fill='none' stroke='#000'><circle cx='14' cy='14' r='7.4' stroke-width='5.2'/><circle cx='14' cy='14' r='10.9' stroke-width='3.4' stroke-dasharray='4.28 4.28'/></svg>",
+};
+
+// C51: the per-style icon map (docs/eras.md, "Icon map"). Every inline SVG the screens draw from JS comes from here,
+// keyed by kind and icon name, so an era (outline or filled icons) ships its own set beside iOS 6's:
+//   rows    name -> [tile colour, glyph name]   29pt row tiles (tileSvg, rowIcon)
+//   glyphs  glyph name -> parts                 the white glyphs on row tiles, 24 units
+//   guides  name -> [light, colour, body]       Copying Files' 58-unit tiles (guideSvg)
+//   home    name -> { colour, gradient, svg }   Home tiles drawn by a screen's own CSS (homeTileCss)
+//   tabs    tab -> SVG                          the tab bar's --glyph tokens (tabGlyphTokens)
+//   tile    the row tile's size, corners and glyph size
+// An era's set names only what it redraws: anything it leaves out falls back to iOS 6's entry.
+export const ICON_SETS = {
+  ios6: { rows: ROW_ICONS, glyphs: GLYPHS, guides: GUIDE_TILES, home: HOME_TILES, tabs: TAB_GLYPHS,
+    tile: { size: SIZE, radius: R, glyph: 19 } },
+};
+
+// The style the page shows: <html data-style="ios7"> (docs/eras.md), iOS 6 when none is set.
+export function iconStyle(doc = globalThis.document) {
+  return doc?.documentElement?.dataset?.style || "ios6";
+}
+
+// One entry of the map: `kind` ("rows", "guides", …), `name`, for `style` (the page's by default).
+export function icon(kind, name, style = iconStyle()) {
+  const own = ICON_SETS[style]?.[kind];
+  // hasOwnProperty, not Object.hasOwn: that needs iOS 15.4 and the app runs on 15.0
+  return own && Object.prototype.hasOwnProperty.call(own, name) ? own[name] : ICON_SETS.ios6[kind]?.[name];
+}
+
+// An SVG as a CSS url() the way ios6.css writes them: only <, > and # escaped, the SVG's quotes single.
+export const cssSvgUrl = (svg) => `url("data:image/svg+xml,${svg.replace(/</g, "%3C").replace(/>/g, "%3E").replace(/#/g, "%23")}")`;
+
+// The tab bar's glyph tokens for `style`, one rule per tab: what ios6.css holds for iOS 6 and an era's stylesheet
+// carries for its own set.
+export function tabGlyphTokens(style = "ios6") {
+  return Object.keys(TAB_GLYPHS).map((tab) => `.tab[data-tab="${tab}"] { --glyph: ${cssSvgUrl(icon("tabs", tab, style))}; }`).join("\n");
+}
+
+// A Home tile's paint (home.css .home-glyph): its colour, then the glyph over its gradient.
+export function homeTileCss(name, style = iconStyle()) {
+  const t = icon("home", name, style);
+  if (!t) throw new Error(`no home tile ${name}`);
+  return `background-color: ${t.colour}; background-image: ${cssSvgUrl(t.svg)}, linear-gradient(${t.gradient.join(", ")});`;
+}
+
+// The names of Copying Files' tiles, and one tile as a whole SVG: flat like Home's tiles (no gloss), the tile's
+// colour, the white glyph.
+export const GUIDE_TILE_NAMES = Object.keys(GUIDE_TILES);
+export function guideSvg(name, style = iconStyle()) {
+  const t = icon("guides", name, style);
+  if (!t) throw new Error(`no guide tile ${name}`);
+  const [, colour, body] = t;
+  return "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 58 58'>"
+    + `<rect width='58' height='58' fill='${colour}'/><g fill='#fff'>${body}</g></svg>`;
+}
+
 function glyphSvg(parts) {
   return parts.map(([kind, d, w]) => kind === "s"
     ? `<path d="${d}" fill="none" stroke="#fff" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round"/>`
     : `<path d="${d}" fill="#fff"${kind === "e" ? ' fill-rule="evenodd"' : ""}/>`).join("");
 }
 
-export function tileSvg(name) {
-  const icon = ROW_ICONS[name];
-  if (!icon) throw new Error(`no row icon ${name}`);
-  const [colour, glyph] = icon;
-  const g = 19 / 24; // the glyph's 24 units drawn 19pt across
-  const off = (SIZE - 24 * g) / 2;
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${SIZE}" height="${SIZE}" viewBox="0 0 ${SIZE} ${SIZE}">`
-    + `<rect width="${SIZE}" height="${SIZE}" rx="${R}" fill="${colour}"/>`
-    + `<g transform="translate(${off} ${off}) scale(${g})">${glyphSvg(GLYPHS[glyph])}</g></svg>`;
+export function tileSvg(name, style = iconStyle()) {
+  const entry = icon("rows", name, style);
+  if (!entry) throw new Error(`no row icon ${name}`);
+  const [colour, glyph] = entry;
+  const { size, radius, glyph: across } = { ...ICON_SETS.ios6.tile, ...ICON_SETS[style]?.tile };
+  const g = across / 24; // the glyph's 24 units drawn `tile.glyph` across (19pt in iOS 6)
+  const off = (size - 24 * g) / 2;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">`
+    + `<rect width="${size}" height="${size}" rx="${radius}" fill="${colour}"/>`
+    + `<g transform="translate(${off} ${off}) scale(${g})">${glyphSvg(icon("glyphs", glyph, style))}</g></svg>`;
 }
 
 const cache = new Map();
 // A row's `icon` for nav/ui.js grouped()/plain(): the tile as a picture in the .cell-icon (ios6.css .row-icon).
-export function rowIcon(name) {
-  if (!cache.has(name)) cache.set(name, "data:image/svg+xml," + encodeURIComponent(tileSvg(name)));
-  return { cls: "row-icon", src: cache.get(name) };
+export function rowIcon(name, style = iconStyle()) {
+  const key = `${style}:${name}`;
+  if (!cache.has(key)) cache.set(key, "data:image/svg+xml," + encodeURIComponent(tileSvg(name, style)));
+  return { cls: "row-icon", src: cache.get(key) };
 }

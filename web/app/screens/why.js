@@ -13,7 +13,7 @@
 import { el, grouped } from "../nav/ui.js";
 import { format, settingsRoute } from "../router.js";
 import { NAME } from "../brand.js";
-import { rowIcon } from "../icons/rowicons.js";
+import { rowIcon, homeTileCss, iconStyle } from "../icons/rowicons.js";
 
 export const WHY_ROUTE = { tab: "home", path: ["why"] };
 export const whyHref = (fmt = format) => fmt(WHY_ROUTE);
@@ -84,7 +84,8 @@ export const WHY_POINTS = [
 
 export const shotSrc = (id) => `img/why/${id}.jpg`;
 
-export const WHY_CSS = `
+// The page's CSS for `style`: the Why tile's star comes from the icon map (icons/rowicons.js "home", C51).
+export const whyCss = (style = "ios6") => `
 .why-intro { margin: 14px 19px 0; font-size: 17px; line-height: 22px; text-align: center; color: var(--text); text-shadow: var(--emboss); }
 .why-lead .table.grouped { border-width: 2px; }
 .cell.why-line .cell-inner { min-height: 0; padding-block: 9px; }
@@ -92,16 +93,17 @@ export const WHY_CSS = `
 .cell.why-shot-cell .cell-inner { display: block; padding: 10px; min-height: 0; }
 .why-shot { display: block; width: 100%; max-width: 320px; height: auto; margin: 0 auto; border-radius: 7px;
   border: 1px solid var(--table-edge); }
-.home-glyph.glyph-why { background-color: #d8820f; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23fff' d='M12 3.2l2.6 5.5 6 .7-4.4 4.1 1.2 5.9L12 16.5l-5.4 2.9 1.2-5.9-4.4-4.1 6-.7z'/%3E%3C/svg%3E"), linear-gradient(#f4b03f, #d8820f);
+.home-glyph.glyph-why { ${homeTileCss("why", style)}
   background-size: 21px 21px, 100% 100%; background-repeat: no-repeat; background-position: center; }
 @media (min-width: 700px) { .why-page { max-width: 640px; margin: 0 auto; } }
 `;
+export const WHY_CSS = whyCss();
 
 export function ensureWhyStyle(doc = globalThis.document) {
   if (!doc?.head || doc.getElementById?.("why-style")) return false;
   const s = doc.createElement("style");
   s.id = "why-style";
-  s.textContent = WHY_CSS;
+  s.textContent = whyCss(iconStyle(doc));
   doc.head.append(s);
   return true;
 }

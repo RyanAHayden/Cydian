@@ -21,6 +21,7 @@
 //   await newCertificate({ request, revokeId })   key + CSR made here, POST /certificates, packed as a .p12
 //   await makeOwnSigning({ request, ... })    newCertificate + the profile for this app's own App ID (Make Certificate)
 //   await profileForP12({ request, serials }) the own App ID's profile for a .p12 imported without one
+//   await profileForAnyP12({ request })       the same when the .p12's serial isn't known: every distribution certificate
 //   certTeam(cert)                            the team ID (subject OU) in an Apple certificate
 //   profileSerials(mobileprovision)         the serials of the certificates a profile lists (for findCertificate)
 //   profileRows(cache)                        the Provisioning Profile rows for the cache
@@ -173,7 +174,9 @@ const b64decode = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
 // (changed in place; the caller saves it; the entry shape is in the header). Returns { entry, made, reason, appId,
 // deviceMade }. `certId`, when the caller already knows the certificate's ASC id, also remakes a profile made with
 // another certificate; without it a reused profile costs one call (the App ID's capabilities).
-export async function ensureProfile({ request, bundleId, prefix, udid, deviceName, serials, certId = null, cache = {}, now = Date.now() }) {
+// `certIds` (F276): make the profile with these certificates instead of looking up `serials` (a .p12 whose serial
+// isn't known: profileForAnyP12).
+export async function ensureProfile({ request, bundleId, prefix, udid, deviceName, serials, certId = null, certIds = null, cache = {}, now = Date.now() }) {
   const identifier = appIdFor(bundleId, prefix);
   let cached = cache[identifier] ?? null;
   let appId = cached?.bundleIdId ? { id: cached.bundleIdId, identifier, made: false } : null;
@@ -189,14 +192,14 @@ export async function ensureProfile({ request, bundleId, prefix, udid, deviceNam
   if (!reason) return { entry: cached, made: false, reason: null, appId: identifier, deviceMade: false };
 
   const deviceMade = udid ? (await ensureDevice(request, udid, deviceName)).made : false;
-  const cert = await findCertificate(request, serials);
+  const cert = certIds?.length ? { id: certIds[0], all: certIds } : await findCertificate(request, serials);
   if (!cert) throw new AscError("Your certificate isn't in this developer account.", { code: "no-cert" });
   const devices = (await request("GET", `/devices${q({ "filter[platform]": "IOS", "filter[status]": "ENABLED", limit: 200 })}`)).data ?? [];
   const name = profileName(identifier);
   for (const p of (await request("GET", `/profiles${q({ "filter[name]": name, limit: 200 })}`)).data ?? []) {
     await request("DELETE", `/profiles/${p.id}`); // names are unique: the old one goes first
   }
-  const created = (await request("POST", "/profiles", profileBody({ name, bundleIdId: appId.id, certId: cert.id, deviceIds: devices.map((d) => d.id) }))).data;
+  const created = (await request("POST", "/profiles", profileBody({ name, bundleIdId: appId.id, certId: cert.all ?? cert.id, deviceIds: devices.map((d) => d.id) }))).data;
   const content = created.attributes.profileContent;
   const info = parseProfile(b64decode(content));
   const entry = { identifier, bundleIdId: appId.id, id: created.id, name, content, expires: info.expires?.toISOString() ?? null,
@@ -207,7 +210,7 @@ export async function ensureProfile({ request, bundleId, prefix, udid, deviceNam
 
 export function profileBody({ name, bundleIdId, certId, deviceIds }) {
   return { data: { type: "profiles", attributes: { name, profileType: "IOS_APP_ADHOC" },
-    relationships: { bundleId: { data: { type: "bundleIds", id: bundleIdId } }, certificates: rel("certificates", [certId]),
+    relationships: { bundleId: { data: { type: "bundleIds", id: bundleIdId } }, certificates: rel("certificates", [].concat(certId)),
       devices: rel("devices", deviceIds) } } };
 }
 
@@ -313,6 +316,25 @@ export async function makeOwnSigning({ request, bundleId = BUNDLE_ID, prefix = n
 // `serials`: the .p12's certificate serial(s). -> ensureProfile's result (AscError "no-cert" when it isn't in the account).
 export const profileForP12 = ({ request, serials, bundleId = BUNDLE_ID, prefix, team = null, udid = null, deviceName, cache = {}, now = Date.now() }) =>
   ensureProfile({ request, bundleId, prefix: prefix ?? appIdPrefix(null, team), udid, deviceName, serials, cache, now });
+
+// F276: a .p12 picked alone whose serial can't be read here (its certificate is encrypted with the password, often
+// with 3DES/RC2, which WebCrypto lacks): the own App ID's profile lists every distribution certificate in the account,
+// so it fits whichever of them the .p12 holds (a .p12 from another account fails at import, as with a wrong profile).
+// The prefix comes from the team in those certificates. -> ensureProfile's result plus `certs` (how many it lists);
+// AscError "no-cert" when the account has none.
+export async function profileForAnyP12({ request, bundleId = BUNDLE_ID, prefix = null, udid = null, deviceName, cache = {}, now = Date.now() }) {
+  const r = await request("GET", `/certificates${q({ "filter[certificateType]": "DISTRIBUTION,IOS_DISTRIBUTION", limit: 200 })}`);
+  const certs = (r.data ?? []).filter((c) => ["DISTRIBUTION", "IOS_DISTRIBUTION"].includes(c.attributes?.certificateType ?? "DISTRIBUTION"));
+  if (!certs.length) {
+    throw new AscError("This account has no Apple Distribution certificate, so the .p12 can't be from it. Make Certificate "
+      + "makes one, or import a .p12 from this account.", { code: "no-cert" });
+  }
+  let team = null;
+  for (const c of certs) { if (!team && c.attributes?.certificateContent) { try { team = certTeam(b64decode(c.attributes.certificateContent)); } catch { /* unreadable */ } } }
+  const out = await ensureProfile({ request, bundleId, prefix: prefix ?? appIdPrefix(null, team), udid, deviceName, serials: [],
+    certIds: certs.map((c) => c.id), cache, now });
+  return { ...out, certs: certs.length };
+}
 
 // The serials of the certificates an imported profile lists (the website's .p12 is one of them).
 export function profileSerials(profileBytes) {

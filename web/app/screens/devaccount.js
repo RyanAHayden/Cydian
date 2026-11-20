@@ -8,13 +8,17 @@
 //   accountGroup({ native, redraw })     the group for the Signing page
 //   await autoProfileSite({ ipa, id, bundleId, keep, log })   the website's sign-time step: the profile bytes made for
 //                                        this app, or null to sign with the imported one
+//   await makeCertificateFlow(native)    Make Certificate: a new Apple Distribution certificate + own profile, kept
+//   await profileFromKey(native)         a .p12 picked without a profile: the own App ID's profile from the key
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { grouped } from "../nav/ui.js";
 import { showAlert, alertOK } from "../nav/alert.js";
 import { NAME, DOMAIN } from "../brand.js";
 import { sortKeyFiles, issuerFromText, UUID_RE } from "../core/certfiles.js";
-import { makeJwt, httpTransport, ensureProfile, appIdPrefix, profileRows, profileSerials, findCertificate, ensureDevice } from "../core/asc.js";
-import { parseProfile, fromBase64, normalUdid } from "../core/signing.js";
+import { makeJwt, httpTransport, ensureProfile, appIdPrefix, profileRows, profileSerials, findCertificate, ensureDevice,
+  makeOwnSigning, profileForP12, profileForAnyP12, LIMIT_TEXT, REVOKE_WARNING } from "../core/asc.js";
+import { parseProfile, fromBase64, toBase64, normalUdid } from "../core/signing.js";
+import { showHUD } from "../nav/hud.js";
 import { storedUdid, startUdid, watchUdid } from "./signing.js";
 import { ascGuideHref, ASC_GUIDE_LINK } from "./guides.js";
 
@@ -29,7 +33,14 @@ export const siteKey = () => { const k = readJson(KEY); return k?.p8 && k.keyId 
 export function siteRequest(k = siteKey(), { origin = globalThis.location?.origin ?? "", fetcher } = {}) {
   return httpTransport({ base: `${origin}/apple/api.appstoreconnect.apple.com/v1`, token: () => makeJwt(k), ...(fetcher ? { fetcher } : {}) });
 }
-const nativeRequest = (n) => (method, path, body) => n.call("asc.request", { method, path: `/v1${path}`, ...(body ? { body } : {}) });
+// The shell's errors carry "asc_<status>" (ASC.swift); core/asc.js reads `.status` (404 App ID gone, 403/409 for
+// Make Certificate), so it's set from that.
+export const nativeRequest = (n) => (method, path, body) => n.call("asc.request", { method, path: `/v1${path}`, ...(body ? { body } : {}) })
+  .catch((e) => {
+    const m = /^asc_(\d{3})$/.exec(String(e?.code ?? ""));
+    if (m && e && typeof e === "object" && e.status == null) { try { e.status = Number(m[1]); } catch { /* frozen */ } }
+    throw e;
+  });
 
 async function keyInfo(native) {
   const n = nativeOf(native);
@@ -189,14 +200,161 @@ export async function registerUdid(native, udid, { request } = {}) {
   try { return await deviceLine(request ?? (n?.call ? nativeRequest(n) : siteRequest()), { udid }); } catch (e) { return String(e?.message ?? e).replace(/^\w+: /, ""); }
 }
 
+// ---- F276: Make Certificate (an API key and no .p12 of this account) ----
+// The RSA key and the CSR are made here (the app's WebView or the browser); only the CSR goes to Apple. The .p12
+// (random password) is packed here and imported with the profile for the app's own App ID (core/asc.js makeOwnSigning):
+//   app       signing.import (it needs a profile with the .p12), into the Keychain
+//   website   saveIdentity (IndexedDB, as an imported .p12)
+// At Apple's limit the user picks the certificate to revoke (pickRevoke), with the warning; nothing is revoked unasked.
+export const MAKE_CERT_BUTTON = "Make Certificate";
+export const P12_NAME = `${NAME} Distribution.p12`;
+export const PROFILE_FILE = `${NAME} (made with your API key).mobileprovision`;
+export const makeCertText = (app) => `${NAME} makes a new Apple Distribution certificate in your account and signs with it. `
+  + `Its private key is made ${app ? "on this iPhone" : "in this browser"} and never leaves it: only a signing request goes to Apple. `
+  + "Needs an API key with the Admin role.";
+
+// The picker at Apple's limit: one button per certificate (UIAlertView-style stacked), then the warning and Revoke.
+// Resolves with the picked certificate's id, or null.
+export async function pickRevoke(certs, { alert = showAlert } = {}) {
+  if (!certs?.length) return null;
+  const label = (c) => `${c.kind}${c.expires ? `, until ${String(c.expires).slice(0, 10)}` : ""}${c.ours ? " (in use)" : ""}`;
+  const names = certs.map((c, i) => `${i + 1}. ${c.name}: ${label(c)}`);
+  const pick = await alert({ title: "Certificate Limit", message: [LIMIT_TEXT, ...names].join("\n\n"),
+    buttons: [...certs.map((c, i) => `Revoke ${i + 1}`), "Cancel"], cancel: certs.length, stacked: true });
+  const c = certs[pick?.index];
+  if (!c) return null;
+  const sure = await alert({ title: `Revoke ${label(c)}?`, message: [c.name, REVOKE_WARNING,
+    ...(c.ours ? [`It's the certificate ${NAME} signs with now.`] : [])].join("\n\n"),
+  buttons: ["Cancel", "Revoke"], cancel: 0, colors: { 1: "red" } });
+  return sure?.index === 1 ? c.id : null;
+}
+
+// The serials this app signs with now (the picker marks that certificate "in use").
+async function currentSerials(n, load) {
+  if (n?.call) {
+    const st = await n.call("signing.status", {}).catch(() => null);
+    return st?.identity?.serial ? [st.identity.serial] : [];
+  }
+  const id = await load().catch(() => null);
+  return id?.profile ? profileSerials(id.profile) : [];
+}
+const identityApi = async () => { const m = await import("../signing-client.js"); return { load: m.loadIdentity, save: m.saveIdentity }; };
+const message = (e) => String(e?.message ?? e).replace(/^\w+: /, "");
+
+// Puts a made (or picked) .p12 and its profile (base64 or bytes) where signing finds it.
+export async function keepIdentity(n, { p12, password, profile }, { save } = {}) {
+  const prof = typeof profile === "string" ? fromBase64(profile) : profile;
+  if (n?.call) {
+    await n.call("signing.import", { p12: toBase64(p12), profile: toBase64(prof), password: password ?? "" });
+    await save({ p12Name: P12_NAME, profileName: PROFILE_FILE }).catch(() => {});
+  } else {
+    await save({ p12, p12Name: P12_NAME, password: password ?? "", passwordOk: true, profile: prof, profileName: PROFILE_FILE });
+  }
+}
+
+// The whole flow. Resolves true once the certificate is kept. `deps` swap the request, alerts, HUD and identity store.
+export async function makeCertificateFlow(native, { request, alert = showAlert, hud = showHUD, identity, udid = null, confirm = true } = {}) {
+  const n = nativeOf(native);
+  const app = !!n?.call;
+  const req = request ?? (app ? nativeRequest(n) : siteRequest());
+  const { load, save } = identity ?? (await identityApi());
+  if (confirm) {
+    const go = await alert({ title: `${MAKE_CERT_BUTTON}?`, message: makeCertText(app), buttons: ["Cancel", "Make"], cancel: 0 });
+    if (go?.index !== 1) return false;
+  }
+  const ownSerials = await currentSerials(n, load);
+  let made = null;
+  let revokeId = null;
+  for (let round = 0; !made && round < 4; round++) {
+    const hide = hud("Making Certificate");
+    try {
+      made = await makeOwnSigning({ request: req, udid, deviceName: "iPhone", cache: {}, revokeId, ownSerials });
+    } catch (e) {
+      if (e?.code === "cert-limit" || e?.code === "cert-gone") {
+        hide();
+        if (e.code === "cert-gone") await alertOK("Certificate Gone", e.message, alert);
+        revokeId = await pickRevoke(e.certs, { alert });
+        if (!revokeId) return false;
+        continue;
+      }
+      await alertOK("Couldn't Make Certificate", message(e), alert);
+      return false;
+    } finally { hide(); }
+  }
+  if (!made) return false;
+  // The .p12 is only in memory: a failed profile step is retried here rather than losing it.
+  let profile = made.profile;
+  let problem = made.profileError;
+  while (!profile) {
+    const again = await alert({ title: "Certificate Made, No Profile", message: `${NAME} made the certificate, but not the profile `
+      + `to go with it: ${message(problem)}${app ? "" : " The certificate is kept in this browser anyway."}`,
+    buttons: [app ? "Discard" : "Later", "Try Again"], cancel: 0 });
+    if (again?.index !== 1) {
+      if (!app) await save({ p12: made.p12, p12Name: P12_NAME, password: made.password, passwordOk: true }).catch(() => {});
+      return false;
+    }
+    const hide = hud("Making Profile");
+    try {
+      profile = (await profileForP12({ request: req, serials: [made.serial], team: made.team, udid, deviceName: "iPhone", cache: {} })).entry.content;
+    } catch (e) { problem = e; } finally { hide(); }
+  }
+  try {
+    await keepIdentity(n, { p12: made.p12, password: made.password, profile }, { save });
+  } catch (e) {
+    await alertOK("Couldn't Import", message(e), alert);
+    return false;
+  }
+  await alertOK("Certificate Made", `${NAME} made an Apple Distribution certificate${made.expires ? ` (until ${String(made.expires).slice(0, 10)})` : ""} `
+    + `and signs with it now. Its key lives only ${app ? "in this iPhone's Keychain" : "in this browser"}.`, alert);
+  return true;
+}
+
+// Whether a certificate is there to sign with (app: in the Keychain; website: a .p12 kept). Unknown counts as yes, so
+// the Make Certificate row shows only when there's surely none.
+export async function hasCertificate(native, { load } = {}) {
+  const n = nativeOf(native);
+  try {
+    if (n?.call) {
+      let st = await n.call("signing.status", {});
+      if (typeof st === "string") st = JSON.parse(st);
+      return !st || typeof st !== "object" || !("identity" in st) || Boolean(st.identity);
+    }
+    const id = await (load ?? (await identityApi()).load)();
+    return Boolean(id?.p12);
+  } catch { return true; }
+}
+
+// F276: a key user picked a .p12 and no .mobileprovision: the profile for the app's own App ID comes from the key,
+// listing every distribution certificate in the account (the .p12's serial can't be read before it's opened).
+// Saves it with the staged identity; resolves true when it did. Quiet (false) without a key or when nothing is missing.
+export async function profileFromKey(native, { request, identity, alert = showAlert, hud = showHUD, info = keyInfo } = {}) {
+  const n = nativeOf(native);
+  const { load, save } = identity ?? (await identityApi());
+  const id = await load().catch(() => null);
+  if (!id?.p12 || id.profile) return false;
+  if (!(await info(native))) return false;
+  const hide = hud("Making Profile");
+  try {
+    const r = await profileForAnyP12({ request: request ?? (n?.call ? nativeRequest(n) : siteRequest()), udid: null, deviceName: "iPhone", cache: {} });
+    await save({ profile: fromBase64(r.entry.content), profileName: PROFILE_FILE });
+    return true;
+  } catch (e) {
+    hide();
+    await alertOK("No Profile Made", `The API key couldn't make a profile for this .p12: ${message(e)}`, alert);
+    return false;
+  } finally { hide(); }
+}
+
 // Check Account: is the certificate in the account, is this iPhone registered (and register it).
-async function checkAccount(native) {
+async function checkAccount(native, redraw = () => {}) {
   const n = nativeOf(native);
   const lines = [];
   let find = false;
+  let noCert = false; // F276: none imported, or not in this account: offer Make Certificate
+  let udid = null;
   try {
     const request = n?.call ? nativeRequest(n) : siteRequest();
-    let serials = [], udid = null, candidates = [];
+    let serials = [], candidates = [];
     if (n?.call) {
       const st = await n.call("signing.status", {}).catch(() => null);
       serials = st?.identity?.serial ? [st.identity.serial] : [];
@@ -213,19 +371,25 @@ async function checkAccount(native) {
     if (serials.length) {
       const c = await findCertificate(request, serials);
       lines.push(c ? `Certificate: in the account (${c.attributes?.displayName || c.attributes?.name || c.id}).`
-        : "Certificate: not in this account. Import the .p12 of one of this account's certificates (Apple Distribution).");
-    } else lines.push("Certificate: none imported yet.");
+        : `Certificate: not in this account. Import the .p12 of one of this account's certificates (Apple Distribution), or ${MAKE_CERT_BUTTON}.`);
+      noCert = !c;
+    } else { lines.push("Certificate: none imported yet."); noCert = true; }
     const line = await deviceLine(request, { udid, candidates, app: !!n?.call });
     lines.push(line);
     find = !!n?.call && udidUnknown(udid, line);
   } catch (e) {
     lines.push(String(e?.message ?? e).replace(/^\w+: /, ""));
   }
-  if (!find) return alertOK("Developer Account", lines.join("\n\n"));
+  if (!find && !noCert) return alertOK("Developer Account", lines.join("\n\n"));
   // F277: not paired, and the app's own profile doesn't show this iPhone in the account: offer the website's visit
-  const { index } = await showAlert({ title: "Developer Account", message: [...lines, FIND_UDID_TEXT].join("\n\n"),
-    buttons: ["OK", FIND_UDID_BUTTON], cancel: 0 });
-  if (index !== 1) return;
+  const buttons = ["OK", ...(find ? [FIND_UDID_BUTTON] : []), ...(noCert ? [MAKE_CERT_BUTTON] : [])];
+  const { index } = await showAlert({ title: "Developer Account", message: [...lines, ...(find ? [FIND_UDID_TEXT] : [])].join("\n\n"),
+    buttons, cancel: 0 });
+  if (buttons[index] === MAKE_CERT_BUTTON) {
+    if (await makeCertificateFlow(native, { udid }).catch((e) => alertOK("Couldn't Make Certificate", message(e)).then(() => false))) redraw();
+    return;
+  }
+  if (buttons[index] !== FIND_UDID_BUTTON) return;
   try { await findUdidViaSite(native); } catch (e) { await alertOK("UDID Not Found", String(e?.message ?? e).replace(/^\w+: /, "")); }
 }
 
@@ -244,7 +408,10 @@ export function accountGroup({ native, redraw = () => {} } = {}) {
     const info = await keyInfo(native);
     const rows = info
       ? [{ label: "API Key", detail: info.keyId }, { label: "Issuer ID", subtitle: info.issuerId },
-        { label: "Check Account", onClick: () => checkAccount(native) }, { label: "Remove API Key", onClick: () => removeKey(native, redraw) }]
+        { label: "Check Account", onClick: () => checkAccount(native, redraw) },
+        ...((await hasCertificate(native)) ? [] : [{ label: MAKE_CERT_BUTTON, subtitle: "No certificate yet: make one with this key", chevron: true,
+          onClick: () => makeCertificateFlow(native).then((ok) => { if (ok) redraw(); }, (e) => alertOK("Couldn't Make Certificate", message(e))) }]),
+        { label: "Remove API Key", onClick: () => removeKey(native, redraw) }]
       : [{ label: "Add API Key", subtitle: "AuthKey_<Key ID>.p8, recommended", chevron: true, cls: "asc-add", onClick: () => input.click() }];
     const made = info ? profileRows(await cache(native)) : [];
     const frag = grouped([{ header: "Apple Developer Account", rows, footer }, ...(made.length ? [{ header: `Profiles Made by ${NAME}`, rows: made }] : [])]);

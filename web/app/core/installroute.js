@@ -154,15 +154,26 @@ export const CONNECT_ALERT = {
   buttons: ["Cancel", `Open ${VPN}`], open: 1,
 };
 
-// Where to type the code, one short line a step; `img` is the user's own screenshot of that Settings row (iPhone 15,
-// iOS 27, dark), cropped to the row and ringed on the page.
+// Where to type the code, one short line a step; `img` is the user's own screenshot of that Settings screen (iPhone 15,
+// iOS 27, dark), cropped to the row and its neighbours. `size` is the image's pixels; `box` is the row to tap,
+// measured from its separator lines and group edges, as percentages of the image ({x, y, w, h}); the page rings it.
 export const PAIR_GUIDE = [
   { text: "Open Settings" },
-  { text: "Privacy & Security", img: "img/pair/1-privacy-security.jpg" },
-  { text: "Developer Mode", img: "img/pair/2-developer-mode.jpg" },
-  { text: `Pair with ${NAME}`, img: "img/pair/3-pair-with-ifizbox.jpg" },
+  { text: "Privacy & Security", img: "img/pair/1-privacy-security.jpg", size: [1206, 509],
+    box: { x: 3.98, y: 63.75, w: 92.04, h: 29.17 } },
+  { text: "Developer Mode", img: "img/pair/2-developer-mode.jpg", size: [1206, 602],
+    box: { x: 3.98, y: 51.66, w: 92.04, h: 24.17 } },
+  { text: `Pair with ${NAME}`, img: "img/pair/3-pair-with-ifizbox.jpg", size: [1206, 320],
+    box: { x: 3.98, y: 38.75, w: 92.04, h: 45.94 } },
   { text: "Type the code above" },
 ];
+
+// The ring over a step's row: absolute-position styles for an element laid over the image, `pad` CSS px outside the
+// row on every side so the outline sits around it with even margins.
+export function ringStyle(box, pad = 3) {
+  const at = (pct, d) => `calc(${pct}% ${d < 0 ? "-" : "+"} ${Math.abs(d)}px)`;
+  return { left: at(box.x, -pad), top: at(box.y, -pad), width: at(box.w, 2 * pad), height: at(box.h, 2 * pad) };
+}
 
 export const PAIR_STEPS = {
   file: [

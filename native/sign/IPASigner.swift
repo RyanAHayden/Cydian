@@ -16,7 +16,11 @@ struct SignedApp {
 }
 
 final class IPASigner {
-    let profile: Profile
+    private(set) var profile: Profile
+    // Own provisioning profiles (native/Sources/ASC.swift): with an App Store Connect key set, the profile made for
+    // this app (its bundle ID, the imported profile, the certificate DER, the log), or nil to keep the imported one.
+    // Asked only when the app keeps its bundle ID (Keep Bundle IDs).
+    static var autoProfile: ((String, Profile, Data, (String) -> Void) throws -> Profile?)?
     let identity: SigningIdentity
     var time = Date()
     var maxMachO: UInt64 = 1 << 31   // a single binary held in memory while it's signed
@@ -102,6 +106,9 @@ final class IPASigner {
         }
         // F237: kept, Info.plist keeps the ID and only the entitlements carry the profile's App ID (entID).
         let keep = options.keeps(options.bundleID ?? oldID)
+        if keep, let auto = IPASigner.autoProfile, let made = try auto(options.bundleID ?? oldID, profile, identity.certificate, log) {
+            profile = made
+        }
         let (newID, entID) = try profile.signingIDs(for: options.bundleID ?? oldID, keep: keep)
 
         // An explicit profile covers one app ID: extensions (and Watch apps) would need their own, so they go. Kept

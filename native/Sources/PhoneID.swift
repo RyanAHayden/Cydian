@@ -19,8 +19,20 @@ enum PhoneID {
         return p
     }
 
+    // The UDID lockdown gave through This iPhone's pairing (IDevice.readUDID): kept, and it wins over the profile's
+    // guess in the sideload build.
+    static let udidKey = "ifizbox.phone.udid"
+    static func remember(_ udid: String) {
+        let u = udid.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        guard !u.isEmpty else { return }
+        UserDefaults.standard.set(u, forKey: udidKey)
+        lock.lock(); known = .some(.udid(u)); lock.unlock()
+    }
+    static var udid: String? { if case .udid(let u)? = current() { return u }; return nil }
+
     static var source: String? {
         guard current() != nil else { return nil }
+        if AppMode.current != .jailbreak, UserDefaults.standard.string(forKey: udidKey) != nil { return "lockdown" }
         return AppMode.current == .jailbreak ? "helper" : "profile"
     }
 
@@ -35,6 +47,7 @@ enum PhoneID {
             }
             return .udid(line)
         }
+        if let u = UserDefaults.standard.string(forKey: udidKey) { return .udid(u) }
         let embedded = Bundle.main.url(forResource: "embedded", withExtension: "mobileprovision").flatMap { try? Data(contentsOf: $0) }
         return DeviceCheck.phone(fromEmbedded: embedded)
     }

@@ -456,7 +456,7 @@ export function dropOtherCertProfile(cache, identifier, serials) {
   return true;
 }
 
-export async function autoProfileSite({ ipa, id, bundleId = null, keep = true, log = () => {}, cert = undefined }) {
+export async function autoProfileSite({ ipa, id, bundleId = null, keep = true, log = () => {}, cert = undefined, request = undefined }) {
   const k = siteKey();
   if (!k || !keep || !id?.profile) return null;
   let own = bundleId;
@@ -468,8 +468,8 @@ export async function autoProfileSite({ ipa, id, bundleId = null, keep = true, l
   const prefix = appIdPrefix(base.appId, base.teamId);
   const serials = await siteSerials(id, { cert });
   dropOtherCertProfile(c, appIdFor(own, prefix), serials);
-  const r = await ensureProfile({ request: siteRequest(k), bundleId: own, prefix,
-    udid: storedUdid()?.udid ?? null, deviceName: "iPhone", serials, cache: c });
+  const r = await ensureProfile({ request: request ?? siteRequest(k), bundleId: own, prefix,
+    udid: storedUdid()?.udid ?? null, deviceName: "iPhone", serials, cache: c, log });
   writeJson(CACHE, c);
   log(r.made ? `Profile ${r.appId}: made by ${NAME} (${r.reason})${r.deviceMade ? ", this iPhone added to the account" : ""}` : `Profile ${r.appId}: made by ${NAME}, reused`);
   return fromBase64(r.entry.content);

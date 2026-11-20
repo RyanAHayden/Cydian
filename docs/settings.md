@@ -90,7 +90,12 @@ The pages under it:
   the checkmark at once and spins that row until `tailscale.setConnect` and the status read after it answer, no
   HUD) and **Tailscale** (Sign In, or the device with Test Connection and Sign Out). No Developer Mode row: an
   install it stops explains it in its alert. Groups that come, go or change size slide (FLIP, transform and opacity
-  only: `slideLayout`).
+  only: `slideLayout`). `idevice.status` (Pairing, the VPN) and `tailscale.status` (Connect With, Tailscale) are read
+  at once and each fills its own rows as it answers; the last answer of this app run shows at once, its rows spinning
+  while they're read again; a read past its deadline (`TIMEOUTS`) says Not Responding, red. An answer swaps only the
+  rows that changed (`patchGroups`), never the whole page. Test Connection and Check Connection spin in their own
+  row (no HUD) for at most 25 and 20 seconds; Check Connection with neither LocalDevVPN nor Tailscale's route on
+  answers Turn On LocalDevVPN at once instead of waiting out `idevice.verify`.
 - **Pairing** (`installation/pair`), one page that runs by itself: a sentence on what it gives, the LocalDevVPN
   check (Turn On LocalDevVPN alert when it's off, rechecked when the app comes back), then on iOS 27 pairing starts
   on its own: the 6-digit code and where to type it, a line and a ringed Settings screenshot a step; before iOS 27,

@@ -55,10 +55,26 @@ enum VPNCheck {
         return soErr == ECONNREFUSED ? .refused : .silent
     }
 
+    /// F301: a probe's deadline. 10.7.0.1 is this phone through LocalDevVPN, so an answer (connected or refused) comes
+    /// in milliseconds; only a silent address waits it out.
+    static let probeTimeout: TimeInterval = 0.75
+
+    /// F301: idevice.status is read on every visit of Settings > Installation & Signing and every 2 s while the Pairing
+    /// page waits for the VPN, so it must be quick. LocalDevVPN is a tunnel interface with an IPv4 address (utun):
+    /// with none up it can't be on, and nothing is probed (the probes' deadline was the whole wait with the VPN off).
+    /// Otherwise both ports are probed at once (they were one after the other: 3 s with LocalDevVPN off and another
+    /// VPN on, 0.75 s now).
     static func status() -> [String: Any] {
-        let rp = probe(IDevice.remotePairingPort), ld = rp == .silent ? probe(IDevice.lockdownPort) : .silent
-        let local = rp != .silent || ld != .silent
         let up = tunnels()
-        return ["localDevVPN": local, "otherVPN": !local && !up.isEmpty, "tunnels": up]
+        guard !up.isEmpty else { return ["localDevVPN": false, "otherVPN": false, "tunnels": up] }
+        let ports = [IDevice.remotePairingPort, IDevice.lockdownPort]
+        var answers = [Probe](repeating: .silent, count: ports.count)
+        let lock = NSLock()
+        DispatchQueue.concurrentPerform(iterations: ports.count) { i in
+            let a = probe(ports[i], timeout: probeTimeout)
+            lock.lock(); answers[i] = a; lock.unlock()
+        }
+        let local = answers.contains { $0 != .silent }
+        return ["localDevVPN": local, "otherVPN": !local, "tunnels": up]
     }
 }

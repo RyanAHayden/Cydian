@@ -100,6 +100,7 @@ test("the next tap clears the last answer before it checks again", async () => {
   assert.equal(look(cell).check, "ok");
   const again = tap(cell);
   assert.deepEqual(look(cell), { check: "", label: "Check Connection" });
+  await wait(5); // F301: idevice.status is read first, then idevice.verify
   answer({});
   await again;
   assert.equal(look(cell).check, "ok");
@@ -119,4 +120,21 @@ test("the main page's action row: Successful stays through the status repaint, t
   assert.deepEqual(look(cell), { check: "ok", label: "✓Successful" });
   await wait(50);
   assert.deepEqual(look(cell), { check: "", label: "Check Connection" });
+});
+
+test("F301: the main page shows the last idevice.status answer at once instead of Checking…, then reads again", async () => {
+  const { forgetStatus, rememberStatus } = await import("./installroute.js");
+  forgetStatus();
+  const page0 = mainPage({ store: store(), native: bridge({ "idevice.status": () => new Promise(() => {}) }), links: {} });
+  page0.refresh();
+  assert.equal(page0.status().state, "checking", "nothing known yet: Checking…");
+  rememberStatus(PAIRED_ON);
+  let answer;
+  const page = mainPage({ store: store(), native: bridge({ "idevice.status": () => new Promise((r) => { answer = r; }) }), links: {} });
+  const done = page.refresh();
+  assert.equal(page.status().state, "ready", "Ready to Install from the last answer");
+  answer({ ...PAIRED_ON, localDevVPN: false });
+  await done;
+  assert.equal(page.status().state, "vpnOff", "the fresh answer replaces it");
+  forgetStatus();
 });

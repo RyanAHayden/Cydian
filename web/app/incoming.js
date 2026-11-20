@@ -17,6 +17,9 @@
 //                                      Manage's Add, filled in; an IPA to Install IPAs, then Install (signAndInstall).
 //                                      Off, or a link iFizBox has no use for: handed back (handBack below)
 //
+//   B175: the app run's log (screens/apprun.js) still up with its run over closes when iFizBox comes back to the
+//   front and before any link opens; a run still going asks first (clearRunPage)
+//
 //   startIncoming({ native })          once, in the app
 //   await handleIncoming(url, deps)    -> "import" | "install" | "myipas" | "add" | "shared" | "package" | "account" | "tab" | "other-source" |
 //                                         "other-install" | "other-app" | null (not one of ours)
@@ -30,8 +33,15 @@ import { packageIdOf } from "./websign-gate.js";
 import { NAME } from "./brand.js";
 import { markHandoff } from "./handoffclock.js";
 
-export function startIncoming({ native = globalThis.ifizboxNative, events = globalThis } = {}) {
+export function startIncoming({ native = globalThis.ifizboxNative, events = globalThis, doc = globalThis.document,
+  runPage = defaultRunPage, alert = showAlert } = {}) {
   if (!native?.call) return;
+  // B175: back in front (reopened, or a link or file brought it up) with the app run's log still up and its run over:
+  // that page closes. A link's take does the same before it opens anything (clearRunPage).
+  doc?.addEventListener?.("visibilitychange", () => {
+    if (doc.visibilityState === "hidden") return;
+    Promise.resolve(runPage()).then((p) => { if (p && !p.busy && !p.aside) return p.dismiss(); }).catch(() => {});
+  });
   let busy = false;
   let again = false; // B174: an "ifizbox:url" while a take ran: take once more after it
   const take = async () => {
@@ -47,6 +57,8 @@ export function startIncoming({ native = globalThis.ifizboxNative, events = glob
           try { r = await native.call("app.takeURL", {}); } catch { return; } // an older shell
           if (!r?.url) break;
           markHandoff();
+          await clearRunPage(r.url, { runPage, alert }); // B175: the finished run's log closes first
+          markHandoff();
           await handleIncoming(r.url, { native });
           markHandoff(); // its page just opened: Return Home After leaves it there (handoffclock.js)
         }
@@ -59,6 +71,37 @@ export function startIncoming({ native = globalThis.ifizboxNative, events = glob
   const receiving = onReceiving();
   events.addEventListener("ifizbox:receiving", (e) => { markHandoff(); receiving(e.detail); });
   return take();
+}
+
+// B175: the app run's page (screens/apprun.js runPage), loaded only once a link comes.
+const defaultRunPage = () => import("./screens/apprun.js").then((m) => m.runPage()).catch(() => null);
+
+// B175: before a link opens anything, the app run's log (Apps/Log) gets out of its way. Over: it closes and the link
+// opens once it has gone. Still running: an alert asks; Wait (the default) opens the link once the run ends (its page
+// closed first), Open Now puts the page aside (it comes back with its result when the run ends) and opens the link on
+// top. A page already put aside stays so.
+//   await clearRunPage(url, { runPage, alert }) -> "none" | "closed" | "waited" | "on-top"
+export const RUNNING_TITLE = "Install Running";
+export async function clearRunPage(url, { runPage = defaultRunPage, alert = showAlert } = {}) {
+  const page = await Promise.resolve(runPage()).catch(() => null);
+  if (!page) return "none";
+  if (!page.busy) { await page.dismiss(); return "closed"; }
+  if (page.aside) return "on-top";
+  const { index } = await alert({ title: RUNNING_TITLE, message: runningText(url), buttons: ["Open Now", "Wait"], cancel: 1 });
+  if (page.busy && index === 0) { page.putAside(); return "on-top"; }
+  const waited = page.busy;
+  await page.ended();
+  await page.dismiss();
+  return waited ? "waited" : "closed";
+}
+
+export function runningText(url) {
+  const u = String(url ?? "");
+  let what = "";
+  if (/^ifizbox:\/\/myipas\b/i.test(u)) what = myIpasPath(u)[1]?.slice(4) ?? "";
+  else if (/^ifizbox:\/\/install\b/i.test(u)) { const a = installAsk(u); what = a ? a.name || ipaFileName(a.url) : ""; }
+  const it = what ? what.slice(0, 80) : "What you opened";
+  return `${it} opens once the apps being installed are done. Open it now, on top of the install?`;
 }
 
 // B166: the shell's trail of a hand-off (native/share/App/ShareBridge.swift OpenLog: every hop from iOS's scene

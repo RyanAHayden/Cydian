@@ -30,6 +30,7 @@
 // What iOS took leaves the queue (and is recorded for Installed) as it goes; failed and cancelled apps stay queued.
 // An app handed to iOS while iFizBox was in the background ends "Sent to iOS", and turns Installed once iOS says it has
 // it when iFizBox is back in front (followHandoff, B76).
+// B175: a finished run's page closes when iFizBox is back in front or a link comes (incoming.js, through runPage()).
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { el, barButton } from "../nav/ui.js";
 import { openProgress, openOn, RETURN_LABEL, CLOSING_LABEL, WAITING_LABEL, TRY_AGAIN_LABEL, CLOSE_GRACE, CLOSE_BY_HAND,
@@ -49,6 +50,12 @@ import { SELF_UPDATE_LINES, SELF_UPDATE_FAILED, HERE_CLOSING_LINE } from "../sig
 // only where there is a screen to keep on (the app's bridge, or a browser with navigator.wakeLock): never in node.
 const screenAwake = (on) => (globalThis.ifizboxNative?.call || globalThis.navigator?.wakeLock
   ? import("../backend.js").then((m) => m.getBackend().keepAwake?.(on)) : undefined);
+
+// B175: the app run's page that is up, or null: { busy (the run works, or iFizBox's own update waits locked for iOS),
+// aside (put aside by Open Now), ended() (a promise for the run being over, or the page gone), dismiss() (closes it;
+// rows iOS hasn't confirmed are still asked about), putAside() }. incoming.js closes a finished one before a link.
+let shown = null;
+export const runPage = () => shown;
 
 let runs = 0;
 export const laneRunId = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}${++runs}`;
@@ -172,7 +179,16 @@ export function followHandoff(run, rows, { isInstalled, doc = globalThis.documen
     check();
   };
   doc?.addEventListener?.("visibilitychange", onVisibility);
-  return { check, stop: () => {
+  // B175: the page closed by itself (iFizBox back in front with the run over): no more visibility changes, but the
+  // question for the rows iOS hasn't confirmed is asked now and its retries run out (an app installed while iFizBox
+  // was away is still recorded).
+  const wind = () => {
+    if (stopped) return;
+    doc?.removeEventListener?.("visibilitychange", onVisibility);
+    left = tries;
+    check();
+  };
+  return { check, wind, stop: () => {
     stopped = true;
     if (timer) { clear(timer); timer = null; }
     doc?.removeEventListener?.("visibilitychange", onVisibility);
@@ -305,7 +321,8 @@ export async function runAppRun(jobs, deps) {
   const isInstalled = deps.isInstalled ?? lanes.isInstalled;
   const handoff = followHandoff(run, rows, { isInstalled, answered,
     ...(deps.doc ? { doc: deps.doc } : {}) });
-  page.onClose?.(() => handoff.stop());
+  let winding = false; // B175: closed by dismiss(): the follow winds down instead of stopping
+  page.onClose?.(() => (winding && handoff.wind ? handoff.wind() : handoff.stop()));
   let tickQueued = false;
   const tick = () => {
     if (tickQueued) return;
@@ -336,6 +353,7 @@ export async function runAppRun(jobs, deps) {
 
   let first = null;
   let latest = null;
+  let settled = () => {}; // B175: wakes runPage().ended() once the run is over
   if (deps.onClose) page.onClose(() => deps.onClose(latest));
 
   async function drive(promise) {
@@ -375,6 +393,8 @@ export async function runAppRun(jobs, deps) {
     else if (fin) page.finish({ label: fin.label, status: text, action: fin.action ?? (() => false) });
     else if (opener) page.finish({ label: RETURN_LABEL, status: text, action: () => false, also: opener });
     else page.finish({ label: RETURN_LABEL, status: text, action: () => false });
+    if (page.hidden) page.show?.(); // B175: put aside for a link (Open Now): back with its result
+    settled();
     return result;
   }
 
@@ -387,7 +407,7 @@ export async function runAppRun(jobs, deps) {
   let following = null; // the self row being followed (one follow per send)
   let selfEnd = null; // the follow's latest finish, drawn again when another row's retry ends
   const later = deps.later ?? ((f, ms) => { const t = setTimeout(f, ms); t?.unref?.(); return t; }); // node: don't hold tests
-  const selfFinish = (o) => { selfEnd = o; page.finish(o); };
+  const selfFinish = (o) => { selfEnd = o; page.finish(o); settled(); };
   function followSelf(text) {
     const self = rows.find((r) => isSelf(r) && r.state === "installed");
     if (!self) return page.finish({ label: RETURN_LABEL, status: text, action: () => false });
@@ -428,6 +448,7 @@ export async function runAppRun(jobs, deps) {
       summary.textContent = now;
       page.bar({ left: closeB, right: retryAll });
       page.finish({ label: TRY_AGAIN_LABEL, status: now, title: "Not Updated", action: () => { retry(self.id); return true; } });
+      settled();
     };
     if (typeof watch !== "function") return onState("guessed"); // no shell to follow: Closing, then by hand if it didn't
     Promise.resolve().then(() => watch(onState)).then(over, () => over(null));
@@ -458,6 +479,25 @@ export async function runAppRun(jobs, deps) {
     };
     Promise.resolve().then(() => watch(() => {})).then(over, () => over(null));
   }
+
+  // B175: this page as runPage() hands it out while it is up
+  const waiters = [];
+  const busy = () => !page.closed && (run.running || run.stopping || Boolean(selfEnd?.locked && following));
+  settled = () => { if (!busy()) for (const f of waiters.splice(0)) f(); };
+  let closing = null;
+  const handle = {
+    get busy() { return busy(); },
+    get aside() { return Boolean(page.hidden); },
+    ended: () => (busy() ? new Promise((f) => waiters.push(f)) : Promise.resolve()),
+    dismiss() {
+      if (!closing) { winding = true; closing = Promise.resolve(page.close()).catch(() => {}); }
+      return closing;
+    },
+    // Open Now: the page slides away while the run goes on (end() brings it back)
+    putAside() { page.hide?.(); },
+  };
+  shown = handle;
+  page.onClose?.(() => { if (shown === handle) shown = null; for (const f of waiters.splice(0)) f(); });
 
   // every row starts drawn
   for (const r of rows) draw(r);

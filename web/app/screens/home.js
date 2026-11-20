@@ -814,6 +814,14 @@ function renderCredits(body) {
         + "buttons and alerts, typos fixed), under GPLv3, from its source at git.saurik.com/cydia.git. "
         + `${NAME} is not affiliated with SaurikIT.`,
     },
+    { // ElleKit (vendor/ellekit): bundled for tweak injection, with its BSD-3-Clause licence
+      header: "Software",
+      rows: [{ label: "ElleKit", subtitle: "Évelyne Bélanger\nTweak injection, BSD-3-Clause", chevron: true,
+        cls: "thanks-row", icon: { text: "E", color: "#7a8a99" },
+        onClick: () => window.open("https://github.com/tealbathingsuit/ellekit", "_blank", "noopener") }],
+      footer: `${NAME} adds ElleKit's libellekit.dylib to a signed app when a tweak you inject needs CydiaSubstrate `
+        + "and you added none. ElleKit is © 2022 Évelyne Bélanger, under the BSD 3-Clause licence.",
+    },
   ])));
   globalThis.ifizboxNative?.call?.("app.info", {}).then((i) => {
     if (i?.version) body.querySelector(".cell-detail").textContent = i.version;

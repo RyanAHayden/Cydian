@@ -51,6 +51,12 @@ class Release(unittest.TestCase):
             f.write("- A test release\n")
         env = {k: v for k, v in os.environ.items()
                if k not in ("IFIZBOX_RELEASE_REPO", "IFIZBOX_PIRACY_SYNC_ARGS", "IFIZBOX_RELEASE_HISTORY")}
+        # T47's stray-file check looks at an empty checkout, so a leftover in this one's web/app/ doesn't fail these
+        # (tools/test_stray_check.py tests that check)
+        clean = os.path.join(self.tmp, "clean")
+        if not os.path.isdir(clean):
+            subprocess.run(["git", "init", "-q", clean], check=True)
+        env["IFIZBOX_STRAY_ROOT"] = clean
         env.update(env_extra or {})
         return subprocess.run([SCRIPT, "--dry-run", "--dist", self.dist, "--notes", notes, *extra], cwd=ROOT,
                               env=env, capture_output=True, text=True, timeout=60)

@@ -100,6 +100,9 @@ iOS SDK, which can't go on a hosted runner. The steps below are what it runs.
 3. Look at the plan first: `tools/release.sh --dry-run --notes notes.md`. That builds `native/` (it needs the
    toolchain from `docs/native.md`: `SWIFT_TOOLCHAIN`, `IOS_SDK`), runs mkdeb/mkipa's checks, and prints the tag,
    the asset names and the notes. It publishes nothing and makes no network calls.
+   Both builds bundle `web/app/` as it is on disk, so this run and the real one (and `tools/setup/release.sh`)
+   stop first when `web/app/` holds files git doesn't track, ignored ones included (`tools/stray-check.sh` lists
+   them): delete them, or commit the ones that belong.
 4. Publish: `tools/release.sh --notes notes.md`. It needs `gh` with a login for the repo's owner (`RyanAHayden` for
    `RyanAHayden/iFizBox`): when `GH_TOKEN` isn't set it takes the owner's token with
    `gh auth token --user <owner>`, so it doesn't matter which gh account is active (an account with pull rights

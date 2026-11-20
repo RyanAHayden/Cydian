@@ -22,6 +22,8 @@
   31 tokens from an `--lt-*` and ios6.css/packages.css read each one. Every token block's selector is at most html
   plus two attributes, and any `ios<N>.css` in index.html is linked after palettes.css.
 - `docs/eras.md`: the Palettes bullet and "What is clean today".
+- `web/app/screens/queue-confirm.test.js` (F218's red-button test): it asserted palettes.css's red rule; it now
+  asserts there is none and that Solarized's block sets `--lt-red`. Found by the first `done` (gate failed there).
 
 ## Decision: how an era's dark block outranks the dark palettes
 

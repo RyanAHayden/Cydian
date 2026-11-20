@@ -8,7 +8,9 @@
 //                                           http://127.0.0.1:<port>/<path> (iOS wants HTTPS only for the manifest)
 //   POST /sign/host?bundleid=&version=&title=   body: an IPA the phone signed (iFizBox's own update: iOS closes
 //                                           iFizBox, and its local server, while installing over it) -> {itms, ...};
-//                                           kept TTL seconds in KV, then gone
+//                                           kept TTL seconds in KV, then gone. One body up to HOST_BODY_MAX, or B215:
+//                                           &size= without a body -> {token, partSize, parts}; PUT /sign/host/<token>/<i>
+//                                           each 20 MB part, POST /sign/host/<token>/done -> {itms, ...}
 //   GET  /sign/host/<token>/manifest.plist, /sign/host/<token>/app.ipa   what that itms link fetches (each looks
 //                                           again for a few seconds before a 404: KV is eventually consistent)
 //   GET  /sign/host/<token>/status          B83: {manifest, started, finished} as /sign/up's: the app stays open
@@ -64,7 +66,6 @@ import { limited } from "./limits.js"; // F312
 
 const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type" };
-const MAX_IPA = 25 * 1024 * 1024; // KV's largest value
 const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json", "Cache-Control": "no-store", ...CORS } });
 const fail = (code, error, status = 400) => json({ code, error }, status);
 
@@ -581,16 +582,14 @@ async function hosted(req, u, env, ttl, t, what, ctx = null) {
     return json(Object.fromEntries(IOS_MARKS.map((k) => [k, Boolean(s[k])])));
   }
   const get = req.method === "GET";
+  // B215: the IPA is in parts (hostPartKey); the token's own key holds only its metadata, done once every part is in
+  const meta = await waitFor(() => hostMeta(env, t), (m) => Boolean(m?.done), HOST_WAIT, env);
+  if (!meta?.done) return gone();
   if (what === "manifest.plist") {
-    const read = () => env.HOSTED.getWithMetadata(t, { type: "stream" }).then((r) => { r.value?.cancel?.(); return r.metadata ?? null; });
-    const metadata = await waitFor(read, Boolean, HOST_WAIT, env);
-    if (!metadata) return gone();
     if (get) await markIos(env, t, "manifest", ttl, hostIosKey(t));
-    return plist(manifest({ url: `${u.origin}/sign/host/${t}/app.ipa`, ...metadata }));
+    return plist(manifest({ url: `${u.origin}/sign/host/${t}/app.ipa`, ...meta }));
   }
-  const data = await waitFor(() => env.HOSTED.get(t, { type: "arrayBuffer" }), Boolean, HOST_WAIT, env);
-  if (!data) return gone();
-  const n = data.byteLength;
+  const n = meta.size;
   let start = 0, end = n - 1, status = 200;
   const r = /^bytes=(\d*)-(\d*)$/.exec(req.headers.get("Range") ?? "");
   if (r && (r[1] || r[2])) { // iOS's installer may ask for parts
@@ -602,13 +601,20 @@ async function hosted(req, u, env, ttl, t, what, ctx = null) {
   const headers = { "Content-Type": "application/octet-stream", "Accept-Ranges": "bytes", "Cache-Control": "no-store",
     "Content-Length": String(end - start + 1), ...(status === 206 ? { "Content-Range": `bytes ${start}-${end}/${n}` } : {}) };
   if (!get) return new Response(null, { status, headers });
-  let at = start, begun = false;
+  let at = start, begun = false, held = -1, data = null; // `data`: part `held`, read whole (20 MB at most)
   const body = new ReadableStream({
     async pull(c) {
       if (at > end) { c.close(); return; }
       if (!begun) { begun = true; await markIos(env, t, "started", ttl, hostIosKey(t)); }
-      const stop = Math.min(end + 1, at + HOST_CHUNK);
-      c.enqueue(new Uint8Array(data.slice(at, stop)));
+      const i = Math.floor(at / meta.partSize), from = i * meta.partSize;
+      if (held !== i) {
+        data = await env.HOSTED.get(hostPartKey(t, i), { type: "arrayBuffer" });
+        if (!data) { c.error(new Error("expired")); return; }
+        held = i;
+      }
+      const stop = Math.min(end + 1, at + HOST_CHUNK, from + data.byteLength);
+      if (stop <= at) { c.error(new Error("part cut short")); return; }
+      c.enqueue(new Uint8Array(data.slice(at - from, stop - from)));
       at = stop;
       // the IPA's last byte is handed over (a Range that stops short of it isn't the end). B208: iOS hangs up once it
       // has Content-Length bytes, and Cloudflare then cancels the request with this put still pending (as F190 saw on
@@ -626,6 +632,80 @@ async function hosted(req, u, env, ttl, t, what, ctx = null) {
     return new Response(f.readable, { status, headers });
   }
   return new Response(body, { status, headers });
+}
+
+// ---- B215: /sign/host's parts. The token's key holds {bundleId, version, title, size, parts, partSize, done} and no
+// value; part i is at hostPartKey (outliving the token, so a link never points at half an app).
+// HOST_MAX caps a parted upload; HOST_BODY_MAX one plain body (a Worker request takes ~100 MB).
+export const HOST_MAX = 512 * 1024 * 1024, HOST_BODY_MAX = 95 * 1024 * 1024;
+const hostPartKey = (t, i) => `${t}.${i}`;
+async function hostMeta(env, t, part = null) {
+  const r = await env.HOSTED.getWithMetadata(part === null ? t : hostPartKey(t, part), { type: "stream" });
+  r.value?.cancel?.();
+  return r.metadata ?? null;
+}
+function hostLink(u, t, meta, ttl) {
+  const m = `${u.origin}/sign/host/${t}/manifest.plist`;
+  return json({ itms: "itms-services://?action=download-manifest&url=" + encodeURIComponent(m), manifest: m,
+    expiresIn: ttl, bundleId: meta.bundleId, name: meta.title, version: meta.version });
+}
+
+// One plain body (meta.size bytes, from Content-Length) cut into meta.partSize parts as it streams in, each handed to
+// put(i, ArrayBuffer): at most one part is held. A Response when it isn't an IPA or isn't Content-Length long, else null.
+export async function hostBody(stream, meta, put) {
+  const bad = () => fail("bad_ipa", "That isn't an IPA (a zip archive).");
+  const short = () => fail("bad_request", `The body should be ${meta.size} bytes.`);
+  if (!stream) return short();
+  const rd = stream.getReader();
+  let i = 0, buf = new Uint8Array(partLen(meta, 0)), fill = 0;
+  try {
+    for (;;) {
+      const { done, value } = await rd.read();
+      if (done) break;
+      let c = value instanceof Uint8Array ? value : new Uint8Array(value);
+      while (c.byteLength) {
+        if (i >= meta.parts) return short();
+        const take = Math.min(c.byteLength, buf.byteLength - fill);
+        buf.set(c.subarray(0, take), fill);
+        fill += take; c = c.subarray(take);
+        if (i === 0 && fill >= 2 && (buf[0] !== 0x50 || buf[1] !== 0x4b)) return bad();
+        if (fill === buf.byteLength) {
+          await put(i, buf.buffer);
+          i++; fill = 0;
+          buf = i < meta.parts ? new Uint8Array(partLen(meta, i)) : new Uint8Array(0);
+        }
+      }
+    }
+  } finally {
+    rd.releaseLock();
+  }
+  return i === meta.parts ? null : short();
+}
+
+// PUT /sign/host/<t>/<i> (part i, exactly its length) and POST /sign/host/<t>/done (every part in: the link).
+async function hostPart(req, u, env, ttl, t, which) {
+  const meta = await hostMeta(env, t);
+  if (!meta) return fail("gone", "That upload has expired. Update again.", 404);
+  if (meta.done && which === "done") return hostLink(u, t, meta, ttl); // the app's retry after a dropped answer
+  if (meta.done) return fail("bad_request", "That upload is finished.", 409);
+  if (!meta.parts) return fail("bad_request", "Send the size first (POST /sign/host with size=).", 409);
+  if (which === "done") {
+    for (let i = 0; i < meta.parts; i++) {
+      if ((await hostMeta(env, t, i))?.n !== partLen(meta, i)) return fail("bad_request", `Part ${i + 1} of ${meta.parts} is missing.`, 409);
+    }
+    const done = { ...meta, done: true };
+    await env.HOSTED.put(t, "", { expirationTtl: ttl, metadata: done });
+    return hostLink(u, t, done, ttl);
+  }
+  const i = Number(which);
+  if (i >= meta.parts) return fail("bad_request", "No such part.");
+  const body = new Uint8Array(await req.arrayBuffer());
+  if (body.byteLength !== partLen(meta, i)) return fail("bad_request", `Part ${i + 1} should be ${partLen(meta, i)} bytes.`);
+  if (i === 0 && (body[0] !== 0x50 || body[1] !== 0x4b)) return fail("bad_ipa", "That isn't an IPA (a zip archive).");
+  // the token expires `ttl` after its size POST unless done comes first, and done gives it `ttl` again: a part put
+  // any time in between must outlive both
+  await env.HOSTED.put(hostPartKey(t, i), body.buffer, { expirationTtl: 2 * ttl + 300, metadata: { n: body.byteLength } });
+  return json({ ok: true, part: i });
 }
 
 async function metaOf(env, t, part = null) {
@@ -798,16 +878,29 @@ export default {
       const app = appOf(u.searchParams);
       if (!app) return fail("bad_request", "Send bundleid, version and title in the query.");
       if (!allowed(app.bundleId, env.HOST_IDS)) return fail("not_allowed", `This server hosts only ${NAME}'s own signed app.`, 403);
+      // B215: in parts, as /sign/upload: size= (no body) -> {token, partSize, parts}, then PUT /sign/host/<t>/<i>, POST
+      // /sign/host/<t>/done -> {itms, ...}. A KV value holds 25 MB and the signed 0.17.2 IPA is 29.6 MB.
+      if (u.searchParams.has("size")) {
+        const size = Number(u.searchParams.get("size"));
+        if (!Number.isSafeInteger(size) || size < 4) return fail("bad_request", "Send the IPA's size in bytes (size=).");
+        if (size > HOST_MAX) return fail("too_large", `The signed IPA is over ${HOST_MAX / 1024 / 1024} MB.`, 413);
+        const t = token(), parts = Math.ceil(size / PART);
+        await env.HOSTED.put(t, "", { expirationTtl: ttl, metadata: { ...app, size, parts, partSize: PART, done: false } });
+        return json({ token: t, partSize: PART, parts, expiresIn: ttl });
+      }
+      // One body (the apps before B215 send it so): cut into the same parts as it streams in, never held whole.
       const size = Number(req.headers.get("Content-Length") || 0);
-      if (!size || size > MAX_IPA) return fail("too_large", "Send the signed IPA as the body (up to 25 MB).", 413);
-      const body = await req.arrayBuffer();
-      if (body.byteLength > MAX_IPA || new Uint8Array(body, 0, 2).join() !== "80,75") return fail("bad_ipa", "That isn't an IPA (a zip archive).");
-      const t = token();
-      await env.HOSTED.put(t, body, { expirationTtl: ttl, metadata: app });
-      const m = `${u.origin}/sign/host/${t}/manifest.plist`;
-      return json({ itms: "itms-services://?action=download-manifest&url=" + encodeURIComponent(m), manifest: m,
-        expiresIn: ttl, bundleId: app.bundleId, name: app.title, version: app.version });
+      if (size > 0 && size < 4) return fail("bad_ipa", "That isn't an IPA (a zip archive).");
+      if (!size || size > HOST_BODY_MAX) return fail("too_large", `Send the signed IPA as the body (up to ${HOST_BODY_MAX / 1024 / 1024} MB), or in parts (size=).`, 413);
+      const t = token(), meta = { ...app, size, parts: Math.ceil(size / PART), partSize: PART, done: true };
+      const bad = await hostBody(req.body, meta, (i, buf) => env.HOSTED.put(hostPartKey(t, i), buf, { expirationTtl: ttl + 300, metadata: { n: buf.byteLength } }));
+      if (bad) return bad;
+      await env.HOSTED.put(t, "", { expirationTtl: ttl, metadata: meta });
+      return hostLink(u, t, meta, ttl);
     }
+
+    const hp = /^\/sign\/host\/([0-9a-f]{48})\/(\d{1,4}|done)$/.exec(u.pathname);
+    if (hp && (req.method === "PUT" || req.method === "POST")) return hostPart(req, u, env, ttl, hp[1], hp[2]);
 
     const h = /^\/sign\/host\/([0-9a-f]{48})\/(manifest\.plist|app\.ipa|status)$/.exec(u.pathname);
     if (h && (req.method === "GET" || req.method === "HEAD")) return hosted(req, u, env, ttl, h[1], h[2], ctx);

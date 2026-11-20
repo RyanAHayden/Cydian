@@ -898,6 +898,77 @@ import { d1 } from "./src/d1-sqlite.js";
   console.log("worker host finished mark kept: ok");
 }
 
+// B215: a signed IPA over KV's 25 MB a value (0.17.2's was 29.6 MB): in parts (size=, PUT each, done) and as one body
+// (the apps before B215), no KV value over 25 MB, served back whole, by Range across a part edge, and finished.
+{
+  const { PART: P, HOST_MAX, hostBody } = await import("./src/index.js");
+  const sizes = [];
+  const kept = [];
+  const ttls = {};
+  const kv = { ...env.HOSTED, put: async (k, v, o) => { sizes.push(typeof v === "string" ? v.length : v.byteLength); ttls[k] = o?.expirationTtl; return env.HOSTED.put(k, v, o); } };
+  const henv = { ...env, WAIT_SCALE: "0.02", HOSTED: kv };
+  const at = (path, init) => w.fetch(new Request("https://sign.example" + path, init), henv, { waitUntil: (p) => kept.push(p) });
+  const big = new Uint8Array(29.6 * 1024 * 1024 | 0);
+  big[0] = 0x50; big[1] = 0x4b; big[P - 1] = 7; big[P] = 8; big[big.length - 1] = 9;
+  const q = "/sign/host?bundleid=com.ryha.ifizbox&version=0.17.2&title=iFizBox";
+  const check = async (tok) => {
+    assert.match(await (await at(`/sign/host/${tok}/manifest.plist`)).text(), /<string>0\.17\.2<\/string>/);
+    assert.equal((await at(`/sign/host/${tok}/app.ipa`, { method: "HEAD" })).headers.get("Content-Length"), String(big.length));
+    let r = await at(`/sign/host/${tok}/app.ipa`, { headers: { Range: `bytes=${P - 2}-${P + 1}` } });
+    assert.equal(r.status, 206);
+    assert.deepEqual([...new Uint8Array(await r.arrayBuffer())], [0, 7, 8, 0]);
+    r = await at(`/sign/host/${tok}/app.ipa`);
+    const got = new Uint8Array(await r.arrayBuffer());
+    assert.equal(got.length, big.length);
+    assert.ok(got[0] === 0x50 && got[P - 1] === 7 && got[P] === 8 && got[big.length - 1] === 9);
+    await Promise.all(kept);
+    assert.deepEqual(await (await at(`/sign/host/${tok}/status`)).json(), { manifest: true, started: true, finished: true });
+  };
+  // in parts
+  let r = await at(q + "&size=" + big.length, { method: "POST" });
+  const up = await r.json();
+  assert.equal(up.partSize, P);
+  assert.equal(up.parts, 2);
+  assert.equal((await at(`/sign/host/${up.token}/manifest.plist`)).status, 404, "no link before done");
+  r = await at(`/sign/host/${up.token}/done`, { method: "POST" });
+  assert.equal(r.status, 409);
+  assert.match((await r.json()).error, /Part 1 of 2 is missing/);
+  assert.equal((await at(`/sign/host/${up.token}/0`, { method: "PUT", body: big.subarray(0, 10) })).status, 400, "a part of the wrong length");
+  assert.equal((await at(`/sign/host/${up.token}/0`, { method: "PUT", body: new Uint8Array(P) })).status, 400, "part 0 not a zip");
+  assert.equal((await at(`/sign/host/${up.token}/2`, { method: "PUT", body: big.subarray(0, 10) })).status, 400, "no such part");
+  for (let i = 0; i < up.parts; i++) {
+    r = await at(`/sign/host/${up.token}/${i}`, { method: "PUT", body: big.subarray(i * P, Math.min(big.length, (i + 1) * P)) });
+    assert.equal(r.status, 200);
+  }
+  r = await at(`/sign/host/${up.token}/done`, { method: "POST" });
+  assert.equal(r.status, 200);
+  const done = await r.json();
+  assert.match(done.itms, /^itms-services:/);
+  assert.equal(done.manifest, `https://sign.example/sign/host/${up.token}/manifest.plist`);
+  assert.equal((await at(`/sign/host/${up.token}/1`, { method: "PUT", body: big.subarray(P) })).status, 409, "finished");
+  assert.equal((await (await at(`/sign/host/${up.token}/done`, { method: "POST" })).json()).manifest, done.manifest, "done again (a retry) answers the link");
+  await check(up.token);
+  // a part put just before the token's first ttl ran out outlives the token's second ttl, given at done
+  assert.ok(ttls[`${up.token}.0`] >= 2 * 600, "parts outlive the link");
+  assert.equal((await at(q, { method: "POST", body: new Uint8Array([0x50]), headers: { "Content-Length": "1" } })).status, 400, "too small to be an IPA");
+  assert.equal((await at(q + "&size=" + (HOST_MAX + 1), { method: "POST" })).status, 413);
+  assert.equal((await at(q + "&size=x", { method: "POST" })).status, 400);
+  // one body, as the apps before B215 send it
+  r = await at(q, { method: "POST", body: big, headers: { "Content-Length": String(big.length) } });
+  assert.equal(r.status, 200);
+  await check(/\/sign\/host\/([0-9a-f]{48})\//.exec((await r.json()).manifest)[1]);
+  assert.ok(Math.max(...sizes) <= 25 * 1024 * 1024, "no KV value over 25 MB");
+  assert.equal((await at(q, { method: "POST", body: big, headers: { "Content-Length": String(96 * 1024 * 1024) } })).status, 413);
+  // hostBody: a body shorter or longer than its Content-Length, or not a zip, stores nothing usable
+  const meta = { size: 10, parts: 1, partSize: P };
+  const body = (b) => new Response(b).body;
+  assert.equal((await hostBody(body(big.subarray(0, 9)), meta, async () => {})).status, 400);
+  assert.equal((await hostBody(body(big.subarray(0, 11)), meta, async () => {})).status, 400);
+  assert.equal((await hostBody(body(new Uint8Array(10)), meta, async () => {})).status, 400);
+  assert.equal(await hostBody(body(big.subarray(0, 10)), meta, async () => {}), null);
+  console.log("worker host in parts (B215): ok");
+}
+
 // F178/B165: iFizBox's AltStore source at https://<DOMAIN>/repo/source.json: the latest release's source.json
 // (live the moment a release is published), else the deployed web/app/source.json (ASSETS) when GitHub fails; and
 // the site's proxy answers its own /repo/ URLs without fetching itself.

@@ -106,7 +106,9 @@ class InstallServerSource(unittest.TestCase):
         self.assertIn("InstallPrompt.rehost(bid, link: hosted)", host)  # B91: the next tap opens it
         self.assertIn("InstallPrompt.end(bid, link: hosted)", host)
         self.assertNotIn("CloseForUpdate", host)  # that closes iFizBox: only for its own update
-        self.assertIn('server + "/sign/host"', body(self.sideload, "static func uploadHosted(", "\n    }\n\n"))
+        # B215: through HostUpload, which posts to /sign/host in parts
+        self.assertIn("HostUpload(file, server: server, app: app)", body(self.sideload, "static func uploadHosted(", "\n    }\n\n"))
+        self.assertIn('server + "/sign/host"', body(self.sideload, "final class HostUpload {", "\n}\n"))
         self.assertIn("InstallPrompt.heard(bid)", body(self.sideload, "private static func pollHosted(", "\n    }\n\n"))
 
     def test_freeze_after_the_prompt_closed_opens_no_prompt(self):

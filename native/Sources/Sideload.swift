@@ -360,23 +360,18 @@ enum Sideload {
     // itms-services link; then iOS installs from the server, unaffected by iFizBox closing.
     static func hostAndOpen(_ output: URL, server: String, app: SignedApp, record: SignedRecord, job: SignJob? = nil,
                             log: ((String) -> Void)? = nil, opened: @escaping (Result<(SignedApp, SignedRecord), Error>) -> Void, served: ((Bool) -> Void)?) {
-        // The Worker (worker/src/index.js) doesn't open the IPA: the app says what it is.
-        var q = URLComponents(string: server + "/sign/host")!
-        q.queryItems = [URLQueryItem(name: "bundleid", value: app.bundleID), URLQueryItem(name: "version", value: app.version),
-                        URLQueryItem(name: "title", value: app.name)]
-        var req = URLRequest(url: q.url!)
-        req.httpMethod = "POST"
-        req.setValue("application/octet-stream", forHTTPHeaderField: "Content-Type")
-        req.timeoutInterval = 300
-        let upload = URLSession.shared.uploadTask(with: req, fromFile: output) { data, resp, error in
+        // The Worker (worker/src/index.js) doesn't open the IPA: the app says what it is. B215: sent in parts (HostUpload).
+        let upload = HostUpload(output, server: server, app: app) { res in
             try? FileManager.default.removeItem(at: output)
             job?.end()
             if job?.cancelled == true { opened(.failure(SignJob.cancelledError)); served?(false); return } // F196
-            let json = (data.flatMap { try? JSONSerialization.jsonObject(with: $0) }) as? [String: Any]
-            guard error == nil, (resp as? HTTPURLResponse)?.statusCode == 200, let itms = json?["itms"] as? String,
-                  let link = URL(string: itms) else {
-                let why = (json?["error"] as? String) ?? error?.localizedDescription ?? "the server didn't answer"
-                opened(.failure(Failed(text: "server: \(why)"))); served?(false)
+            let json: [String: Any]
+            switch res {
+            case .failure(let e): opened(.failure(e)); served?(false); return
+            case .success(let j): json = j
+            }
+            guard let link = (json["itms"] as? String).flatMap({ URL(string: $0) }) else {
+                opened(.failure(Failed(text: "server: it gave no install link"))); served?(false)
                 return
             }
             SignBridge.queue.async {
@@ -384,7 +379,7 @@ enum Sideload {
                 reschedule()
             }
             // B83: the link's status route, which says when iOS has the whole IPA (CloseForUpdate)
-            let status = (json?["manifest"] as? String).flatMap { m in
+            let status = (json["manifest"] as? String).flatMap { m in
                 m.hasSuffix("/manifest.plist") ? URL(string: String(m.dropLast("manifest.plist".count)) + "status") : nil
             }
             // B178: iFizBox closes itself once iOS has the IPA, with no notification (the progress page says so)
@@ -396,7 +391,7 @@ enum Sideload {
             }
         }
         job?.onCancel { upload.cancel() } // F196
-        upload.resume()
+        upload.start()
     }
 
     static func signAndOpen(_ input: URL, url: String, id: SecIdentity, profile: Profile, options: SignOptions, servers: Servers,
@@ -425,7 +420,7 @@ enum Sideload {
             signer.options = options
             if let job = job { signer.stop = { job.cancelled } }
             if let log = log { let nslog = signer.log; signer.log = { nslog($0); log($0) } }
-            if servers.host != nil { signer.level = 6 } // R41: uploaded to the server (25 MB cap): small beats fast
+            if servers.host != nil { signer.level = 6 } // R41: uploaded to the server: small beats fast
             signer.installedAppID = { installedAppID($0, log: log) } // B138: an update keeps its App ID
             app = try signer.sign(input, to: output) { emit($0, $1) }
             log?("Signed \(app.name) \(app.version) as \(app.bundleID), \(Sideload.size(output))")
@@ -795,28 +790,22 @@ enum Sideload {
 
     // POST /sign/host (worker/src/index.js): the itms-services link and its status route. On SignBridge.queue.
     static func uploadHosted(_ file: URL, server: String, app: SignedApp, done: @escaping (Result<(URL, URL?), Error>) -> Void) {
-        var q = URLComponents(string: server + "/sign/host")!
-        q.queryItems = [URLQueryItem(name: "bundleid", value: app.bundleID), URLQueryItem(name: "version", value: app.version),
-                        URLQueryItem(name: "title", value: app.name)]
-        var req = URLRequest(url: q.url!)
-        req.httpMethod = "POST"
-        req.setValue("application/octet-stream", forHTTPHeaderField: "Content-Type")
-        req.timeoutInterval = 300
-        URLSession.shared.uploadTask(with: req, fromFile: file) { data, resp, error in
-            let json = (data.flatMap { try? JSONSerialization.jsonObject(with: $0) }) as? [String: Any]
+        HostUpload(file, server: server, app: app) { res in // B215: in parts
             let result: Result<(URL, URL?), Error>
-            if error == nil, (resp as? HTTPURLResponse)?.statusCode == 200, let itms = json?["itms"] as? String,
-               let link = URL(string: itms) {
-                let status = (json?["manifest"] as? String).flatMap { m in
-                    m.hasSuffix("/manifest.plist") ? URL(string: String(m.dropLast("manifest.plist".count)) + "status") : nil
+            switch res {
+            case .failure(let e): result = .failure(e)
+            case .success(let json):
+                if let link = (json["itms"] as? String).flatMap({ URL(string: $0) }) {
+                    let status = (json["manifest"] as? String).flatMap { m in
+                        m.hasSuffix("/manifest.plist") ? URL(string: String(m.dropLast("manifest.plist".count)) + "status") : nil
+                    }
+                    result = .success((link, status))
+                } else {
+                    result = .failure(Failed(text: "server: it gave no install link"))
                 }
-                result = .success((link, status))
-            } else {
-                let why = (json?["error"] as? String) ?? error?.localizedDescription ?? "the server didn't answer"
-                result = .failure(Failed(text: "server: \(why)"))
             }
             SignBridge.queue.async { done(result) }
-        }.resume()
+        }.start()
     }
 
     // Polls the hosted link's GET status every 2 s: `step(false, true)` once when iOS begins fetching, then
@@ -1526,4 +1515,112 @@ enum InstallLog {
 
     // A new install of the app: lines left from an earlier one are dropped.
     static func reset(_ bundleID: String) { DispatchQueue.main.async { waiting.removeValue(forKey: bundleID) } }
+}
+
+// B215: POST /sign/host in parts (worker/src/index.js): ?size= -> {token, partSize, parts}, PUT /sign/host/<t>/<i> each
+// part, POST /sign/host/<t>/done -> {itms, manifest, ...}. A KV value holds 25 MB, so one body capped the signed IPA
+// there (0.17.2's was 29.6 MB). Each step is tried up to 3 times on a dropped connection or a 5xx; a 4xx ends it with
+// the server's own words. `done` gets the done answer's JSON or the error, once, off the main queue; cancel() stops it
+// and hands `done` an error at once, as a cancelled upload task did.
+final class HostUpload {
+    private let file: URL, base: String, query: [URLQueryItem]
+    private let onDone: (Result<[String: Any], Error>) -> Void
+    private let lock = NSLock()
+    private var task: URLSessionTask?, stopped = false, ended = false
+
+    init(_ file: URL, server: String, app: SignedApp, done: @escaping (Result<[String: Any], Error>) -> Void) {
+        self.file = file; self.base = server + "/sign/host"; self.onDone = done
+        query = [URLQueryItem(name: "bundleid", value: app.bundleID), URLQueryItem(name: "version", value: app.version),
+                 URLQueryItem(name: "title", value: app.name)]
+    }
+
+    private func done(_ r: Result<[String: Any], Error>) {
+        lock.lock(); let first = !ended; ended = true; lock.unlock()
+        if first { onDone(r) }
+    }
+
+    @discardableResult
+    func start() -> HostUpload {
+        let size = ((try? FileManager.default.attributesOfItem(atPath: file.path))?[.size] as? NSNumber)?.int64Value ?? 0
+        guard size > 0 else { done(.failure(Sideload.Failed(text: "server: the signed IPA is missing"))); return self }
+        var q = URLComponents(string: base)!
+        q.queryItems = query + [URLQueryItem(name: "size", value: String(size))]
+        // a Signing Server from before B215 answers a POST without a body 413: it gets the IPA as one body, which it takes
+        // up to 25 MB (a bigger IPA keeps the server's 413, as does a new server's "over HOST_MAX")
+        let old = size <= 25 * 1024 * 1024
+        send(q.url!, "POST", nil, failed: { code, e in code == 413 && old ? self.whole() : self.done(.failure(e)) }) { j in
+            guard let t = j["token"] as? String, let part = (j["partSize"] as? NSNumber)?.int64Value, part > 0,
+                  let parts = (j["parts"] as? NSNumber)?.intValue, parts > 0 else {
+                return self.whole()
+            }
+            self.part(0, of: parts, size: part, total: size, token: t)
+        }
+        return self
+    }
+
+    private func whole() {
+        var q = URLComponents(string: base)!
+        q.queryItems = query
+        send(q.url!, "POST", nil, file: file) { self.done(.success($0)) }
+    }
+
+    func cancel() {
+        lock.lock(); stopped = true; let t = task; lock.unlock()
+        t?.cancel()
+        done(.failure(Sideload.Failed(text: "server: the upload was cancelled")))
+    }
+
+    private func part(_ i: Int, of parts: Int, size: Int64, total: Int64, token t: String) {
+        if i == parts {
+            return send(URL(string: "\(base)/\(t)/done")!, "POST", nil) { self.done(.success($0)) }
+        }
+        let data: Data
+        do {
+            let h = try FileHandle(forReadingFrom: file)
+            defer { try? h.close() }
+            try h.seek(toOffset: UInt64(Int64(i) * size))
+            data = h.readData(ofLength: Int(min(size, total - Int64(i) * size)))
+        } catch {
+            return done(.failure(Sideload.Failed(text: "server: couldn't read the signed IPA (\(error.localizedDescription))")))
+        }
+        send(URL(string: "\(base)/\(t)/\(i)")!, "PUT", data) { _ in
+            self.part(i + 1, of: parts, size: size, total: total, token: t)
+        }
+    }
+
+    // One request (`body`, or `file` as the body); `next` gets its JSON on a 200. Retried twice on a dropped connection
+    // or a 5xx; then `failed` (HTTP status, 0 without one) or `done` gets the error.
+    private func send(_ url: URL, _ method: String, _ body: Data?, file: URL? = nil, tries: Int = 3,
+                      failed: ((Int, Error) -> Void)? = nil, next: @escaping ([String: Any]) -> Void) {
+        var req = URLRequest(url: url)
+        req.httpMethod = method
+        req.setValue("application/octet-stream", forHTTPHeaderField: "Content-Type")
+        req.timeoutInterval = 300
+        let finished = { (data: Data?, resp: URLResponse?, error: Error?) in
+            self.lock.lock(); let stop = self.stopped; self.lock.unlock()
+            if stop { return }
+            let json = (data.flatMap { try? JSONSerialization.jsonObject(with: $0) }) as? [String: Any]
+            let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
+            if error == nil, code == 200, let j = json { return next(j) }
+            if tries > 1, error != nil || code >= 500 {
+                NSLog("[sideload] %@ %@ failed (%@), trying again", method, url.path, error?.localizedDescription ?? "HTTP \(code)")
+                return DispatchQueue.global().asyncAfter(deadline: .now() + 2) {
+                    self.send(url, method, body, file: file, tries: tries - 1, failed: failed, next: next)
+                }
+            }
+            let why = (json?["error"] as? String) ?? error?.localizedDescription ?? "the server didn't answer"
+            let e = Sideload.Failed(text: "server: \(why)")
+            if let failed = failed { return failed(code, e) }
+            self.done(.failure(e))
+        }
+        let t: URLSessionTask
+        if let file = file { t = URLSession.shared.uploadTask(with: req, fromFile: file, completionHandler: finished) }
+        else if let body = body { t = URLSession.shared.uploadTask(with: req, from: body, completionHandler: finished) }
+        else { t = URLSession.shared.dataTask(with: req, completionHandler: finished) }
+        lock.lock()
+        if stopped { lock.unlock(); return }
+        task = t
+        lock.unlock()
+        t.resume()
+    }
 }

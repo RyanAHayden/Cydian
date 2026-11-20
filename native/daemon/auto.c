@@ -679,6 +679,240 @@ int auto_plan_installs(const char *plan, char (*ids)[UPD_FIELD], char (*vers)[UP
     return k;
 }
 
+/* B192: automatic installs take packages from https sources only. */
+static char *slurp(const char *path);
+
+int auto_list_prefix(const char *uri, char *out, size_t size) {
+    if (!uri || !size) return 0;
+    const char *p = strstr(uri, "://");
+    if (p) p += 3;
+    else {
+        const char *c = strchr(uri, ':'), *s = strchr(uri, '/');
+        p = c && (!s || c < s) ? c + 1 : uri;
+    }
+    /* user:password@ goes (only in the host part) */
+    const char *s = strchr(p, '/');
+    const char *host_end = s ? s : p + strlen(p);
+    for (const char *a = p; a < host_end; a++)
+        if (*a == '@') p = a + 1;
+    static const char quoted[] = "\\|{}[]<>\"^~_=!@#$%^&*";
+    size_t at = 0;
+    for (const unsigned char *c = (const unsigned char *)p; *c; c++) {
+        if (*c == '/') {
+            if (at + 1 >= size) return 0;
+            out[at++] = '_';
+        } else if (*c <= 0x20 || *c >= 0x7f || strchr(quoted, *c)) {
+            if (at + 3 >= size) return 0;
+            snprintf(out + at, 4, "%%%02x", *c);
+            at += 3;
+        } else {
+            if (at + 1 >= size) return 0;
+            out[at++] = (char)*c;
+        }
+    }
+    if (!at || out[at - 1] != '_') {
+        if (at + 1 >= size) return 0;
+        out[at++] = '_';
+    }
+    out[at] = 0;
+    return 1;
+}
+
+static int lower(int c) { return c >= 'A' && c <= 'Z' ? c + 32 : c; }
+
+/* 1 if the n bytes at a are word, case aside. */
+static int same_word(const char *a, size_t n, const char *word) {
+    if (strlen(word) != n) return 0;
+    for (size_t i = 0; i < n; i++)
+        if (lower((unsigned char)a[i]) != word[i]) return 0;
+    return 1;
+}
+
+int auto_plain_http(const char *uri) {
+    if (!uri) return 0;
+    while (*uri == ' ' || *uri == '\t') uri++;
+    const char *e = strstr(uri, "://");
+    if (!e) return 0;
+    size_t n = (size_t)(e - uri);
+    if (same_word(uri, n, "http")) return 1;
+    return n > 5 && same_word(e - 5, 5, "+http");
+}
+
+#define SRC_MAX 512
+static struct { char prefix[1024]; int http; } srcs[SRC_MAX];
+static int nsrc;
+
+static void add_source(const char *uri, size_t len) {
+    char u[1024];
+    if (!len || len >= sizeof u || nsrc >= SRC_MAX) return;
+    memcpy(u, uri, len);
+    u[len] = 0;
+    if (!auto_list_prefix(u, srcs[nsrc].prefix, sizeof srcs[nsrc].prefix)) return;
+    srcs[nsrc].http = auto_plain_http(u);
+    nsrc++;
+}
+
+static int blank(int c) { return c == ' ' || c == '\t' || c == '\r'; }
+
+/* One-line style: "deb [options] uri dist [components]" per line, '#' comments. */
+static void sources_list(const char *text) {
+    for (const char *p = text; p && *p; ) {
+        size_t n;
+        const char *next = line(p, &n);
+        const char *h = memchr(p, '#', n), *end = h ? h : p + n, *a = p;
+        while (a < end && blank(*a)) a++;
+        const char *w = a;
+        while (a < end && !blank(*a)) a++;
+        if (same_word(w, (size_t)(a - w), "deb")) {
+            while (a < end && blank(*a)) a++;
+            if (a < end && *a == '[') {
+                const char *c = memchr(a, ']', (size_t)(end - a));
+                a = c ? c + 1 : end;
+                while (a < end && blank(*a)) a++;
+            }
+            w = a;
+            while (a < end && !blank(*a)) a++;
+            add_source(w, (size_t)(a - w));
+        }
+        p = next;
+    }
+}
+
+/* deb822 style (*.sources): stanzas of Types:, URIs:, Enabled: (fields case aside, URIs may continue on
+ * indented lines). */
+static void sources_deb822(const char *text) {
+    char uris[4096];
+    size_t ul = 0;
+    int deb = 0, enabled = 1, in_uris = 0;
+    for (const char *p = text; ; ) {
+        size_t n = 0;
+        const char *next = p && *p ? line(p, &n) : NULL;
+        const char *a = p, *end = p ? p + n : p;
+        int empty = 1;
+        for (const char *c = a; c && c < end; c++)
+            if (!blank(*c)) { empty = 0; break; }
+        if (!next || empty) {
+            if (deb && enabled)
+                for (size_t i = 0; i < ul; ) {
+                    while (i < ul && blank(uris[i])) i++;
+                    size_t j = i;
+                    while (j < ul && !blank(uris[j])) j++;
+                    add_source(uris + i, j - i);
+                    i = j;
+                }
+            ul = 0;
+            deb = in_uris = 0;
+            enabled = 1;
+            if (!next) break;
+            p = next;
+            continue;
+        }
+        if (*a == '#') { p = next; continue; }
+        const char *val = NULL;
+        if (blank(*a)) val = in_uris ? a : NULL;
+        else {
+            const char *colon = memchr(a, ':', n);
+            in_uris = 0;
+            if (colon) {
+                size_t kl = (size_t)(colon - a);
+                val = colon + 1;
+                if (same_word(a, kl, "types")) {
+                    for (const char *c = val; c < end; ) {
+                        while (c < end && blank(*c)) c++;
+                        const char *w = c;
+                        while (c < end && !blank(*c)) c++;
+                        if (same_word(w, (size_t)(c - w), "deb")) deb = 1;
+                    }
+                    val = NULL;
+                } else if (same_word(a, kl, "enabled")) {
+                    while (val < end && blank(*val)) val++;
+                    const char *w = val;
+                    while (val < end && !blank(*val)) val++;
+                    enabled = !same_word(w, (size_t)(val - w), "no");
+                    val = NULL;
+                } else if (same_word(a, kl, "uris")) in_uris = 1;
+                else val = NULL;
+            }
+        }
+        if (val && ul + (size_t)(end - val) + 1 < sizeof uris) {
+            uris[ul++] = ' ';
+            memcpy(uris + ul, val, (size_t)(end - val));
+            ul += (size_t)(end - val);
+        }
+        p = next;
+    }
+}
+
+static void load_sources(const char *apt_dir) {
+    nsrc = 0;
+    char path[4096], dir[4096];
+    if (join(path, sizeof path, apt_dir, "sources.list")) {
+        char *t = slurp(path);
+        if (t) sources_list(t);
+        free(t);
+    }
+    if (!join(dir, sizeof dir, apt_dir, "sources.list.d")) return;
+    DIR *d = opendir(dir);
+    if (!d) return;
+    struct dirent *e;
+    while ((e = readdir(d))) {
+        size_t nl = strlen(e->d_name);
+        int list = nl > 5 && !strcmp(e->d_name + nl - 5, ".list");
+        int deb822 = nl > 8 && !strcmp(e->d_name + nl - 8, ".sources");
+        if (e->d_name[0] == '.' || !(list || deb822) || !join(path, sizeof path, dir, e->d_name)) continue;
+        char *t = slurp(path);
+        if (t) { if (list) sources_list(t); else sources_deb822(t); }
+        free(t);
+    }
+    closedir(d);
+}
+
+/* Whether a lists file belongs to a plain-http source: the longest matching prefix decides, http on a tie. */
+static int list_http(const char *name) {
+    size_t best = 0;
+    int http = 0;
+    for (int i = 0; i < nsrc; i++) {
+        size_t pl = strlen(srcs[i].prefix);
+        if (pl < best || strncmp(name, srcs[i].prefix, pl)) continue;
+        if (pl > best) { best = pl; http = srcs[i].http; }
+        else http |= srcs[i].http;
+    }
+    return http;
+}
+
+int auto_insecure(const char *apt_dir, const char *lists, const char *const *ids, const char *const *vers, int n,
+                  unsigned char *hit) {
+    for (int i = 0; i < n; i++) hit[i] = 0;
+    if (!apt_dir || !lists || n <= 0) return 0;
+    load_sources(apt_dir);
+    if (!nsrc) return 0;
+    DIR *d = opendir(lists);
+    if (!d) return 0;
+    int hits = 0;
+    struct dirent *e;
+    char *buf = NULL;
+    size_t cap = 0;
+    while (hits < n && (e = readdir(d))) {
+        size_t nl = strlen(e->d_name);
+        char path[4096];
+        if (nl < 9 || strcmp(e->d_name + nl - 9, "_Packages") || !list_http(e->d_name) ||
+            !join(path, sizeof path, lists, e->d_name))
+            continue;
+        FILE *f = fopen(path, "r");
+        if (!f) continue;
+        struct stanza st = {{0}, {0}, 1}; /* url: 1, so stanza_end matches on id and version alone */
+        while (getline(&buf, &cap, f) > 0) {
+            if (buf[0] == '\n' || (buf[0] == '\r' && buf[1] == '\n')) { stanza_end(&st, ids, vers, n, hit, &hits); st.url = 1; }
+            else if (field(buf, "Package", st.pkg, sizeof st.pkg) || field(buf, "Version", st.ver, sizeof st.ver)) {}
+        }
+        stanza_end(&st, ids, vers, n, hit, &hits);
+        fclose(f);
+    }
+    free(buf);
+    closedir(d);
+    return hits;
+}
+
 /* A file's text (at most 16 MiB), malloc'd, or NULL. */
 static char *slurp(const char *path) {
     int fd = open(path, O_RDONLY | O_CLOEXEC);
@@ -856,6 +1090,24 @@ int auto_step(const struct auto_env *env, int force, int update, int dry, struct
             n = m;
         }
     }
+    /* B192: installs nobody tapped take packages from https sources only; an http one is left for a person. */
+    if (n > 0 && may == AUTO_INSTALL_NOW && env->apt_dir && env->lists_dir) {
+        int k = 0;
+        for (int i = 0; i < before->kept; i++)
+            if (chosen[i]) { ids[k] = before->items[i].id; vers[k] = before->items[i].to; k++; }
+        if (auto_insecure(env->apt_dir, env->lists_dir, ids, vers, k, linked) > 0) {
+            int j = 0, m = 0;
+            for (int i = 0; i < before->kept; i++) {
+                if (!chosen[i]) continue;
+                if (linked[j++]) {
+                    say(env, "%s %s comes from an http source: automatic installs take https only, left for you",
+                        before->items[i].id, before->items[i].to);
+                    chosen[i] = 0;
+                } else ids[m++] = before->items[i].id;
+            }
+            n = m;
+        }
+    }
     if (n > 0 && may == AUTO_INSTALL_NOW && !dry && env->busy && env->busy(env->ctx)) {
         say(env, "dpkg is busy (another install): the automatic upgrades wait for the next start");
         n = 0;
@@ -874,6 +1126,12 @@ int auto_step(const struct auto_env *env, int force, int update, int dry, struct
             if (auto_linked(env->lists_dir, pi, pv, k, linked) > 0) {
                 for (int i = 0; i < k; i++)
                     if (linked[i]) { say(env, "the automatic upgrades need %s %s, a link apt can't fetch: left for you", pi[i], pv[i]); break; }
+                failed = 1;
+            }
+            /* B192: and a dependency from an http source. */
+            if (!failed && env->apt_dir && auto_insecure(env->apt_dir, env->lists_dir, pi, pv, k, linked) > 0) {
+                for (int i = 0; i < k; i++)
+                    if (linked[i]) { say(env, "the automatic upgrades need %s %s, from an http source: left for you", pi[i], pv[i]); break; }
                 failed = 1;
             }
         }

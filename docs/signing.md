@@ -20,7 +20,10 @@ iOS's install prompt.
   on PATH or in `~/emsdk`) and fails when the committed copy differs from what the same emcc builds.
 - **Settings > Signing**: the `.p12`, its password and the `.mobileprovision` in this browser's
   IndexedDB (`signing-client.js`), the profile's details, **Install iFizBox App** and **Bring My Certificate**,
-  Remove Certificate. Until signing is set up, Home has the Signing tile beside Featured.
+  Remove Certificate. Until signing is set up (a certificate, or a Free Apple ID login), Home shows a solid red
+  Signing Needs Setup tile under the welcome, opening Settings > Signing. In the sideload app the same tile reads
+  Signing Server Down when the Signing Server doesn't answer, checked again each time Home shows and when the app
+  comes back.
 - **Install** (an app's page, first row; the nav bar's Install runs it): `signing-client.js signInBrowser`:
   1. *Downloading*: the IPA through the Worker's `/api/fetch?url=…&kind=ipa` (most hosts send no CORS headers),
      streamed, up to 512 MB (`MAX_UPLOAD_MB`). The Worker hands the upstream body on untouched (no JS per chunk:

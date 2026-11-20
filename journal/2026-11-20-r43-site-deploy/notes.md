@@ -110,3 +110,16 @@ production branch.
   upload a version to the production Worker.
 - Push counts are first-parent commits on origin/main; the runner pushes per merge, but whether each push
   triggered its own build (or Cloudflare coalesced queued ones) was not checked.
+
+## Decision (owner, 2026-11-20)
+
+The owner picked **C2, deploy on release tags**, not the recommended B: the Workers Builds Git link is
+disconnected, and T53 makes `tools/publish.sh` run `tools/buildinfo.sh && cd worker && npx wrangler deploy -c
+wrangler.ifizbox.toml` itself from the tagged commit (which already holds the new `source.json`, so the lag noted
+under C goes away), plus a way to redeploy a tag by hand. No GitHub Action and no repo secret, so C1's token risk
+doesn't apply. The C2 cost that stays: deploys depend on the release machine's wrangler login.
+
+This session made no deploy change. It only recorded the answer here and ticked R43. The build work is T53.
+
+**Not verified** (this session): that the Workers Builds link really is disconnected. I took that from the
+owner's answer and did not check the dashboard (this session has no dashboard access).

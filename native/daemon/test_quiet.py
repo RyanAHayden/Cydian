@@ -7,6 +7,8 @@ import subprocess
 import tempfile
 import unittest
 
+from test_auto import SAN_ENV, SAN_FLAGS  # T45's ASan/UBSan probe: flags, or [] and why not
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 NATIVE = os.path.dirname(HERE)
 CC = shutil.which(os.environ.get("CC", "cc")) or shutil.which("clang") or shutil.which("gcc")
@@ -42,9 +44,14 @@ class Quiet(unittest.TestCase):
             with open(src, "w") as f:
                 f.write(DRIVER)
             # -pipe and TMPDIR: cc's scratch files stay out of the shared /tmp, which other gates can fill (EDQUOT).
-            subprocess.run([CC, "-pipe", "-std=c11", "-Wall", "-Wextra", "-Werror", "-I", HERE, "-o", exe, src],
-                           check=True, capture_output=True, env=dict(os.environ, TMPDIR=tmp))
-            out = subprocess.run([exe], capture_output=True, text=True, timeout=30, check=True).stdout.splitlines()
+            # SAN_FLAGS: ASan/UBSan where the probe in test_auto.py found them working (SAN_SKIP says why not).
+            subprocess.run([CC, "-pipe", "-std=c11", "-Wall", "-Wextra", "-Werror", *SAN_FLAGS, "-I", HERE, "-o", exe,
+                            src], check=True, capture_output=True, env=dict(os.environ, TMPDIR=tmp))
+            out = subprocess.run([exe], capture_output=True, text=True, timeout=30, check=True,
+                                 env=dict(os.environ, **SAN_ENV)).stdout.splitlines()
+            if SAN_FLAGS:
+                with open(exe, "rb") as f:
+                    self.assertIn(b"__asan_init", f.read())
         h = read(os.path.join(HERE, "auto.h"))
         kinds = re.search(r"enum \{ (AUTO_NOTE_UPGRADES[^}]*)\}", h).group(1).replace(" ", "").split(",")
         n = {k: i for i, k in enumerate(kinds)}

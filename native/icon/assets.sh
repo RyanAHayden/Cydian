@@ -1,54 +1,53 @@
 #!/usr/bin/env bash
-# Compiles the app icon into an asset catalog (Assets.car) for each build: native/icon/Assets.car (the .deb's plain
-# icon) and native/icon/AssetsLite.car (the sideload IPA's LITE icon). Only Apple's actool writes Assets.car, so this
-# runs on a Mac with Xcode; build.sh copies the committed .car files on Linux. Rerun it after tools/icons.sh changes
-# the icons, and commit what it writes.
+# Compiles the app icons into an asset catalog (Assets.car) for each build: native/icon/Assets.car (the .deb's plain
+# icons) and native/icon/AssetsLite.car (the sideload IPA's, with the LITE sash). Only Apple's actool writes
+# Assets.car, so this runs on a Mac with Xcode; build.sh copies the committed .car files on Linux. Rerun it after
+# tools/icons.sh or icon/alternates.py change the icons, and commit what it writes.
 #
 #   native/icon/assets.sh          on the Mac
-#   native/icon/assets.sh <host>   from Linux: copies the PNGs to <host> over ssh, runs actool there, copies back
+#   native/icon/assets.sh <host>   from Linux: builds the catalogs here, compiles them on <host> over ssh, copies back
 #
-# iOS reads Info.plist's CFBundleIconName (AppIcon) from Assets.car for notifications, Settings and Spotlight; with the
-# name set and no catalog it shows a blank placeholder there. native/test_icons.py checks every size is in each .car.
+# Each catalog (icon/alternates.py catalog) holds AppIcon, Info.plist's CFBundleIconName (Classic, with Gunmetal as
+# its dark appearance), and every alternate set Info.plist's CFBundleAlternateIcons lists (F323: the icon follows the
+# theme, Sources/AppIcon.swift). iOS reads AppIcon from Assets.car for notifications, Settings and Spotlight; with the
+# name set and no catalog it shows a blank placeholder there. native/test_icons.py checks every set and size.
 set -euo pipefail
 cd "$(dirname "$0")"
-sizes="20 29 40 60"
+
+# compile <dir holding Assets.xcassets> <out.car>, on the Mac
+compile() {
+  export DEVELOPER_DIR=${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}
+  local alts=() name
+  for name in $(cd "$1/Assets.xcassets" && ls -d Icon-*.appiconset); do alts+=(--alternate-app-icon "${name%.appiconset}"); done
+  mkdir -p "$1/out"
+  xcrun actool --compile "$1/out" --platform iphoneos --minimum-deployment-target 15.0 --target-device iphone \
+    --app-icon AppIcon "${alts[@]}" --output-partial-info-plist "$1/partial.plist" \
+    --errors --warnings --output-format human-readable-text "$1/Assets.xcassets" > "$1/actool.log" 2>&1 ||
+    { cat "$1/actool.log" >&2; exit 1; }
+  # A set actool didn't take whole ("unassigned children": a dark appearance dropped) is a broken icon: stop.
+  if grep -i -E "warning|error" "$1/actool.log" >&2; then echo "icon assets: actool complained (above)" >&2; exit 1; fi
+  cp "$1/out/Assets.car" "$2"
+}
+
+if [ "${1:-}" = --compile ]; then compile "$2" "$3"; exit 0; fi
+
+work=$(mktemp -d)
+trap 'rm -rf "$work"' EXIT
+python3 alternates.py catalog "$work/plain" >/dev/null
+python3 alternates.py catalog "$work/lite" --lite >/dev/null
 
 if [ "$(uname)" != Darwin ]; then
   host=${1:?"icon assets: run on a Mac, or give a Mac's ssh host"}
   dir=$(ssh "$host" mktemp -d)
-  scp -q assets.sh AppIcon*.png "$host:$dir/"
-  ssh "$host" "bash $dir/assets.sh"
+  tar -C "$work" -cf - plain lite | ssh "$host" tar -C "$dir" -xf -
+  scp -q assets.sh "$host:$dir/"
+  ssh "$host" "bash $dir/assets.sh --compile $dir/plain $dir/Assets.car && bash $dir/assets.sh --compile $dir/lite $dir/AssetsLite.car"
   scp -q "$host:$dir/Assets.car" "$host:$dir/AssetsLite.car" .
   ssh "$host" rm -rf "$dir"
-  # The PNGs the .car files were compiled from, so native/test_icons.py notices icons changed without a rerun.
-  sha256sum AppIcon*.png > assets.sources
-  echo "icon assets: wrote native/icon/Assets.car, AssetsLite.car and assets.sources"
-  exit 0
+else
+  compile "$work/plain" Assets.car
+  compile "$work/lite" AssetsLite.car
 fi
-
-export DEVELOPER_DIR=${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}
-work=$(mktemp -d)
-trap 'rm -rf "$work"' EXIT
-
-# catalog <prefix> <out.car>: an AppIcon set of <prefix>*.png at every iPhone size, compiled to <out.car>
-catalog() {
-  local set=$work/$1/Assets.xcassets/AppIcon.appiconset images=""
-  mkdir -p "$set" "$work/$1/out"
-  printf '{"info":{"author":"xcode","version":1}}' > "$work/$1/Assets.xcassets/Contents.json"
-  for pt in $sizes; do
-    for s in 2 3; do
-      cp "$1${pt}x${pt}@${s}x.png" "$set/"
-      images="$images{\"idiom\":\"iphone\",\"size\":\"${pt}x${pt}\",\"scale\":\"${s}x\",\"filename\":\"$1${pt}x${pt}@${s}x.png\"},"
-    done
-  done
-  cp "${1}1024.png" "$set/"
-  images="$images{\"idiom\":\"ios-marketing\",\"size\":\"1024x1024\",\"scale\":\"1x\",\"filename\":\"${1}1024.png\"}"
-  printf '{"images":[%s],"info":{"author":"xcode","version":1}}' "$images" > "$set/Contents.json"
-  xcrun actool --compile "$work/$1/out" --platform iphoneos --minimum-deployment-target 15.0 \
-    --target-device iphone --app-icon AppIcon --output-partial-info-plist "$work/$1/partial.plist" \
-    --notices --warnings --errors --output-format human-readable-text "$work/$1/Assets.xcassets"
-  cp "$work/$1/out/Assets.car" "$2"
-}
-catalog AppIcon Assets.car
-catalog AppIconLite AssetsLite.car
-shasum -a 256 AppIcon*.png > assets.sources
+# The PNGs the .car files were compiled from, so native/test_icons.py notices icons changed without a rerun.
+python3 alternates.py sources > assets.sources
+echo "icon assets: wrote native/icon/Assets.car, AssetsLite.car and assets.sources"

@@ -23,6 +23,83 @@
 			<key>CFBundleIconFiles</key><array><string>AppIcon20x20</string><string>AppIcon29x29</string><string>AppIcon40x40</string><string>AppIcon60x60</string></array>
 			<key>CFBundleIconName</key><string>AppIcon</string>
 		</dict>
+		<!-- F323: the alternate icons, written by icon/alternates.py plist (do not edit): Sources/AppIcon.swift switches -->
+		<key>CFBundleAlternateIcons</key><dict>
+			<key>Icon-classic</key><dict><key>CFBundleIconName</key><string>Icon-classic</string></dict>
+			<key>Icon-sepia</key><dict><key>CFBundleIconName</key><string>Icon-sepia</string></dict>
+			<key>Icon-solarized</key><dict><key>CFBundleIconName</key><string>Icon-solarized</string></dict>
+			<key>Icon-legalpad</key><dict><key>CFBundleIconName</key><string>Icon-legalpad</string></dict>
+			<key>Icon-metal</key><dict><key>CFBundleIconName</key><string>Icon-metal</string></dict>
+			<key>Icon-oled</key><dict><key>CFBundleIconName</key><string>Icon-oled</string></dict>
+			<key>Icon-gunmetal</key><dict><key>CFBundleIconName</key><string>Icon-gunmetal</string></dict>
+			<key>Icon-midnight</key><dict><key>CFBundleIconName</key><string>Icon-midnight</string></dict>
+			<key>Icon-linen</key><dict><key>CFBundleIconName</key><string>Icon-linen</string></dict>
+			<key>Icon-nord</key><dict><key>CFBundleIconName</key><string>Icon-nord</string></dict>
+			<key>Icon-dracula</key><dict><key>CFBundleIconName</key><string>Icon-dracula</string></dict>
+			<key>Icon-leather</key><dict><key>CFBundleIconName</key><string>Icon-leather</string></dict>
+			<key>Icon-felt</key><dict><key>CFBundleIconName</key><string>Icon-felt</string></dict>
+			<key>Icon-wood</key><dict><key>CFBundleIconName</key><string>Icon-wood</string></dict>
+			<key>Icon-clear</key><dict><key>CFBundleIconName</key><string>Icon-clear</string></dict>
+			<key>Icon-classic-oled</key><dict><key>CFBundleIconName</key><string>Icon-classic-oled</string></dict>
+			<key>Icon-classic-midnight</key><dict><key>CFBundleIconName</key><string>Icon-classic-midnight</string></dict>
+			<key>Icon-classic-linen</key><dict><key>CFBundleIconName</key><string>Icon-classic-linen</string></dict>
+			<key>Icon-classic-nord</key><dict><key>CFBundleIconName</key><string>Icon-classic-nord</string></dict>
+			<key>Icon-classic-dracula</key><dict><key>CFBundleIconName</key><string>Icon-classic-dracula</string></dict>
+			<key>Icon-classic-leather</key><dict><key>CFBundleIconName</key><string>Icon-classic-leather</string></dict>
+			<key>Icon-classic-felt</key><dict><key>CFBundleIconName</key><string>Icon-classic-felt</string></dict>
+			<key>Icon-classic-wood</key><dict><key>CFBundleIconName</key><string>Icon-classic-wood</string></dict>
+			<key>Icon-classic-clear</key><dict><key>CFBundleIconName</key><string>Icon-classic-clear</string></dict>
+			<key>Icon-sepia-oled</key><dict><key>CFBundleIconName</key><string>Icon-sepia-oled</string></dict>
+			<key>Icon-sepia-gunmetal</key><dict><key>CFBundleIconName</key><string>Icon-sepia-gunmetal</string></dict>
+			<key>Icon-sepia-midnight</key><dict><key>CFBundleIconName</key><string>Icon-sepia-midnight</string></dict>
+			<key>Icon-sepia-linen</key><dict><key>CFBundleIconName</key><string>Icon-sepia-linen</string></dict>
+			<key>Icon-sepia-nord</key><dict><key>CFBundleIconName</key><string>Icon-sepia-nord</string></dict>
+			<key>Icon-sepia-dracula</key><dict><key>CFBundleIconName</key><string>Icon-sepia-dracula</string></dict>
+			<key>Icon-sepia-leather</key><dict><key>CFBundleIconName</key><string>Icon-sepia-leather</string></dict>
+			<key>Icon-sepia-felt</key><dict><key>CFBundleIconName</key><string>Icon-sepia-felt</string></dict>
+			<key>Icon-sepia-wood</key><dict><key>CFBundleIconName</key><string>Icon-sepia-wood</string></dict>
+			<key>Icon-sepia-clear</key><dict><key>CFBundleIconName</key><string>Icon-sepia-clear</string></dict>
+			<key>Icon-solarized-oled</key><dict><key>CFBundleIconName</key><string>Icon-solarized-oled</string></dict>
+			<key>Icon-solarized-gunmetal</key><dict><key>CFBundleIconName</key><string>Icon-solarized-gunmetal</string></dict>
+			<key>Icon-solarized-midnight</key><dict><key>CFBundleIconName</key><string>Icon-solarized-midnight</string></dict>
+			<key>Icon-solarized-linen</key><dict><key>CFBundleIconName</key><string>Icon-solarized-linen</string></dict>
+			<key>Icon-solarized-nord</key><dict><key>CFBundleIconName</key><string>Icon-solarized-nord</string></dict>
+			<key>Icon-solarized-dracula</key><dict><key>CFBundleIconName</key><string>Icon-solarized-dracula</string></dict>
+			<key>Icon-solarized-leather</key><dict><key>CFBundleIconName</key><string>Icon-solarized-leather</string></dict>
+			<key>Icon-solarized-felt</key><dict><key>CFBundleIconName</key><string>Icon-solarized-felt</string></dict>
+			<key>Icon-solarized-wood</key><dict><key>CFBundleIconName</key><string>Icon-solarized-wood</string></dict>
+			<key>Icon-solarized-clear</key><dict><key>CFBundleIconName</key><string>Icon-solarized-clear</string></dict>
+			<key>Icon-legalpad-oled</key><dict><key>CFBundleIconName</key><string>Icon-legalpad-oled</string></dict>
+			<key>Icon-legalpad-gunmetal</key><dict><key>CFBundleIconName</key><string>Icon-legalpad-gunmetal</string></dict>
+			<key>Icon-legalpad-midnight</key><dict><key>CFBundleIconName</key><string>Icon-legalpad-midnight</string></dict>
+			<key>Icon-legalpad-linen</key><dict><key>CFBundleIconName</key><string>Icon-legalpad-linen</string></dict>
+			<key>Icon-legalpad-nord</key><dict><key>CFBundleIconName</key><string>Icon-legalpad-nord</string></dict>
+			<key>Icon-legalpad-dracula</key><dict><key>CFBundleIconName</key><string>Icon-legalpad-dracula</string></dict>
+			<key>Icon-legalpad-leather</key><dict><key>CFBundleIconName</key><string>Icon-legalpad-leather</string></dict>
+			<key>Icon-legalpad-felt</key><dict><key>CFBundleIconName</key><string>Icon-legalpad-felt</string></dict>
+			<key>Icon-legalpad-wood</key><dict><key>CFBundleIconName</key><string>Icon-legalpad-wood</string></dict>
+			<key>Icon-legalpad-clear</key><dict><key>CFBundleIconName</key><string>Icon-legalpad-clear</string></dict>
+			<key>Icon-metal-oled</key><dict><key>CFBundleIconName</key><string>Icon-metal-oled</string></dict>
+			<key>Icon-metal-gunmetal</key><dict><key>CFBundleIconName</key><string>Icon-metal-gunmetal</string></dict>
+			<key>Icon-metal-midnight</key><dict><key>CFBundleIconName</key><string>Icon-metal-midnight</string></dict>
+			<key>Icon-metal-linen</key><dict><key>CFBundleIconName</key><string>Icon-metal-linen</string></dict>
+			<key>Icon-metal-nord</key><dict><key>CFBundleIconName</key><string>Icon-metal-nord</string></dict>
+			<key>Icon-metal-dracula</key><dict><key>CFBundleIconName</key><string>Icon-metal-dracula</string></dict>
+			<key>Icon-metal-leather</key><dict><key>CFBundleIconName</key><string>Icon-metal-leather</string></dict>
+			<key>Icon-metal-felt</key><dict><key>CFBundleIconName</key><string>Icon-metal-felt</string></dict>
+			<key>Icon-metal-wood</key><dict><key>CFBundleIconName</key><string>Icon-metal-wood</string></dict>
+			<key>Icon-metal-clear</key><dict><key>CFBundleIconName</key><string>Icon-metal-clear</string></dict>
+			<key>Icon-clear-oled</key><dict><key>CFBundleIconName</key><string>Icon-clear-oled</string></dict>
+			<key>Icon-clear-gunmetal</key><dict><key>CFBundleIconName</key><string>Icon-clear-gunmetal</string></dict>
+			<key>Icon-clear-midnight</key><dict><key>CFBundleIconName</key><string>Icon-clear-midnight</string></dict>
+			<key>Icon-clear-linen</key><dict><key>CFBundleIconName</key><string>Icon-clear-linen</string></dict>
+			<key>Icon-clear-nord</key><dict><key>CFBundleIconName</key><string>Icon-clear-nord</string></dict>
+			<key>Icon-clear-dracula</key><dict><key>CFBundleIconName</key><string>Icon-clear-dracula</string></dict>
+			<key>Icon-clear-leather</key><dict><key>CFBundleIconName</key><string>Icon-clear-leather</string></dict>
+			<key>Icon-clear-felt</key><dict><key>CFBundleIconName</key><string>Icon-clear-felt</string></dict>
+			<key>Icon-clear-wood</key><dict><key>CFBundleIconName</key><string>Icon-clear-wood</string></dict>
+		</dict>
+		<!-- end of icon/alternates.py's block -->
 	</dict>
 	<!-- F57: reading a vendor's payment secret from the Keychain asks for Face ID (Paid.swift) -->
 	<key>NSFaceIDUsageDescription</key><string>Face ID unlocks your payment details when you buy a package.</string>

@@ -20,6 +20,7 @@ import { showAlert } from "../nav/alert.js";
 import { popupOpen, whenNoPopup } from "../nav/popups.js";
 import { sourceKey, sourcesFor } from "../core/sources.js";
 import { settings } from "../settings-store.js";
+import { nativeIcons, iconImage } from "../appicon.js"; // F323: Home's header shows the app's icon now
 import { pullToRefresh } from "../nav/pullrefresh.js";
 import { go as navGo } from "../nav/go.js";
 import { lazyNs, load } from "../lazy.js";
@@ -645,6 +646,9 @@ function renderRoot(body) {
   icon.srcset = `icons/${g}-76.png 1x, icons/${g}-152.png 2x, icons/${g}-228.png 3x`;
   icon.width = icon.height = 57;
   icon.alt = "";
+  // F323: the apps show the icon the app has now (the theme's, or Theme > App Icon's pick), as the Home Screen does;
+  // screens/settings.js applyTheme repaints it when the theme or the pick changes. The website keeps its WEB icon.
+  if (nativeIcons()) iconImage(icon, "current");
   const limits = versionLimits(!globalThis.ifizboxNative ? "web" : settings.mode);
   if (limits) {
     icon.classList.add("tappable");

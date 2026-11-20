@@ -5,7 +5,8 @@
  * launchd starts it every hour and at load (com.ryha.ifizbox.upgrades.plist). What a run does is auto.c's
  * auto_step, tested on Linux (test_auto.py); this file only gathers the facts and does the work:
  *   - the F13 settings, as the app mirrors them into its preferences (com.ryha.ifizbox, user mobile: keys
- *     "ifizbox.checkUpdates" and so on, "ifizbox.autoMarked" and "ifizbox.holds" lists), flattened to auto.h's text;
+ *     "ifizbox.checkUpdates" and so on, "ifizbox.autoMarked" and "ifizbox.holds" lists, the
+ *     "ifizbox.ignoredVersions" map), flattened to auto.h's text;
  *   - the network (SCNetworkReachability: none, Wi-Fi, cellular), charging (IOKit's power sources: AC Power),
  *     locked (com.apple.springboard.lockstate), when SpringBoard started (sysctl), dpkg's lock;
  *   - apt from <prefix>/usr/bin with a clean environment and time limits: update (10 min), the plan
@@ -216,6 +217,20 @@ static char *e_settings(void *ctx) {
         for (id v in flatList(prefs[pair[0]]))
             if ([v isKindOfClass:NSString.class] && [v rangeOfString:@"\n"].location == NSNotFound)
                 [text appendFormat:@"%@=%@\n", pair[1], v];
+    /* F282: Ignore This Version, {id: version} (a dictionary as prefs.set writes it, or localStorage's JSON text). */
+    id iv = prefs[@"ifizbox.ignoredVersions"];
+    if ([iv isKindOfClass:NSString.class]) {
+        NSData *d = [iv dataUsingEncoding:NSUTF8StringEncoding];
+        iv = d ? [NSJSONSerialization JSONObjectWithData:d options:0 error:nil] : nil;
+    }
+    if ([iv isKindOfClass:NSDictionary.class])
+        for (id k in [[iv allKeys] sortedArrayUsingSelector:@selector(compare:)]) {
+            id v = iv[k];
+            if (![k isKindOfClass:NSString.class] || ![v isKindOfClass:NSString.class] || ![k length] || ![v length]) continue;
+            NSCharacterSet *bad = [NSCharacterSet characterSetWithCharactersInString:@"=\r\n"];
+            if ([k rangeOfCharacterFromSet:bad].location != NSNotFound || [v rangeOfCharacterFromSet:bad].location != NSNotFound) continue;
+            [text appendFormat:@"ignore=%@=%@\n", k, v];
+        }
     return dupString(text);
 }
 

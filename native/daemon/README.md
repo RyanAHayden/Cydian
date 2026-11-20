@@ -44,6 +44,10 @@ clock, phone and apt in a folder); `main.m` only fills `struct auto_env` with th
   `Bridge.swift` `prefs.set` at launch and on every change, with get()'s string/bool/number values and the lists as
   arrays; a setting nobody picked is removed, so the default above applies. `ifizbox.autoMarked` is the package
   page's Update Automatically switch.
+- **Ignore This Version:** `ifizbox.ignoredVersions`, `{id: version}` (a dictionary, or the JSON text), becomes
+  `ignore=<id>=<version>` settings lines. An upgrade whose version on offer is that one (equal by dpkg's order, as
+  the app compares it) is taken out of the plan: it neither counts (badge, "n Upgrades", the state) nor installs
+  by itself. A newer version counts and installs again.
 - **When:** Off and On Launch: no background check (On Launch is the app's). Every 6 Hours: when the last check is
   5 h old; Daily: 23 h (launchd starts it hourly). On cellular with Use Cellular Data off, a due check waits for the
   next start (the last time stays). `--force` checks whatever the schedule says.

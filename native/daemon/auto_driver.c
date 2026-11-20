@@ -181,6 +181,14 @@ int main(int argc, char **argv) {
         auto_pick(&list, &s, settings, slurp(argv[4]), slurp(argv[5]), chosen);
         for (int i = 0; i < list.kept; i++)
             if (chosen[i]) printf("%s\n", list.items[i].id);
+    } else if (!strcmp(cmd, "samever") && argc == 4) {
+        printf("%d\n", auto_same_version(argv[2], argv[3]));
+    } else if (!strcmp(cmd, "drop") && argc == 4) {
+        /* auto_driver drop <plan> <settings>    the count left, then the ids left */
+        upd_parse_simulation(slurp(argv[2]), &list);
+        auto_drop_ignored(&list, slurp(argv[3]));
+        printf("%d\n", list.n);
+        for (int i = 0; i < list.kept; i++) printf("%s\n", list.items[i].id);
     } else if (!strcmp(cmd, "removes") && argc == 3) {
         printf("%d\n", auto_plan_removes(slurp(argv[2])));
     } else if (!strcmp(cmd, "finish") && argc == 3) {

@@ -118,6 +118,7 @@ test("the prefs mirror sends every daemon key at launch, then each change on its
   settings.set("autoInstallIdle", false);
   settings.autoMarked.set("com.foo", true);
   await settings.holds.set("com.bar", true);
+  settings.ignoredVersions.set("com.baz", "1.2"); // F282: Ignore This Version reaches the daemon too
   settings.set("appearance", "dark"); // not the daemon's
   await tick();
   assert.deepEqual(native.calls, [
@@ -125,6 +126,7 @@ test("the prefs mirror sends every daemon key at launch, then each change on its
     ["prefs.set", { values: { "ifizbox.autoInstallIdle": false } }],
     ["prefs.set", { values: { "ifizbox.autoMarked": ["com.foo"] } }],
     ["prefs.set", { values: { "ifizbox.holds": ["com.bar"] } }],
+    ["prefs.set", { values: { "ifizbox.ignoredVersions": { "com.baz": "1.2" } } }],
   ]);
 });
 

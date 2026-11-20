@@ -293,7 +293,9 @@ export function addRecent(list, query, max = RECENT_MAX) {
 // app takes only those it shows itself (settings.isShown).
 export const TRAVELS = ["appearance", "lightTheme", "darkTheme", "device", "worksOnMyPhone", "compatMarks", "iosVersion"];
 export const DAEMON_KEYS = ["autoInstall", "autoInstallIdle", "respring", "keepVersions"];
-export const DAEMON_LISTS = ["holds", "autoMarked"];
+// F282: "ignoredVersions" (Ignore This Version) goes as its { id: version } object, so the daemon's count and
+// automatic installs skip that version too.
+export const DAEMON_LISTS = ["holds", "autoMarked", "ignoredVersions"];
 const byKey = new Map(SETTINGS.map((d) => [d.key, d]));
 
 // The architecture list in core/apt.js is the source of truth; the options above must cover it.
@@ -716,7 +718,7 @@ export function createSettings({ storage = globalThis.localStorage, mode = "site
   };
 
   // F70: the daemon's preferences, { "ifizbox.<key>": value }: string, bool or number as get() gives them, the lists
-  // as arrays of package ids. A setting nobody has picked is null (the shell removes the key), so the daemon keeps
+  // as arrays of package ids, ignoredVersions as its { id: version } object (F282). A setting nobody has picked is null (the shell removes the key), so the daemon keeps
   // its own default.
   // `keys`: only these (a setting's key or a list's name), for one change.
   // F128: the full set also sends RETIRED_DAEMON_KEYS as null, so a value an older app left there goes and the
@@ -727,6 +729,7 @@ export function createSettings({ storage = globalThis.localStorage, mode = "site
       if (RETIRED_DAEMON_KEYS.includes(k)) out[PREFIX + k] = null;
       else if (k === "holds") out[HOLDS_KEY] = readHolds().sort();
       else if (k === "autoMarked") out[AUTO_MARKED_KEY] = readMarked();
+      else if (k === "ignoredVersions") out[IGNORED_VERSIONS_KEY] = readIgnoredVersions(); // F282
       else if (DAEMON_KEYS.includes(k)) {
         const raw = store.get(PREFIX + k);
         out[PREFIX + k] = raw != null && def(k).options.some((o) => String(o.value) === raw) ? get(k) : null;

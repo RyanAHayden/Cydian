@@ -120,9 +120,35 @@ class Decisions(Base):
         self.assertEqual(self.pick("autoInstall=all\n", held="com.ex.held\n"), ["com.ex.tweak", "libfoo"])
         self.assertEqual(self.pick("autoInstall=all\nhold=libfoo\n"), ["com.ex.tweak", "com.ex.held"])
         self.assertEqual(self.pick("autoInstall=marked\nmarked=libfoo\nhold=libfoo\n"), [])
+        # F282: Ignore This Version: only that version; another one installs.
+        self.assertEqual(self.pick("autoInstall=all\nignore=libfoo=2:3.2-1\nignore=com.ex.held=1.9\n"),
+                         ["com.ex.tweak", "com.ex.held"])
         # A version that failed isn't tried again; a newer one is.
         self.assertEqual(self.pick("autoInstall=all\n", state="last 1\nfailed libfoo=2:3.2-1\nfailed com.ex.tweak=1.1\n"),
                          ["com.ex.tweak", "com.ex.held"])
+
+    def test_same_version(self):
+        same = lambda a, b: self.run_driver("samever", a, b).strip() == "1"
+        for a, b in (("1.0", "1.0"), ("0:1.0", "1.0"), ("01.0", "1.0"), ("1.0", "1.0-0"), ("2:3.2-1", "2:3.2-01")):
+            self.assertTrue(same(a, b), (a, b))
+            self.assertTrue(same(b, a), (b, a))
+        for a, b in (("1.0", "1.0.0"), ("1.0", "1:1.0"), ("1.0~b1", "1.0"), ("1.0-1", "1.0-2"), ("1.0a", "1.0"),
+                     ("1.0", "1.1")):
+            self.assertFalse(same(a, b), (a, b))
+            self.assertFalse(same(b, a), (b, a))
+
+    def drop(self, settings, plan=PLAN):
+        return self.run_driver("drop", self.file(plan, "plan"), self.file(settings, "s")).split()
+
+    def test_drop_ignored(self):
+        self.assertEqual(self.drop(None), ["3", "com.ex.tweak", "libfoo", "com.ex.held"])
+        # Only the ignored version goes; whole ids; an equal spelling counts; one for another id leaves it alone.
+        self.assertEqual(self.drop("ignore=libfoo=2:3.2-1\n"), ["2", "com.ex.tweak", "com.ex.held"])
+        self.assertEqual(self.drop("ignore=com.ex.tweak=1.2.0\nignore=libfo=2:3.2-1\nignore=com.ex.held=2.0-0\r\n"),
+                         ["2", "com.ex.tweak", "libfoo"])
+        self.assertEqual(self.drop("ignore=com.ex.tweak=1.1\nignore=com.ex.tweak\nignore==1.2\n"),
+                         ["3", "com.ex.tweak", "libfoo", "com.ex.held"])
+        self.assertEqual(self.drop("ignore=com.ex.tweak=1.2\nignore=libfoo=2:3.2-1\nignore=com.ex.held=2.0\n"), ["0"])
 
     def test_plan_removes(self):
         removes = lambda t: self.run_driver("removes", self.file(t)).strip()
@@ -348,6 +374,30 @@ class Runs(Base):
         self.put("plan", self.get("plan.after"))
         self.facts(now=NOW + 3 * H, charging=1, locked=1)
         self.assertEqual(self.calls(self.step()), ["simulate", "showhold", "badge 1"])
+
+    def test_ignored_version_neither_counts_nor_installs(self):
+        # F282: libfoo 2:3.2-1 is ignored: two upgrades, and libfoo isn't installed with Everything.
+        self.put("settings", "autoInstall=all\nautoInstallIdle=false\nhold=com.ex.held\nignore=libfoo=2:3.2-1\n")
+        self.put("plan.after", "Inst com.ex.held [1.0] (2.0 Example [iphoneos-arm64])\n"
+                               "Inst libfoo [2:3.1-1] (2:3.2-1 Procursus:1.0/1900 [iphoneos-arm64])\n")
+        log = self.step()
+        self.assertTrue(any("1 upgrade at an ignored version left out" in l for l in log))
+        calls = self.calls(log)
+        self.assertIn("install com.ex.tweak", calls)
+        self.assertNotIn("libfoo", " ".join(c for c in calls if c.startswith(("install", "simulate "))))
+        # What's left: the held one; libfoo still left out.
+        self.assertEqual(calls[-1], "notify upgrades 1 1 Upgrade | com.ex.held 2.0 is available.")
+        self.assertNotIn("libfoo", self.get("state"))
+        # Without installs: the check's notification counts two.
+        self.setUp()
+        self.put("settings", "ignore=libfoo=2:3.2-1\n")
+        self.assertEqual(self.calls(self.step()), ["update", "simulate",
+                         "notify upgrades 2 2 Upgrades | 2 upgrades: Example Tweak and com.ex.held."])
+        # A newer libfoo than the ignored one counts again (new since the last notification).
+        self.put("plan", PLAN.replace("2:3.2-1", "2:3.3-1"))
+        self.facts(now=NOW + 23 * H)
+        log = self.calls(self.step())
+        self.assertEqual(log[-1], "notify upgrades 3 3 Upgrades | 3 upgrades: Example Tweak, libfoo and com.ex.held.")
 
     def test_marked_only(self):
         self.put("settings", "autoInstall=marked\nautoInstallIdle=false\nmarked=libfoo\n")

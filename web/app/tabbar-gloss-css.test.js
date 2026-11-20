@@ -26,8 +26,10 @@ const lastStop = (grad) => {
 };
 
 const backgrounds = [];
-const base = /(^|\n)\.tabbar\s*\{[^}]*background\s*:\s*([^;]+);/.exec(ios6)?.[2];
-assert.ok(base, ".tabbar background missing");
+// C44: .tabbar paints var(--tabbar); Classic's layers are that token's value.
+assert.match(ios6, /(^|\n)\.tabbar\s*\{\s*background\s*:\s*var\(--tabbar\)\s*;\s*\}/);
+const base = /(?:^|[\s;{])--tabbar\s*:\s*([^;]+);/.exec(ios6)?.[1];
+assert.ok(base, "--tabbar missing");
 backgrounds.push(["Classic .tabbar", base]);
 for (const [name, src] of [["ios6.css", ios6], ["palettes.css", palettes]]) {
   for (const m of src.matchAll(/--dk-tabbar\s*:\s*([^;]+);/g)) backgrounds.push([`${name} --dk-tabbar #${backgrounds.length}`, m[1]]);

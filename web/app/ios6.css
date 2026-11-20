@@ -203,21 +203,59 @@ html[data-theme="dark"][data-palette="gunmetal"] {
 }
 body { color: var(--text); background: #000; }
 
-/* ---- Nav bar: "Menu Bar (Blue)" and, under the notch, "Status Bar (Blue)" ---- */
-.navbar {
-  background:
+/* ==== look-only { ====
+   From here to "} look-only" (and in the other look-only stretches below): the nav bar, bar buttons, tab bar and
+   grouped tables, painted only. Their layout is style.css's "Era hooks"; ios6-css.test.js fails if a rule in here sets
+   anything but colour, background, border, shadow, filter, opacity, type or content (docs/eras.md). The decorations
+   an era would not share come from the tokens below, so an era swaps values instead of undoing iOS 6. */
+:root {
+  /* Nav bar: "Menu Bar (Blue)" and, under the notch, "Status Bar (Blue)" */
+  --nav-bar:
     linear-gradient(#2d3642, #2d3642) bottom / 100% 1px no-repeat,              /* bottom edge */
     linear-gradient(#eff2f7, #eff2f7) 0 env(safe-area-inset-top) / 100% 1px no-repeat, /* top highlight, 1px */
     linear-gradient(#bdcbdc, #597498) bottom / 100% 44px no-repeat,              /* background: Cydia on the 4S */
     linear-gradient(#4f698b, #3f5b7f);                                           /* status bar */
+  --nav-shadow: linear-gradient(rgba(0,0,0,.18), rgba(0,0,0,0)); /* 2.5px of black at 18% fading down over the screen */
+  --nav-title: #fff;
+  --nav-title-emboss: 0 -1px 0 rgba(0,0,0,.5);
+  --site-strip: #000; /* the website's status-bar strip */
+  /* Bar buttons: UINavigationBarDefaultButton and ...Pressed (4S UIKit art) */
+  --bar-btn-text: #fff;
+  --bar-btn-emboss: 0 -1px 0 rgba(0,0,0,.45);
+  --bar-btn-edge: #2f4769; --bar-btn-edge-top: #343a42;
+  --bar-btn: linear-gradient(#99aac2, #41618e);
+  --bar-btn-shadow: inset 0 1px 0 rgba(255,255,255,.3), 0 1px 0 rgba(255,255,255,.25);
+  --bar-btn-pressed-edge: #1c2c4f; --bar-btn-pressed-edge-top: #30343c;
+  --bar-btn-pressed: linear-gradient(#8b97af, #283e6b);
+  /* Tab bar: "Tab bar" */
+  --tabbar:
+    linear-gradient(rgba(0,0,0,.7), rgba(0,0,0,.7)) top / 100% 1px no-repeat,          /* top dark highlight */
+    linear-gradient(rgba(255,255,255,.1), rgba(255,255,255,.1)) 0 1px / 100% 1px no-repeat, /* top highlight */
+    linear-gradient(#2f2f2f, #151515 49.5%, #000 49.5%) 0 1px / 100% 48px no-repeat, /* background */
+    #000;
+  --tabbar-shadow: linear-gradient(rgba(0,0,0,0), rgba(0,0,0,.18)); /* 2.5px above, black at 18% */
+  --tab-text: #a8a8a8;
+  --tab-text-active: #fff;
+  --tab-active: rgba(255,255,255,.15);         /* "selected highlight": white at 15% */
+  --tab-active-edge: inset 0 0 1px rgba(0,0,0,.31); /* with a soft inner edge */
+  --tab-icon: linear-gradient(#9d9d9d, #595959); /* "icon (off)": a grey gradient through the glyph */
+  --tab-icon-active: linear-gradient(165deg, #d9e5f9, #77b5eb 47.3%, #0091e5 48.8%, #0fbff7); /* "2 (active)" */
+  --tab-icon-emboss: drop-shadow(0 -1px 0 rgba(0,0,0,.75));
+  --tab-icon-emboss-active: drop-shadow(0 2.5px 2.5px rgba(0,0,0,.4));
+  /* "# indicator": red gloss pill, 2px white ring, shadow under it */
+  --badge-ring: 2px solid #fff;
+  --badge: linear-gradient(#f7b3b7, #e92d35 48.8%, #e70f19 50.5%, #c50103);
+  --badge-shadow: 0 2px 2.5px rgba(0,0,0,.6);
+  /* Grouped tables: the pinstripe ground (colours above: --pin-*, --table*, --divider*, --head, --emboss, --select) */
+  --grouped-ground: repeating-linear-gradient(90deg, var(--pin-dark) 0 2.5px, var(--pin-light) 2.5px 8px) var(--pin-light);
 }
-.navbar::after { /* Shadow: 2.5px of black at 18% fading down over the screen */
-  content: ""; position: absolute; left: 0; right: 0; top: 100%; height: 2.5px; pointer-events: none;
-  background: linear-gradient(rgba(0,0,0,.18), rgba(0,0,0,0));
-}
+
+/* ---- Nav bar: "Menu Bar (Blue)" and, under the notch, "Status Bar (Blue)" ---- */
+.navbar { background: var(--nav-bar); }
+.navbar::after { background: var(--nav-shadow); }
 .nav-title {
-  font-size: 20px; font-weight: bold; line-height: 44px; color: #fff; text-align: center;
-  text-shadow: 0 -1px 0 rgba(0,0,0,.5);
+  font-size: 20px; font-weight: bold; line-height: 44px; color: var(--nav-title); text-align: center;
+  text-shadow: var(--nav-title-emboss);
 }
 /* Dark: "Status Bar (Black)" under the notch and the black menu bar ("Semi-transparent black bar", opaque):
    #4c4c4c to black at 52%, a 1px white-at-20% highlight on top, a 1px black-at-70% shadow at the bottom. */
@@ -232,8 +270,6 @@ html[data-theme="dark"] .tabbar { background: var(--dk-tabbar); }
    half, so there is no line or step where the strip was. (Stretching the whole gloss put the dark split on the
    strip's edge.) */
 html[data-shell="app"] .navbar::before {
-  content: ""; position: absolute; left: 0; right: 0; top: 0; height: calc(env(safe-area-inset-top) + 22px);
-  pointer-events: none;
   background: inherit;
   background-repeat: no-repeat;
   background-position: 0 0, top, top, 0 0;
@@ -241,25 +277,20 @@ html[data-shell="app"] .navbar::before {
 }
 /* On the website the strip stays plain black, as iOS's opaque black status bar (index.html) draws it: the nav bar
    starts below it. */
-html:not([data-shell="app"]) .navbar::before {
-  content: ""; position: absolute; left: 0; right: 0; top: 0; height: env(safe-area-inset-top); background: #000;
-  pointer-events: none;
-}
+html:not([data-shell="app"]) .navbar::before { background: var(--site-strip); }
 
 /* Bar buttons and the back arrow, from the 4S's UIKit art (UINavigationBarDefaultButton, ...Pressed, ...Back), the
    versions the user picked (2026-11-17). background-origin: border-box matters: without
    it the gradient tiles into the 1px border and its light top shows as a line along the bottom. */
 .bar-button {
-  height: 29px; min-width: 50px; max-width: 100%; padding: 0 9px; overflow: hidden; white-space: nowrap;
-  text-overflow: ellipsis; cursor: pointer; touch-action: manipulation;
-  font-size: 12px; font-weight: bold; line-height: 27px; color: #fff; text-shadow: 0 -1px 0 rgba(0,0,0,.45);
-  border: 1px solid #2f4769; border-top-color: #343a42; border-radius: 5px;
-  background: linear-gradient(#99aac2, #41618e); background-origin: border-box;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.3), 0 1px 0 rgba(255,255,255,.25);
+  font-size: 12px; font-weight: bold; line-height: 27px; color: var(--bar-btn-text); text-shadow: var(--bar-btn-emboss);
+  border: 1px solid var(--bar-btn-edge); border-top-color: var(--bar-btn-edge-top); border-radius: 5px;
+  background: var(--bar-btn); background-origin: border-box;
+  box-shadow: var(--bar-btn-shadow);
 }
 .bar-button:active, .bar-button.is-pressed {
-  background: linear-gradient(#8b97af, #283e6b); background-origin: border-box;
-  border-color: #1c2c4f; border-top-color: #30343c;
+  background: var(--bar-btn-pressed); background-origin: border-box;
+  border-color: var(--bar-btn-pressed-edge); border-top-color: var(--bar-btn-pressed-edge-top);
 }
 html[data-theme="dark"] .bar-button:not(.back):not(.done) {
   border-color: var(--dk-btn-edge); background: var(--dk-btn); background-origin: border-box;
@@ -267,13 +298,17 @@ html[data-theme="dark"] .bar-button:not(.back):not(.done) {
 html[data-theme="dark"] .bar-button:not(.back):not(.done):active, html[data-theme="dark"] .bar-button:not(.back):not(.done).is-pressed {
   background: var(--dk-btn-pressed); background-origin: border-box;
 }
+:root { /* the back arrow: UINavigationBarDefaultBack and ...BackPressed, drawn over the button by border-image */
+  --bar-back: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MiIgaGVpZ2h0PSI2MCI+PGRlZnM+PGxpbmVhckdyYWRpZW50IGlkPSJiIiB4Mj0iMCIgeTI9IjEiPjxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzM1M2E0MyIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzJkNDE1YiIvPjwvbGluZWFyR3JhZGllbnQ+PGxpbmVhckdyYWRpZW50IGlkPSJmIiB4Mj0iMCIgeTI9IjEiPjxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzk5YWFjMiIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzQxNjE4ZSIvPjwvbGluZWFyR3JhZGllbnQ+PC9kZWZzPjxwYXRoIGQ9Ik0yIDMxIDIyIDVRMjMuNSAzIDI2IDNIMzZRNDEgMyA0MSA4VjU0UTQxIDU5IDM2IDU5SDI2UTIzLjUgNTkgMjIgNTdaIiBmaWxsPSIjZmZmIiBvcGFjaXR5PSIuMyIvPjxwYXRoIGQ9Ik0yIDI5IDIyIDNRMjMuNSAxIDI2IDFIMzZRNDEgMSA0MSA2VjUyUTQxIDU3IDM2IDU3SDI2UTIzLjUgNTcgMjIgNTVaIiBmaWxsPSJ1cmwoI2IpIi8+PHBhdGggZD0iTTQuNiAyOSAyMy42IDQuM1EyNC44IDMgMjYuNSAzSDM2UTM5IDMgMzkgNlY1MlEzOSA1NSAzNiA1NUgyNi41UTI0LjggNTUgMjMuNiA1My43WiIgZmlsbD0idXJsKCNmKSIvPjxwYXRoIGQ9Ik0yMy42IDQuM1EyNC44IDMgMjYuNSAzSDM2UTM5IDMgMzkgNiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utb3BhY2l0eT0iLjMiIHN0cm9rZS13aWR0aD0iMSIvPjwvc3ZnPgo=");
+  --bar-back-pressed: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MiIgaGVpZ2h0PSI2MCI+PGRlZnM+PGxpbmVhckdyYWRpZW50IGlkPSJiIiB4Mj0iMCIgeTI9IjEiPjxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzMwMzQzYyIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzFjMmM0ZiIvPjwvbGluZWFyR3JhZGllbnQ+PGxpbmVhckdyYWRpZW50IGlkPSJmIiB4Mj0iMCIgeTI9IjEiPjxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzhiOTdhZiIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzI4M2U2YiIvPjwvbGluZWFyR3JhZGllbnQ+PC9kZWZzPjxwYXRoIGQ9Ik0yIDMxIDIyIDVRMjMuNSAzIDI2IDNIMzZRNDEgMyA0MSA4VjU0UTQxIDU5IDM2IDU5SDI2UTIzLjUgNTkgMjIgNTdaIiBmaWxsPSIjZmZmIiBvcGFjaXR5PSIuMyIvPjxwYXRoIGQ9Ik0yIDI5IDIyIDNRMjMuNSAxIDI2IDFIMzZRNDEgMSA0MSA2VjUyUTQxIDU3IDM2IDU3SDI2UTIzLjUgNTcgMjIgNTVaIiBmaWxsPSJ1cmwoI2IpIi8+PHBhdGggZD0iTTQuNiAyOSAyMy42IDQuM1EyNC44IDMgMjYuNSAzSDM2UTM5IDMgMzkgNlY1MlEzOSA1NSAzNiA1NUgyNi41UTI0LjggNTUgMjMuNiA1My43WiIgZmlsbD0idXJsKCNmKSIvPjxwYXRoIGQ9Ik0yMy42IDQuM1EyNC44IDMgMjYuNSAzSDM2UTM5IDMgMzkgNiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utb3BhY2l0eT0iLjMiIHN0cm9rZS13aWR0aD0iMSIvPjwvc3ZnPgo=");
+}
 .bar-button.back {
-  height: 30px; min-width: 0; max-width: 100%; padding: 0 5px 0 1px; line-height: 28px;
+  line-height: 28px;
   border: solid transparent; border-width: 0 5px 0 13px; border-radius: 0;
   background: none; box-shadow: none;
-  border-image: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MiIgaGVpZ2h0PSI2MCI+PGRlZnM+PGxpbmVhckdyYWRpZW50IGlkPSJiIiB4Mj0iMCIgeTI9IjEiPjxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzM1M2E0MyIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzJkNDE1YiIvPjwvbGluZWFyR3JhZGllbnQ+PGxpbmVhckdyYWRpZW50IGlkPSJmIiB4Mj0iMCIgeTI9IjEiPjxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzk5YWFjMiIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzQxNjE4ZSIvPjwvbGluZWFyR3JhZGllbnQ+PC9kZWZzPjxwYXRoIGQ9Ik0yIDMxIDIyIDVRMjMuNSAzIDI2IDNIMzZRNDEgMyA0MSA4VjU0UTQxIDU5IDM2IDU5SDI2UTIzLjUgNTkgMjIgNTdaIiBmaWxsPSIjZmZmIiBvcGFjaXR5PSIuMyIvPjxwYXRoIGQ9Ik0yIDI5IDIyIDNRMjMuNSAxIDI2IDFIMzZRNDEgMSA0MSA2VjUyUTQxIDU3IDM2IDU3SDI2UTIzLjUgNTcgMjIgNTVaIiBmaWxsPSJ1cmwoI2IpIi8+PHBhdGggZD0iTTQuNiAyOSAyMy42IDQuM1EyNC44IDMgMjYuNSAzSDM2UTM5IDMgMzkgNlY1MlEzOSA1NSAzNiA1NUgyNi41UTI0LjggNTUgMjMuNiA1My43WiIgZmlsbD0idXJsKCNmKSIvPjxwYXRoIGQ9Ik0yMy42IDQuM1EyNC44IDMgMjYuNSAzSDM2UTM5IDMgMzkgNiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utb3BhY2l0eT0iLjMiIHN0cm9rZS13aWR0aD0iMSIvPjwvc3ZnPgo=") 0 10 0 26 fill / 0 5px 0 13px;
+  border-image: var(--bar-back) 0 10 0 26 fill / 0 5px 0 13px;
 }
-.bar-button.back:active, .bar-button.back.is-pressed { border-image-source: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MiIgaGVpZ2h0PSI2MCI+PGRlZnM+PGxpbmVhckdyYWRpZW50IGlkPSJiIiB4Mj0iMCIgeTI9IjEiPjxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzMwMzQzYyIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzFjMmM0ZiIvPjwvbGluZWFyR3JhZGllbnQ+PGxpbmVhckdyYWRpZW50IGlkPSJmIiB4Mj0iMCIgeTI9IjEiPjxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzhiOTdhZiIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzI4M2U2YiIvPjwvbGluZWFyR3JhZGllbnQ+PC9kZWZzPjxwYXRoIGQ9Ik0yIDMxIDIyIDVRMjMuNSAzIDI2IDNIMzZRNDEgMyA0MSA4VjU0UTQxIDU5IDM2IDU5SDI2UTIzLjUgNTkgMjIgNTdaIiBmaWxsPSIjZmZmIiBvcGFjaXR5PSIuMyIvPjxwYXRoIGQ9Ik0yIDI5IDIyIDNRMjMuNSAxIDI2IDFIMzZRNDEgMSA0MSA2VjUyUTQxIDU3IDM2IDU3SDI2UTIzLjUgNTcgMjIgNTVaIiBmaWxsPSJ1cmwoI2IpIi8+PHBhdGggZD0iTTQuNiAyOSAyMy42IDQuM1EyNC44IDMgMjYuNSAzSDM2UTM5IDMgMzkgNlY1MlEzOSA1NSAzNiA1NUgyNi41UTI0LjggNTUgMjMuNiA1My43WiIgZmlsbD0idXJsKCNmKSIvPjxwYXRoIGQ9Ik0yMy42IDQuM1EyNC44IDMgMjYuNSAzSDM2UTM5IDMgMzkgNiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utb3BhY2l0eT0iLjMiIHN0cm9rZS13aWR0aD0iMSIvPjwvc3ZnPgo="); background: none; }
+.bar-button.back:active, .bar-button.back.is-pressed { border-image-source: var(--bar-back-pressed); background: none; }
 html[data-theme="dark"] .bar-button.back { border-image-source: var(--dk-back); }
 html[data-theme="dark"] .bar-button.back:active, html[data-theme="dark"] .bar-button.back.is-pressed { filter: brightness(.75); }
 
@@ -298,6 +333,7 @@ html[data-theme="dark"] .bar-button.red:not(.back):not(.done):is(:active, .is-pr
   border-color: var(--dk-red-pressed-edge); border-top-color: var(--dk-red-pressed-edge-top);
   background: var(--dk-red-pressed); background-origin: border-box;
 }
+/* ==== } look-only ==== */
 
 /* B118: two buttons in one row under a grouped table (Settings > Signing's Replace and Remove Certificate), as iOS 6's
    Contacts sets its buttons side by side. Each is a button.cell-inner, so app.js's pressed look reaches it. The plain
@@ -338,41 +374,26 @@ html[data-theme="dark"] .pair-button.delete-button:is(:active, .is-pressed) {
   background-origin: border-box; background-clip: padding-box;
 }
 
+/* ==== look-only { ==== */
 /* ---- Tab bar: "Tab bar" ---- */
 /* The gloss is the kit's 49 pt bar from the top, split at the bar's own half (24.5 pt), where the icons expect it.
    The strip over the home indicator (--safe-bottom) is the base colour under it, which every theme's --dk-tabbar
    keeps equal to the gloss's last (dark) colour, so the bottom half carries on over the strip with no seam.
    (Stretching the gloss over the strip put the split at half of 49 pt + the strip: through the icons.) */
-.tabbar {
-  background:
-    linear-gradient(rgba(0,0,0,.7), rgba(0,0,0,.7)) top / 100% 1px no-repeat,          /* top dark highlight */
-    linear-gradient(rgba(255,255,255,.1), rgba(255,255,255,.1)) 0 1px / 100% 1px no-repeat, /* top highlight */
-    linear-gradient(#2f2f2f, #151515 49.5%, #000 49.5%) 0 1px / 100% 48px no-repeat, /* background */
-    #000;
-}
-.tabbar::before { /* Shadow above: 2.5px, black at 18% */
-  content: ""; position: absolute; left: 0; right: 0; bottom: 100%; height: 2.5px; pointer-events: none;
-  background: linear-gradient(rgba(0,0,0,0), rgba(0,0,0,.18));
-}
+.tabbar { background: var(--tabbar); }
+.tabbar::before { background: var(--tabbar-shadow); }
 .tab {
-  display: flex; flex-direction: column; align-items: center;
-  height: 44px; margin: 3px 2px 0; padding-top: 3.5px; border-radius: 2.5px;
-  color: #a8a8a8; font-size: 10px; font-weight: bold; line-height: 12px;
+  border-radius: 2.5px;
+  color: var(--tab-text); font-size: 10px; font-weight: bold; line-height: 12px;
 }
-.tab.active { /* "selected highlight": white at 15% with a soft inner edge */
-  color: #fff; background: rgba(255,255,255,.15); box-shadow: inset 0 0 1px rgba(0,0,0,.31);
-}
-.tab-label { margin-top: 1px; max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.tab-icon { width: 28px; height: 28px; filter: drop-shadow(0 -1px 0 rgba(0,0,0,.75)); }
-.tab-icon::before { /* "icon (off)": a grey gradient through the glyph */
-  content: ""; display: block; width: 100%; height: 100%;
-  background: linear-gradient(#9d9d9d, #595959);
+.tab.active { color: var(--tab-text-active); background: var(--tab-active); box-shadow: var(--tab-active-edge); }
+.tab-icon { filter: var(--tab-icon-emboss); }
+.tab-icon::before { /* the tab's glyph (--glyph, below) masks the fill */
+  background: var(--tab-icon);
   -webkit-mask: var(--glyph) center / contain no-repeat; mask: var(--glyph) center / contain no-repeat;
 }
-.tab.active .tab-icon { filter: drop-shadow(0 2.5px 2.5px rgba(0,0,0,.4)); }
-.tab.active .tab-icon::before { /* "2 (active)": the glossy blue, split just under half */
-  background: linear-gradient(165deg, #d9e5f9, #77b5eb 47.3%, #0091e5 48.8%, #0fbff7);
-}
+.tab.active .tab-icon { filter: var(--tab-icon-emboss-active); }
+.tab.active .tab-icon::before { background: var(--tab-icon-active); }
 .tab[data-tab="home"]      { --glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'%3E%3Cpath d='M14 3 1.5 14H5v11h7v-7h4v7h7V14h3.5z'/%3E%3C/svg%3E"); }
 .tab[data-tab="sources"]   { --glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'%3E%3Crect x='3' y='3' width='22' height='6' rx='2'/%3E%3Crect x='3' y='11' width='22' height='6' rx='2'/%3E%3Crect x='3' y='19' width='22' height='6' rx='2'/%3E%3C/svg%3E"); }
 .tab[data-tab="changes"]   { --glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'%3E%3Cpath fill-rule='evenodd' d='M14 2a12 12 0 1 0 0 24 12 12 0 1 0 0-24zm0 3a9 9 0 1 1 0 18 9 9 0 1 1 0-18z'/%3E%3Cpath d='M12.6 7h2.8v6.3l4.4 3.1-1.6 2.3-5.6-4z'/%3E%3C/svg%3E"); }
@@ -382,64 +403,47 @@ html[data-theme="dark"] .pair-button.delete-button:is(:active, .is-pressed) {
 
 /* "# indicator": red gloss pill, 2px white ring, shadow under it. Scaled to the tab bar (the kit's is 23px). */
 .badge {
-  min-width: 20px; height: 20px; padding: 0 5px; border: 2px solid #fff; border-radius: 10px;
+  border: var(--badge-ring); border-radius: 10px;
   font-size: 13px; font-weight: bold; line-height: 16px; letter-spacing: -.02em; color: #fff; text-align: center;
-  background: linear-gradient(#f7b3b7, #e92d35 48.8%, #e70f19 50.5%, #c50103);
-  box-shadow: 0 2px 2.5px rgba(0,0,0,.6);
+  background: var(--badge);
+  box-shadow: var(--badge-shadow);
 }
-.tab .badge { position: absolute; top: -2px; left: calc(50% + 5px); }
 
 /* ---- Grouped tables: "Grouped Tables" ---- */
-.page-body.grouped {
-  background: repeating-linear-gradient(90deg, var(--pin-dark) 0 2.5px, var(--pin-light) 2.5px 8px) var(--pin-light);
-  padding-bottom: calc(var(--tab-h) + 20px); /* clear the fixed tab bar, then the table's own 20px; the last hint must scroll into view */
-}
-.group { margin: 10px 10px 0; }
-.group + .group { margin-top: 23px; }
+.page-body.grouped { background: var(--grouped-ground); }
 .group-header { /* "Table Label": 17px bold slate, white emboss */
-  margin: 0 9px 7px; font-size: 17px; font-weight: bold; line-height: 21px; letter-spacing: -.01em;
+  font-size: 17px; font-weight: bold; line-height: 21px; letter-spacing: -.01em;
   color: var(--head); text-shadow: var(--emboss);
 }
-.group:first-child > .group-header { margin-top: 10px; }
 .group-footer {
-  overflow-wrap: anywhere; /* a long URL wraps instead of running off the screen */
-  margin: 7px 9px 0; font-size: 15px; line-height: 19px; text-align: center;
+  font-size: 15px; line-height: 19px; text-align: center;
   color: var(--head); text-shadow: var(--emboss);
 }
-.table { list-style: none; margin: 0; padding: 0; }
 .table.grouped { /* "Grouped Table": #f7f7f7, 1px #b7b9bd, 9.5px corners, white drop shadow, faint inner shadow */
-  overflow: hidden; background: var(--table); border: 1px solid var(--table-edge); border-radius: 9.5px;
+  background: var(--table); border: 1px solid var(--table-edge); border-radius: 9.5px;
   box-shadow: inset 0 .5px .5px var(--table-inset); /* no white drop below: on a phone it read as white past the outline */
 }
-.cell-inner {
-  display: flex; align-items: center; gap: 8px; width: 100%; min-height: 43px; padding: 0 10px;
-  border: 0; background: none; text-align: left; color: var(--text); text-decoration: none; cursor: default;
-}
-a.cell-inner, button.cell-inner { cursor: pointer; }
+.cell-inner { border: 0; background: none; text-align: left; color: var(--text); text-decoration: none; }
 .grouped .cell + .cell { border-top: 1px solid var(--divider); }                 /* "divider": shadow, */
 .grouped .cell + .cell > .cell-inner { box-shadow: inset 0 1px 0 var(--divider-hi); }  /* then highlight */
-.cell-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.cell-label { font-size: 17px; font-weight: bold; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.cell-subtitle { font-size: 14px; color: var(--subtitle); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.cell-detail { flex: none; max-width: 50%; font-size: 17px; color: var(--detail); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.cell-label { font-size: 17px; font-weight: bold; }
+.cell-subtitle { font-size: 14px; color: var(--subtitle); }
+.cell-detail { font-size: 17px; color: var(--detail); }
 .cell-count {
-  flex: none; min-width: 26px; height: 20px; padding: 0 7px; border-radius: 10px; text-align: center;
+  border-radius: 10px; text-align: center;
   font-size: 14px; font-weight: bold; line-height: 20px; color: #fff; background: var(--count);
 }
 .cell-icon {
-  flex: none; width: 29px; height: 29px; border-radius: 6px; display: grid; place-items: center;
+  border-radius: 6px;
   font-size: 15px; font-weight: bold; color: #fff;
   background: #8c99b3; /* flat, like Home's tiles: no shadow or gloss */
 }
 /* F205: iOS 6 Settings' row tiles (icons/rowicons.js draws the flat tile and glyph as one SVG). Measured on the 4S: the
-   tile 7pt in from the cell's edge and the label 11pt after it, so 3pt off .cell-inner's 10px padding and onto its gap. */
-.cell-icon.row-icon { background: none; box-shadow: none; border-radius: 0; margin: 0 3px 0 -3px; }
-.cell-icon.row-icon img { display: block; width: 29px; height: 29px; }
+   tile 7pt in from the cell's edge and the label 11pt after it, so 3pt off .cell-inner's 10px padding and onto its gap
+   (style.css). */
+.cell-icon.row-icon { background: none; box-shadow: none; border-radius: 0; }
 /* "arrows copy": 8.75 x 13.2 chevron, #7f7f7f, its right edge 10.5px in from the cell's */
-.cell-inner.chevron::after {
-  content: ""; flex: none; width: 9px; height: 13px; margin-right: .5px;
-  background: var(--chevron) center / contain no-repeat;
-}
+.cell-inner.chevron::after { background: var(--chevron) center / contain no-repeat; }
 .cell-check::after { content: "✓"; font-size: 20px; font-weight: bold; color: var(--detail); }
 /* Tap: the blue selection, white text, as UITableViewCell does on touch down. */
 /* Only app.js's .is-pressed, not :active: iOS keeps :active on a held row after the touch turns into a scroll. */
@@ -448,8 +452,7 @@ a.cell-inner, button.cell-inner { cursor: pointer; }
 .cell-inner.chevron.is-pressed::after {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 17.5 26.4'%3E%3Cpath fill='%23fff' d='M.07 4.23 9.12 13.27 0 22.26 4.12 26.38 17.47 13.03 4.43 0Z'/%3E%3C/svg%3E");
 }
-/* F163 (nav/selection.js): the opened row's blue, a copy over the row that fades by opacity alone during the pop. */
-.cell-inner.sel-ghost { position: absolute; inset: 0; width: auto; pointer-events: none; will-change: opacity; }
+/* ==== } look-only ==== */
 
 /* "switch (on)" / "switch (off)": 77 x 27, a pill with the kit's edge gradient (on #819fb9 to #255985, off #ccc to
    #878787), track #007fe9 or #ededed with an inner shadow, ON in white or OFF in grey, and the 27px handle
@@ -799,13 +802,14 @@ html[data-theme="dark"] .sign-pw-glyph.pw-right { background-color: var(--dk-pw-
 .share-cancel:focus { outline: none; } /* focused on open (Escape, VoiceOver); the phone draws no ring */
 .share-cancel:active::before { background: linear-gradient(#3a3a3a, #232323 25%, #0c0c0c 60%, #000 80%, #141414); }
 
-/* The nav bar's Share button: UIBarButtonSystemItemAction, from the kit's "Action" bordered button (43 x 29 pt; the
-   tray and the arrow sweeping up out of it, white on a dark shadow 1 pt up). */
-.bar-button.bar-icon { min-width: 43px; width: 43px; padding: 0; display: inline-flex; align-items: center; justify-content: center; }
+/* ==== look-only { ==== */
+/* The nav bar's Share button: UIBarButtonSystemItemAction, from the kit's "Action" bordered button (43 x 29 pt, sized in
+   style.css; the tray and the arrow sweeping up out of it, white on a dark shadow 1 pt up). */
 .bar-button.share-button::before {
-  content: ""; width: 25px; height: 20px; filter: drop-shadow(0 -1px 0 rgba(0,0,0,.45));
+  filter: drop-shadow(0 -1px 0 rgba(0,0,0,.45));
   background: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjExNDQgODQzIDUwIDQwIj48ZyBmaWxsPSIjZmZmIj48cGF0aCBkPSJNMTE5MiA4NTggMTE3NiA4NDVWODUzSDExNzNDMTE2Ny4xMyA4NTMgMTE1NiA4NTcuNzUgMTE1NiA4NzEgMTE1NiA4NzEuMTkgMTE2MS41OCA4NjMgMTE3MyA4NjNIMTE3NlY4NzFaIi8+PHBhdGggZD0iTTExODAgODczVjg3N0gxMTUwVjg1N0gxMTU4TDExNjAgODUzSDExNDZMMTE0NS45NyA4ODEuMDEgMTE4NCA4ODFWODcwWiIvPjwvZz48L3N2Zz4=") center / 25px 20px no-repeat;
 }
+/* ==== } look-only ==== */
 
 /* Sources' Add while iOS's Paste bubble waits (screens/sources.js): a green "Paste", unlike any held or Done look. */
 
@@ -954,9 +958,7 @@ html[data-theme="dark"] .store-segment:active:not(.selected) { background: var(-
   position: absolute; left: 0; right: 0; top: 0; height: 480px; transform: translateY(-480px);
   background: var(--plain); color: #777;
 }
-.pull-clip.grouped > .pull-refresh {
-  background: repeating-linear-gradient(90deg, var(--pin-dark) 0 2.5px, var(--pin-light) 2.5px 8px) var(--pin-light);
-}
+.pull-clip.grouped > .pull-refresh { background: var(--grouped-ground); } /* the grouped page's own ground */
 .pull-inner { position: absolute; left: 0; right: 0; bottom: 0; height: 60px; }
 .pull-arrow {
   position: absolute; left: 33px; top: 9px; width: 22px; height: 42px;

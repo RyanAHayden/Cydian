@@ -1,0 +1,74 @@
+/* C44 spike, approach B ("tokenising"): the same iOS 7 look as spike-override.css, written against ios6.css and
+   style.css after C44's split. Not shipped. Tags as in spike-override.css, plus
+     [T] a token or hook value (no rule, no specificity)
+   Everything here is look or a token: ios6-css.test.js's era check (layoutIn) passes on this file. */
+
+/* Geometry hooks: the same in both tones. */
+html[data-style="ios7"] {
+  --bar-btn-h: 44px; --bar-btn-min-w: 0px; --bar-btn-pad: 0 8px;         /* [T] [T] [T] hooks */
+  --bar-back-h: 44px; --bar-back-pad: 0 8px 0 4px;                       /* [T] [T] hooks */
+  --tab-item-h: 49px; --tab-item-margin: 0; --tab-item-pad-top: 7px;    /* [T] [T] [T] hooks */
+  --group-margin: 35px 0 0; --group-gap: 35px; --group-first-head: 0px; /* [T] [T] [T] hooks */
+  --group-head-margin: 0 15px 7px; --group-foot-margin: 7px 15px 0;     /* [T] [T] hooks */
+  --cell-min-h: 44px; --cell-pad: 0 15px;                               /* [T] [T] hooks */
+}
+/* Colours: light only. A colour token set on bare html[data-style] has the dark block's specificity and comes later,
+   so it would win in dark too (the first render of this spike drew white tables under white text in OLED Black). */
+html[data-style="ios7"][data-theme="light"] {
+  /* nav bar */
+  --nav-bar: linear-gradient(rgba(0,0,0,.3), rgba(0,0,0,.3)) bottom / 100% .5px no-repeat, #f7f7f7; /* [T] */
+  --nav-shadow: none;                       /* [T] */
+  --nav-title: #000;                        /* [T] */
+  --nav-title-emboss: none;                 /* [T] */
+  --site-strip: #f7f7f7;                    /* [T] */
+  /* bar buttons: text only */
+  --bar-btn-text: #007aff; --bar-btn-emboss: none;                       /* [T] [T] */
+  --bar-btn-edge: transparent; --bar-btn-edge-top: transparent;          /* [T] [T] */
+  --bar-btn: none; --bar-btn-shadow: none;                               /* [T] [T] */
+  --bar-btn-pressed: none; --bar-btn-pressed-edge: transparent; --bar-btn-pressed-edge-top: transparent; /* [T] [T] [T] */
+  --bar-back: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='42' height='60'%3E%3Cpath d='M22 10 4 29l18 19' fill='none' stroke='%23007aff' stroke-width='5'/%3E%3C/svg%3E"); /* [T] chevron in the arrow's slot */
+  --bar-back-pressed: var(--bar-back);      /* [T] */
+  /* tab bar */
+  --tabbar: linear-gradient(rgba(0,0,0,.3), rgba(0,0,0,.3)) top / 100% .5px no-repeat, #f7f7f7; /* [T] */
+  --tabbar-shadow: none;                    /* [T] */
+  --tab-text: #929292; --tab-text-active: #007aff;                      /* [T] [T] */
+  --tab-active: none; --tab-active-edge: none;                          /* [T] [T] */
+  --tab-icon: currentColor; --tab-icon-active: currentColor;            /* [T] [T] */
+  --tab-icon-emboss: none; --tab-icon-emboss-active: none;              /* [T] [T] */
+  --badge-ring: 0 solid transparent; --badge: #ff3b30; --badge-shadow: none; /* [T] [T] [T] */
+  /* grouped tables: edge to edge, white, inset hairlines on #efeff4 */
+  --grouped-ground: #efeff4;                /* [T] */
+  --table: #fff; --table-edge: #c8c7cc; --table-inset: transparent;     /* [T] [T] [T] */
+  --divider: #c8c7cc; --divider-hi: transparent;                        /* [T] [T] */
+  --head: #6d6d72; --emboss: none; --detail: #8e8e93;                   /* [T] [T] [T] */
+  --select: #d9d9d9;                        /* [T] */
+}
+/* Dark (OLED Black): the shared tokens the light block set, plus the --dk-* ones ios6.css's dark rules read. Its
+   selector must outrank the palette blocks (html[data-theme="dark"][data-palette="..."]) for any palette but OLED. */
+html[data-style="ios7"][data-theme="dark"] {
+  --dk-nav-bar: linear-gradient(#262626, #262626) bottom / 100% .5px no-repeat, #000; /* [T] */
+  --dk-nav-shadow: none; --dk-tabbar: linear-gradient(#262626, #262626) top / 100% .5px no-repeat, #000; /* [T] [T] */
+  --dk-btn-edge: transparent; --dk-btn: none; --dk-btn-pressed: none;   /* [T] [T] [T] */
+  --dk-back: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='42' height='60'%3E%3Cpath d='M22 10 4 29l18 19' fill='none' stroke='%230a84ff' stroke-width='5'/%3E%3C/svg%3E"); /* [T] */
+  --nav-title: #fff; --nav-title-emboss: none; --site-strip: #000;      /* [T] [T] [T] */
+  --bar-btn-text: #0a84ff; --bar-btn-emboss: none; --bar-btn-shadow: none; /* [T] [T] [T] */
+  --tab-text: #8d8d93; --tab-text-active: #0a84ff; --tab-active: none; --tab-active-edge: none; /* [T] x4 */
+  --tab-icon: currentColor; --tab-icon-active: currentColor; --tab-icon-emboss: none; --tab-icon-emboss-active: none; /* [T] x4 */
+  --badge-ring: 0 solid transparent; --badge: #ff453a; --badge-shadow: none; /* [T] [T] [T] */
+  --grouped-ground: #000; --table: #1c1c1e; --table-edge: #38383a; --divider: #38383a; /* [T] x4 */
+  --head: #8d8d93; --detail: #8d8d93; --select: #3a3a3c;                /* [T] [T] [T] */
+}
+
+/* Look-only rules: type and the few shapes the tokens don't carry. */
+html[data-style="ios7"] .nav-title { font-size: 17px; font-weight: 600; }                      /* [N] [N] */
+html[data-style="ios7"] .bar-button { font-size: 17px; font-weight: 400; line-height: 44px; border-radius: 0; } /* [N] [N] [N] [D] */
+html[data-style="ios7"] .bar-button:active, html[data-style="ios7"] .bar-button.is-pressed { opacity: .3; } /* [N] */
+html[data-style="ios7"] .bar-button.back { line-height: 44px; }                                 /* [N] */
+html[data-style="ios7"] .bar-button.share-button::before { filter: none; }                     /* [D] */
+html[data-style="ios7"] .tab { font-weight: 400; border-radius: 0; }                           /* [N] [D] */
+html[data-style="ios7"] .badge { line-height: 20px; }                                          /* [N] */
+html[data-style="ios7"] .group-header { font-size: 13px; font-weight: 400; line-height: 16px; letter-spacing: 0; text-transform: uppercase; } /* [N] x5 */
+html[data-style="ios7"] .group-footer { font-size: 13px; line-height: 16px; text-align: left; } /* [N] [N] [N] */
+html[data-style="ios7"] .table.grouped { border-width: .5px 0; border-radius: 0; }             /* [N] [D] */
+html[data-style="ios7"] .cell-label { font-weight: 400; }                                       /* [N] */
+html[data-style="ios7"] .cell-inner.is-pressed, html[data-style="ios7"] .cell-inner.is-pressed * { color: inherit; } /* [D] */

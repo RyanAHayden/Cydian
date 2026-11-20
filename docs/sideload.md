@@ -4,6 +4,13 @@ How Feather signs and installs IPAs with nothing but the phone, how jailbreak in
 does. iFizBox is its own project: it never routes through another project's server. How iFizBox signs and installs
 in detail: docs/signing.md.
 
+**Tweaks in sideloaded apps.** iFizBox injects tweaks into the apps it signs, on phones without a jailbreak. The
+sideload app reads APT repos as Tweak Sources and lists only the tweaks it can inject (an arm64 or arm `.dylib` under
+`Library/MobileSubstrate/DynamicLibraries` with its filter plist, no dependencies beyond the hook libraries).
+A tweak's page says which apps it works in and has Add to App; Sign Options' Inject Tweaks also takes a tweak from a
+source or your own `.deb`, `.dylib` or zipped `.framework`. ElleKit is bundled for tweaks that link CydiaSubstrate,
+and an app's tweaks are kept for its re-signs. How it's done: docs/signing.md "Tweak injection".
+
 The notes on the other projects come from their source, not from runs on a phone. Sources, at these commits:
 
 | Project | Commit | Licence | Can iFizBox (GPL-3.0-or-later) take code? |

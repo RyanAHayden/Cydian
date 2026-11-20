@@ -38,6 +38,7 @@ import { refreshInBackground } from "./sources.js";
 import { markiFizBoxInstalled, browsingLocked, askToBrowse } from "../websign-gate.js";
 import * as guides from "./guides.js";
 import { guideRows, JAILBREAK_INFO_URL } from "./guides.js";
+import * as why from "./why.js"; // F303: Why <NAME> (#/home/why)
 import { NAME } from "../brand.js";
 import { rowIcon, PAGE_ICONS } from "../icons/rowicons.js";
 
@@ -151,7 +152,7 @@ export function homeLinks() {
 // F156: Home's link rows that stay open on the locked website (user 2026-11-18: "dont lock credits and thank you or
 // jailbreaking help"): Settings (F123), Upgrading & Jailbreaking Help, the User Guides and Credits / Thank You. They
 // need no install and help people get to one. Find Extensions and Recommended Sources stay locked.
-const OPEN_WHILE_LOCKED = new Set(["settings", "help", "guides", "credits"]);
+const OPEN_WHILE_LOCKED = new Set(["settings", "help", "guides", "credits", "why"]); // F303: Why <NAME> too
 export function openWhileLocked(href) {
   if (!href?.startsWith?.("#/")) return false;
   const route = parse(href);
@@ -234,6 +235,7 @@ export function nav(route, ctx) {
     case "credits": return { title: "Credits" };
     case "guides": return guides.nav(route, guidesLite()); // F157
     case "help": return { title: "Help" };
+    case "why": return why.nav(); // F303
     case "featured": return { title: "Featured" };
     case "sources": return { title: "More Sources" };
     case "wishlist": return route.path.length === 1 ? { title: "Wish List", style: "plain" } : browse.nav(route); // F102; F125 moved its row to Installed, the route stays for old links
@@ -595,9 +597,14 @@ function renderRoot(body) {
   // both (Top 25, and the Themes collection).
   const halves = tileRow("halves", tile({ label: "Signing", href: format(settingsRoute(["signing"])), glyph: "signing" }));
   let setUp = true; // hidden until signingSetUp answers: no tile flashing in and out once it is set up
+  // F303: Why <NAME>, high on Home where nobody has set the app up yet (why.js showsWhyTile): the website always, the
+  // sideload app until signing is set up. Its glyph and the page's styles come from why.js (ensureWhyStyle).
+  why.ensureWhyStyle();
+  const whyRow = tileRow("stack why", tile({ label: why.WHY_TILE.label, subtitle: why.WHY_TILE.subtitle, href: why.whyHref(), glyph: "why" }));
   const drawThemes = () => {
     const themes = showsThemes(settings.deviceType());
     halves.hidden = lockedNow || themes || !showsSigningTile(settings.mode, setUp);
+    whyRow.hidden = !why.showsWhyTile(settings.mode, setUp); // F303
     for (const row of lockedTop) row.hidden = !showsSigningTile(settings.mode, setUp);
   };
   // Asked again each time Home's root comes back (Settings > Signing is on Home's stack: Back from it lands here).
@@ -678,6 +685,7 @@ function renderRoot(body) {
     head,
     certRow(), // F244: hidden unless the sideload build's certificate or profile nears its end
     hintBox,
+    whyRow,
     tileRow("pair",
       tile({ label: "GitHub", href: REPO_URL, glyph: "github", external: true }),
       // Cydia's pair was Facebook | Twitter: here GitHub | Discord (the community)
@@ -983,6 +991,7 @@ export function render(el, route, ctx) {
     case "credits": return renderCredits(el);
     case "guides": guides.render(el, route, { lite: guidesLite() }); return; // F157
     case "help": return renderHelp(el);
+    case "why": why.render(el, { mode: settings.mode, install: () => installiFizBox() }); return; // F303
     case "featured": return renderFeatured(el);
     case "sources": return renderSources(el, ctx);
     case "browse": return renderBrowseRoute(el, route, ctx);

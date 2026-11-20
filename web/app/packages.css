@@ -100,6 +100,8 @@ html[data-theme="dark"] .search-cancel:active { background: var(--dk-btn-pressed
 
 /* ---- the package page ---- */
 .group-footer { white-space: pre-line; }
+/* F314: a paid package's Download .deb on the site, greyed: its footer says where it installs instead */
+.deb-paid .cell-label { color: var(--subtitle); }
 .pkg-head-table { display: block; }
 .pkg-head { display: flex; align-items: center; gap: 12px; padding: 10px; position: relative; min-height: 84px; }
 .pkg-icon.large { width: 64px; height: 64px; border-radius: 12px; }

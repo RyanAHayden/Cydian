@@ -56,7 +56,7 @@ import { featuredStrip, paymentGroup, paidStateOf, soldByVendor } from "./extras
 import { installQueue } from "../queue.js";
 import { queuedFor, MODE_LABEL } from "../core/queue.js";
 import { hasRollback, rollbackSlot } from "./rollback.js";
-import { autoMarkShown, AUTO_MARK_LABEL, AUTO_MARK_FOOTER } from "../core/automark.js";
+import { autoMarkShown, AUTO_MARK_LABEL } from "../core/automark.js";
 import { createWishlist, wishLabel, wishRows, WISH_EMPTY } from "../core/wishlist.js";
 import { filterRows } from "../core/changes.js";
 import { sizeText as formatSize } from "../core/appqueue.js";
@@ -1251,7 +1251,7 @@ async function renderPackage(body, route, key, id, ctx) {
   if (!pkg.installedOnly && source) details.append(openInGroup(source, { pkg: st.package || id }));
   if (st.debUrl && getBackend().kind === "http") {
     // Paid packages (cydia::commercial) only download for a buyer's device: the repo refuses the proxy.
-    if (/(^|,)\s*cydia::commercial\s*(,|$)/.test(st.tag ?? "")) details.append(grouped([{ footer: "A paid package: buy and install it from a package manager on the phone." }]));
+    if (/(^|,)\s*cydia::commercial\s*(,|$)/.test(st.tag ?? "")) details.append(grouped([paidDebSection()]));
     else details.append(downloadGroup(st));
   }
   details.append(grouped([{ footer: `${st.package}\n${[sourceName, pkg.row.section].filter(Boolean).join(" · ")}` }]));
@@ -1667,6 +1667,26 @@ export function installedAppSection(rec) {
   return { header: "Installed App", rows: [{ label: "Version", detail: version }], footer: rec.note || null };
 }
 
+// F314: Installed Package in the iOS 6 hint style (AGENTS.md, Hints): Version alone (a status row, no footer), then
+// each switch in a group of its own with its own footer. `dpkgHeld`: a hold set on the phone (the site's uploaded
+// status file), shown and not switchable, so its footer says what holds it and where to change it.
+export const IGNORE_UPGRADES_FOOTER = "Leaves this package out of Upgrade All.";
+export const DPKG_HELD_FOOTER = "Held on the phone, so Upgrade All leaves it out. Release the hold there to change it.";
+export const AUTO_UPDATE_FOOTER = "Installs its updates by itself.";
+export function installedSections({ version, dpkgHeld = false, mark = false }) {
+  return [
+    { header: "Installed Package", rows: [{ label: "Version", detail: version }] },
+    { rows: [{ label: "Ignore Upgrades", detail: dpkgHeld ? "Held by dpkg" : null }],
+      footer: dpkgHeld ? DPKG_HELD_FOOTER : IGNORE_UPGRADES_FOOTER },
+    ...(mark ? [{ rows: [{ label: AUTO_MARK_LABEL }], footer: AUTO_UPDATE_FOOTER }] : []),
+  ];
+}
+
+// F314: a paid package on the site: no Download .deb (the repo refuses the proxy), the row greyed with the footer
+// saying where it installs instead. A group of its own with a row, so its hint isn't glued to the footer under it.
+export const PAID_DEB_FOOTER = "A paid package: buy and install it from a package manager on the phone.";
+export const paidDebSection = () => ({ rows: [{ label: "Download .deb", detail: "Paid", cls: "deb-paid" }], footer: PAID_DEB_FOOTER });
+
 // Installed Package (F7, Cydia's Installed Details): the version on the device and the Ignore Upgrades switch
 // (Settings' Ignored Upgrades; in the app a dpkg hold, core/settings.js holds). Null when it isn't installed.
 async function installedGroup(id) {
@@ -1677,12 +1697,7 @@ async function installedGroup(id) {
   // On the site a hold in the uploaded status file is dpkg's, set on the phone: shown, not switchable here.
   const dpkgHeld = p.held && catalog.statusSource() !== "native";
   const mark = autoMarkShown(settings); // F70: Update Automatically, for Only Packages I Mark
-  const frag = grouped([{
-    header: "Installed Package",
-    rows: [{ label: "Version", detail: p.version }, { label: "Ignore Upgrades", detail: dpkgHeld ? "Held by dpkg" : null },
-      ...(mark ? [{ label: AUTO_MARK_LABEL }] : [])],
-    footer: "Do not include this package when selecting Upgrade All." + (mark ? " " + AUTO_MARK_FOOTER : ""),
-  }]);
+  const frag = grouped(installedSections({ version: p.version, dpkgHeld, mark }));
   if (!dpkgHeld) {
     // grouped() draws plain rows; the switch goes into its cell afterwards, as on the Settings tab.
     const cell = frag.querySelectorAll(".cell-inner")[1];

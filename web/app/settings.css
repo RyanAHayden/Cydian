@@ -70,6 +70,9 @@
 .pair-shot-img { display: block; width: 100%; height: auto; }
 .pair-ring { position: absolute; box-sizing: border-box; border: 2.5px solid #0a84ff; border-radius: 999px;
   pointer-events: none; }
+/* This iPhone's page: a wait inside a group (the code coming, the iPhone connecting), the grey spinner and its line
+   in the footer's place and size, left-aligned like a footer (packages.css .loading draws the spinner). */
+.group .loading.pair-wait { justify-content: flex-start; margin: 8px 9px 0; font-size: 15px; line-height: 19px; }
 /* Paired: the check sits on its own row. */
 .pair-done .cell-label { font-weight: bold; }
 /* Installation & Signing's nav title (screens/settings.js mergedNav): as wide as a nav title may be beside the back

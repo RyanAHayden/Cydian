@@ -40,7 +40,8 @@ test("This iPhone's page: one sentence under the title, no list of benefits", ()
 test("VPN off: its state and Open LocalDevVPN, nothing to pair yet", () => {
   let opened = 0;
   const gs = setupGroups("connect", { paired: null, pairOnPhone: true, localDevVPN: false, otherVPN: false }, null, { openVPN: () => opened++ });
-  assert.equal(gs.length, 2);
+  assert.equal(gs.length, 3);
+  assert.deepEqual(gs[2], { spinner: "Waiting for LocalDevVPN…" }); // B133: the poll for the VPN spins
   assert.deepEqual(gs[1].rows.map((r) => [r.label, r.detail]), [["LocalDevVPN", "Off"], ["Open LocalDevVPN", undefined]]);
   gs[1].rows[1].onClick();
   assert.equal(opened, 1);
@@ -53,7 +54,8 @@ test("pairing: the code group, then the guide with the step or error line; Try A
   assert.deepEqual(on[1].rows.map((r) => [r.label, r.detail]), [["LocalDevVPN", "On"]]);
   assert.ok(on[2].pin);
   assert.ok(on[3].guide);
-  assert.equal(on[3].footer, "Waiting for the iPhone to connect (port 5).");
+  assert.equal(on[3].spinner, "Waiting for the iPhone to connect (port 5)."); // B133: a wait, so it spins
+  assert.equal(on[3].footer, undefined);
   assert.equal(on.length, 4);
   assert.match(setupGroups("pairing", null, { pin: "123456", text: "", error: "bad proof" })[3].footer, /bad proof.*try again/);
   let tries = 0;

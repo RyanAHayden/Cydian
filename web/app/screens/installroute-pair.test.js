@@ -59,7 +59,9 @@ test("the page draws at once: the intro and a spinner while idevice.status answe
   assert.match(box.textContent, /Install on This iPhone/);
   answer(VPN_OFF);
   await done;
-  assert.equal(withClass(box, "loading-spinner").length, 0);
+  assert.ok(!box.textContent.includes("Checking…"));
+  // B133: what spins now is the wait for the VPN
+  assert.deepEqual(withClass(box, "loading").map((n) => n.textContent), ["Waiting for LocalDevVPN…"]);
   assert.deepEqual(labels(box), ["LocalDevVPN", "Open LocalDevVPN"]);
   leave();
 });
@@ -139,7 +141,7 @@ test("connect groups: each way's rows and footer (pure)", () => {
   const signedIn = { tailscale: { signedIn: true, address: "100.1.2.3" } };
   assert.deepEqual(connectGroups("tailscale", signedIn)[0].rows.map((r) => [r.label, r.detail]), [["Tailscale", "On"], ["Open Tailscale", undefined]]);
   assert.match(connectGroups("tailscale", signedIn)[0].footer, /^Turn on the Tailscale app's VPN/);
-  assert.deepEqual(connectGroups("tailscale", null, { busy: "Log in on the page" })[0].rows[0], { label: "Signing In…", detail: "Log in on the page" });
+  assert.deepEqual(connectGroups("tailscale", null, { busy: "Log in on the page" })[0].rows[0], { label: "Signing In…", detail: "Log in on the page", spin: true });
   const picked = [];
   connectGroups("ask", null, { choose: (v) => picked.push(v) })[0].rows.forEach((r) => r.onClick());
   assert.deepEqual(picked, ["localdevvpn", "tailscale"]);

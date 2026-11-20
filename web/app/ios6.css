@@ -861,10 +861,10 @@ html[data-theme="dark"] .ph-box, html[data-theme="dark"] .ph-bar { background: v
 html.has-reload :is(.page-body, .sheet-scroll, .search-results, .progress-scroll, .console-scroll, .filter-drop-inner)::after {
   content: ""; display: block; flex: none; clear: both; height: 44px;
 }
-/* B26: a reload runs in the background (pull to refresh, the launch refresh), so a sheet can be open: sheets have no
-   tab bar, so over one the strip comes over the sheet (z-index above the sheets' 25) and sits at its bottom, just
-   above the home indicator. `translate` composes with the strip's slide animation (transform) and is composited. */
-body:has(.sheet) .reload-bar { z-index: 26; translate: 0 calc(var(--tab-h) - var(--safe-bottom)); }
+/* A reload runs in the background (pull to refresh, the launch refresh), so a sheet can open while it shows. As on
+   iOS 6, a modal sheet (packages.css .sheet, z-index 25) covers everything under it, the strip included: the strip
+   keeps its z-index 2 and no rule lifts it over a sheet, so it is hidden while the sheet is up and shows again,
+   where it was, when the sheet slides away. */
 @media (prefers-reduced-motion: reduce) { .reload-spinner { animation-duration: 3s; } }
 
 /* ---- F181: the package page's Details / Reviews / Related (nav/ui.js segmented, the one grey segmented control:

@@ -145,9 +145,7 @@ test("F150/F204: nothing blocks input or moves: a 44 pt strip on the tab bar, no
   const room = rules.find((r) => /^html\.has-reload :is\([^)]*\.page-body[^)]*\.sheet-scroll[^)]*\)::after$/.test(r.sel));
   assert.ok(room, "the scrollers get room at their end while it shows");
   assert.match(room.decl, /height\s*:\s*44px/);
-  const over = rules.find((r) => r.sel === "body:has(.sheet) .reload-bar");
-  assert.ok(over && Number(/z-index\s*:\s*(\d+)/.exec(over.decl)[1]) > 25, "over a sheet it comes above it");
-  assert.match(over.decl, /translate\s*:/, "and moves by translate, composited");
+  assert.ok(!rules.some((r) => r.sel === "body:has(.sheet) .reload-bar"), "B154: a modal sheet covers the strip; nothing lifts it over one");
   assert.doesNotMatch(readFileSync(new URL("./reloadbar.js", import.meta.url), "utf8").replace(/^\s*\/\/.*$/gm, ""), /translateY\(-/, "it slides up from behind the tab bar, not down from the top");
   // and the bar's own module makes no scrim (the HUD's .hud-scrim is what used to eat taps)
   assert.doesNotMatch(readFileSync(new URL("./reloadbar.js", import.meta.url), "utf8").replace(/^\s*\/\/.*$/gm, ""), /scrim|inset/);

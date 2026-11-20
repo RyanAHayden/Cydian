@@ -1,7 +1,8 @@
 // F150: Cydia's reload bar. While sources refresh, a dark translucent strip shows, with a small white spinner at its
 // left, a line saying what is happening (core/reloadsteps.js) and a blue Cancel at its right. It blocks nothing:
 // there is no scrim, only the strip itself takes touches. F204: it sits on top of the tab bar and slides up from
-// behind it (over a sheet, at the sheet's bottom); nothing on the page moves. html.has-reload only gives every
+// behind it; nothing on the page moves. B154: a modal sheet covers it, as on iOS 6 (ios6.css), and it shows again
+// when the sheet closes. html.has-reload only gives every
 // scroller 44 pt more room at its end (ios6.css) so the last row still scrolls clear of the strip. It slides back
 // down behind the tab bar when hidden. Only transform animates.
 //

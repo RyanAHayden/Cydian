@@ -9,7 +9,8 @@
 #   tools/ui-15.sh ME type TEXT       type into the focused field
 #   tools/ui-15.sh ME open URL        open a URL, e.g. ifizbox://sources
 #   tools/ui-15.sh ME launch BUNDLE   launch (or bring forward) an app; the brand's ID if BUNDLE is omitted
-#   tools/ui-15.sh ME install IPA     install an .ipa (sign it for this phone first)
+#   tools/ui-15.sh ME install IPA [--as-is]  sign an .ipa for this phone (zsign, the team's ad hoc profile; keeps
+#                                     its bundle ID, like the app's own signer) and install it; --as-is: no signing
 #   tools/ui-15.sh ME home            Home
 #   tools/ui-15.sh ME lock-button     lock the screen;  ME wake: wake and unlock it (no passcode on this phone)
 #   tools/ui-15.sh ME shot NAME       screenshot -> ref/15/screens/NAME.png
@@ -19,7 +20,7 @@
 set -eu
 lock=${XDG_RUNTIME_DIR:-/tmp}/ifizbox-15-ui.lock  # outside the repo: shared by every worktree on this machine
 run=${XDG_RUNTIME_DIR:-/tmp}/ifizbox-15           # logs of the background tunnel, WDA and port forward
-rig=${IFIZBOX_15_RIG:-$HOME/.local/share/ifizbox-rig}  # WDA.ipa, ddi/, ca-bundle.pem (docs/iphone15.md)
+rig=${IFIZBOX_15_RIG:-$HOME/.local/share/ifizbox-rig}  # WDA.ipa, ddi/, ca-bundle.pem, zsign, sign/ (docs/iphone15.md)
 udid=${IFIZBOX_15_UDID:-00008130-0018450C3661001C}
 wda=http://127.0.0.1:8100
 stale=30
@@ -96,9 +97,18 @@ case $cmd in
   launch)
     [ $# -gt 0 ] || { . "$here/native/brand.env"; set -- "$BRAND_BUNDLE_ID"; }
     up; post /wda/apps/activate "{\"bundleId\":\"$1\"}" ;;
-  install) gi install --path="$1" | tail -1 ;;
+  install)
+    ipa=$1
+    if [ "${2:-}" != --as-is ]; then
+      ipa=$run/signed.ipa
+      "$rig/zsign" -q -z 1 -k "$rig/sign/key.pem" -c "$rig/sign/cert.pem" -m "$rig/sign/app.mobileprovision" \
+        -o "$ipa" "$1" || { echo "zsign failed on $1" >&2; exit 1; }
+    fi
+    gi install --path="$ipa" >/dev/null || { echo "install failed: $run/ios.log" >&2; exit 1; }
+    echo "installed $1" ;;
   home) up; curl -sf -m 30 -X POST "$wda/wda/homescreen" >/dev/null ;;
-  lock-button) up; curl -sf -m 30 -X POST "$wda/wda/lock" >/dev/null ;;
+  lock-button)  # a short side-button press: WDA's /wda/lock holds it, which on iOS 27 opens Siri
+    up; post /wda/performIoHidEvent '{"page":12,"usage":48,"duration":0.05}' ;;
   wake) up; curl -sf -m 30 -X POST "$wda/wda/unlock" >/dev/null ;;
   shot)
     dir=$here/ref/15/screens; mkdir -p "$dir"

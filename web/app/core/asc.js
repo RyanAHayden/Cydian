@@ -17,16 +17,21 @@
 //                                             sidedrop's register, cert_id, ensure_app_id, regen_profile)
 //   makeCertificate(request, csr) / distributionCerts / revokeCertificate   Apple Distribution certificates
 //                                             (Admin keys; revoke only the one the user picks)
-//   profileSerials(mobileprovision)          the serials of the certificates a profile lists (for findCertificate)
+//   certsForPicker(request, ownSerials)      the revoke picker's list (both distribution kinds, `ours` marked)
+//   await newCertificate({ request, revokeId })   key + CSR made here, POST /certificates, packed as a .p12
+//   await makeOwnSigning({ request, ... })    newCertificate + the profile for this app's own App ID (Make Certificate)
+//   await profileForP12({ request, serials }) the own App ID's profile for a .p12 imported without one
+//   certTeam(cert)                            the team ID (subject OU) in an Apple certificate
+//   profileSerials(mobileprovision)         the serials of the certificates a profile lists (for findCertificate)
 //   profileRows(cache)                        the Provisioning Profile rows for the cache
 //
 // The profile cache (the caller keeps it, e.g. as JSON in storage): { [App ID identifier]: entry }, entry =
 //   { identifier, bundleIdId, id, name, content (the .mobileprovision, base64), expires (ISO), udids,
 //     capabilities, certId, push, made (ISO) }
 // SPDX-License-Identifier: GPL-3.0-or-later
-import { NAME } from "../brand.js";
+import { NAME, BUNDLE_ID } from "../brand.js";
 import { parsePlist, parseProfile, normalUdid } from "./signing.js";
-import { unpem, certSerial } from "./freecert.js";
+import { unpem, certSerial, makeKey, makeCsr, makeP12, sameKey, newPassword } from "./freecert.js";
 
 export const ASC_API = "https://api.appstoreconnect.apple.com/v1";
 export const AUD = "appstoreconnect-v1";
@@ -217,6 +222,96 @@ export async function distributionCerts(request) {
       expires: c.attributes?.expirationDate ?? null }));
 }
 export const revokeCertificate = (request, id) => request("DELETE", `/certificates/${id}`);
+
+// ---- Make Certificate (an API key and no .p12) ----
+// The key and CSR are made here (the phone's WebView or the browser) and never sent anywhere; only the CSR goes to
+// Apple. At Apple's limit the caller lists distributionCerts and the user picks the one to revoke (never chosen here).
+export const KEY_ROLE_TEXT = "Apple refused: making certificates needs an API key with the Admin role (App Manager keys can "
+  + "register iPhones but not make certificates). Make an Admin key in App Store Connect > Users and Access > Integrations, "
+  + "or import your own .p12.";
+export const LIMIT_TEXT = "Your account already has as many Apple Distribution certificates as Apple allows. Pick one to "
+  + `revoke and ${NAME} makes a new one in its place.`;
+export const REVOKE_WARNING = "Apps signed with the revoked certificate stop opening, on every iPhone, wherever they were "
+  + "signed (another signing service, Xcode ad hoc builds); App Store and TestFlight apps aren't affected.";
+
+// The certificates for the revoke picker: Apple Distribution and the older iOS Distribution share the limit.
+// `ownSerials` marks the one this app signs with (`ours`), so the picker can say so.
+export async function certsForPicker(request, ownSerials = []) {
+  const mine = new Set([].concat(ownSerials).filter(Boolean).map((s) => String(s).toUpperCase().replace(/^0+/, "")));
+  const r = await request("GET", `/certificates${q({ "filter[certificateType]": "DISTRIBUTION,IOS_DISTRIBUTION", limit: 200 })}`);
+  return (r.data ?? []).filter((c) => ["DISTRIBUTION", "IOS_DISTRIBUTION"].includes(c.attributes?.certificateType ?? "DISTRIBUTION"))
+    .map((c) => ({ id: c.id, name: c.attributes?.displayName || c.attributes?.name || c.id,
+      kind: c.attributes?.certificateType === "IOS_DISTRIBUTION" ? "iOS Distribution" : "Apple Distribution",
+      serial: c.attributes?.serialNumber ?? "", expires: c.attributes?.expirationDate ?? null,
+      ours: mine.has(String(c.attributes?.serialNumber ?? "").toUpperCase().replace(/^0+/, "")) }))
+    .sort((a, b) => String(b.expires ?? "").localeCompare(String(a.expires ?? ""))); // newest first (a year from made)
+}
+
+// The team ID in an Apple certificate: the subject's OU (the issuer's OU, "G3", comes before it in the DER).
+export function certTeam(cert) {
+  const b = cert instanceof Uint8Array ? cert : new Uint8Array(cert);
+  let team = null;
+  for (let i = 0; i + 6 < b.length; i++) {
+    if (b[i] === 0x06 && b[i + 1] === 3 && b[i + 2] === 0x55 && b[i + 3] === 0x04 && b[i + 4] === 0x0b) {
+      const n = b[i + 6];
+      const v = String.fromCharCode(...b.slice(i + 7, i + 7 + n));
+      if (/^[A-Z0-9]{10}$/.test(v)) team = v;
+    }
+  }
+  return team;
+}
+
+// A new Apple Distribution certificate packed as a .p12: { certId, cert, serial, team, expires, p12, password }.
+// `revokeId`: the certificate the user picked at the limit, revoked first (refused if it's no longer listed).
+// Errors (AscError .code): "key-role" (not an Admin key), "key-refused", "cert-limit" and "cert-gone" (both with
+// .certs, the picker's list), else Apple's.
+export async function newCertificate({ request, revokeId = null, ownSerials = [], password = newPassword(), subtle } = {}) {
+  if (revokeId) {
+    const listed = await certsForPicker(request, ownSerials);
+    if (!listed.some((c) => c.id === revokeId)) {
+      throw Object.assign(new AscError("That certificate isn't in your account any more. Pick another.", { code: "cert-gone" }), { certs: listed });
+    }
+    await revokeCertificate(request, revokeId);
+  }
+  const key = await makeKey(subtle);
+  const csr = await makeCsr({ privateKey: key.privateKey, spki: key.spki, cn: NAME }, subtle); // Apple sets its own subject
+  let made;
+  try { made = await makeCertificate(request, csr); } catch (e) {
+    if (e.status === 403) throw new AscError(KEY_ROLE_TEXT, { status: 403, code: "key-role" });
+    if (e.status === 401) throw new AscError("Apple didn't accept the API key: check the Key ID and Issuer ID belong to this .p8.", { status: 401, code: "key-refused" });
+    if (e.status === 409) {
+      const listed = await certsForPicker(request, ownSerials);
+      if (listed.length) throw Object.assign(new AscError(LIMIT_TEXT, { status: 409, code: "cert-limit" }), { certs: listed });
+    }
+    throw e;
+  }
+  if (!sameKey(made.cert, key.spki)) throw new AscError("Apple's certificate isn't for the key made here.", { code: "cert-key" });
+  const p12 = await makeP12({ pkcs8: key.pkcs8, cert: made.cert, password, name: NAME }, subtle);
+  return { certId: made.id, cert: made.cert, serial: certSerial(made.cert), team: certTeam(made.cert), expires: made.expires, p12, password };
+}
+
+// Make Certificate, the whole "API key only" setup: the certificate, then the App ID and Ad Hoc profile for this
+// app's own App ID (the app's signing.import needs a profile with the .p12). `prefix` defaults to appIdPrefix(null,
+// <the certificate's team>). The .p12 exists only in memory until the caller imports it, so a failed profile doesn't
+// throw it away: it comes back with `profileError` and the caller imports the .p12 and makes the profile later.
+// -> { ...newCertificate's, identifier, profile (the .mobileprovision, base64) | null, entry | null, profileError | null }
+export async function makeOwnSigning({ request, bundleId = BUNDLE_ID, prefix = null, udid = null, deviceName, cache = {},
+  revokeId = null, ownSerials = [], password, subtle, now = Date.now() } = {}) {
+  const made = await newCertificate({ request, revokeId, ownSerials, password, subtle });
+  const pre = prefix ?? appIdPrefix(null, made.team);
+  const out = { ...made, identifier: appIdFor(bundleId, pre), profile: null, entry: null, profileError: null };
+  try {
+    const r = await ensureProfile({ request, bundleId, prefix: pre, udid, deviceName, serials: [made.serial], certId: made.certId, cache, now });
+    out.entry = r.entry;
+    out.profile = r.entry.content;
+  } catch (e) { out.profileError = e; }
+  return out;
+}
+
+// A .p12 imported alone (no .mobileprovision) by a key user: the profile for this app's own App ID comes from the key.
+// `serials`: the .p12's certificate serial(s). -> ensureProfile's result (AscError "no-cert" when it isn't in the account).
+export const profileForP12 = ({ request, serials, bundleId = BUNDLE_ID, prefix, team = null, udid = null, deviceName, cache = {}, now = Date.now() }) =>
+  ensureProfile({ request, bundleId, prefix: prefix ?? appIdPrefix(null, team), udid, deviceName, serials, cache, now });
 
 // The serials of the certificates an imported profile lists (the website's .p12 is one of them).
 export function profileSerials(profileBytes) {

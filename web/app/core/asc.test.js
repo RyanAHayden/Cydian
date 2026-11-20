@@ -4,9 +4,11 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { webcrypto } from "node:crypto";
 import { keyIdFromName, makeJwt, httpTransport, appIdFor, appIdPrefix, remakeReason, ensureProfile, profileBody,
-  findCertificate, profileSerials, profileRows, makeCertificate, distributionCerts, revokeCertificate, APP_ID_CAPS, AscError } from "./asc.js";
-import { certSerial } from "./freecert.js";
-import { NAME } from "../brand.js";
+  findCertificate, profileSerials, profileRows, makeCertificate, distributionCerts, revokeCertificate, APP_ID_CAPS, AscError,
+  newCertificate, makeOwnSigning, profileForP12, certTeam, LIMIT_TEXT, KEY_ROLE_TEXT, REVOKE_WARNING } from "./asc.js";
+import { certSerial, unpem, tlv, seq, oid } from "./freecert.js";
+import { der, children, checkP12Password } from "./signing.js";
+import { NAME, BUNDLE_ID } from "../brand.js";
 
 const subtle = webcrypto.subtle;
 const fx = (name) => new Uint8Array(readFileSync(new URL(`./fixtures/signing/${name}`, import.meta.url)));
@@ -286,4 +288,123 @@ test("httpTransport: bearer token, JSON body, Apple's error detail", async () =>
 test("profileRows", () => {
   const rows = profileRows({ a: { identifier: "com.example.a", made: "2026-11-18", expires: "2027-11-18T00:00:00Z", udids: ["1", "2"], push: "production" } }, Date.UTC(2026, 10, 19));
   assert.deepEqual(rows, [{ label: "com.example.a", subtitle: "Ad Hoc, 2 devices, Push, until 2027-11-18" }]);
+});
+
+// ---- Make Certificate against the fake ASC ----
+// Apple's side of POST /certificates: a certificate for the CSR's key (unsigned: nothing here checks Apple's signature),
+// with Apple's issuer OU "G3" before the subject's team OU, and Apple's 409 at the limit.
+function fakeCert(csrPem, serial, team = "S8NFX3A2LT") {
+  const b = unpem(csrPem);
+  const [info] = children(b, der(b, 0));
+  const [, name, spki] = children(b, info);
+  const ou = (v) => tlv(0x31, seq(oid("2.5.4.11"), tlv(0x13, new TextEncoder().encode(v))));
+  const alg = seq(oid("1.2.840.113549.1.1.11"), Uint8Array.of(5, 0));
+  const t = (s) => tlv(0x17, new TextEncoder().encode(s));
+  const tbs = seq(tlv(0xa0, tlv(0x02, Uint8Array.of(2))), tlv(0x02, Uint8Array.from(Buffer.from(serial, "hex"))), alg, seq(ou("G3")),
+    seq(t("261119000000Z"), t("271119000000Z")), seq(ou(team)), b.slice(name.end, spki.end));
+  return seq(tbs, alg, tlv(0x03, Uint8Array.of(0, 1, 2, 3)));
+}
+function withCerts(asc, { limit = 2, status = 409 } = {}) {
+  asc.dist = asc.dist ?? [];
+  const base = asc.request;
+  asc.request = async (method, path, body) => {
+    const p = path.split("?")[0];
+    if (method === "GET" && p === "/certificates") { asc.calls.push(`${method} ${p}`); return { data: [...asc.certs, ...asc.dist] }; }
+    if (method === "DELETE" && p.startsWith("/certificates/")) {
+      asc.calls.push(`${method} ${p}`);
+      asc.dist = asc.dist.filter((c) => `/certificates/${c.id}` !== p);
+      return {};
+    }
+    if (method === "POST" && p === "/certificates") {
+      asc.calls.push(`${method} ${p}`);
+      asc.lastCertBody = body;
+      if (asc.dist.length >= limit) throw new AscError("App Store Connect POST /certificates: You already have a current Distribution certificate", { status, code: "ENTITY_ERROR.ATTRIBUTE.INVALID" });
+      const serial = `7A${String(asc.dist.length + 1).padStart(2, "0")}`;
+      const cert = fakeCert(body.data.attributes.csrContent, serial);
+      const c = { id: `NC${asc.dist.length + 1}`, attributes: { certificateType: "DISTRIBUTION", serialNumber: serial, displayName: "Me",
+        expirationDate: "2027-11-19T00:00:00.000+0000", certificateContent: Buffer.from(cert).toString("base64") } };
+      asc.dist.push(c);
+      return { data: c };
+    }
+    return base(method, path, body);
+  };
+  return asc;
+}
+
+test("Make Certificate: key and CSR made here, a DISTRIBUTION certificate, a .p12 that opens, the own App ID's profile", async () => {
+  const asc = withCerts(fakeAsc({ certs: [], devices: [{ id: "D1", attributes: { udid: "U1", status: "ENABLED" } }] }));
+  const cache = {};
+  const r = await makeOwnSigning({ request: asc.request, udid: "U2", deviceName: "iPhone", cache, subtle });
+  assert.equal(asc.lastCertBody.data.attributes.certificateType, "DISTRIBUTION");
+  assert.match(asc.lastCertBody.data.attributes.csrContent, /^-----BEGIN CERTIFICATE REQUEST-----/);
+  assert.ok(!JSON.stringify(asc.lastCertBody).includes("PRIVATE KEY")); // only the CSR leaves
+  assert.equal(r.certId, "NC1");
+  assert.equal(r.serial, "7A01");
+  assert.equal(r.team, "S8NFX3A2LT");
+  assert.ok(await checkP12Password(r.p12, r.password, subtle));
+  assert.equal(await checkP12Password(r.p12, "wrong", subtle), false);
+  // the profile: this app's own App ID, under the certificate's team, with the new certificate
+  assert.equal(r.identifier, appIdFor(BUNDLE_ID, appIdPrefix(null, "S8NFX3A2LT")));
+  assert.equal(r.profileError, null);
+  assert.equal(r.profile, cache[r.identifier].content);
+  assert.equal(cache[r.identifier].certId, "NC1");
+  assert.deepEqual(asc.lastProfile.data.relationships.certificates.data, [{ type: "certificates", id: "NC1" }]);
+  assert.ok(asc.devices.some((d) => d.attributes.udid === "U2"));
+  // nothing revoked on its own
+  assert.ok(!asc.calls.some((c) => c.startsWith("DELETE /certificates")));
+});
+
+test("Make Certificate at Apple's limit: the list to pick from, nothing revoked; then only the picked one", async () => {
+  const asc = withCerts(fakeAsc({ certs: [], devices: [{ id: "D1", attributes: { udid: "U1", status: "ENABLED" } }] }));
+  asc.dist = [
+    { id: "OLD", attributes: { certificateType: "IOS_DISTRIBUTION", serialNumber: "0011", name: "Old", expirationDate: "2027-01-01T00:00:00.000+0000" } },
+    { id: "MINE", attributes: { certificateType: "DISTRIBUTION", serialNumber: "22", displayName: "Mine", expirationDate: "2027-06-01T00:00:00.000+0000" } },
+  ];
+  let err;
+  await assert.rejects(makeOwnSigning({ request: asc.request, ownSerials: ["22"], subtle }), (e) => (err = e).code === "cert-limit");
+  assert.equal(err.message, LIMIT_TEXT);
+  assert.deepEqual(err.certs.map((c) => [c.id, c.kind, c.ours]), [["MINE", "Apple Distribution", true], ["OLD", "iOS Distribution", false]]);
+  assert.ok(!asc.calls.some((c) => c.startsWith("DELETE")));
+  assert.match(REVOKE_WARNING, /stop opening/);
+
+  // a pick that's gone meanwhile: refused, nothing revoked
+  await assert.rejects(newCertificate({ request: asc.request, revokeId: "NOPE", subtle }), (e) => e.code === "cert-gone" && e.certs.length === 2);
+  assert.ok(!asc.calls.some((c) => c.startsWith("DELETE")));
+
+  const r = await makeOwnSigning({ request: asc.request, revokeId: "OLD", subtle });
+  assert.deepEqual(asc.calls.filter((c) => c.startsWith("DELETE")), ["DELETE /certificates/OLD"]);
+  assert.ok(asc.dist.some((c) => c.id === "MINE"));
+  assert.ok(r.certId);
+});
+
+test("Make Certificate: a non-Admin key, a refused key; a failed profile keeps the .p12", async () => {
+  const role = withCerts(fakeAsc(), { limit: 0, status: 403 });
+  await assert.rejects(newCertificate({ request: role.request, subtle }), (e) => e.code === "key-role" && e.message === KEY_ROLE_TEXT);
+  const bad = withCerts(fakeAsc(), { limit: 0, status: 401 });
+  await assert.rejects(newCertificate({ request: bad.request, subtle }), (e) => e.code === "key-refused");
+  // 409 with nothing to revoke is Apple's own error, passed on
+  const odd = withCerts(fakeAsc({ certs: [] }), { limit: 0 });
+  await assert.rejects(newCertificate({ request: odd.request, subtle }), (e) => e.status === 409 && e.code !== "cert-limit");
+
+  const asc = withCerts(fakeAsc({ certs: [] }));
+  const base = asc.request;
+  asc.request = (method, path, body) => (method === "POST" && path === "/profiles" ? Promise.reject(new AscError("nope", { status: 500 })) : base(method, path, body));
+  const r = await makeOwnSigning({ request: asc.request, prefix: "com.example", subtle });
+  assert.equal(r.profile, null);
+  assert.equal(r.profileError.status, 500);
+  assert.ok(r.p12.length > 100 && r.password);
+});
+
+test("a .p12 imported alone: the own App ID's profile comes from the key", async () => {
+  const asc = fakeAsc({ devices: [{ id: "D1", attributes: { udid: "U1", status: "ENABLED" } }] });
+  const r = await profileForP12({ request: asc.request, serials: ["ABC"], team: "S8NFX3A2LT", udid: "U1", cache: {} });
+  assert.equal(r.appId, appIdFor(BUNDLE_ID, appIdPrefix(null, "S8NFX3A2LT")));
+  assert.equal(r.entry.certId, "C1");
+  await assert.rejects(profileForP12({ request: asc.request, serials: ["FFFF"], prefix: "com.example", cache: {} }), (e) => e.code === "no-cert");
+});
+
+test("certTeam reads the subject's OU, not the issuer's", () => {
+  const csr = "-----BEGIN CERTIFICATE REQUEST-----\n" + Buffer.from(seq(seq(tlv(0x02, Uint8Array.of(0)), seq(), seq(seq(), Uint8Array.of(3, 1, 0)), tlv(0xa0)))).toString("base64") + "\n-----END CERTIFICATE REQUEST-----";
+  assert.equal(certTeam(fakeCert(csr, "01", "ABCDE12345")), "ABCDE12345");
+  assert.equal(certTeam(Uint8Array.of(1, 2, 3)), null);
 });

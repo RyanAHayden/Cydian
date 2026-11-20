@@ -206,7 +206,7 @@ graph TD
 Requirements: Python 3 (standard library only) and Node.js 22 or later.
 
 ```bash
-tools/check.sh                 # the test gate: every test_*.py, node --test web/app, node worker/test.mjs
+tools/check.sh                 # the test gate: every test_*.py, node --test web/app, every worker/test*.mjs
 node worker/node.mjs           # the website, /api/fetch and /sign/* on http://localhost:8787
 cd worker && npx wrangler dev  # or the same Worker under Wrangler, as on ifizbox.com
 ```

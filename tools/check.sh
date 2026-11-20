@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Test gate for agent-runner: every test_*.py under the repo, the zsign WebAssembly build (where emcc is),
-# `node --test web/app` and the Worker's own test.
+# `node --test web/app` and the Worker's own tests (every worker/test*.mjs).
 # The native builds (jailbreak .deb and sideload IPA) come first, when their toolchain is there.
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -71,7 +71,11 @@ else
 fi
 
 node --test web/app
-node worker/test.mjs
+# The Worker's Node tests, each worker/test*.mjs on its own (test.mjs, test-push.mjs, test-github.mjs, ...): a new
+# one runs without a wrapper test_*.py or an import at the end of test.mjs.
+for t in worker/test*.mjs; do
+  node "$t" || { echo "check: $t failed"; exit 1; }
+done
 
 # T43: the skip summary, after everything else so it's the last thing on screen.
 if [ -s "$skips" ]; then

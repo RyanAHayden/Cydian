@@ -60,6 +60,7 @@ import { encodeUrl } from "./core/urlencode.js";
 import { reviewsApi, reviewsBase } from "./core/reviews.js";
 import { updateFailures, failureFor, liveUpdate } from "./core/aptupdate.js";
 import { createKeepAwake } from "./core/keepawake.js";
+import { decompress } from "./core/unpack.js"; // B177: Packages.bz2 / .zst the shell's net.packages can't read
 
 // F287: the shell calls that are work the screen must stay on for: a streamed helper run (apt-get update, an apply,
 // a rollback, an uninstall with its console), a .deb's download and install, an IPA or paid package's install.
@@ -121,6 +122,23 @@ export function createNativeBackend({ native = globalThis.ifizboxNative, sourceO
     return new Response(empty ? null : fromBase64(r.body), { status: r.status, headers: r.headers ?? {} });
   }
 
+  // B177: Packages.bz2, then Packages.zst in repoDir, fetched by the shell (net.fetch) and unpacked here. The first
+  // one the repo serves and that unpacks wins; null when neither does (net.packages' not_found stands then).
+  async function packagesInJs(repoDir) {
+    for (const name of ["Packages.bz2", "Packages.zst"]) {
+      let bytes;
+      try { bytes = new Uint8Array(await (await fetchUrl(repoDir + name)).arrayBuffer()); } catch (e) {
+        if (e?.code === "upstream" || e?.code === "not_found") continue; // not served: the next name
+        throw e;
+      }
+      if (!bytes.length || bytes[0] === 0x3c) continue; // an HTML page some hosts send for every path
+      let plain;
+      try { plain = decompress(name, bytes); } catch { continue; }
+      return { text: new TextDecoder().decode(plain), source: repoDir + name, cached: false };
+    }
+    return null;
+  }
+
   const appsSeen = new Map(); // bundleId -> true | false | null, the session's answers (F219)
   async function appsInstalled(bundleIds) {
     const ids = [...new Set((bundleIds ?? []).map(String).filter(Boolean))];
@@ -169,7 +187,23 @@ export function createNativeBackend({ native = globalThis.ifizboxNative, sourceO
     async packages(repoDir) {
       const hit = await localList(repoDir + "Packages");
       if (hit) return { text: hit.text, source: `apt:${hit.name}`, cached: true };
-      const r = await call("net.packages", { dir: repoDir });
+      let r;
+      try { r = await call("net.packages", { dir: repoDir }); } catch (e) {
+        // B177: the shell tries Packages.xz, .gz and plain only. BigBoss serves Packages.bz2 alone (its plain
+        // Packages redirects to an HTML page), so net.packages says not_found: fetch .bz2 (then .zst) here and
+        // unpack it in JS (core/unpack.js), as the site's proxy does.
+        if (e?.code !== "not_found") throw e;
+        const got = await packagesInJs(repoDir);
+        if (!got) throw e;
+        return got;
+      }
+      // B177: and BigBoss's plain Packages redirects to an HTML page that starts with blank lines, which the shell's
+      // first-byte "<" check lets through as the index (0 packages, no error): an HTML answer is no index either.
+      if (/^\s*</.test(String(r?.text ?? "").slice(0, 512))) {
+        const got = await packagesInJs(repoDir);
+        if (got) return got;
+        throw new BackendError("not_found", `no Packages index in ${repoDir} (the repo answered with a web page)`);
+      }
       return { text: r.text, source: r.source || repoDir, cached: false };
     },
     // ifizbox-helper <words>; onEvent({ fd, line }) sees its output as it comes. Resolves { code, stdout, stderr }.

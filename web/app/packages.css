@@ -868,9 +868,8 @@ html[data-theme="dark"] .dep-piracy .dep-review-title { color: var(--dk-bad); }
 .source-row.is-waiting .cell-count { display: none; }
 .source-row.is-waiting .cell-inner.chevron::after { display: none; }
 /* A row that failed: the tab bar's red badge (ios6.css .badge's gloss) with "!", the reason in red under its name
-   (sources.css .cell-error); no chevron, since a tap refreshes it again instead of opening it. */
+   (sources.css .cell-error). B177: it keeps its chevron: a tap opens its page, with the whole error and Refresh. */
 .source-row.is-failed .cell-count.row-failed-badge {
   min-width: 20px; padding: 0 6px; font-size: 13px; letter-spacing: -.02em;
   background: linear-gradient(#f7b3b7, #e92d35 48.8%, #e70f19 50.5%, #c50103); box-shadow: 0 1px 1.5px rgba(0,0,0,.45);
 }
-.source-row.is-failed .cell-inner.chevron::after { display: none; }

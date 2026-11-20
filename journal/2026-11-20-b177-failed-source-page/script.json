@@ -1,0 +1,16 @@
+[
+ {"wait": 2000},
+ {"eval": "localStorage.setItem('ifizbox.firstVisit','later'); 'ok'"},
+ {"nav": "#/sources", "ms": 45000},
+ {"shot": "sources"},
+ {"eval": "[...document.querySelectorAll('.page.is-top .source-row')].map(r=>r.className.replace('cell ','')+' | '+r.innerText.replace(/\\n/g,' / ')).join('\\n')"},
+ {"eval": "(()=>{const a=document.querySelector('.page.is-top .source-row.is-failed a.cell-inner')||[...document.querySelectorAll('.page.is-top .source-row a.cell-inner')].find(x=>/Havoc/.test(x.innerText)); if(!a) return 'no row'; location.hash=a.getAttribute('href'); return a.getAttribute('href')})()"},
+ {"wait": 5000},
+ {"shot": "failed-page"},
+ {"eval": "document.querySelector('.page.is-top')?.innerText.slice(0,1200)"},
+ {"eval": "localStorage.setItem('ifizbox.appearance','dark'); 'ok'"},
+ {"nav": "#/sources", "ms": 8000},
+ {"eval": "(()=>{const a=[...document.querySelectorAll('.page.is-top .source-row a.cell-inner')].find(x=>/Havoc/.test(x.innerText)); if(!a) return 'no row'; location.hash=a.getAttribute('href'); return a.getAttribute('href')})()"},
+ {"wait": 5000},
+ {"shot": "failed-page-dark"}
+]

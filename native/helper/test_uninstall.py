@@ -8,6 +8,7 @@ import subprocess
 import tempfile
 import unittest
 
+from scratch import Scratch
 from test_appversions import app, plist
 from test_helper import CC, build
 
@@ -16,13 +17,12 @@ from test_helper import CC, build
 class UninstallApp(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.tmp = tempfile.mkdtemp()
+        # Not in /tmp: its quota is shared with the whole machine (scratch.py).
+        scratch = Scratch()
+        cls.addClassCleanup(scratch.close)
+        cls.tmp = scratch.path
         cls.driver = os.path.join(cls.tmp, "test_driver")
         build(cls.driver, ["test_driver.c", "policy.c", "spawn.c"])
-
-    @classmethod
-    def tearDownClass(cls):
-        shutil.rmtree(cls.tmp)
 
     def run_driver(self, *args, driver=None):
         r = subprocess.run([driver or self.driver, *args], capture_output=True, text=True, timeout=30)

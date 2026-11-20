@@ -8,7 +8,8 @@
 #   3. builds that commit in a clean temporary worktree and publishes it with tools/release.sh: tag vX.Y.Z,
 #      iFizBox.ipa, the .debs and iFizBox's own APT repo, as the repo owner's GitHub account
 #   4. commits the updated AltStore source (web/app/source.json, the built-in source) and pushes it
-#   5. checks that releases/latest/download/iFizBox.ipa is X.Y.Z
+#   5. waits until https://<domain>/repo/ serves X.Y.Z (tools/release.sh --verify-live; release.sh itself already
+#      checked that releases/latest/download/iFizBox.ipa is this release)
 #
 # Needs SWIFT_TOOLCHAIN and IOS_SDK in the environment (the native build: native/README.md) and gh logged in to the
 # repo owner's account. --dry-run builds and prints what would be published, and changes nothing.
@@ -40,11 +41,9 @@ last=$(git tag -l 'v[0-9]*' | sed 's/^v//' | sort -V | tail -n1)
 newest=$(printf '%s\n%s\n' "${last:-0.0.0}" "$version" | sort -V | tail -n1)
 [ "$version" != "${last:-}" ] && [ "$newest" = "$version" ] || die "$version isn't newer than the last release (${last:-none})"
 if [ $dry = 0 ]; then
-  command -v gh >/dev/null || die "needs the gh CLI"
-  # The release goes up as the repo's owner, whichever gh account is active.
-  GH_TOKEN=$(gh auth token -u "$owner" 2>/dev/null) || die "gh has no login for $owner (gh auth login)"
-  export GH_TOKEN
-  [ "$(gh api user -q .login)" = "$owner" ] || die "the token isn't $owner's"
+  # release.sh publishes as the repo's owner (gh auth token --user), whichever gh account is active; its
+  # --check-auth makes the same check now, so a missing login stops here before the version commit is pushed.
+  tools/release.sh --check-auth || die "gh can't publish to $repo as $owner (see above)"
 fi
 
 # 2. the version commit
@@ -73,10 +72,8 @@ if ! git diff --quiet web/app/source.json; then
   git push -q origin main
 fi
 
-# 5. what the app and the site will download now
-got=$(curl -fsSL "https://github.com/$repo/releases/latest/download/$BRAND_NAME.ipa" | python3 -c '
-import io, plistlib, sys, zipfile
-z = zipfile.ZipFile(io.BytesIO(sys.stdin.buffer.read()))
-print(plistlib.loads(z.read(next(n for n in z.namelist() if n.endswith(".app/Info.plist"))))["CFBundleShortVersionString"])')
-[ "$got" = "$version" ] || die "latest/download/$BRAND_NAME.ipa is $got, not $version"
+# 5. the site: release.sh already checked releases/latest/download after publishing; now wait until the deploy of the
+# push above serves this release at https://$BRAND_DOMAIN/repo/ (source.json and Packages)
+tools/release.sh --verify-live "$version" ||
+  die "v$version is on GitHub but https://$BRAND_DOMAIN/repo/ doesn't serve it yet: look at the Workers Builds deploy, then run tools/release.sh --verify-live $version"
 echo "publish: $BRAND_NAME $version is out: https://github.com/$repo/releases/tag/v$version"

@@ -1,9 +1,10 @@
 // F93: one signing job on the website, inside the Web Worker (signing-worker.js): zsign (vendor/zsign, WebAssembly)
 // signs an IPA with the user's certificate, all in the worker's memory. Nothing here touches the network.
 //
-//   await runSignJob(createZsign, { ipa, p12, password, profile, bring, appBundleId, keepBundleId }, { progress })
-//     -> { ipa: Uint8Array (signed), bundleId (signed as), originalId, name, version }
-//   Throws Error with .code: bad_ipa (not an IPA, no app inside), bad_profile, sign_failed (zsign's own reason).
+//   await runSignJob(createZsign, { ipa, p12, password, profile, bring, appBundleId, keepBundleId, refuseSha256 }, { progress })
+//     -> { ipa: Uint8Array (signed), bundleId (signed as), originalId, name, version, sha256 (of the IPA as it came) }
+//   Throws Error with .code: bad_ipa (not an IPA, no app inside), bad_profile, sign_failed (zsign's own reason),
+//   malware (F292: the IPA's SHA-256 is in refuseSha256, core/malicious.js malwareHashes).
 //
 // `createZsign` is the module factory (vendor/zsign/zsign.js; a fake in the tests): it takes { print, printErr }
 // and resolves a module with FS, ccall and callMain. A fresh module per job: zsign's main() keeps globals.
@@ -15,6 +16,7 @@
 import { isZip, profileInfo, signingIds, appEntitlements, plistXml, identityPlist, zsignArgs, zsignError, appInfo,
   IFIZBOX_ID, IDENTITY_FILE, TRANSFER_FILE } from "./core/websign.js";
 import { injectInto } from "./core/tweaks.js";
+import { MALWARE_REFUSED } from "./core/malicious.js";
 
 const fail = (code, message) => Object.assign(new Error(message), { code });
 
@@ -40,9 +42,21 @@ export function removeTree(FS, path) {
   } else FS.unlink(path);
 }
 
-export async function runSignJob(createZsign, { ipa, p12, password = "", profile, bring = null, appBundleId = null, keepBundleId = true, tweaks = null }, { progress = () => {} } = {}) {
+// F292: the IPA's SHA-256 (lowercase hex) as it came, before anything changes it; null where the browser has no
+// crypto.subtle (an http page), which only leaves the report and the hash check without it.
+export async function ipaSha256(bytes) {
+  try {
+    const d = new Uint8Array(await globalThis.crypto.subtle.digest("SHA-256", bytes));
+    return Array.from(d, (b) => b.toString(16).padStart(2, "0")).join("");
+  } catch { return null; }
+}
+
+export async function runSignJob(createZsign, { ipa, p12, password = "", profile, bring = null, appBundleId = null, keepBundleId = true, tweaks = null, refuseSha256 = [] }, { progress = () => {} } = {}) {
   const bytes = ipa instanceof Uint8Array ? ipa : new Uint8Array(ipa);
   if (!isZip(bytes)) throw fail("bad_ipa", "That file isn't an IPA (a zip archive).");
+  // F292: hashed before signing; one on the known-malware list (core/malicious.js MALWARE_IPAS) goes no further
+  const sha256 = await ipaSha256(bytes);
+  if (sha256 && (refuseSha256 ?? []).some((h) => String(h).toLowerCase() === sha256)) throw fail("malware", MALWARE_REFUSED);
   let prof;
   try { prof = profileInfo(profile); } catch (e) { throw fail("bad_profile", e.message); }
   const log = [];
@@ -100,7 +114,8 @@ export async function runSignJob(createZsign, { ipa, p12, password = "", profile
   let out = null;
   try { out = code === 0 ? FS.readFile("/w/out.ipa") : null; } catch { /* no output */ }
   if (!out?.length) throw fail("sign_failed", zsignError(log));
-  return { ipa: out, bundleId, originalId: info.bundleId, name: info.name, version: info.version, ...(injected.length ? { injected } : {}) };
+  return { ipa: out, bundleId, originalId: info.bundleId, name: info.name, version: info.version, ...(sha256 ? { sha256 } : {}),
+    ...(injected.length ? { injected } : {}) };
 }
 
 // mkdir -p inside emscripten's FS.

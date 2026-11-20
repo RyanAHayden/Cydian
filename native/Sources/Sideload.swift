@@ -210,6 +210,8 @@ enum Sideload {
         }
         // The progress page's console (signing-client.js): what each step did, a line each.
         let log = { (s: String) in c.emitOnMain([["log": s]]) }
+        let refuse = IPAHash.refuse(c.params) // F292
+        var ipaSha: String? = nil // F292: set (IPAHash.check) before signAndOpen, read once it answers
         let finish = { (r: Result<(SignedApp, SignedRecord), Error>) in
             switch r {
             case .failure(let e):
@@ -221,7 +223,16 @@ enum Sideload {
                                         "version": app.version, "removed": app.removed, "fixedArm64e": app.fixedArm64e]
                 if let x = rec.expires { j["expires"] = ISO8601DateFormatter().string(from: x) }
                 j["device"] = PhoneID.check(profile).json // F236: "unknown" makes a missing app name the likely cause
+                if let s = ipaSha { j["sha256"] = s }
                 Apt.reply(c, j, nil)
+            }
+        }
+        // F292: the IPA's hash before signing; a known-malware one stops here (the file goes, as signAndOpen's would)
+        let hashed = { (file: URL) -> Bool in
+            do { ipaSha = try IPAHash.check(file, refuse: refuse, log: log); return true } catch {
+                try? FileManager.default.removeItem(at: file)
+                finish(.failure(error))
+                return false
             }
         }
         if let tok = c.params["token"] as? String {
@@ -231,6 +242,7 @@ enum Sideload {
                     return Apt.reply(c, nil, "gone: that IPA was looked at more than 15 minutes ago; start again")
                 }
                 log("Using the IPA downloaded for the look-first sheet (\(p.url))")
+                guard hashed(p.file) else { return }
                 signAndOpen(p.file, url: p.url, id: id, profile: profile, options: options, servers: servers, emit: emit, log: log, job: job, opened: finish, step: step)
             }
             return
@@ -242,6 +254,7 @@ enum Sideload {
             case .failure(let e): finish(.failure(e))
             case .success(let file):
                 log("Downloaded \(Sideload.size(file))")
+                guard hashed(file) else { return }
                 signAndOpen(file, url: url.absoluteString, id: id, profile: profile, options: options, servers: servers, emit: emit, log: log, job: job, opened: finish, step: step)
             }
         }

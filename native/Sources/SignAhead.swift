@@ -78,6 +78,12 @@ enum SignAhead {
             let signThat = { (file: URL) in
                 SignBridge.queue.async {
                     do {
+                        // F292: the IPA's hash before signing; a known-malware one stops here
+                        let sha: String?
+                        do { sha = try IPAHash.check(file, refuse: IPAHash.refuse(c.params), log: log) } catch {
+                            try? FileManager.default.removeItem(at: file)
+                            throw error
+                        }
                         let (app, record, output) = try sign(file, url: source, id: id, profile: profile, options: options, emit: emit, log: log, job: job)
                         let tok = SignBridge.token()
                         kept[tok] = Kept(output: output, app: app, record: record)
@@ -87,6 +93,7 @@ enum SignAhead {
                                                 "name": app.name, "version": app.version]
                         if let x = record.expires { j["expires"] = ISO8601DateFormatter().string(from: x) }
                         j["device"] = PhoneID.check(profile).json
+                        if let s = sha { j["sha256"] = s } // F292
                         Apt.reply(c, j, nil)
                     } catch { fail(error) }
                 }

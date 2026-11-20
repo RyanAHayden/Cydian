@@ -18,6 +18,8 @@
 //   malwareIpa({ bundleId, version, sha256 }) -> the entry, or null
 //   malwareAlert(entry, name)                 -> the refusal { title, message, buttons, cancel }
 //   rememberIpaHash(storage, bundleId, version, sha256), ipaHash(storage, bundleId, version)
+//   rememberSigned(storage, { ids, versions, sha256 })   F292: a signer's hash under every ID and version it may carry
+//   malwareHashes(list)                       -> the list's SHA-256s, for the signers' refuseSha256 (code "malware")
 import { deviceToken } from "./reviews.js";
 
 export const MALICIOUS_REASONS = [
@@ -109,7 +111,7 @@ export function malwareAlert(entry, name = "") {
     buttons: entry.link ? [WHY_LISTED, "OK"] : ["OK"], cancel: entry.link ? 1 : 0 };
 }
 
-// The IPA hashes this device saw (the website hashes the bytes it signs), so a report can carry one.
+// The IPA hashes this device saw (F292: both signers hash the IPA before signing it), so a report can carry one.
 export const HASH_KEY = "ifizbox.ipaHashes";
 const loadHashes = (storage) => {
   try { const v = JSON.parse(storage?.getItem(HASH_KEY) ?? "{}"); return v && typeof v === "object" ? v : {}; } catch { return {}; }
@@ -123,3 +125,20 @@ export function rememberIpaHash(storage, bundleId, version, sha256) {
   try { storage?.setItem(HASH_KEY, JSON.stringify(all)); } catch { /* full */ }
 }
 export const ipaHash = (storage, bundleId, version) => loadHashes(storage)[`${bundleId}@${version ?? ""}`] ?? null;
+
+// F292: a signed IPA's hash, kept under every ID and version it may be reported by: the app page's (the source's
+// bundle ID and version), the IPA's own Info.plist ones and the ID it was signed as.
+export function rememberSigned(storage, { ids = [], versions = [], sha256 = null } = {}) {
+  if (!SHA.test(String(sha256 ?? "").toLowerCase())) return;
+  const is = [...new Set(ids.filter((i) => typeof i === "string" && i))];
+  const vs = [...new Set(versions.map((v) => (v == null ? "" : String(v))).filter(Boolean))];
+  for (const i of is) for (const v of vs.length ? vs : [""]) rememberIpaHash(storage, i, v, sha256);
+}
+
+// F292: the known-malware hashes, lowercased, for the signers to refuse before signing (the native shell's
+// signing.install / signing.prepare `refuseSha256`, the website's signing worker).
+export const malwareHashes = (list = MALWARE_IPAS) =>
+  [...new Set(list.map((e) => String(e?.sha256 ?? "").toLowerCase()).filter((h) => SHA.test(h)))];
+
+// F292: the refusal a signer gives for one of them (code "malware").
+export const MALWARE_REFUSED = "That IPA is on the known-malware list. It won't be signed.";

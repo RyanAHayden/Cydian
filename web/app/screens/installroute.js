@@ -92,7 +92,7 @@ let signInVisit = null; // B143: the pair page's visit that started it (leaving 
 // B133: `reading`: idevice.status hasn't answered yet: Pairing and the VPN say Checking…, Pairing with the spinner.
 // `devModeReading`: idevice.developerMode is being asked: its row says Checking… with the spinner.
 export function installationGroups(choice, st, { pick = () => {}, openVPN = () => {}, connect = () => {}, signIn = () => {}, test = () => {}, signOut = () => {}, busy = null, devMode = null,
-  reading = false, devModeReading = false } = {}) {
+  reading = false, devModeReading = false, connectPick = null } = {}) {
   const groups = [{
     header: "Install Apps With",
     rows: ROUTE_OPTIONS.map((o) => ({ label: o.label, subtitle: o.subtitle, cls: "route-row", checked: o.value === choice, onClick: () => pick(o.value) })),
@@ -117,7 +117,10 @@ export function installationGroups(choice, st, { pick = () => {}, openVPN = () =
       ...(dm?.warn ? { warn: true } : {}),
     });
     const ts = st?.tailscale ?? null;
-    const now = ts?.connect ?? "auto";
+    // B167: while idevice.status (tailscale.status with it) hasn't answered, Tailscale's state is unknown, not signed
+    // out: its row says Checking… with the spinner (one row, as Sign In is), and Connect With keeps the pick just made.
+    const tsUnknown = reading || !st;
+    const now = ts?.connect ?? (tsUnknown && connectPick) ?? "auto";
     groups.push({
       header: "Connect With",
       rows: CONNECT_OPTIONS.map((o) => ({ label: o.label, checked: o.value === now, onClick: () => connect(o.value) })),
@@ -125,6 +128,7 @@ export function installationGroups(choice, st, { pick = () => {}, openVPN = () =
     });
     const rows = busy
       ? [{ label: "Signing In…", detail: busy, spin: true }]
+      : tsUnknown ? [{ label: "Tailscale", detail: "Checking…", spin: true }]
       : ts?.signedIn
         ? [{ label: "Device", detail: ts.name || NAME },
           { label: "Test Connection", cls: "sign-import", onClick: test },
@@ -169,10 +173,10 @@ async function paintInstallation(el, { store, native, alert, redraw, sub = null 
   let devMode = null; // idevice.developerMode's `on`, once read
   const paint = (st, { reading = false, devModeReading = false } = {}) => {
     const sections = installationGroups(choice, st, {
-      devMode, reading, devModeReading,
+      devMode, reading, devModeReading, connectPick,
       pick: (v) => pickRoute(v, known, { set: (r) => store.set(ROUTE_KEY, r), open: goTo }),
       openVPN: () => openVPN(native, alert),
-      connect: async (v) => { await busy("Switching", () => call(native, "tailscale.setConnect", { value: v }).catch(() => {})); redraw(); },
+      connect: async (v) => { await busy("Switching", () => call(native, "tailscale.setConnect", { value: v }).catch(() => {})); connectPick = v; redraw(); },
       signIn: () => tailscaleSignIn(native, alert, redraw),
       test: () => tailscaleTest(native, alert),
       signOut: async () => {
@@ -188,16 +192,35 @@ async function paintInstallation(el, { store, native, alert, redraw, sub = null 
     const shown = subGroups(sections, sub);
     const frag = spinRows(warnFooters(shown), shown);
     for (const d of frag.querySelectorAll?.(".cell-detail") ?? []) if (d.textContent === "Another VPN") d.classList.add("install-red");
-    el.replaceChildren(frag);
+    slideBelow(el, () => el.replaceChildren(frag));
   };
   paint(null, { reading: true });
   known = await status(native); // read for the Signing Server choice too, so a tap on This iPhone knows the pairing
+  connectPick = null; // the answer carries Connect With now
   if (choice !== "iphone" || sub === "with") return;
   const dmAsk = canReadDeveloperMode(known);
   paint(known, { devModeReading: dmAsk });
   if (!dmAsk) return;
   devMode = await readDeveloperMode(native);
   if (el.isConnected !== false) paint(known); // the read row goes, with or without an answer
+}
+
+let connectPick = null; // B167: the Connect With pick just made, until idevice.status answers with it
+
+// B167: a repaint that makes the box taller or shorter (Checking… giving way to Tailscale's three signed-in rows, a
+// footer's new length) doesn't make what's under it jump: everything below starts where it was and slides to its
+// new place (FLIP, by transform only, as nav/ui.js collapse).
+export function slideBelow(box, change) {
+  const before = box.isConnected && box.getBoundingClientRect ? box.getBoundingClientRect().height : null;
+  change();
+  if (before == null) return;
+  const d = before - box.getBoundingClientRect().height;
+  if (Math.abs(d) < 0.5) return;
+  for (let n = box; n && !n.classList?.contains("page-body"); n = n.parentElement) {
+    for (let s = n.nextElementSibling; s; s = s.nextElementSibling) {
+      s.animate?.([{ transform: `translateY(${d}px)` }, { transform: "none" }], { duration: 300, easing: "cubic-bezier(.25,.1,.25,1)" });
+    }
+  }
 }
 
 // Developer Mode through the pairing: true/false, or null when it couldn't be read (an older shell, no answer).
@@ -421,6 +444,7 @@ export function connectGroups(vpn, st, { openVPN = () => {}, choose = () => {}, 
     const ts = st?.tailscale ?? null;
     const rows = busy
       ? [{ label: "Signing In…", detail: busy, spin: true }]
+      : !st ? [{ label: "Tailscale", detail: "Checking…", spin: true }] // B167: no status yet is unknown, not signed out
       : ts?.signedIn ? [{ label: "Tailscale", detail: ts.address ? "On" : "Off" }] : [{ label: "Sign In", cls: "sign-import", onClick: signIn }];
     rows.push({ label: "Open Tailscale", cls: "sign-import", onClick: openTailscale });
     return [{

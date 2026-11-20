@@ -1,0 +1,15 @@
+[
+ {"wait": 3000},
+ {"eval": "localStorage.setItem('ifizbox.firstVisit','later'); localStorage.setItem('ifizbox.swipeHint','1'); 'ok'"},
+ {"nav": "#/sources", "ms": 6000},
+ {"clicktext": "Edit", "ms": 2000},
+ {"clicktext": "Add", "ms": 2000},
+ {"eval": "(()=>{const i=[...document.querySelectorAll('input')].filter(x=>x.offsetParent!==null).at(-1); if(!i) return 'no input'; i.value='https://fizl0.github.io/apps/source.json'; i.dispatchEvent(new Event('input',{bubbles:true})); return 'ok'})()"},
+ {"clicktext": "Add Source", "ms": 12000},
+ {"eval": "document.querySelector('.page.is-top')?.innerText.slice(0,400)"},
+ {"eval": "new Promise((res)=>{const q=indexedDB.open('ifizbox-installed',1);q.onupgradeneeded=()=>q.result.createObjectStore('apps',{keyPath:'id'});q.onsuccess=()=>{const t=q.result.transaction('apps','readwrite');const s=t.objectStore('apps');const S='https://fizl0.github.io/apps/source.json';s.put({id:'io.github.fizl0.openmx',name:'openMX',version:'0.18.0',key:'alt:'+S,source:S,sourceName:'FIZL0',icon:null,date:Date.parse('2026-11-20T08:00:00Z')});s.put({id:'com.mariopartyrd.partyboard',name:'Party Board',version:'1.0.0',key:'alt:'+S,source:S,sourceName:'FIZL0',icon:null,date:Date.parse('2026-11-20T08:30:00Z')});s.put({id:'com.example.youmod',name:'YouMod',version:'19.0',key:null,source:'https://example.invalid/src.json',sourceName:'YouMod Source',icon:null,date:Date.parse('2026-11-19T08:30:00Z')});t.oncomplete=()=>{q.result.close();res('seeded')};}})"},
+ {"nav": "#/installed", "ms": 9000},
+ {"shot": "installed"},
+ {"eval": "document.querySelector('.page.is-top')?.innerText.slice(0,1500)"},
+ {"eval": "new Promise((res)=>{const q=indexedDB.open('ifizbox-installed',1);q.onsuccess=()=>{const g=q.result.transaction('apps').objectStore('apps').getAll();g.onsuccess=()=>res(JSON.stringify(g.result.map(r=>[r.id,r.name,r.sourceName,r.version])))}})"}
+]

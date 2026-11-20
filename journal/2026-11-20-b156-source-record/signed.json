@@ -1,0 +1,10 @@
+{"apps": [
+ {"bundleId": "io.github.fizl0.hst", "originalBundleId": "io.github.fizl0.hst", "name": "OpenTennis", "version": "1.8.2",
+  "url": "https://github.com/FIZL0/opentennis/releases/download/v1.8.2/opentennis-ios.ipa", "signed": "2026-11-20T09:00:00Z", "expires": "2026-11-27T09:00:00Z"},
+ {"bundleId": "io.github.fizl0.openmx", "originalBundleId": "io.github.fizl0.openmx", "name": "openMX", "version": "0.18.0",
+  "url": "https://github.com/FIZL0/openmx/releases/download/v0.18.0/openmx-ios.ipa", "signed": "2026-11-20T08:00:00Z", "expires": "2026-11-27T08:00:00Z"},
+ {"bundleId": "com.mariopartyrd.partyboard", "originalBundleId": "com.mariopartyrd.partyboard", "name": "Party Board", "version": "1.0.0",
+  "url": "https://github.com/FIZL0/partyboard/releases/download/v1.0.0/partyboard-ios.ipa", "signed": "2026-11-20T08:30:00Z", "expires": "2026-11-27T08:30:00Z"},
+ {"bundleId": "com.example.youmod", "originalBundleId": "com.example.youmod", "name": "YouMod", "version": "19.0",
+  "url": "https://example.invalid/youmod.ipa", "signed": "2026-11-19T08:30:00Z", "expires": "2026-11-26T08:30:00Z"}
+], "next": null}

@@ -154,6 +154,37 @@ export function withSourceNames(installed, records) {
   return { ...installed, apps };
 }
 
+// B156: an app installed from a source whose Installed record never got written (Install records it only once iOS
+// said it has the app, B136; an answer that came too early left none) listed as "Signed by iFizBox. No source
+// lists it." under no letter. The shell's signed-app record keeps the IPA's `url`; a source whose app offers that
+// exact download names it, and the record is written again. Matching the download, not the bundle ID, keeps B150's
+// rule: RyukGram and real Instagram share an ID, never an IPA.
+//   unrecordedSigned(installed, records) -> the signed apps no record stands for (by bundle ID or original ID)
+//   sourceRecordFor(app, pkgs, now)     -> the record of `app` (a signed app) for the first catalog package
+//                                          ({ stanza: { ipa }, key }) offering its url, or null
+const httpHref = (u) => {
+  try { const x = new URL(String(u ?? "").trim()); return /^https?:$/.test(x.protocol) ? x.href : null; } catch { return null; }
+};
+export function unrecordedSigned(installed, records) {
+  if (!Array.isArray(installed?.apps)) return [];
+  const ids = new Set((records ?? []).map((r) => r?.id).filter(Boolean));
+  return installed.apps.filter((a) => a?.bundleId && !ids.has(a.bundleId) && !(a.originalBundleId && ids.has(a.originalBundleId)));
+}
+export function sourceRecordFor(app, pkgs, now = Date.now()) {
+  const want = httpHref(app?.url);
+  if (!want || !app?.bundleId) return null;
+  for (const p of pkgs ?? []) {
+    const ipa = p?.stanza?.ipa;
+    if (!ipa) continue;
+    const offers = [p.stanza.downloadURL, ipa.downloadURL, ...(ipa.versions ?? []).map((v) => v?.downloadURL)];
+    if (!offers.some((u) => httpHref(u) === want)) continue;
+    const signed = Date.parse(app.signed);
+    return appRecord({ id: app.bundleId, name: text(ipa.name) || app.name, version: app.version, key: p.key ?? null,
+      source: ipa.sourceUrl, sourceName: ipa.sourceName, icon: ipa.iconURL ?? null }, Number.isFinite(signed) ? signed : now);
+  }
+  return null;
+}
+
 // signing.installed through the bridge, renamed by the device's records (withSourceNames). Throws as the call does.
 export async function signedAppsNamed(native = globalThis.ifizboxNative, { store = apps } = {}) {
   const [installed, records] = await Promise.all([native.call("signing.installed", {}), store().then((s) => s.all()).catch(() => [])]);

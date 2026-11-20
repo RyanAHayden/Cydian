@@ -192,6 +192,14 @@ re-sign; on the website, Install) asks for the app's profile first:
    capabilities changed or the certificate did (`remakeReason`); the old profile is deleted before its new one is
    made.
 
+"The imported certificate" is the `.p12`'s own. The app has its serial from the Keychain (`signing.status`). The
+website reads it out of the `.p12` in the browser (`core/p12cert.js`: the certificate bag decrypted with the password,
+PBES2/AES through WebCrypto, 3DES and RC2 in JS) and keeps it with the identity (`signing-client.js identityCert`,
+`p12Cert`, keyed to the `.p12`'s SHA-256). That serial is used rather than every certificate the imported profile lists,
+since a profile made from an API key for a `.p12` picked alone can list all the account's distribution certificates.
+Only when the `.p12` can't be read there (a cipher or encoding it doesn't know) does the website fall back to the
+profile's list. A cached profile that doesn't list the `.p12`'s certificate is made again.
+
 The app is then signed with that profile instead of the imported one. An Apple error stops the sign with Apple's
 words, and a certificate that isn't in the key's account stops it with a line that says so. Keep Bundle IDs off
 signs with the imported profile.

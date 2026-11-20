@@ -250,7 +250,7 @@ export function bmpPassword(pw) {
 }
 
 // RFC 7292 B.2: PKCS#12's own key derivation (id 3: the MAC key), with WebCrypto's digest.
-async function pkcs12Kdf(subtle, hash, password, salt, iterations, id, n) {
+export async function pkcs12Kdf(subtle, hash, password, salt, iterations, id, n) {
   const { name, u, v } = hash;
   const fill = (src, len) => { const o = new Uint8Array(len); for (let i = 0; i < len; i++) o[i] = src[i % src.length]; return o; };
   const S = salt.length ? fill(salt, v * Math.ceil(salt.length / v)) : new Uint8Array(0);

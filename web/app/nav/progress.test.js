@@ -106,3 +106,18 @@ test("F247: startView: one item opens on the Log, none or two or more on the row
   assert.deepEqual(views, ["log", "pane"]);
   assert.deepEqual(picked, [1, 0]);
 });
+
+// B214: the real page (C22's showSheet scaffold) takes a pane: the app run's first call after opening it threw a
+// ReferenceError (`body` lost in C22), leaving a blank "Running / Preparing" page and every sideload run stuck.
+test("openProgress: pane() and view() work on the real page", async () => {
+  const { withDocument } = await import("../fakes.test-helper.js");
+  const { openProgress } = await import("./progress.js");
+  withDocument((doc) => {
+    const page = openProgress({ title: "Running" });
+    const node = doc.createElement("div");
+    assert.equal(page.pane(node), node);
+    page.view("pane");
+    assert.ok(doc.querySelector(".progress-body .progress-pane"), "the pane is in the page's body");
+    page.close();
+  });
+});

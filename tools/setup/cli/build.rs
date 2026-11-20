@@ -3,7 +3,10 @@ use std::fs;
 use std::path::Path;
 
 fn main() {
-    let env = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../native/brand.env");
+    // Read when the script runs, not baked in with env!(): the target dir is shared across worktrees
+    // (tools/setup/test_setup.py), and cargo reuses a build script compiled in a worktree that may be gone.
+    let dir = std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR is set by cargo");
+    let env = Path::new(&dir).join("../../../native/brand.env");
     println!("cargo:rerun-if-changed={}", env.display());
     let text = fs::read_to_string(&env).unwrap_or_else(|e| panic!("{}: {e}", env.display()));
     for key in ["BRAND_NAME", "BRAND_DOMAIN"] {

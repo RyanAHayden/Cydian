@@ -54,6 +54,7 @@ import { detectMode } from "./core/settings.js";
 import { queueWords, parseSimulation, mergePlans } from "./core/queue.js";
 import { installQueue } from "./queue.js";
 import { NAME } from "./brand.js";
+import { encodeUrl } from "./core/urlencode.js";
 import { reviewsApi, reviewsBase } from "./core/reviews.js";
 import { updateFailures, failureFor, liveUpdate } from "./core/aptupdate.js";
 
@@ -130,8 +131,9 @@ export function createNativeBackend({ native = globalThis.ifizboxNative, sourceO
     // off plain http, so an <img src=http://…> (BigBoss) never loads. -> { type, bytes } (PNG or JPEG, at most
     // 256 KB, checked by the shell); errors keep the shell's code (not_found, upstream, bad_type, too_large: the
     // repo answered; network, timeout: it didn't), which source-icon.js's cache tells apart.
-    async iconBytes(url) {
-      if (!/^https?:\/\//i.test(String(url))) throw new BackendError("bad_url", `not an http(s) URL: ${url}`);
+    async iconBytes(raw) {
+      const url = encodeUrl(String(raw ?? "")); // B149: a raw space fails the shell's URL(string:) before iOS 17
+      if (!/^https?:\/\//i.test(url)) throw new BackendError("bad_url", `not an http(s) URL: ${raw}`);
       let r;
       try { r = await native.call("net.icon", { url }); } catch (e) {
         const m = String(e?.message ?? e).match(/^([a-z_]+): /);

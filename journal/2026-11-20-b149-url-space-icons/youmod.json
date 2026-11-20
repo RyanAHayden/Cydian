@@ -1,0 +1,66 @@
+[
+ {
+  "wait": 3000
+ },
+ {
+  "eval": "localStorage.setItem('ifizbox.firstVisit','later'); localStorage.setItem('ifizbox.swipeHint','1'); 'ok'"
+ },
+ {
+  "nav": "#/sources",
+  "ms": 6000
+ },
+ {
+  "clicktext": "Edit",
+  "ms": 2000
+ },
+ {
+  "clicktext": "Add",
+  "ms": 2000
+ },
+ {
+  "eval": "(()=>{const i=[...document.querySelectorAll('input')].filter(x=>x.offsetParent!==null).at(-1); if(!i) return 'no input'; i.value='https://raw.githubusercontent.com/MountainofPenguin/Altstore-Repository/main/apps.json'; i.dispatchEvent(new Event('input',{bubbles:true})); return 'ok'})()"
+ },
+ {
+  "clicktext": "Add Source",
+  "ms": 15000
+ },
+ {
+  "shot": "source-added"
+ },
+ {
+  "eval": "[...document.querySelectorAll('.page.is-top img')].map(i=>i.getAttribute('src')+' '+i.naturalWidth).join('\\n')"
+ },
+ {
+  "clicktext": "YouMod Repo",
+  "ms": 5000
+ },
+ {
+  "shot": "source-page"
+ },
+ {
+  "eval": "[...document.querySelectorAll('.page.is-top img')].map(i=>i.getAttribute('src')+' '+i.naturalWidth).join('\\n')"
+ },
+ {
+  "clicktext": "All Apps",
+  "ms": 5000
+ },
+ {
+  "shot": "all-apps"
+ },
+ {
+  "eval": "[...document.querySelectorAll('.page.is-top img')].map(i=>i.getAttribute('src')+' '+i.naturalWidth).join('\\n')"
+ },
+ {
+  "clicktext": "YouMod",
+  "ms": 5000
+ },
+ {
+  "shot": "after-youmod-tap"
+ },
+ {
+  "eval": "[...document.querySelectorAll('.page.is-top img')].map(i=>i.getAttribute('src')+' '+i.naturalWidth).join('\\n')"
+ },
+ {
+  "eval": "document.querySelector('.page.is-top')?.innerText.slice(0,400)"
+ }
+]

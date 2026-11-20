@@ -53,6 +53,16 @@ def copy_launch(app):
         f.write(b"\x89PNG\r\n\x1a\n")
 
 
+def copy_icons(app, lite=False):
+    """B179: the icon as build.sh lays it out: every size loose as AppIcon<pt>x<pt>@<s>x.png and the build's Assets.car."""
+    src = "AppIconLite" if lite else "AppIcon"
+    for pt in (20, 29, 40, 60):
+        for s in (2, 3):
+            shutil.copy(os.path.join(HERE, "icon", "%s%dx%d@%dx.png" % (src, pt, pt, s)),
+                        os.path.join(app, "AppIcon%dx%d@%dx.png" % (pt, pt, s)))
+    shutil.copy(os.path.join(HERE, "icon", "AssetsLite.car" if lite else "Assets.car"), os.path.join(app, "Assets.car"))
+
+
 class Deb(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.mkdtemp()
@@ -72,8 +82,7 @@ class Deb(unittest.TestCase):
         shutil.copy(os.path.join(HERE, "daemon/com.ryha.ifizbox.upgrades.plist"),
                     os.path.join(self.root, mkdeb.DAEMON_JOB[len("./"):]))
         os.chmod(os.path.join(self.root, mkdeb.DAEMON_JOB[len("./"):]), 0o644)
-        for name in ("AppIcon60x60@2x.png", "AppIcon60x60@3x.png"):
-            shutil.copy(os.path.join(HERE, "icon", name), self.app)
+        copy_icons(self.app)
         copy_launch(self.app)
         for name in ("index.html", "app.js", "style.css", "router.js", "nav/stack.js"):
             self.write(self.app, "web/" + name, b"x")
@@ -254,7 +263,9 @@ class Plists(unittest.TestCase):
         self.assertTrue(p["CADisableMinimumFrameDurationOnPhone"])
         self.assertEqual(p["MinimumOSVersion"], "15.0")
         self.assertIn("UIApplicationSceneManifest", p)  # iOS 27 refuses apps without the scene lifecycle
-        self.assertEqual(p["CFBundleIcons"]["CFBundlePrimaryIcon"]["CFBundleIconFiles"], ["AppIcon60x60"])
+        self.assertEqual(p["CFBundleIcons"]["CFBundlePrimaryIcon"]["CFBundleIconFiles"],
+                         ["AppIcon20x20", "AppIcon29x29", "AppIcon40x40", "AppIcon60x60"])
+        self.assertEqual(p["CFBundleIcons"]["CFBundlePrimaryIcon"]["CFBundleIconName"], "AppIcon")
 
     def test_entitlements(self):
         with open(os.path.join(HERE, "entitlements.plist"), "rb") as f:

@@ -275,8 +275,9 @@ folder in the Files app. Paste the table here when it exists.
 What opening the app shows before the page draws: a plain fill in the pinstripes' light colour, then the page's own
 loading screen (`index.html` `#boot`: the bars, the pinstripes and Loading).
 
-**Constraints.** The app is built on Linux: no storyboard (no `ibtool`), no asset catalog (no `actool`, so no
-`Assets.car`). That leaves Info.plist's `UILaunchScreen` dictionary (iOS 14+). Keeping one at all matters: without
+**Constraints.** The app is built on Linux: no storyboard (no `ibtool`), and no asset catalog compiled in the build
+(no `actool`; the one `Assets.car` holds only the app icon, compiled once on a Mac by `native/icon/assets.sh` and
+committed). That leaves Info.plist's `UILaunchScreen` dictionary (iOS 14+). Keeping one at all matters: without
 `UILaunchScreen` or `UILaunchStoryboardName` iOS runs the app letterboxed at an old screen size.
 
 **What `UILaunchScreen` accepts** (Apple's Information Property List reference): `UIColorName` (background),

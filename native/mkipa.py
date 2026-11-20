@@ -19,6 +19,7 @@ import zipfile
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from mkdeb import macho_info  # noqa: E402
 import launch_check  # noqa: E402
+import carfile  # noqa: E402
 from brand import NAME  # noqa: E402  (F180: native/brand.env)
 
 APP = "Payload/%s.app/" % NAME
@@ -157,11 +158,8 @@ def check(path):
     if "com.apple.itunes.ipa" not in types:
         problems.append("Info.plist does not open .ipa files")
     problems += ipa_type_problems(info)
-    for name in info.get("CFBundleIcons", {}).get("CFBundlePrimaryIcon", {}).get("CFBundleIconFiles", []) or ["?"]:
-        for scale in ("@2x", "@3x"):
-            png = files.get(APP + name + scale + ".png")
-            if not png or not png[1].startswith(b"\x89PNG"):
-                problems.append("icon %s%s.png missing" % (name, scale))
+    # B179: the icon at every size, loose and in Assets.car (carfile.py).
+    problems += carfile.icon_problems(info, {n: d for n, (_, d) in files.items()}, APP, lite=True)
     # N10: the launch screen's keys and images (launch_check.py).
     problems += launch_check.problems(info, {n: d for n, (_, d) in files.items()}, APP)
 

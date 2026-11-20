@@ -16,6 +16,7 @@ import tarfile
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import launch_check  # noqa: E402
+import carfile  # noqa: E402
 from brand import NAME  # noqa: E402  (F180: native/brand.env)
 
 PREFIX = "./var/jb/"
@@ -217,11 +218,8 @@ def check(path):
             problems.append("Info.plist %s is %r, want %r" % (k, info.get(k), v))
     if "UIApplicationSceneManifest" not in info:
         problems.append("Info.plist has no UIApplicationSceneManifest")
-    for name in info.get("CFBundleIcons", {}).get("CFBundlePrimaryIcon", {}).get("CFBundleIconFiles", []) or ["?"]:
-        for scale in ("@2x", "@3x"):
-            png = files.get(APP + name + scale + ".png")
-            if not png or not png[1].startswith(b"\x89PNG"):
-                problems.append("icon %s%s.png missing" % (name, scale))
+    # B179: the icon at every size, loose and in Assets.car (carfile.py).
+    problems += carfile.icon_problems(info, {n: d for n, (_, d) in files.items()}, APP, lite=False)
     # N10: the launch screen's keys and images (launch_check.py).
     problems += launch_check.problems(info, {n: d for n, (_, d) in files.items()}, APP)
 

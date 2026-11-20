@@ -20,8 +20,10 @@ A Swift shell around one WKWebView that shows `web/app/` from the app bundle (do
 - `fake/`: the Swift side in node for tests without a device: `fake-native.mjs` (same methods over a fixture
   prefix), `ifizbox-helper` (a shell stand-in with the real allowlist; `update` copies `fixture/remote/lists/` into
   apt's lists) and `fixture/`. `web/app/backend-native.test.js` uses it; N4's queue tests can too.
-- `Info.plist` (with `CADisableMinimumFrameDurationOnPhone`), `entitlements.plist`, `VERSION`, `icon/` (`icon.svg`
-  and the PNGs made from it with `rsvg-convert -w 120|180`), `deb/` (control, postinst, prerm).
+- `Info.plist` (with `CADisableMinimumFrameDurationOnPhone`), `entitlements.plist`, `VERSION`, `icon/` (the app
+  icon at every iPhone size, plain and LITE, from `tools/icons.sh`; `Assets.car`/`AssetsLite.car`, the asset catalogs
+  Info.plist's `CFBundleIconName` names, compiled on a Mac by `icon/assets.sh <mac host>` since only actool writes
+  them; `carfile.py` reads them for the checks), `deb/` (control, postinst, prerm).
 - `daemon/` (N5): `ifizbox-upgrades`, a launchd daemon in the .deb. Once a day it runs `apt-get update`, sets the icon
   badge to the upgrade count and posts "n Upgrades" when something is new (daemon/README.md).
 - `build.sh` / `make package` → `build/iFizBox.deb`: rootless (`/var/jb/Applications/iFizBox.app`, and the helper at

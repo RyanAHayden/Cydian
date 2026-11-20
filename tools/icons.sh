@@ -13,6 +13,8 @@
 #   web/app/icons/icon-web-glossy-{76,152,228}.png  the WEB icon with iOS 6 corners, for the website's Home header
 #   native/icon/AppIconLite60x60{@2x,@3x}.png  the sideload IPA's icon: an orange LITE sash (red read as LIVE)
 #                                       (the .deb keeps the plain one; native/build.sh picks)
+#   native/icon/AppIcon{,Lite}{20x20,29x29,40x40}@{2x,3x}.png, AppIcon{,Lite}1024.png  the other icon sizes and the
+#                                       masters for Assets.car (native/icon/assets.sh, on a Mac with Xcode)
 #
 # Needs rsvg-convert (librsvg). Run it after editing the master and commit what it writes.
 set -euo pipefail
@@ -116,4 +118,14 @@ png "$lite" 180 native/icon/AppIconLite60x60@3x.png
 png "$master" 60 native/icon/AppIcon60x60.png
 png "$master" 120 native/icon/AppIcon60x60@2x.png
 png "$master" 180 native/icon/AppIcon60x60@3x.png
+# Every iPhone icon size iOS asks for (notifications 20pt, Settings 29pt, Spotlight 40pt, home 60pt), loose for
+# CFBundleIconFiles, plus the 1024 px masters native/icon/assets.sh compiles into Assets.car on a Mac.
+for pt in 20 29 40; do
+  for s in 2 3; do
+    png "$master" $((pt * s)) "native/icon/AppIcon${pt}x${pt}@${s}x.png"
+    png "$lite" $((pt * s)) "native/icon/AppIconLite${pt}x${pt}@${s}x.png"
+  done
+done
+png "$master" 1024 native/icon/AppIcon1024.png
+png "$lite" 1024 native/icon/AppIconLite1024.png
 echo "icons: wrote $dir/icon-glossy.svg, the PNGs and $dir/launch/"

@@ -12,7 +12,7 @@ import zipfile
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import mkipa  # noqa: E402
-from test_native import copy_launch, fake_macho, plist  # noqa: E402
+from test_native import copy_icons, copy_launch, fake_macho, plist  # noqa: E402
 
 
 def signed_macho(entitlements):
@@ -41,8 +41,7 @@ class Ipa(unittest.TestCase):
         with open(base, "wb") as f:
             f.write(plist())
         mkipa.merge_plist(base, os.path.join(HERE, "Info-sideload.plist"), os.path.join(self.app, "Info.plist"))
-        for name in ("AppIcon60x60@2x.png", "AppIcon60x60@3x.png"):
-            shutil.copy(os.path.join(HERE, "icon", name), self.app)
+        copy_icons(self.app, lite=True)
         copy_launch(self.app)
         for name in ("index.html", "app.js", "style.css", "router.js", "nav/stack.js"):
             self.write("web/" + name, b"x")

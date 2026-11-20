@@ -18,7 +18,9 @@
 	<key>UIRequiredDeviceCapabilities</key><array><string>arm64</string></array>
 	<key>CFBundleIcons</key><dict>
 		<key>CFBundlePrimaryIcon</key><dict>
-			<key>CFBundleIconFiles</key><array><string>AppIcon60x60</string></array>
+			<!-- B179: CFBundleIconName is Assets.car's AppIcon (icon/assets.sh); the loose PNGs at every size are the
+			     fallback for a re-signer that drops the name. Notifications are 20pt, Settings 29, Spotlight 40. -->
+			<key>CFBundleIconFiles</key><array><string>AppIcon20x20</string><string>AppIcon29x29</string><string>AppIcon40x40</string><string>AppIcon60x60</string></array>
 			<key>CFBundleIconName</key><string>AppIcon</string>
 		</dict>
 	</dict>

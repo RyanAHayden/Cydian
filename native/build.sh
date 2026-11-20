@@ -143,7 +143,13 @@ bundle() {
   fi
   # The sideload IPA's icon has a LITE sash (tools/icons.sh), so it isn't taken for the jailbreak app.
   local icon=AppIcon60x60; [ -z "$overlay" ] || icon=AppIconLite60x60
-  for x in @2x @3x; do cp "icon/$icon$x.png" "$app/AppIcon60x60$x.png"; done
+  # B179: every iPhone size loose (CFBundleIconFiles) and the asset catalog CFBundleIconName names (icon/assets.sh,
+  # compiled on a Mac): without Assets.car iOS 26 drew a blank placeholder for the app's notifications.
+  local car=Assets.car; [ -z "$overlay" ] || car=AssetsLite.car
+  for pt in 20 29 40 60; do
+    for x in @2x @3x; do cp "icon/${icon/60x60/${pt}x${pt}}$x.png" "$app/AppIcon${pt}x${pt}$x.png"; done
+  done
+  cp "icon/$car" "$app/Assets.car"
   # N10: the launch screen's images, loose PNGs that Info.plist's UILaunchScreen names (launch/make.py).
   cp launch/Launch*@2x.png launch/Launch*@3x.png "$app/"
   cp bridge.js "$app/bridge.js"

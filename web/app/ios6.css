@@ -122,6 +122,11 @@ html[data-theme="dark"] {
   --dk-red: linear-gradient(#d07079, #b82e3a 51.7%, #b01825 51.7%);
   --dk-red-pressed-edge: #3d1418; --dk-red-pressed-edge-top: #1d1516;
   --dk-red-pressed: linear-gradient(#9f7478, #76373b 51.7%, #6f252b 51.7%);
+  /* B118: the red Remove button (.pair-button.delete-button), UIPreferencesDeleteButtonDark and ...DarkPressed */
+  --dk-delete: linear-gradient(#efc7c7 2.3%, #e89d9d 3.4%, #e18181 8%, #db6a6a 19.3%, #d55554 28.4%, #d03f3e 37.5%,
+    #cb2d2b 48.3%, #c60f03 50%, #c0140b 68%, #be1710 75%, #bb1d19 85%, #b8211f 94.9%, #c03836 96%);
+  --dk-delete-pressed: linear-gradient(#d1b5b5 2.3%, #af7c7c 3.4%, #9d5a5a 8%, #994a4a 19.3%, #953b3b 28.4%, #912c2b 37.5%,
+    #8e1f1e 48.3%, #8a0a02 50%, #860e08 68%, #85100b 75%, #831411 85%, #801716 94.9%, #8d2f2e 96%);
 }
 /* Gunmetal (F13, user 2026-11-17): the kit's black bars ("Status Bar (Black)", the black menu and tool bars,
    "Button (Black)") over gunmetal grouped tables, with white text at full contrast. The tab bar is the light
@@ -271,6 +276,45 @@ html[data-theme="dark"] .bar-button.red:not(.back):not(.done) {
 html[data-theme="dark"] .bar-button.red:not(.back):not(.done):is(:active, .is-pressed) {
   border-color: var(--dk-red-pressed-edge); border-top-color: var(--dk-red-pressed-edge-top);
   background: var(--dk-red-pressed); background-origin: border-box;
+}
+
+/* B118: two buttons in one row under a grouped table (Settings > Signing's Replace and Remove Certificate), as iOS 6's
+   Contacts sets its buttons side by side. Each is a button.cell-inner, so app.js's pressed look reaches it. The plain
+   one is a one-row grouped table (its colours, edge and 9.5px corners; pressed: the cell selection). The red one is
+   the 4S's UIPreferencesDeleteButtonNormal (...Pressed, ...Dark, ...DarkPressed), 88px@2x: a 1pt translucent black
+   edge drawn over the page (so background-clip: padding-box, with the gradient sized to the border-box like the
+   bar buttons: background-origin: border-box), a gloss split at row 43 of 88 and a 1pt white emboss under it. */
+.button-pair { position: relative; display: flex; gap: 9px; margin-top: 10px; } /* relative: holds the hidden file input */
+.button-pair > .pair-button { flex: 1 1 0; min-width: 0; }
+.cell-inner.pair-button { /* .cell-inner (below) would otherwise take its border and background away */
+  box-sizing: border-box; height: 44px; min-height: 44px; padding: 0 6px; justify-content: center; text-align: center;
+  font: inherit; font-size: 15px; font-weight: bold; line-height: 18px; color: var(--text); cursor: pointer;
+  touch-action: manipulation; overflow: hidden;
+  background: var(--table); border: 1px solid var(--table-edge); border-radius: 9.5px;
+  box-shadow: inset 0 .5px .5px var(--table-inset);
+}
+.cell-inner.pair-button:is(:active, .is-pressed) { background: var(--select); background-origin: border-box; color: #fff; }
+.pair-button.delete-button {
+  color: #fff; text-shadow: 0 -1px 0 rgba(0,0,0,.45);
+  border: 1px solid rgba(0,0,0,.6); border-bottom-color: rgba(0,0,0,.62); border-radius: 8px;
+  background: linear-gradient(#efc8c8 2.3%, #e89e9f 3.4%, #e08283 8%, #d9696b 19.3%, #d35254 28.4%, #ce3e3f 37.5%,
+    #ca2b2d 48.3%, #c50b0d 50%, #c81d1f 68%, #c51f21 75%, #bc191b 85%, #af0a0c 94.9%, #b72022 96%);
+  background-origin: border-box; background-clip: padding-box;
+  box-shadow: 0 1px 0 rgba(255,255,255,.75);
+}
+.pair-button.delete-button:is(:active, .is-pressed) {
+  background: linear-gradient(#dec7c8 2.3%, #c99d9d 3.4%, #b88080 8%, #aa6768 19.3%, #9c4f50 28.4%, #913a3b 37.5%,
+    #872829 48.3%, #760708 50%, #821a1b 68%, #851c1d 75%, #891819 85%, #89090a 94.9%, #951f1f 96%);
+  background-origin: border-box; background-clip: padding-box;
+}
+html[data-theme="dark"] .pair-button.delete-button {
+  background: var(--dk-delete);
+  background-origin: border-box; background-clip: padding-box;
+  box-shadow: 0 1px 0 rgba(255,255,255,.15);
+}
+html[data-theme="dark"] .pair-button.delete-button:is(:active, .is-pressed) {
+  background: var(--dk-delete-pressed);
+  background-origin: border-box; background-clip: padding-box;
 }
 
 /* ---- Tab bar: "Tab bar" ---- */

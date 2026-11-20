@@ -20,7 +20,7 @@ test("installation and signing both open the merged page; their sub-pages stay t
 
 test("Install Apps With and This iPhone's groups come first, then the Certificate and Provisioning Profile", () => {
   const layout = mergedLayout(signingLayout({ mode: "sideload", certificate: true, profile: true, options: true }));
-  assert.deepEqual(layout, ["install", "certificate", "profile", "options", "server", "status", "remove", "help"]);
+  assert.deepEqual(layout, ["install", "certificate", "profile", "options", "server", "status", "help"]);
   // off (the website, the jailbreak app): the Signing page as before
   assert.deepEqual(mergedLayout(["certificate", "help"], false), ["certificate", "help"]);
 });

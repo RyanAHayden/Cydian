@@ -407,6 +407,9 @@ export function tweakKind(name) {
 //     iphoneos-arm64 or iphoneos-arm, no theme/app/daemon/CLI/jailbreak-utility section or purpose, and every Depends
 //     group satisfiable by a hook library we provide or can drop (HOOK_DEPS: substrate/ElleKit -> the bundled
 //     ElleKit, PreferenceLoader, firmware, cy+ feature names). Anything depending on another package is left out.
+//   isLibraryStanza(stanza) -> bool                  B185: a library for other tweaks (Comet), by Section, purpose::library
+//     or a Description that is about a library/framework; injectableFromFields then answers { library: true,
+//     why: LIBRARY_WHY }, and inspectTweakDeb does too for a .deb that only carries frameworks or loose .dylibs
 //   countInjectable(packagesText) -> n               the Sources tab's count for a Tweak Source
 //   inspectTweakDeb(debBytes) -> { ok, why, dylibs, bundles, executables, anyApp, systemOnly }   the real check, on
 //     first open of a package page: a .dylib under Library/MobileSubstrate/DynamicLibraries (rootless: var/jb/…) or
@@ -428,10 +431,27 @@ const THEME_DEPS = new Set(["winterboard", "snowboard", "com.anemonetheming.anem
 const BAD_SECTION = /\b(themes?|theming|wallpapers?|ringtones?|fonts?|applications?|apps|terminal|development|developer|system|repositories|repo|jailbreak|utilities|networking|packaging|data_storage|keyboards?|widgets?|addons?|carrier|soundboard|sounds?|icons?|skins?|ebooks?|games?)\b/;
 const BAD_PURPOSE = new Set(["purpose::uikit", "purpose::console", "purpose::library", "purpose::daemon", "role::developer"]);
 
+// B185: what the user reads for a package other tweaks build on (Comet, a SwiftUI preferences framework; colour picker
+// and support libraries): no paths, no jargon.
+export const LIBRARY_WHY = "This is a library for other tweaks, not something to add to an app.";
+const LIBRARY_SECTION = /\b(librar(y|ies)|frameworks?)\b/;
+// A description that is about a library or framework: "A SwiftUI Prefs Framework", "Color picker support library for
+// tweaks", "library for Foxfort tweaks", "An API … for developers". Only a short noun phrase at the start counts, and
+// never an app's own library ("moves the app library", "a photo library button").
+const LIBRARY_DESC = /^\s*(?:(?:a|an|the)\s+)?(?:[\w+.-]+\s+){0,5}?(?<!\b(?:app|apps|photos?|music|media|video|ipod|game|games|sticker|emoji|icon|widget|my)\s)(?:librar(?:y|ies)|framework)\b/i;
+const FOR_DEVELOPERS = /\bfor (?:tweak )?developers\b/i;
+export function isLibraryStanza(st) {
+  const section = String(st?.section ?? "").toLowerCase().replace(/[_-]+/g, " ");
+  const tags = String(st?.tag ?? "").split(",").map((t) => t.trim().toLowerCase());
+  const desc = String(st?.description ?? "").split("\n")[0];
+  return LIBRARY_SECTION.test(section) || tags.includes("purpose::library") || LIBRARY_DESC.test(desc) || FOR_DEVELOPERS.test(desc);
+}
+
 export function injectableFromFields(st) {
   const no = (why) => ({ ok: false, why });
   if (!st || !st.package) return no("not a package");
   if (!TWEAK_ARCHES.has(String(st.architecture ?? "").trim())) return no("not for iPhone (Architecture)");
+  if (isLibraryStanza(st)) return { ok: false, why: LIBRARY_WHY, library: true }; // B185
   const section = String(st.section ?? "").toLowerCase().replace(/[_-]+/g, " ");
   if (BAD_SECTION.test(section)) return no(`not a tweak (${st.section})`);
   const tags = String(st.tag ?? "").split(",").map((t) => t.trim().toLowerCase()).filter(Boolean);
@@ -462,7 +482,7 @@ export function inspectTweakDeb(data) {
   const dataTar = members.find((m) => /^data\.tar(\.|$)/.test(m.name));
   if (!dataTar) fail("This .deb has no data.tar.");
   const entries = readTar(decompress(dataTar.name, dataTar.data, TWEAK_LIMIT));
-  const dylibs = [], plists = new Map(), bad = new Set();
+  const dylibs = [], plists = new Map(), bad = new Set(), other = new Set();
   for (const e of entries) {
     if (e.type !== "file" && e.type !== "symlink") continue;
     const p = clean(e.path);
@@ -473,6 +493,10 @@ export function inspectTweakDeb(data) {
     else if (/^(System\/)?Library\/Launch(Daemons|Agents)\//.test(p)) bad.add("a daemon");
     else if (/^(usr\/(local\/)?)?s?bin\//.test(p)) bad.add("command-line tools");
     else if (/^Library\/Themes\//.test(p)) bad.add("a theme");
+    // B185: what a package with nothing to inject is instead, for a plain reason (LIBRARY_WHY and the two below)
+    else if (/^Library\/PreferenceBundles\//.test(p)) other.add("settings");
+    else if (/^Library\/ControlCenter\/Bundles\//.test(p)) other.add("control center");
+    else if (/\.(dylib|framework)(\/|$)/.test(p)) other.add("library");
   }
   const bundles = new Set(), executables = new Set();
   for (const d of dylibs) {
@@ -485,11 +509,15 @@ export function inspectTweakDeb(data) {
   const apps = ids.filter((b) => !isSystem(b) && !ANY_APP.has(b.toLowerCase()));
   const systemOnly = !anyApp && !apps.length;
   let why = null;
-  if (!dylibs.length) why = "Nothing to inject: no .dylib in Library/MobileSubstrate/DynamicLibraries.";
-  else if (![...dylibs].some((d) => plists.has(d))) why = "Its .dylib has no filter .plist, so it doesn't say which app it's for.";
+  if (!dylibs.length) why = other.has("library") ? LIBRARY_WHY
+    : other.has("control center") ? "This adds to Control Center, which is part of iOS, not something to add to an app."
+      : other.has("settings") ? "This only adds a page to Settings, not something to add to an app."
+        : "There's nothing in it that can go into an app.";
+  else if (![...dylibs].some((d) => plists.has(d))) why = "It doesn't say which apps it's for, so it can't be added to one.";
   else if (bad.size) why = `It also installs ${[...bad].join(", ")}, which can't go into an app.`;
   else if (systemOnly) why = "It's for iOS itself (SpringBoard or a system app), not an app you can sign.";
-  return { ok: !why, why, dylibs, bundles: apps, anyApp, systemOnly, executables: [...executables] };
+  return { ok: !why, why, dylibs, bundles: apps, anyApp, systemOnly, executables: [...executables],
+    library: !dylibs.length && other.has("library") };
 }
 
 export function targetsApp(info, bundleId) {

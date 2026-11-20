@@ -5,6 +5,7 @@ import assert from "node:assert/strict";
 import { gzipSync } from "node:zlib";
 import { injectableFromFields, countInjectable, inspectTweakDeb, filterBundles, readTextPlist, readBplist, targetsApp,
   worksInText, appNameOf } from "./tweaks.js";
+import { isLibraryStanza, LIBRARY_WHY } from "./tweaks.js"; // B185
 
 const st = (o) => ({ package: "com.x.tweak", architecture: "iphoneos-arm64", section: "Tweaks", ...o });
 
@@ -108,8 +109,8 @@ test("the .deb check refuses SpringBoard-only tweaks, missing filters, apps, dae
     ["./Library/MobileSubstrate/DynamicLibraries/SB.plist", xmlFilter(["com.apple.springboard"])]]));
   assert.equal(sb.ok, false);
   assert.match(sb.why, /SpringBoard/);
-  assert.match(inspectTweakDeb(deb([["./Library/MobileSubstrate/DynamicLibraries/N.dylib", "x"]])).why, /filter/);
-  assert.match(inspectTweakDeb(deb([["./usr/lib/libfoo.dylib", "x"]])).why, /Nothing to inject/);
+  assert.match(inspectTweakDeb(deb([["./Library/MobileSubstrate/DynamicLibraries/N.dylib", "x"]])).why, /which apps it's for/);
+  assert.equal(inspectTweakDeb(deb([["./usr/lib/libfoo.dylib", "x"]])).why, LIBRARY_WHY);
   const withApp = inspectTweakDeb(deb([["./Library/MobileSubstrate/DynamicLibraries/T.dylib", "x"],
     ["./Library/MobileSubstrate/DynamicLibraries/T.plist", xmlFilter(["com.x.app"])], ["./Applications/X.app/X", "x"],
     ["./var/jb/usr/bin/tool", "x"], ["./Library/LaunchDaemons/com.x.plist", "x"]]));
@@ -169,4 +170,87 @@ test("catalog: a Tweak Source keeps injectable tweaks only, counts on its own pa
   // a plain APT load (no tweaks flag) on a phone without a jailbreak still counts for nothing
   c.load("deb:https://plain/:./", text, "https://plain/", "iphoneos-arm64");
   assert.equal(c.list("deb:https://plain/:./").length, 0);
+});
+
+// ---- B185: libraries for other tweaks (Comet and the like) are never offered as something to add to an app ----
+// The stanzas are Chariz's and Havoc's own (Packages, 2026-11-20); `canister` is the row Search gets from Canister for
+// the same package, which has no Depends, so only Section, tags and Description can tell.
+const canister = (o) => ({ package: o.package, architecture: o.architecture, section: o.section, tag: o.tag, description: o.description });
+const COMET = { package: "com.ginsu.comet", architecture: "iphoneos-arm64", section: "Tweaks", depends: "dev.theos.orion14, firmware (>= 14.0)",
+  description: "A SwiftUI Prefs Framework", tag: "compatible_min::ios14.0" };
+
+test("fields: Comet and other libraries are libraries, from the Packages stanza and from Canister's row alike", () => {
+  for (const s of [COMET, canister(COMET)]) {
+    const r = injectableFromFields(s);
+    assert.equal(r.ok, false);
+    assert.equal(r.library, true);
+    assert.equal(r.why, LIBRARY_WHY);
+  }
+  for (const [package_, section, description] of [
+    ["com.muirey03.libimagepicker", "Development", "A simple library for choosing images in preference bundles."],
+    ["com.foxfort.libfoxfortutils", "Development", "library for Foxfort tweaks"],
+    ["ws.hbang.alderis", "Development", "Color picker support library for tweaks"],
+    ["com.tapsharp.support", "Development", "Support Framework for Tapsharp Tweaks."],
+    ["com.tr1fecta.magmaapi", "Tweaks", "An API for Magma (Evo) for developers"],
+    ["com.squ1dd13.inky", "System", "Inky is a colour picker library that can be used to provide colour options in tweak preference bundles."],
+    ["com.x.libs", "Libraries", "Shared code"],
+  ]) assert.equal(isLibraryStanza({ package: package_, section, description }), true, package_);
+  assert.equal(isLibraryStanza({ package: "com.x.y", section: "Tweaks", tag: "purpose::library" }), true);
+});
+
+test("fields: real tweaks that only mention a library or developers are still tweaks", () => {
+  for (const [package_, description] of [
+    ["com.irepo.vinculum2", "Made on stream! twitch.tv/billbuildsyt. Vinculum 2 is the great successor to Vinculum. Completely reworked from the ground up! Vinculum 2 moves the app library from the last page to under the dock for quick and easy access."],
+    ["org.hahalosah.nofreeapplimit", "Removes the 3 app limit for free developer accounts"],
+    ["com.lacertosusrepo.libellum", "Notes on your lockscreen and notification center..."],
+    ["weeb.lillie.youtubedislikesreturn", "Bring Back Dislikes On YouTube"],
+    ["com.x.photos", "Adds a photo library button to Instagram"],
+  ]) {
+    const s = { package: package_, architecture: "iphoneos-arm", section: "Tweaks", description };
+    assert.equal(isLibraryStanza(s), false, package_);
+    assert.equal(injectableFromFields(s).ok, true, package_);
+  }
+});
+
+test("the .deb check: Comet's files (a framework, nothing to inject) say it's a library, in plain words", () => {
+  // Comet 2.0.1 rootless: Theos FRAMEWORK_NAME = Comet, Comet_INSTALL_PATH = /Library/Frameworks
+  const info = inspectTweakDeb(deb([
+    ["./var/jb/Library/Frameworks/Comet.framework/Comet", "\xcf\xfa\xed\xfe"],
+    ["./var/jb/Library/Frameworks/Comet.framework/Info.plist", "x"],
+    ["./var/jb/Library/Frameworks/Comet.framework/Modules/Comet.swiftmodule/arm64-apple-ios.swiftmodule", "x"],
+    ["./var/jb/Library/Frameworks/Comet.framework/Modules/module.modulemap", "x"],
+  ]));
+  assert.equal(info.ok, false);
+  assert.equal(info.library, true);
+  assert.equal(info.why, LIBRARY_WHY);
+  assert.doesNotMatch(info.why, /\/|\.dylib|\.plist|inject/i, "no paths or jargon");
+});
+
+test("the .deb check: a Control Center module or a Settings page only gets its own plain reason", () => {
+  // com.muirey03.powermodule (Havoc), its data.tar as served
+  const power = inspectTweakDeb(deb([
+    ["./Library/ControlCenter/Bundles/PowerModule.bundle/Info.plist", "x"],
+    ["./Library/ControlCenter/Bundles/PowerModule.bundle/PowerModule", "x"],
+    ["./Library/ControlCenter/Bundles/PowerModule.bundle/Power@3x.png", "x"],
+    ["./Library/PreferenceBundles/PowerModulePrefs.bundle/Info.plist", "x"],
+    ["./Library/PreferenceBundles/PowerModulePrefs.bundle/PowerModulePrefs", "x"],
+    ["./Library/PreferenceBundles/PowerModulePrefs.bundle/Root.plist", "x"],
+    ["./Library/PreferenceLoader/Preferences/PowerModulePrefs.plist", "x"],
+    ["./usr/bin/mobileldrestart", "x"],
+  ]));
+  assert.equal(power.ok, false);
+  assert.equal(power.library, false);
+  assert.match(power.why, /Control Center/);
+  const prefs = inspectTweakDeb(deb([["./var/jb/Library/PreferenceBundles/X.bundle/X", "x"], ["./var/jb/Library/PreferenceLoader/Preferences/X.plist", "x"]]));
+  assert.match(prefs.why, /Settings/);
+  for (const why of [power.why, prefs.why]) assert.doesNotMatch(why, /\/|\.dylib|\.plist|inject/i);
+  assert.equal(inspectTweakDeb(deb([["./var/jb/usr/share/x/readme.txt", "x"]])).why, "There's nothing in it that can go into an app.");
+});
+
+test("the .deb check: a real app tweak beside a framework of its own still goes in", () => {
+  const info = inspectTweakDeb(deb([["./var/jb/Library/MobileSubstrate/DynamicLibraries/YTLite.dylib", "\xcf\xfa\xed\xfe"],
+    ["./var/jb/Library/MobileSubstrate/DynamicLibraries/YTLite.plist", xmlFilter(["com.google.ios.youtube"])],
+    ["./var/jb/Library/Frameworks/Helper.framework/Helper", "x"]]));
+  assert.equal(info.ok, true, info.why);
+  assert.equal(info.library, false);
 });

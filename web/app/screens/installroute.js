@@ -298,6 +298,7 @@ export function mainPage({ store, native = globalThis.ifizboxNative, alert = sho
   const title = slotOf(statusCell.querySelector(".cell-label"), CHECKING.title);
   const subtitle = slotOf(statusCell.querySelector(".cell-subtitle"), CHECKING.subtitle);
   const actionLabel = actionCell.querySelector(".cell-label");
+  const checkButton = checkMark(actionCell); // B135: Check Connection's answer on the action row
   actionCell.classList.add("is-dim");
   actionCell.setAttribute("aria-disabled", "true");
   const slots = {};
@@ -309,7 +310,8 @@ export function mainPage({ store, native = globalThis.ifizboxNative, alert = sho
     icon.className = `status-icon tone-${s.tone}`;
     title.set(s.title, { red: Boolean(s.red) });
     subtitle.set(s.subtitle);
-    actionLabel.textContent = STATUS_ACTIONS[s.action];
+    if (checkButton.active() && s.action !== "check") checkButton.reset();
+    if (!checkButton.active()) actionLabel.textContent = STATUS_ACTIONS[s.action];
     const dim = s === CHECKING;
     actionCell.classList.toggle("is-dim", dim);
     if (dim) actionCell.setAttribute("aria-disabled", "true"); else actionCell.removeAttribute?.("aria-disabled");
@@ -348,7 +350,7 @@ export function mainPage({ store, native = globalThis.ifizboxNative, alert = sho
     await Promise.all(reads);
   };
   const runAction = async (a) => {
-    if (a === "check") return check(native, alert, refresh, store).then(refresh);
+    if (a === "check") return check(native, alert, refresh, store, checkButton).then(refresh);
     if (a === "checkServer") return checkServer();
     if (a === "openVPN") return openVPN(native, alert).then(refresh);
     if (a === "pair") return goTo("pair");
@@ -630,11 +632,12 @@ async function drawPair(box, { store, native, alert, redraw }) {
   // B133: after an action that changes what the page is, it draws as Checking (the spinner) while it reads again,
   // instead of leaving the old page up with nothing moving.
   const recheck = () => { if (visit === v && !pairing) box.replaceChildren(); return redraw(); };
+  let checkButton = null; // B135: the Check Connection button's answer, set once the rows are drawn
   const sections = setupGroups(state, st, pairing, {
     failed: v.failed,
     openVPN: () => openVPN(native, alert),
     retry: start,
-    check: () => check(native, alert, recheck, store),
+    check: () => check(native, alert, recheck, store, checkButton),
     forget: async () => {
       await busy("Forgetting Pairing", () => call(native, "idevice.forget").catch(() => {}));
       store.set(ROUTE_KEY, "server"); v.started = false; recheck();
@@ -648,6 +651,12 @@ async function drawPair(box, { store, native, alert, redraw }) {
   });
   if (state === "paired" && store.get(ROUTE_KEY) !== "iphone") store.set(ROUTE_KEY, "iphone"); // picked This iPhone, already paired
   const frag = pairSections(sections);
+  const ci = sections.findIndex((s) => s.rows?.some((r) => r.label === STATUS_ACTIONS.check));
+  if (ci >= 0) {
+    const ul = [...(frag.children[ci]?.children ?? [])].find((c) => c.classList?.contains("table"));
+    const j = sections[ci].rows.findIndex((r) => r.label === STATUS_ACTIONS.check);
+    checkButton = checkMark(ul?.children[j]?.children?.[0]);
+  }
   if (state === "file") {
     const input = Object.assign(document.createElement("input"), { type: "file", className: "visually-hidden" });
     input.addEventListener("change", async () => {
@@ -681,15 +690,52 @@ async function drawPair(box, { store, native, alert, redraw }) {
   }
 }
 
-async function check(native, alert, redraw, store) {
+// B135: Check Connection answers on its own button (`mark`, checkMark below): a success is a check and a green
+// "Successful" in place of the label, no alert; a failure keeps the alert and puts an x on the button.
+async function check(native, alert, redraw, store, mark = null) {
+  mark?.reset();
   try {
     await busy("Checking Connection", () => call(native, "idevice.verify"));
-    store.set(ROUTE_KEY, "iphone");
-    await alert({ title: "Connected", message: `${NAME} reached this iPhone. Apps install here now.`, buttons: ["OK"] });
+    if (store.get(ROUTE_KEY) !== "iphone") store.set(ROUTE_KEY, "iphone"); // a set redraws Settings' pages, and the mark with them
+    mark?.show(true);
   } catch (e) {
     const why = verifyFailure(e);
-    if (!why.again) return alert({ title: why.title, message: why.message, buttons: ["OK"] });
-    const { index } = await alert({ title: why.title, message: why.message, buttons: ["Cancel", "Pair Again"], cancel: 0 });
-    if (index === 1) { await busy("Forgetting Pairing", () => call(native, "idevice.forget").catch(() => {})); if (visit) visit.started = false; redraw(); }
+    mark?.show(false);
+    try {
+      if (!why.again) return await alert({ title: why.title, message: why.message, buttons: ["OK"] });
+      const { index } = await alert({ title: why.title, message: why.message, buttons: ["Cancel", "Pair Again"], cancel: 0 }) || {};
+      if (index === 1) { await busy("Forgetting Pairing", () => call(native, "idevice.forget").catch(() => {})); if (visit) visit.started = false; redraw(); }
+    } finally { mark?.expire(); } // the x stays while the alert is up, then the same few seconds
   }
+}
+
+// B135: a Check Connection button's answer, drawn on the button (`inner`, its .cell-inner) and gone after
+// CHECK_RESET.ms or on the next tap (check() resets it first). show(true): a check and "Successful" in green (settings.css
+// .check-mark, [data-check]); show(false): an x beside the label, kept until expire() (after the alert). `active()` is
+// true while an answer shows, so the main page's status repaint doesn't write over it.
+export const CHECK_RESET = { ms: 3000 };
+export function checkMark(inner, text = STATUS_ACTIONS.check) {
+  const label = inner?.querySelector?.(".cell-label");
+  let timer = null, on = false;
+  const reset = () => {
+    clearTimeout(timer);
+    timer = null;
+    if (!on) return;
+    on = false;
+    inner.setAttribute("data-check", "");
+    label.textContent = text;
+  };
+  const expire = () => { clearTimeout(timer); if (on) timer = setTimeout(reset, CHECK_RESET.ms); };
+  const show = (ok) => {
+    if (!label) return;
+    reset();
+    on = true;
+    inner.setAttribute("data-check", ok ? "ok" : "fail");
+    const mark = el("span", "check-mark", ok ? "✓" : "✕");
+    mark.setAttribute("aria-hidden", "true");
+    const words = el("span", "check-words", ok ? "Successful" : text);
+    label.replaceChildren(mark, words);
+    if (ok) expire();
+  };
+  return { show, reset, expire, active: () => on };
 }

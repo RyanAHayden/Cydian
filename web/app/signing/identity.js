@@ -1,10 +1,9 @@
 // Signing's identity (Settings > Signing's picks), the website's Bring My Certificate switch and the Signing Server.
-import { APP_SERVER, normalizeServer, LEGACY_SERVER } from "../core/signing.js";
 import { browserSigning, localSigning, sleep } from "./common.js";
 import { readyStatus, statusReady } from "./device.js";
 import { confirmSoon, needsConfirm } from "./password.js";
-
-const SERVER_KEY = "ifizbox.signingServer";
+import { defaultServer, getServer, setServer } from "./common.js";
+export { defaultServer, getServer, setServer };
 
 // The picks wait in memory only, until signing.import puts them into the Keychain; then only their names stay (the
 // .p12 itself never goes to the web view's storage). F93: the website keeps them in IndexedDB (this browser only:
@@ -80,24 +79,6 @@ export function setBring(on) {
     if (on) localStorage.removeItem(BRING_KEY);
     else localStorage.setItem(BRING_KEY, "off");
   } catch { /* private mode: this session only */ }
-}
-
-// A saved website address (LEGACY_SERVER, the website's old signer) means the default too.
-export function defaultServer() { return APP_SERVER; }
-export function getServer() {
-  let saved = null;
-  try { saved = normalizeServer(localStorage.getItem(SERVER_KEY)); } catch { /* private */ }
-  if (!saved || saved === LEGACY_SERVER) return defaultServer();
-  return saved;
-}
-
-export function setServer(s) {
-  const n = normalizeServer(s);
-  try {
-    if (!n || n === APP_SERVER || n === LEGACY_SERVER) localStorage.removeItem(SERVER_KEY);
-    else localStorage.setItem(SERVER_KEY, n);
-  } catch { /* private mode: this session only */ }
-  return n && n !== LEGACY_SERVER ? n : APP_SERVER;
 }
 
 export async function serverStatus(server = getServer()) {

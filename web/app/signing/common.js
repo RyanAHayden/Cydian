@@ -4,6 +4,8 @@ import { detectMode } from "../core/settings.js";
 import { showAlert } from "../nav/alert.js";
 import { isInsecure, INSECURE_IPA_ALERT, INSTALL_ANYWAY } from "../core/insecureipa.js";
 import { malwareHashes, rememberSigned } from "../core/malicious.js";
+import { APP_SERVER, normalizeServer, LEGACY_SERVER } from "../core/signing.js";
+import { GITHUB_REPO, NAME } from "../brand.js";
 
 // B104: a bridge call that downloads an IPA (signing.install, signing.prepare, signing.inspect, library.add), sent by
 // `send(extra)`. For an http link the shell tries the https twin first; when there is none it answers "insecure", and
@@ -78,3 +80,98 @@ export const storageOf = () => { try { return globalThis.localStorage ?? null; }
 export const browserSigning = () => detectMode() === "site";
 // Bytes as an ArrayBuffer of their own, for the signing worker (early.js re-exports it).
 export const buffer = (b) => (b instanceof Uint8Array ? b.slice().buffer : b instanceof ArrayBuffer ? b.slice(0) : new Uint8Array(b ?? []).buffer);
+
+// ---- C37: helpers several signing/ modules share, here so those modules don't import one another ----------------
+// (browser.js, install.js, identity.js and queue.js re-export theirs, so their importers are unchanged). In this
+// module, not one each, so app.js's startup closure (module-graph.test.js) doesn't grow.
+
+// The website signer's error every signing step throws (browser.js, early.js, prompt.js).
+export const signFail = (code, message) => Object.assign(new Error(message), { code });
+
+// The Web Worker, as one call: resolves the worker's answer ({ ipa, bundleId, name, version }), or throws its error.
+// F188: `signal` (the progress page's Cancel) ends the worker, and zsign with it, mid-signing.
+export function runInWorker(job, { make = () => new Worker(new URL("../signing-worker.js", import.meta.url), { type: "module" }), onProgress = () => {}, signal = null } = {}) {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) { reject(signFail("cancelled", "Cancelled")); return; }
+    let w;
+    try { w = make(); } catch (e) { reject(signFail("unsupported", `This browser can't sign apps (${e?.message ?? e}).`)); return; }
+    signal?.addEventListener?.("abort", () => { w.terminate?.(); reject(signFail("cancelled", "Cancelled")); }, { once: true });
+    w.onmessage = (e) => {
+      const m = e.data ?? {};
+      if (m.progress) { onProgress(m.progress); return; }
+      w.terminate?.();
+      if (m.ok) resolve(m); else reject(signFail(m.code ?? "sign_failed", m.error ?? "Signing failed."));
+    };
+    w.onerror = (e) => { w.terminate?.(); reject(signFail("sign_failed", `The signer stopped: ${e?.message ?? "no reason given"}.`)); };
+    const t = [job.ipa, job.p12, job.profile].filter((b) => b instanceof ArrayBuffer);
+    w.postMessage(job, t);
+  });
+}
+
+// A request that failed for want of a connection (Safari: "Load failed") is tried again, up to `tries` times with a
+// pause, as phones drop a request now and then mid-upload (user 2026-11-18: an upload stopped after its second part).
+// An answer from the server, even an error, is final.
+export async function retrying(send, { tries = 3, wait = (ms) => new Promise((r) => setTimeout(r, ms)), signal = null } = {}) {
+  for (let i = 1; ; i++) {
+    try { return await send(); } catch (e) {
+      if (i >= tries || signal?.aborted) throw e; // F188: Cancel isn't a dropped request
+      await wait(800 * i);
+    }
+  }
+}
+
+// F72: an IPA of iFizBox itself (its GitHub releases, where iFizBox's own source points).
+// Only iFizBox's own IPA files count: a release's ${NAME}.ipa, or the test source's <name>-<version>.ipa (F180: no
+// old asset names). Other files under the test-fixtures pre-release (Test Alpha, Test Beta...) are ordinary apps.
+const SELF_IPA = new RegExp(`^https://github\\.com/${GITHUB_REPO.replace(/[.]/g, "\\.")}/releases/(?:latest/)?download/(?:[^/]+/)?(?:${NAME}|${NAME}-[\\d.]+)\\.ipa$`, "i");
+export const isSelfIpa = (url) => SELF_IPA.test(String(url ?? ""));
+
+// Settings > Signing's Signing Server. A saved website address (LEGACY_SERVER, the website's old signer) means the
+// default too.
+const SERVER_KEY = "ifizbox.signingServer";
+export function defaultServer() { return APP_SERVER; }
+export function getServer() {
+  let saved = null;
+  try { saved = normalizeServer(localStorage.getItem(SERVER_KEY)); } catch { /* private */ }
+  if (!saved || saved === LEGACY_SERVER) return defaultServer();
+  return saved;
+}
+
+export function setServer(s) {
+  const n = normalizeServer(s);
+  try {
+    if (!n || n === APP_SERVER || n === LEGACY_SERVER) localStorage.removeItem(SERVER_KEY);
+    else localStorage.setItem(SERVER_KEY, n);
+  } catch { /* private mode: this session only */ }
+  return n && n !== LEGACY_SERVER ? n : APP_SERVER;
+}
+
+// B111: signing.install's {here: "copying" | "installing", progress} event (This iPhone) -> { label } for the page's
+// step and bar ("Copying to iPhone 40%", "Installing 75%"), or null
+export function hereLabel(ev) {
+  const word = { copying: "Copying to iPhone", installing: "Installing" }[ev?.here];
+  if (!word) return null;
+  const p = Math.round(Math.max(0, Math.min(1, Number(ev.progress) || 0)) * 100);
+  return { label: p > 0 && p < 100 ? `${word} ${p}%` : word };
+}
+
+// B150: the name an install's page shows: the caller's (a source's app name, the variant it was picked as, or Custom
+// Install's), else the signed IPA's own (`result.name`, its Info.plist). A bare file name ("App.ipa") isn't a name:
+// the IPA's own wins over it.
+export function shownName(name, result) {
+  const given = String(name ?? "").trim();
+  return (given && !/\.ipa$/i.test(given) ? given : "") || result?.name || given;
+}
+
+// B111: the single install's end on This iPhone: installd has the app, so "Installed <app>", the bar full, and
+// Open <app> (signing.openApp) above the Return button.
+export function finishHere(h, result, { native, name = "", later = setTimeout } = {}) {
+  const app = shownName(name, result) || "the app"; // B150: the source's name before the IPA's
+  const text = `Installed ${app}`;
+  const bid = result?.bundleId;
+  if (typeof h.finish === "function") {
+    h.set(`${text} 100%`);
+    const open = () => { try { Promise.resolve(bridge(native).call("signing.openApp", { bundleId: bid })).catch(() => {}); } catch { /* no bridge */ } return false; };
+    h.finish({ status: text, ...(bid ? { also: { label: `Open ${app}`, action: open } } : {}) });
+  } else later(() => (h.done ? h.done(text) : h.hide()), 1200);
+}

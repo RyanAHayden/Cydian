@@ -48,10 +48,9 @@ import { SELF_RESTART } from "../core/apprun.js";
 import { KNOWN_MALWARE, askInsecure, bridge, failed, keepIpaHash, refusing, stopNative, storageOf,
   untilCancel } from "./common.js";
 import { getServer } from "./identity.js";
-import { isSelfIpa } from "./install.js";
+import { isSelfIpa, finishHere, hereLabel, shownName } from "./common.js";
 import { lastDevice, openRoute } from "./device.js";
 import { followHereSelf, followSelfUpdate } from "./selfupdate.js";
-import { finishHere, hereLabel, shownName } from "./queue.js";
 
 // B110: the wait itself. Its own page ends a tick after the answer, so the install's next step (a HUD opened at once)
 // carries on on the same page instead of it showing Complete first. -> true once connected.

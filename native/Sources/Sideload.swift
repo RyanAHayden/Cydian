@@ -473,14 +473,16 @@ enum Sideload {
             // B124: installd ends this process mid-install, so the icon badge stops counting this update now
             BackgroundCheck.selfHandedOff(ids: [app.bundleID, app.originalBundleID], version: app.version)
         }
-        // B159: iOS 17.4+ installd waits for this copy to go instead of ending it, so iFizBox closes itself once
-        // installd has the IPA and stands still (SelfCloseClock): the call answers first (the page follows
-        // signing.selfUpdate to "Closing iFizBox"), then CloseForUpdate.hereReady exits.
-        let closer: HereClose? = isSelf ? HereClose(job: job) {
-            IDevice.ilog("This iPhone: installd is waiting for \(Brand.name) to close; closing it")
-            log?("iOS has the new \(app.name) and waits for this copy to close: closing \(Brand.name) so iOS can finish installing it")
+        // B159/B173: iOS 17.4+ installd waits for this copy to go instead of ending it (installation_proxy's Complete
+        // never comes while iFizBox runs), so iFizBox closes itself once installd accepted the install (its first
+        // status, SelfCloseClock): the call answers first (the page follows signing.selfUpdate to "Closing iFizBox"),
+        // then CloseForUpdate.hereReady exits, with a backstop off the main queue.
+        let closer: HereClose? = isSelf ? HereClose(job: job, log: log) { why in
+            IDevice.ilog("This iPhone: \(why); closing \(Brand.name) so installd can finish")
+            log?("iOS has the new \(app.name) (\(why)): closing \(Brand.name) so iOS can finish installing it")
             SignBridge.queue.async { opened(.success((app, record))); served?(true) }
-            CloseForUpdate.hereReady()
+            DispatchQueue.main.async { CloseForUpdate.hereReady() }
+            CloseForUpdate.exitBackstop("This iPhone self-update")
         } : nil
         if isSelf { DispatchQueue.main.async { CloseForUpdate.hereBegan(app: app) } }
         DispatchQueue.main.async { KeepAlive.shared.begin() }
@@ -1382,11 +1384,13 @@ enum CloseForUpdate {
 
     // How long after finished iFizBox exits on this route: the install call has just answered, and the page needs
     // a moment to ask signing.selfUpdate and draw "Closing iFizBox".
-    static let hereExit: TimeInterval = 2.5
+    static let hereExit: TimeInterval = 2
 
     // installd has the new IPA and waits for this copy to go: finished, the notification, and out. Main queue.
+    // B173: closes from any state but finished (a state some other path left behind must not keep iFizBox open).
     static func hereReady() {
-        guard state == .waiting else { return }
+        guard state != .finished else { return }
+        if state != .waiting { IDevice.ilog("self-close: closing from state \(state?.rawValue ?? "none")") }
         set(.finished)
         let c = UNMutableNotificationContent()
         c.title = "Finishing the \(Brand.name) Update"
@@ -1409,8 +1413,21 @@ enum CloseForUpdate {
         c.badge = NSNumber(value: n)
         let req = UNNotificationRequest(identifier: "ifizbox.updating", content: c,
                                         trigger: UNTimeIntervalNotificationTrigger(timeInterval: after, repeats: false))
+        IDevice.ilog("self-close: exiting in \(exitAfter) s")
         UNUserNotificationCenter.current().add(req) { _ in
-            DispatchQueue.main.asyncAfter(deadline: .now() + exitAfter) { exit(0) }
+            DispatchQueue.main.asyncAfter(deadline: .now() + exitAfter) { IDevice.ilog("self-close: exit"); exit(0) }
+        }
+        // B173: the exit never waits on the notification's answer or on the main queue alone
+        exitBackstop("closeWith", after: exitAfter + 1)
+    }
+
+    // B173: exit(0) from a queue of its own `after` seconds from now, whatever the main queue is doing (any queue).
+    // The polite exit (closeWith) comes first; this one only runs if it didn't.
+    static let backstop: TimeInterval = hereExit + 2
+    static func exitBackstop(_ why: String, after: TimeInterval = backstop) {
+        DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + after) {
+            IDevice.ilog("self-close: exit (backstop: \(why))")
+            exit(0)
         }
     }
 
@@ -1427,20 +1444,36 @@ enum CloseForUpdate {
 }
 
 // B159: installHere's timer for iFizBox's own update: copied() and installd(p) from IDevice.queue feed SelfCloseClock
-// on the main queue; when it is due (and the job wasn't cancelled, and installd hasn't answered) `fire` runs once on
-// the main queue. end() (any queue) stops it and says whether it fired already.
+// on its own queue (B173: not the main queue, so nothing the main queue waits on can hold the close back); when it is
+// due (and the job wasn't cancelled, and installd hasn't answered) `fire` runs once on that queue with the reason.
+// end() (any queue) stops it and says whether it fired already. Each step goes to the device log and the page's console.
 final class HereClose {
-    private var clock = SelfCloseClock() // main queue
+    private var clock = SelfCloseClock() // on `q`
+    private let q = DispatchQueue(label: "ifizbox.hereclose")
     private let lock = NSLock()
     private var fired = false, ended = false // under lock
     private let job: SignJob?
-    private let fire: () -> Void
+    private let log: ((String) -> Void)?
+    private let fire: (String) -> Void
 
-    init(job: SignJob?, fire: @escaping () -> Void) { self.job = job; self.fire = fire }
+    init(job: SignJob?, log: ((String) -> Void)? = nil, fire: @escaping (String) -> Void) { self.job = job; self.log = log; self.fire = fire }
 
-    func copied() { DispatchQueue.main.async { self.clock.copied(at: Date()); self.arm() } }
+    func copied() {
+        q.async {
+            guard self.clock.copiedAt == nil else { return }
+            self.clock.copied(at: Date())
+            IDevice.ilog("self-close: IPA copied; closing in \(Int(SelfCloseClock.firstQuiet)) s unless installd answers sooner")
+            self.arm()
+        }
+    }
     func installd(_ p: Double) {
-        DispatchQueue.main.async { if self.clock.installd(Int((min(max(p, 0), 1) * 100).rounded()), at: Date()) { self.arm() } }
+        q.async {
+            let pct = Int((min(max(p, 0), 1) * 100).rounded())
+            guard self.clock.installd(pct, at: Date()) else { return }
+            IDevice.ilog("self-close: installd accepted the install (\(pct)%); closing in \(SelfCloseClock.accepted) s")
+            self.log?("installd accepted the new \(Brand.name) (\(pct)%): closing so iOS can finish")
+            self.arm()
+        }
     }
 
     func end() -> Bool {
@@ -1451,13 +1484,14 @@ final class HereClose {
 
     private func arm() {
         guard let at = clock.closeAt else { return }
-        DispatchQueue.main.asyncAfter(deadline: .now() + max(0, at.timeIntervalSinceNow) + 0.05) {
-            guard self.clock.due(Date()), self.job?.cancelled != true else { return }
+        q.asyncAfter(deadline: .now() + max(0, at.timeIntervalSinceNow) + 0.05) {
+            guard self.clock.due(Date()) else { return }
+            if self.job?.cancelled == true { IDevice.ilog("self-close: the job was cancelled; staying open"); return }
             self.lock.lock()
             let go = !self.fired && !self.ended
             if go { self.fired = true }
             self.lock.unlock()
-            if go { self.fire() }
+            if go { self.fire(self.clock.reason) }
         }
     }
 }

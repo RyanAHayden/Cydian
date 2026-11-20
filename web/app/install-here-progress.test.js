@@ -10,7 +10,7 @@ Object.defineProperty(globalThis, "localStorage", { configurable: true, writable
   value: { getItem: (k) => store.get(k) ?? null, setItem: (k, v) => store.set(k, String(v)), removeItem: (k) => store.delete(k) } });
 
 const { herePhase, hereLabel, openPrepared, forgetRoute } = await import("./signing-client.js");
-const { appRows, createAppRun, rowStatus, runStatus, runPercent, SELF_RESTART } = await import("./core/apprun.js");
+const { appRows, createAppRun, rowStatus, runStatus, runPercent, SELF_RESTART, SELF_CLOSING, selfClosing } = await import("./core/apprun.js");
 const { SELF_ID } = await import("./core/appqueue.js");
 const { openRow } = await import("./screens/apprun.js");
 const { NAME } = await import("./brand.js");
@@ -78,14 +78,32 @@ test("a This iPhone row: Copying to iPhone N%, Installing N%, Installed; the bar
   assert.ok(!t.lines.some((l) => /Asked iOS|iOS is installing|prompt/.test(l)));
 });
 
-test("iFizBox itself on This iPhone: the log and the status say it will restart", async () => {
-  assert.equal(SELF_RESTART, `${NAME} will restart`);
-  const t = await hereRun(SELF_ID, NAME, [["copying", 0.5], ["installing", 0.3], ["installing", 1]]);
+test("iFizBox itself on This iPhone: once installd accepts it, the log and the status say it is closing (B173)", async () => {
+  assert.equal(SELF_CLOSING, "Closing so iOS can finish");
+  assert.equal(SELF_RESTART, SELF_CLOSING, "the older name says the same");
+  const t = await hereRun(SELF_ID, NAME, [["copying", 0.5], ["installing", 0.05], ["installing", 0.3], ["installing", 1]]);
   await flush();
-  assert.ok(t.lines.includes(SELF_RESTART));
-  assert.equal(t.seen[1].run, `Installing ${NAME}: ${SELF_RESTART}`);
-  assert.equal(t.seen[2].status, SELF_RESTART);
+  assert.equal(t.seen[0].status, "Copying to iPhone 50%", "not while copying");
+  assert.equal(t.lines.filter((l) => l === SELF_CLOSING).length, 1, "said once, at installd's first status");
+  assert.equal(t.seen[1].run, `Installing ${NAME}: ${SELF_CLOSING}`);
+  assert.equal(t.seen[1].status, SELF_CLOSING, "from the first percent, not only at 100%");
+  assert.equal(t.seen[2].status, SELF_CLOSING);
+  assert.equal(t.seen[3].status, SELF_CLOSING);
   await t.finish();
+});
+
+test("selfClosing: only iFizBox's own row, on This iPhone, once installd has it (B173)", () => {
+  const row = (o) => ({ id: SELF_ID, mode: "install", here: true, state: "installing", phase: "installing", fraction: 0.05, ...o });
+  assert.equal(selfClosing(row()), true);
+  assert.equal(selfClosing(row({ fraction: 0 })), true, "a 0% status counts");
+  assert.equal(selfClosing(row({ phase: "copying" })), false, "still copying");
+  assert.equal(selfClosing(row({ id: "other" })), false, "another app");
+  assert.equal(selfClosing(row({ here: false, phase: "installing" })), false, "iOS's prompt route: the hosted close follows it");
+  assert.equal(selfClosing(row({ state: "installed" })), false, "ended");
+  assert.equal(selfClosing(row({ state: "asking", phase: "asking" })), false, "the Signing Server's prompt");
+  assert.equal(selfClosing(null), false);
+  assert.equal(rowStatus(row({ id: "other", name: "Other" })), "Installing 5%");
+  assert.equal(rowStatus(row()), SELF_CLOSING);
 });
 
 test("the Signing Server route keeps its words: Asked iOS, Tap Install, iOS is installing", async () => {
@@ -186,7 +204,7 @@ test("single install on This iPhone: Copying / Installing percents, then Install
   forgetRoute();
 });
 
-test("iFizBox's own update on This iPhone: 'will restart' as installd starts (installd ends the app, no reply)", async () => {
+test("iFizBox's own update on This iPhone: 'Closing so iOS can finish' as installd starts (the app closes, no reply)", async () => {
   const { installOnDevice } = await import("./signing-client.js");
   forgetRoute();
   const h = fakeHud();

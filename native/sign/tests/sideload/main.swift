@@ -366,7 +366,7 @@ test("manifest check before iOS gets the link (B30)") {
     check(ManifestCheck.host(of: URL(string: "https://sign.ifizbox.com/sign/manifest?x=1")!) == "sign.ifizbox.com", "host")
 }
 
-test("This iPhone self-update: close once installd stands still (B159)") {
+test("This iPhone self-update: close once installd accepted the install (B159, B173)") {
     let t0 = Date(timeIntervalSince1970: 1_000_000)
     var c = SelfCloseClock()
     check(c.closeAt == nil && !c.due(t0.addingTimeInterval(3600)), "never due while the IPA is still being copied")
@@ -374,17 +374,20 @@ test("This iPhone self-update: close once installd stands still (B159)") {
     check(c.closeAt == t0.addingTimeInterval(SelfCloseClock.firstQuiet), "copied: firstQuiet later")
     check(!c.due(t0.addingTimeInterval(SelfCloseClock.firstQuiet - 1)), "not before firstQuiet")
     check(c.due(t0.addingTimeInterval(SelfCloseClock.firstQuiet)), "installd said nothing: due (stuck on 'iOS is installing it')")
+    check(c.reason.contains("no status"), "the reason says installd was silent")
     c.copied(at: t0.addingTimeInterval(5))
     check(c.copiedAt == t0, "a second copied() doesn't restart the clock")
-    check(c.installd(5, at: t0.addingTimeInterval(1)), "a first percentage moves")
-    check(c.closeAt == t0.addingTimeInterval(1 + SelfCloseClock.quiet), "then quiet after it")
-    check(c.installd(40, at: t0.addingTimeInterval(4)), "a new percentage moves")
-    check(!c.installd(40, at: t0.addingTimeInterval(6)), "the same percentage again doesn't")
-    check(c.closeAt == t0.addingTimeInterval(4 + SelfCloseClock.quiet), "a repeat doesn't restart the clock")
-    check(!c.due(t0.addingTimeInterval(8)) && c.due(t0.addingTimeInterval(9)), "due once 40% stood for quiet")
+    check(c.installd(5, at: t0.addingTimeInterval(1)), "the first status is installd accepting the install")
+    check(c.closeAt == t0.addingTimeInterval(1 + SelfCloseClock.accepted), "close `accepted` after it")
+    check(SelfCloseClock.accepted <= 2, "within a couple of seconds")
+    check(!c.installd(40, at: t0.addingTimeInterval(1.5)), "later statuses change nothing")
+    check(!c.installd(40, at: t0.addingTimeInterval(1.8)), "nor repeats")
+    check(c.closeAt == t0.addingTimeInterval(1 + SelfCloseClock.accepted), "moving percentages never push the close back (B173)")
+    check(!c.due(t0.addingTimeInterval(1.9)) && c.due(t0.addingTimeInterval(2)), "due `accepted` after the first status")
+    check(c.reason == "installd accepted the install (5%)", "the reason names the first status")
     var d = SelfCloseClock()
-    d.installd(10, at: t0)
-    check(d.copiedAt == t0 && d.closeAt == t0.addingTimeInterval(SelfCloseClock.quiet), "a percentage without copied() starts it too")
+    d.installd(0, at: t0)
+    check(d.copiedAt == t0 && d.closeAt == t0.addingTimeInterval(SelfCloseClock.accepted), "a 0% status without copied() counts too")
 }
 
 if failures == 0 { print("all passed") } else { print("\(failures) failed"); exit(1) }

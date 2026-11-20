@@ -110,7 +110,10 @@ export function appRows(jobs = []) {
 
 // B111: the This iPhone route (installd over LocalDevVPN): no iOS prompt. install's progress goes "copying" (the IPA's
 // bytes to iOS) then "installing" (installd's percent), and the row's `here` says it took that route.
-export const SELF_RESTART = `${NAME} will restart`;
+// B173: iFizBox's own IPA: once installd accepted it (its first status), the shell closes iFizBox within a couple of
+// seconds so iOS can finish (iOS 17.4+ installd waits for the running copy to go), so the row and the run say so.
+export const SELF_CLOSING = "Closing so iOS can finish";
+export const SELF_RESTART = SELF_CLOSING; // the older name, still imported by signing-client.js
 export const copyingText = (row) => `Copying ${label(row)} to this iPhone`;
 
 // B91: a row whose iOS prompt closed without iOS asking for the IPA: the user's Cancel or a frozen server, iFizBox
@@ -233,7 +236,7 @@ export function createAppRun({ rows, sign, install, discard = () => {}, reprompt
       else if (phase === "copying") log(r, "step", copyingText(r)); // B111: This iPhone
       else if (phase === "installing" && r.here) {
         log(r, "step", `Installing ${label(r)}`);
-        if (isSelf(r)) log(r, "step", SELF_RESTART); // installd ends iFizBox once it has installed the new one
+        if (isSelf(r)) log(r, "step", SELF_CLOSING); // B173: installd accepted it: the shell closes iFizBox now
       } else if (phase === "installing") log(r, "step", `iOS is installing ${label(r)}`);
       else if (phase === "vpn") log(r, "step", VPN_WAIT); // B110: Open LocalDevVPN: the row waits for it
     }
@@ -533,7 +536,7 @@ export function rowStatus(row, opts = {}) {
       return promptUp(row) ? "Tap Install on the iOS prompt" : "Installing"; // B137: This iPhone has no prompt
     case "installing":
       if (row.phase === "copying") return p > 0 && p < 100 ? `Copying to iPhone ${p}%` : "Copying to iPhone";
-      if (row.here && isSelf(row) && p >= 100) return SELF_RESTART;
+      if (selfClosing(row)) return SELF_CLOSING;
       return p > 0 && p < 100 ? `Installing ${p}%` : "Installing";
     case "installed":
       if (row.mode === "resign") return row.expires ? `Re-signed, expires ${dateText(row.expires, opts)}` : "Re-signed";
@@ -562,7 +565,7 @@ export function runStatus(rows) {
   if (ios && helperRow(ios)) return `${ios.mode === "remove" ? "Removing" : "Installing"} ${label(ios)} (${pos(ios)})`;
   if (ios?.phase === "vpn") return VPN_WAIT;
   if (ios?.phase === "copying") return `Copying ${label(ios)} to iPhone (${pos(ios)})`; // B111: This iPhone
-  if (ios?.here && isSelf(ios)) return `Installing ${label(ios)}: ${SELF_RESTART}`;
+  if (selfClosing(ios)) return `Installing ${label(ios)}: ${SELF_CLOSING}`;
   if (ios) return ios.state === "asking" && promptUp(ios) ? `Tap Install for ${label(ios)} (${pos(ios)})` : `Installing ${label(ios)} (${pos(ios)})`;
   const s = rows.filter((r) => SIGNING.has(r.state));
   if (s.length && s.every(helperRow)) return "Preparing";
@@ -598,6 +601,11 @@ export function runPercent(rows) {
 }
 
 export const isSelf = (row) => row?.id === SELF_ID;
+
+// B173: iFizBox's own row on the This iPhone route once installd took it (phase "installing", any percent, the copy
+// over): the shell is closing iFizBox so iOS can finish -> true. Copying, a prompt, or another app: false.
+export const selfClosing = (row) =>
+  Boolean(row && isSelf(row) && row.here && row.state === "installing" && row.phase === "installing" && row.mode !== "resign");
 
 // B159: iFizBox's own upgrade (job.version newer than job.installed, the running version) whose signed IPA
 // (signing.prepare's version, its CFBundleShortVersionString) isn't newer than the running app: the update must

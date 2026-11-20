@@ -25,7 +25,8 @@ test("This iPhone chosen: Pairing and the VPN's state, and a tap picks", () => {
   assert.deepEqual(picked, ["server"]);
   assert.equal(vpnDetail({ localDevVPN: true }), "On");
   assert.equal(vpnDetail(null), "Unknown");
-  assert.equal(SUB_TITLES.pair, "This iPhone");
+  assert.equal(SUB_TITLES.pair, "Pairing"); // F284: This iPhone is the status page above it
+  assert.equal(SUB_TITLES.iphone, "This iPhone");
 });
 
 test("This iPhone's page: one sentence under the title, no list of benefits", () => {

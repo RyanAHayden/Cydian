@@ -48,6 +48,14 @@ import { rowIcon, SETTING_ICONS, PAGE_ICONS } from "../icons/rowicons.js";
 import { drawInstallation, PAGE as INSTALLATION, SUB_TITLES as INSTALLATION_TITLES } from "./installroute.js";
 import { installationBlock } from "./installroute.js";
 import { ROUTE_KEY } from "../core/installroute.js";
+import { mainPage } from "./installroute.js";
+import { certificateDetail } from "../core/installroute.js";
+import { signedAppRows } from "../core/signing.js";
+
+// F284: Installation & Signing's own sub-pages under signing/ (the main page's Signing rows), sideload build only.
+// How Signing Works stays signing/help.
+export const SIGNING_SUBS = { certificate: "Certificate", server: "Signing Server", apps: "Signed Apps" };
+export const opensSigningSub = ([first, second] = [], on = true) => on && first === "signing" && Boolean(SIGNING_SUBS[second]);
 
 // F271: the sideload build has one Installation & Signing page (Install Apps With and This iPhone's groups on top,
 // the Certificate and Provisioning Profile below) in place of Installation and Signing; #settings/installation and
@@ -103,6 +111,7 @@ export function nav(route) {
   const [first, second] = pathOf(route);
   if (first === LOGS) return { title: logsTitle(second) }; // N4: Console Logs
   if (opensMerged([first, second], merged())) return mergedNav(); // F271
+  if (opensSigningSub([first, second], merged())) return { title: SIGNING_SUBS[second] }; // F284
   if (first === "signing" && second === HELP) return { title: HELP_TITLE }; // F134: the walkthrough
   if (first === INSTALLATION && INSTALLATION_TITLES[second]) return { title: INSTALLATION_TITLES[second] };
   const key = second ?? first;
@@ -149,6 +158,7 @@ function draw({ el, route }) {
   else if ((second ?? first) === "blocked") el.replaceChildren(blockedPage()); // F226
   else if (first === "signing" && second === HELP) drawSigningHelp(el); // F134
   else if (opensMerged([first, second], merged())) drawSigning(el); // F271: Installation & Signing
+  else if (opensSigningSub([first, second], merged())) drawSigningSub(el, second); // F284
   else if (first === INSTALLATION && settings.isShown("installRoute")) drawInstallation(el, second, { store: settings }); // sideload
   else if (second) el.replaceChildren(listPage(second));
   else if (first === "signing") drawSigning(el);
@@ -1259,7 +1269,60 @@ function keptInstallation(el) {
   return box;
 }
 
-async function drawDeviceSigning(el) {
+// F284: Installation & Signing's main page (screens/installroute.js mainPage), built once per page and refreshed in
+// place on every later draw (a setting changed, back from the background, the signing status changed): no rebuild,
+// no row back to its spinner.
+const mainKept = new WeakMap(); // page element → mainPage
+const signingLink = (sub) => format(settingsRoute(["signing", sub]));
+const installLink = (sub) => format(settingsRoute([INSTALLATION, sub]));
+function drawMain(el) {
+  watchReturn();
+  let m = mainKept.get(el);
+  if (!m || m.el.parentNode !== el) {
+    m = mainPage({
+      store: settings,
+      links: { with: installLink("with"), iphone: installLink("iphone"), certificate: signingLink("certificate"), server: signingLink("server"),
+        apps: signingLink("apps"), help: signingLink(HELP) },
+      signing: async () => {
+        const { id, status, failure, kept } = await deviceSigningState(el);
+        if (!failure && typeof CustomEvent === "function") globalThis.dispatchEvent?.(new CustomEvent("ifizbox:signing-status", { detail: kept })); // F244
+        offerInstall(missingStep(status, getServer()) == null); // F177
+        return { certificate: failure ? { text: "Unknown" } : certificateDetail(kept, { staged: Boolean(id?.p12 || id?.profile) }) };
+      },
+      apps: async () => {
+        const n = globalThis.ifizboxNative;
+        try { return String(signedAppRows(await n.call("signing.installed", {})).length); } catch { return ""; }
+      },
+      checkServer: () => checkServer(),
+      host: () => { try { return new URL(getServer()).host; } catch { return ""; } },
+    });
+    mainKept.set(el, m);
+    el.replaceChildren(m.el);
+  }
+  m.refresh();
+}
+
+// F284: the Signing rows' pages: Certificate (the certificate, files, profile, account and options groups, and Share
+// Your Certificate), Signing Server (Server, Check Server, Run Your Own), Signed Apps (Certificate Status and the list).
+const CERTIFICATE_PARTS = ["certificate", "files", "profile", "account", "options"];
+async function drawSigningSub(el, sub) {
+  if (sub === "certificate") return drawDeviceSigning(el, { only: CERTIFICATE_PARTS });
+  watchReturn();
+  const page = document.createElement("div");
+  page.className = "signing-page";
+  if (sub === "server") {
+    page.append(serverGroup(el), grouped([{ footer: `Hands iOS the install manifests when apps don't install straight onto this iPhone, and holds ${NAME}'s own updates.` }]));
+  } else {
+    const { kept } = await deviceSigningState(el);
+    page.append(signingExtras({ identity: kept, redraw: redrawAll, dates: settings.get("showExpiry") }));
+  }
+  const top = el.scrollTop;
+  el.replaceChildren(page);
+  el.scrollTop = top;
+}
+
+async function drawDeviceSigning(el, { only = null } = {}) {
+  if (!only && merged()) return drawMain(el);
   watchReturn();
   const { id, status, failure, kept } = await deviceSigningState(el);
   // F244: Home's certificate tile follows the status this page just read (an import, a removal, a new profile)
@@ -1281,8 +1344,12 @@ async function drawDeviceSigning(el) {
     help: () => helpGroup(),
     install: () => keptInstallation(el), // F271: Install Apps With and This iPhone's groups
   };
-  showSigningPage(el, mergedLayout(signingLayout({ mode: "sideload", certificate: Boolean(kept), staged, profile: split.profile.length > 0,
-    options: settings.sections().some((s) => s.page === "signing") }), merged()), parts);
+  const layout = signingLayout({ mode: "sideload", certificate: Boolean(kept), staged, profile: split.profile.length > 0,
+    options: settings.sections().some((s) => s.page === "signing") });
+  if (only) { // F284: the Certificate page, with Share Your Certificate at its end
+    parts.share = () => helpGroup({ howItWorks: false });
+    showSigningPage(el, [...layout.filter((g) => only.includes(g)), "share"], parts);
+  } else showSigningPage(el, mergedLayout(layout, merged()), parts);
   offerInstall(missingStep(status, getServer()) == null); // F177: Install sent the user here: Install Now once ready
 }
 
@@ -1423,10 +1490,10 @@ async function copyUdid(udid, e) {
 
 const SIDEDROP = "https://github.com/RyanAHayden/sidedrop";
 // How Signing Works, then Share Your Certificate: SideDrop, a site the certificate's owner runs so friends can sideload too.
-const helpGroup = () => {
+const helpGroup = ({ howItWorks = true } = {}) => {
   const f = document.createDocumentFragment();
-  f.append(grouped([{ rows: [{ label: HELP_TITLE, href: format(settingsRoute(["signing", HELP])), icon: rowIcon("help") }] }]),
-    grouped([{ rows: [{ label: "Share Your Certificate", subtitle: "Help your friends sideload with SideDrop", chevron: true,
+  if (howItWorks) f.append(grouped([{ rows: [{ label: HELP_TITLE, href: format(settingsRoute(["signing", HELP])), icon: rowIcon("help") }] }]));
+  f.append(grouped([{ rows: [{ label: "Share Your Certificate", subtitle: "Help your friends sideload with SideDrop", chevron: true,
       icon: rowIcon("shareCert"), onClick: () => window.open(SIDEDROP, "_blank", "noopener") }],
     footer: "Have a developer account? Run SideDrop, a site of your own: friends register their iPhone once and every app is "
       + "signed for them with your certificate. Anyone who installs from it can pull the certificate out, so share it only with people you trust." }]));

@@ -1,8 +1,10 @@
-// Settings > Installation & Signing's top half (sideload build, docs/settings.md): Install Apps With Signing Server /
-// This iPhone, and the This iPhone route's page (core/installroute.js holds the rules and texts):
-//   installation       the merged page (screens/settings.js draws it, with installationBlock below at its top):
-//                      the choice, then (This iPhone) Pairing and the VPN's state
-//   installation/pair  This iPhone, one page that runs by itself (core setupState): one sentence on what it gives,
+// Settings > Installation & Signing's install side (sideload build, docs/settings.md): Install Apps With Signing Server /
+// This iPhone, and the This iPhone route's pages (core/installroute.js holds the rules and texts):
+//   installation       the merged page (screens/settings.js draws it from mainPage below: F284's status cell and
+//                      rows, built once and filled in place)
+//   installation/with  Install Apps With: the choice
+//   installation/iphone This iPhone: Pairing, Developer Mode, the VPN, Open LocalDevVPN, Connect With, Tailscale
+//   installation/pair  Pairing, one page that runs by itself (core setupState): one sentence on what it gives,
 //                      drawn at once with a spinner while it checks, then the VPN: which way is decided from the VPN
 //                      apps installed (core vpnRoute: LocalDevVPN's Open, Tailscale's Sign In and Open, a choice when
 //                      both are, Install LocalDevVPN when neither is; rechecked when the app comes back), then
@@ -23,11 +25,14 @@ import { ROUTE_KEY, ROUTE_OPTIONS, VPNS, VPN_POLL, vpnList, vpnOn, IPHONE_INTRO,
 import { ringStyle, vpnWaitText } from "../core/installroute.js";
 import { developerModeInfo, canReadDeveloperMode } from "../core/installroute.js";
 import { leaveQuestion, LEAVE } from "../core/installroute.js";
+import { tailscaleVPNOn, installStatus, CHECKING, STATUS_ACTIONS, serverDetail } from "../core/installroute.js";
 import { NAME } from "../brand.js";
 import { showHUD } from "../nav/hud.js";
 
 export const PAGE = "installation";
-export const SUB_TITLES = { pair: "This iPhone" };
+// F284: Installation & Signing's main page links to Install Apps With (`with`, the choice) and This iPhone (`iphone`:
+// Pairing, Developer Mode, the VPN, Connect With and Tailscale); This iPhone's Pairing row opens the setup (`pair`).
+export const SUB_TITLES = { pair: "Pairing", iphone: "This iPhone", with: "Install Apps With" };
 const VPN = VPNS[0];
 
 const route = (sub) => format(settingsRoute(sub ? [PAGE, sub] : [PAGE]));
@@ -72,6 +77,7 @@ function spinRows(frag, sections) {
 export function vpnDetail(st) {
   if (!st) return "Unknown";
   if (st.localDevVPN) return "On";
+  if (tailscaleVPNOn(st)) return "Off"; // F284: Tailscale's VPN is the route, not another VPN
   return st.otherVPN ? "Another VPN" : "Off";
 }
 
@@ -131,7 +137,7 @@ export function installationGroups(choice, st, { pick = () => {}, openVPN = () =
 export async function drawInstallation(el, sub, { store, native = globalThis.ifizboxNative, alert = showAlert } = {}) {
   const redraw = () => drawInstallation(el, sub, { store, native, alert });
   if (sub === "pair") return drawPair(el, { store, native, alert, redraw });
-  return paintInstallation(el, { store, native, alert, redraw });
+  return paintInstallation(el, { store, native, alert, redraw, sub: SUB_TITLES[sub] ? sub : null });
 }
 
 // F271: the choice and This iPhone's groups as a box of their own, for the top of Settings > Installation & Signing
@@ -153,8 +159,11 @@ export function pickRoute(v, known, { set, open }) {
   return open("pair");
 }
 
-async function paintInstallation(el, { store, native, alert, redraw }) {
-  const choice = store.get(ROUTE_KEY);
+// F284: `sub` "with" draws only the Install Apps With group, "iphone" only This iPhone's groups (whatever the choice).
+export const subGroups = (sections, sub) => (sub === "with" ? sections.slice(0, 1) : sub === "iphone" ? sections.slice(1) : sections);
+
+async function paintInstallation(el, { store, native, alert, redraw, sub = null }) {
+  const choice = sub === "iphone" ? "iphone" : store.get(ROUTE_KEY);
   let known = null; // idevice.status once read, for the tap above
   let devMode = null; // idevice.developerMode's `on`, once read
   const paint = (st, { reading = false, devModeReading = false } = {}) => {
@@ -175,11 +184,14 @@ async function paintInstallation(el, { store, native, alert, redraw }) {
       },
       busy: signingIn,
     });
-    el.replaceChildren(spinRows(warnFooters(sections), sections));
+    const shown = subGroups(sections, sub);
+    const frag = spinRows(warnFooters(shown), shown);
+    for (const d of frag.querySelectorAll?.(".cell-detail") ?? []) if (d.textContent === "Another VPN") d.classList.add("install-red");
+    el.replaceChildren(frag);
   };
   paint(null, { reading: true });
   known = await status(native); // read for the Signing Server choice too, so a tap on This iPhone knows the pairing
-  if (choice !== "iphone") return;
+  if (choice !== "iphone" || sub === "with") return;
   const dmAsk = canReadDeveloperMode(known);
   paint(known, { devModeReading: dmAsk });
   if (!dmAsk) return;
@@ -233,6 +245,118 @@ async function openVPN(native, alert) {
   let r = null;
   try { r = await busy(`Opening ${VPN}`, () => call(native, "idevice.openLocalDevVPN")); } catch { /* below */ }
   if (!r?.opened) await alert({ title: `${VPN} Isn't Installed`, message: `Get ${VPN} from the App Store, open it and turn it on.`, buttons: ["OK"] });
+}
+
+// ---- Installation & Signing's main page (F284, option B of the concept)
+// Built once and updated in place: every row is there from the first frame, and an answer from the bridge only fills
+// a slot (the grey spinner while it loads, then the value fades in: opacity only, settings.css .value-slot). Answers
+// never add or remove rows or change footers; only a tap changes the layout (by opening another page).
+//   (top)         the status cell (core installStatus: two lines, always two lines tall) and one action row whose
+//                 label changes (Check Connection, Open LocalDevVPN, Start Pairing, Sign In to Tailscale…)
+//   Installation  Install Apps With > (installation/with), This iPhone > (installation/iphone): Paired / Not Paired
+//   Signing       Certificate > (days left), Signing Server > (This iPhone while installs go here, else its host),
+//                 Signed Apps > (count)
+//   How Signing Works >
+// `links` holds the hrefs, `signing()` resolves {certificate: {text, red}}, `apps()` the Signed Apps count (text),
+// `checkServer` is Settings' Check Server and `host()` the Signing Server's host.
+export const MAIN_ROWS = ["status", "action", "with", "iphone", "certificate", "server", "apps", "help"];
+
+function slotOf(node, waitText = null) {
+  const value = el("span", "slot-value");
+  const wait = el("span", "slot-wait", waitText);
+  if (waitText == null) { wait.className = "slot-wait loading-spinner"; wait.setAttribute("aria-hidden", "true"); }
+  node.classList.add("value-slot", "is-loading");
+  node.replaceChildren(value, wait);
+  return { node, value,
+    set(text, { red = false } = {}) { value.textContent = text ?? ""; value.classList.toggle?.("install-red", red); node.classList.remove("is-loading"); },
+    wait() { node.classList.add("is-loading"); } };
+}
+
+export function mainPage({ store, native = globalThis.ifizboxNative, alert = showAlert, links, signing = async () => null, apps = async () => "",
+  checkServer = () => {}, host = () => "" } = {}) {
+  const box = el("div", "signing-page install-main");
+  let now = CHECKING; // the status cell's answer (core installStatus)
+  let busyNow = false;
+  const act = async () => {
+    if (now === CHECKING || busyNow) return;
+    busyNow = true;
+    try { await runAction(now.action); } finally { busyNow = false; }
+  };
+  const sections = [
+    { rows: [{ label: "", subtitle: " ", cls: "install-status" }, { label: STATUS_ACTIONS.check, cls: "install-action", onClick: act }] },
+    { header: "Installation", rows: [{ label: "Install Apps With", detail: "", href: links.with }, { label: "This iPhone", detail: "", href: links.iphone }] },
+    { header: "Signing", rows: [{ label: "Certificate", detail: "", href: links.certificate }, { label: "Signing Server", detail: "", href: links.server },
+      { label: "Signed Apps", detail: "", href: links.apps }] },
+    { rows: [{ label: "How Signing Works", href: links.help }] },
+  ];
+  box.append(grouped(sections));
+  const cells = [...box.querySelectorAll(".cell-inner")];
+  const [statusCell, actionCell] = cells;
+  const icon = el("span", "status-icon tone-wait");
+  icon.setAttribute("aria-hidden", "true");
+  statusCell.prepend(icon);
+  const title = slotOf(statusCell.querySelector(".cell-label"), CHECKING.title);
+  const subtitle = slotOf(statusCell.querySelector(".cell-subtitle"), CHECKING.subtitle);
+  const actionLabel = actionCell.querySelector(".cell-label");
+  actionCell.classList.add("is-dim");
+  actionCell.setAttribute("aria-disabled", "true");
+  const slots = {};
+  ["with", "iphone", "certificate", "server", "apps"].forEach((k, i) => { slots[k] = slotOf(cells[i + 2].querySelector(".cell-detail")); });
+
+  let known; // idevice.status once read
+  const paintStatus = (s) => {
+    now = s;
+    icon.className = `status-icon tone-${s.tone}`;
+    title.set(s.title, { red: Boolean(s.red) });
+    subtitle.set(s.subtitle);
+    actionLabel.textContent = STATUS_ACTIONS[s.action];
+    const dim = s === CHECKING;
+    actionCell.classList.toggle("is-dim", dim);
+    if (dim) actionCell.setAttribute("aria-disabled", "true"); else actionCell.removeAttribute?.("aria-disabled");
+  };
+  // Each source's answers land in order: an older read never paints over a newer one.
+  let asked = 0, statusShown = 0, signingShown = 0, appsShown = 0, lastChoice = null;
+  const refresh = async () => {
+    const n = ++asked;
+    const choice = store.get(ROUTE_KEY);
+    const h = host();
+    slots.with.set(ROUTE_OPTIONS.find((o) => o.value === choice)?.label ?? "");
+    if (choice !== "iphone") { paintStatus(installStatus(choice, undefined, { host: h })); slots.server.set(h); }
+    else if (lastChoice && lastChoice !== choice) { paintStatus(CHECKING); title.wait(); subtitle.wait(); slots.server.wait(); } // just picked
+    lastChoice = choice;
+    const reads = [
+      status(native).then((st) => {
+        if (n < statusShown) return;
+        statusShown = n;
+        known = st;
+        const s = installStatus(store.get(ROUTE_KEY), st, { host: h });
+        paintStatus(s);
+        slots.iphone.set(st ? (st.paired ? "Paired" : "Not Paired") : "Unknown");
+        slots.server.set(serverDetail(s, h));
+      }),
+      Promise.resolve().then(signing).catch(() => null).then((v) => {
+        if (n < signingShown) return;
+        signingShown = n;
+        slots.certificate.set(v?.certificate?.text ?? "Unknown", { red: Boolean(v?.certificate?.red) });
+      }),
+      Promise.resolve().then(apps).catch(() => "").then((v) => {
+        if (n < appsShown) return;
+        appsShown = n;
+        slots.apps.set(v ?? "");
+      }),
+    ];
+    await Promise.all(reads);
+  };
+  const runAction = async (a) => {
+    if (a === "check") return check(native, alert, refresh, store).then(refresh);
+    if (a === "checkServer") return checkServer();
+    if (a === "openVPN") return openVPN(native, alert).then(refresh);
+    if (a === "pair") return goTo("pair");
+    if (a === "signIn") return tailscaleSignIn(native, alert, refresh);
+    if (a === "openTailscale") return openApp(native, alert, TAILSCALE_URL, "Tailscale");
+    if (a === "useTailscale") { await busy("Switching", () => call(native, "tailscale.setConnect", { value: "auto" }).catch(() => {})); return refresh(); }
+  };
+  return { el: box, refresh, known: () => known, status: () => now };
 }
 
 // ---- This iPhone's page

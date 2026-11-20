@@ -31,6 +31,7 @@
 import { el, segmented } from "../nav/ui.js";
 import { showAlert } from "../nav/alert.js";
 import { showActionSheet } from "../nav/actionsheet.js";
+import { showSheet } from "../nav/sheet.js";
 import { ratingsCard, reviewCell, appStoreCard } from "./storepage.js";
 import { checkDraft, mergeReviews, ourReview, withStars, LIMITS, buildRating, pageRating, compactCount, appStoreReview } from "../core/reviews.js";
 
@@ -72,24 +73,10 @@ function field(label, { value = "", placeholder = "", max, multiline = false }) 
 
 export function writeReviewSheet({ initial = null, version = "", onSend = async () => {}, footnote = null, onClose = () => {},
   onDelete = null, confirmDelete = confirmDeleteReview } = {}) {
-  const sheet = el("div", "sheet review-sheet");
-  sheet.setAttribute("role", "dialog");
-  sheet.setAttribute("aria-modal", "true");
-  sheet.setAttribute("aria-label", "Write a Review");
-  const bar = el("header", "navbar sheet-bar");
-  const row = el("div", "sheet-bar-row");
   const cancel = el("button", "bar-button", "Cancel");
   cancel.type = "button";
   const send = el("button", "bar-button done", "Send");
   send.type = "button";
-  const left = el("div", "sheet-left");
-  left.append(cancel);
-  const right = el("div", "sheet-right");
-  right.append(send);
-  row.append(left, el("h1", "nav-title", "Write a Review"), right);
-  bar.append(row);
-
-  const body = el("div", "sheet-body review-sheet-body");
   const scroll = el("div", "sheet-scroll review-sheet-scroll");
   const stars = starPicker(initial?.stars ?? 0, () => { error.hidden = true; });
   const rate = el("div", "review-rate");
@@ -115,23 +102,9 @@ export function writeReviewSheet({ initial = null, version = "", onSend = async 
     wrap.append(del);
     scroll.append(wrap);
   }
-  body.append(scroll);
-  sheet.append(bar, body);
-  document.body.append(sheet);
-  const ease = "cubic-bezier(.25,.1,.25,1)";
-  sheet.animate?.([{ transform: "translateY(100%)" }, { transform: "none" }], { duration: 350, easing: ease });
-
-  let closed = false;
-  function close() {
-    if (closed) return;
-    closed = true;
-    document.removeEventListener?.("keydown", onKey);
-    const end = () => { sheet.remove(); onClose(); };
-    const a = sheet.animate?.([{ transform: "none" }, { transform: "translateY(100%)" }], { duration: 300, easing: ease, fill: "forwards" });
-    if (a?.finished) a.finished.then(end, end); else end();
-  }
-  const onKey = (e) => { if (e.key === "Escape") close(); };
-  document.addEventListener?.("keydown", onKey);
+  const close = showSheet({ title: "Write a Review", body: scroll, left: cancel, right: send, cls: "review-sheet",
+    bodyCls: "review-sheet-body", onClose });
+  const { sheet } = close;
   const showError = (msg) => { error.textContent = msg; error.hidden = false; };
 
   let busy = false;
@@ -164,10 +137,10 @@ export function writeReviewSheet({ initial = null, version = "", onSend = async 
       return false;
     } finally { busy = false; send.disabled = del.disabled = false; }
   }
-  cancel.addEventListener("click", close);
+  cancel.addEventListener("click", () => close());
   send.addEventListener("click", doSend);
   del?.addEventListener("click", doDelete);
-  return { sheet, close, send: doSend, remove: doDelete, deleteButton: del, stars, fields, error, closed: () => closed };
+  return { sheet, close: () => close(), send: doSend, remove: doDelete, deleteButton: del, stars, fields, error, closed: close.closed };
 }
 
 const resolved = (p) => Promise.resolve(p).catch(() => null);

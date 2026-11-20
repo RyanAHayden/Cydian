@@ -74,22 +74,34 @@ test("text stays readable: body text 7:1, subtitles, headers, details and links 
 });
 
 // C49: eras (docs/eras.md) restyle the chrome through ios6.css's look tokens, so the light palettes set those tokens
-// rather than paint the nav bar and bar buttons with rules an era rule could not outrank. Brushed Metal's etched
-// text is the one rule left on them (its dark text skips Done and the red button, which a token cannot).
+// rather than paint the nav bar, bar buttons, search bar and header band with rules an era rule could not outrank.
+// Brushed Metal's etched text is the one rule left on them, text only (its dark text skips Done and the red button,
+// which a token cannot); the App Store segmented control keeps rules until ios6.css gives it tokens.
 const rules = [...palettes.replace(/\/\*[\s\S]*?\*\//g, "").matchAll(/([^{}]+)\{([^}]*)\}/g)].map((m) => ({ sel: m[1].trim(), body: m[2] }));
+const packages = read("./packages.css");
 
-test("no palette rule paints the nav bar, bar buttons or back arrow: they ride ios6.css's tokens", () => {
-  for (const { sel } of rules) {
-    if (sel.startsWith('html[data-theme="light"][data-palette="metal"]')) continue;
-    assert.doesNotMatch(sel, /\.navbar|\.bar-button/, sel);
+test("no palette rule paints the nav bar, bar buttons, search and scope bars or header band: they ride tokens", () => {
+  const chrome = /\.navbar|\.bar-button|\.search-(bar|scope|field|cancel)|\.scope-(segment|filter)|\.store-head/;
+  for (const { sel, body } of rules) {
+    if (!chrome.test(sel)) continue;
+    assert.ok(sel.startsWith('html[data-theme="light"][data-palette="metal"] '), sel);
+    for (const [, prop] of body.matchAll(/([\w-]+)\s*:/g)) assert.ok(["color", "text-shadow", "filter"].includes(prop), `${sel}: ${prop}`);
   }
   const map = rules.find((r) => /^html\[data-theme="light"\]:is\([^)]*\)$/.test(r.sel));
   assert.ok(map, "the light palettes' token block");
   const set = tokens(map.body);
-  for (const k of ["--nav-bar", "--bar-btn", "--bar-btn-edge", "--bar-btn-edge-top", "--bar-btn-pressed",
-    "--bar-btn-pressed-edge", "--bar-btn-pressed-edge-top", "--bar-back", "--bar-back-pressed"]) {
-    assert.match(ios6, new RegExp(`var\\(${k}\\)`), `ios6.css reads ${k}`);
-    assert.match(set.get(k) ?? "", /^var\(--lt-[\w-]+\)$/, `${k} from an --lt-* token`);
+  const expect = [
+    [ios6, ["--nav-bar", "--bar-btn", "--bar-btn-edge", "--bar-btn-edge-top", "--bar-btn-pressed", "--bar-btn-pressed-edge",
+      "--bar-btn-pressed-edge-top", "--bar-back", "--bar-back-pressed"]],
+    [packages, ["--search-bar", "--search-bar-scoped", "--search-scope", "--search-field-edge", "--search-field-edge-top",
+      "--search-cancel", "--search-cancel-pressed", "--search-cancel-edge", "--search-cancel-edge-top", "--search-cancel-edge-bottom",
+      "--scope-seg", "--scope-seg-edge", "--scope-seg-edge-top", "--scope-seg-edge-bottom", "--scope-seg-divider",
+      "--scope-seg-selected", "--scope-seg-selected-edge", "--scope-seg-selected-edge-top", "--scope-seg-selected-edge-bottom",
+      "--scope-seg-selected-divider", "--store-head", "--store-head-edge"]],
+  ];
+  for (const [css, keys] of expect) for (const k of keys) {
+    assert.match(css, new RegExp(`var\\(${k}\\)`), `read: ${k}`);
+    assert.match(set.get(k) ?? "", /var\(--lt-[\w-]+\)/, `${k} from an --lt-* token`);
   }
 });
 

@@ -4,7 +4,7 @@
 //
 //   node shots.mjs <web/app dir> <out dir> [--pressed]
 //
-// For each theme (Classic, Sepia, Solarized, OLED Black, Gunmetal, Midnight) it opens Home, Settings, a Settings page pushed from
+// For each theme (Classic, Sepia, Solarized, Legal Pad, Brushed Metal, OLED Black, Gunmetal, Midnight) it opens Home, Settings, a Settings page pushed from
 // it, Sources, Changes, Installed and Search in the app shell (data-shell="app", fake bridge), plus Home and Settings
 // on the website (Classic), at 390x844 and deviceScaleFactor 3. Animations are frozen at their first frame.
 // Writes <name>.png and <name>.json (every element's and ::before/::after's computed style under the nav bar, the

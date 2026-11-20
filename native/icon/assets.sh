@@ -11,6 +11,8 @@
 # its dark appearance), and every alternate set Info.plist's CFBundleAlternateIcons lists (F323: the icon follows the
 # theme, Sources/AppIcon.swift). iOS reads AppIcon from Assets.car for notifications, Settings and Spotlight; with the
 # name set and no catalog it shows a blank placeholder there. native/test_icons.py checks every set and size.
+# F324: every set also gets an Icon Composer document of the same name (icon/glass.py), so iOS 26+ draws it in Liquid
+# Glass (Clear, Tinted, Dark); needs Xcode 26's actool.
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -20,9 +22,12 @@ compile() {
   local alts=() name
   for name in $(cd "$1/Assets.xcassets" && ls -d Icon-*.appiconset); do alts+=(--alternate-app-icon "${name%.appiconset}"); done
   mkdir -p "$1/out"
+  # F324: each set's Icon Composer document (icon/glass.py), same name as its .appiconset: iOS 26+ draws the .icon
+  # in Liquid Glass, iOS 15-25 the PNGs.
+  local glass=("$1"/glass/*.icon)
   xcrun actool --compile "$1/out" --platform iphoneos --minimum-deployment-target 15.0 --target-device iphone \
     --app-icon AppIcon "${alts[@]}" --output-partial-info-plist "$1/partial.plist" \
-    --errors --warnings --output-format human-readable-text "$1/Assets.xcassets" > "$1/actool.log" 2>&1 ||
+    --errors --warnings --output-format human-readable-text "$1/Assets.xcassets" "${glass[@]}" > "$1/actool.log" 2>&1 ||
     { cat "$1/actool.log" >&2; exit 1; }
   # A set actool didn't take whole ("unassigned children": a dark appearance dropped) is a broken icon: stop.
   if grep -i -E "warning|error" "$1/actool.log" >&2; then echo "icon assets: actool complained (above)" >&2; exit 1; fi
@@ -35,6 +40,8 @@ work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 python3 alternates.py catalog "$work/plain" >/dev/null
 python3 alternates.py catalog "$work/lite" --lite >/dev/null
+python3 glass.py write "$work/plain/glass" >/dev/null
+python3 glass.py write "$work/lite/glass" >/dev/null
 
 if [ "$(uname)" != Darwin ]; then
   host=${1:?"icon assets: run on a Mac, or give a Mac's ssh host"}
@@ -50,4 +57,5 @@ else
 fi
 # The PNGs the .car files were compiled from, so native/test_icons.py notices icons changed without a rerun.
 python3 alternates.py sources > assets.sources
+python3 glass.py sources >> assets.sources
 echo "icon assets: wrote native/icon/Assets.car, AssetsLite.car and assets.sources"

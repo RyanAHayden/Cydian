@@ -14,6 +14,7 @@ import carfile  # noqa: E402
 from test_native import plist  # noqa: E402
 sys.path.insert(0, os.path.join(HERE, "icon"))
 import alternates  # noqa: E402
+import glass  # noqa: E402
 
 ICON = os.path.join(HERE, "icon")
 APP = "Payload/iFizBox.app/"
@@ -51,6 +52,7 @@ class Catalogs(unittest.TestCase):
         with open(os.path.join(ICON, "assets.sources")) as f:
             recorded = dict(reversed(line.split()) for line in f if line.strip())
         now = alternates.sources()
+        now.update(glass.sources())  # F324: the .icon documents too
         self.assertEqual(sorted(recorded), sorted(now), "rerun native/icon/assets.sh <mac host>")
         for name, digest in now.items():
             self.assertEqual(recorded[name], digest,
@@ -238,6 +240,80 @@ class Alternates(unittest.TestCase):
             self.assertEqual(sorted(os.listdir(d)), sorted(i + ".png" for i in alternates.icons()))
             with open(os.path.join(d, "sepia.png"), "rb") as f:
                 self.assertEqual(f.read(), read(os.path.join("themes", "sepia", "AppIconLite60x60@3x.png")))
+
+
+class Glass(unittest.TestCase):
+    """F324: every icon set also has an Icon Composer document (icon/glass.py), which iOS 26+ draws in Liquid Glass;
+    the PNG sets above stay for iOS 15-25."""
+
+    @classmethod
+    def setUpClass(cls):
+        import tempfile
+        cls.tmp = tempfile.TemporaryDirectory()
+        glass.write(cls.tmp.name)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.tmp.cleanup()
+
+    def doc(self, name):
+        import json
+        with open(os.path.join(self.tmp.name, name + ".icon", "icon.json")) as f:
+            return json.load(f)
+
+    def test_one_document_per_set(self):
+        want = ["AppIcon"] + list(alternates.sets())
+        self.assertEqual(list(glass.all_sets()), want)
+        self.assertEqual(sorted(n[:-5] for n in os.listdir(self.tmp.name)), sorted(want))
+
+    def test_every_layer_image_is_in_the_bundle(self):
+        for name in glass.all_sets():
+            with self.subTest(set=name):
+                doc = self.doc(name)
+                assets = set(os.listdir(os.path.join(self.tmp.name, name + ".icon", "Assets")))
+                used = set()
+                for group in doc["groups"]:
+                    for layer in group["layers"]:
+                        used.update(s["value"] for s in layer["image-name-specializations"])
+                self.assertEqual(used, assets)
+                self.assertEqual(doc["supported-platforms"], {"squares": ["iOS"]})
+
+    def test_dark_appearance_is_the_dark_icon(self):
+        for name, (light, dark) in glass.all_sets().items():
+            with self.subTest(set=name):
+                doc = self.doc(name)
+                fills = {s.get("appearance", "any"): s["value"]["linear-gradient"] for s in doc["fill-specializations"]}
+                self.assertEqual(fills["any"], [glass.srgb(c) for c in glass.colours(light)["fill"]])
+                self.assertEqual(fills["dark"], [glass.srgb(c) for c in glass.colours(dark)["fill"]])
+                grid = doc["groups"][0]["layers"][0]["image-name-specializations"]
+                self.assertEqual(grid, [{"value": light + "-grid.svg"}, {"appearance": "dark", "value": dark + "-grid.svg"}])
+        self.assertEqual(glass.all_sets()["AppIcon"], alternates.PRIMARY)
+        self.assertEqual(glass.all_sets()["Icon-sepia"], ("sepia", "sepia"))
+
+    def test_glass_layers_and_order(self):
+        doc = self.doc("AppIcon")
+        self.assertEqual([[l["name"] for l in g["layers"]] for g in doc["groups"]], [["grid"], ["sphere", "rim"]])
+        self.assertTrue(all(l["glass"] for g in doc["groups"] for l in g["layers"]))
+        self.assertTrue(all(g["specular"] for g in doc["groups"]))
+
+    def test_colours_follow_the_theme_table(self):
+        """Every theme's layers take that theme's colours (tools/icon_themes.py), all different from Classic's."""
+        names = theme_names()
+        seen = {}
+        for t in names + ["clear"]:
+            c = glass.colours(t)
+            for key in ("rim", "sphere", "grid"):
+                self.assertRegex(c[key][0], r"^[0-9a-f]{6}$")
+            self.assertEqual(len(c["fill"]), 2)
+            seen[t] = (tuple(c["fill"]), c["sphere"], c["grid"])
+        self.assertEqual(len(set(seen.values())), len(seen), "two icons came out the same")
+        self.assertEqual(glass.colours("classic")["grid"][0], "5a6473")  # tools/icon.svg.in's ink
+
+    def test_svg_layers_are_well_formed(self):
+        import xml.etree.ElementTree as ET
+        for layer, text in glass.layer_svgs("nord").items():
+            root = ET.fromstring(text)
+            self.assertEqual(root.get("viewBox"), "0 0 1024 1024", layer)
 
 
 if __name__ == "__main__":

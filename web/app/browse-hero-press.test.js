@@ -8,7 +8,8 @@ import { readFileSync } from "node:fs";
 const strip = (s) => s.replace(/\/\*[\s\S]*?\*\//g, "");
 const app = readFileSync(new URL("./app.js", import.meta.url), "utf8");
 const css = strip(readFileSync(new URL("./packages.css", import.meta.url), "utf8"));
-const rule = (sel) => [...css.matchAll(/([^{}]+)\{([^}]*)\}/g)].find(([, s]) => s.trim() === sel)?.[2] ?? "";
+// Every rule of the selector together (C46: a rule's layout and its look-only half are two rules).
+const rule = (sel) => [...css.matchAll(/([^{}]+)\{([^}]*)\}/g)].filter(([, s]) => s.trim() === sel).map((m) => m[2]).join(";");
 
 test("the loaded card (a link) is pressable; the loading placeholder is not", () => {
   const list = /const PRESSABLE = "([^"]+)"/.exec(app)[1].split(",").map((s) => s.trim());

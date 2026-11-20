@@ -280,7 +280,7 @@ test("F195: Size keeps its unit in the value, the price under it; the row counts
   t.set("size", null);
   assert.equal(t.row.dataset.count, "1");
   const css = readFileSync(new URL("../packages.css", import.meta.url), "utf8");
-  const card = css.match(/\.store-tiles \{[^}]*\}/s)[0];
+  const card = [...css.matchAll(/\n\.store-tiles \{[^}]*\}/gs)].join("\n"); // C46: its layout rule and its look-only rule
   for (const want of ["margin: 16px 10px 0", "var(--table)", "var(--table-edge)", "border-radius: 9.5px", "overflow-x: auto"]) assert.ok(card.includes(want), want);
   assert.match(css, /\.store-tile \{[^}]*flex: 1 1 0/s);
   assert.match(css, /\.store-tile \+ \.store-tile \{[^}]*var\(--divider\)[^}]*var\(--divider-hi\)/s);
@@ -313,7 +313,8 @@ test("B41: a Related row's icon: the picture over the letter tile, the letter al
   // The CSS sizes and clips the picture to the tile and hides it until it loads (the bug: it drew at its own size).
   const css = readFileSync(new URL("../packages.css", import.meta.url), "utf8");
   assert.match(css, /\.store-related-icon \{[^}]*position: relative[^}]*overflow: hidden/s);
-  assert.match(css, /\.store-related-icon img \{[^}]*position: absolute[^}]*inset: 0[^}]*width: 100%[^}]*height: 100%[^}]*opacity: 0/s);
+  assert.match(css, /\.store-related-icon img \{[^}]*position: absolute[^}]*inset: 0[^}]*width: 100%[^}]*height: 100%/s);
+  assert.match(css, /\.store-related-icon img \{[^}]*opacity: 0/s); // C46: in its look-only rule
   assert.match(css, /\.store-related-icon img\.loaded \{[^}]*opacity: 1/s);
 });
 

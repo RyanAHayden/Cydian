@@ -68,7 +68,7 @@ import { onPageShow, patchDetails, cellsOf } from "../nav/pagestate.js";
 import { refreshInstallation } from "./installroute.js";
 import { loadStyle, EASE, DURATION } from "../nav/motion.js";
 import { APP_ICONS, iconGroups } from "../core/settings.js";
-import { nativeIcons, iconSrc, iconOf, iconImage, refreshIcons, tellIcon } from "../appicon.js";
+import { nativeIcons, iconSrc, iconOf, iconImage, refreshIcons, tellIcon, clearHere } from "../appicon.js";
 
 // F284: Installation & Signing's own sub-pages under signing/ (the main page's Signing rows), sideload build only.
 // How Signing Works stays signing/help.
@@ -623,7 +623,7 @@ function appIconGroups() {
 }
 
 // Theme > App Icon > Light / Dark: a grid of icons in groups (core/settings.js iconGroups: this mode's themes, then
-// Clear and the other mode's), the icon this mode has now checked. A tap picks it for this mode (the shell switches
+// Clear and the other mode's; Clear only from iOS 18 on), the icon this mode has now checked. A tap picks it for this mode (the shell switches
 // at once: applyTheme's tellIcon) and the page redraws with the check on it.
 function iconPage(key) {
   const d = defOf(key);
@@ -631,7 +631,7 @@ function iconPage(key) {
   loadStyle("appicon.css");
   const now = iconOf(d.iconTone);
   const frag = document.createDocumentFragment();
-  for (const g of iconGroups(d.iconTone)) {
+  for (const g of iconGroups(d.iconTone, { clear: clearHere() })) { // no Clear below iOS 18
     const group = document.createElement("div");
     group.className = "group";
     const head = Object.assign(document.createElement("h2"), { className: "group-header", textContent: g.header });

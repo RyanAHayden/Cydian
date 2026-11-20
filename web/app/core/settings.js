@@ -904,10 +904,18 @@ export function iconState(get, onScreen) {
 
 // F323: Theme > App Icon > Light / Dark's grid: "Themes", that tone's themes; "Special", Clear and the other tone's
 // themes (any icon works in either mode). Each group's cells are APP_ICONS entries.
-export function iconGroups(tone) {
+// `clear`: whether Clear is offered (clearOffered: not below iOS 18, user 2026-11-20).
+export function iconGroups(tone, { clear = true } = {}) {
   const t = tone === "dark" ? "dark" : "light";
   return [
     { header: "Themes", icons: APP_ICONS.filter((i) => i.tone === t) },
-    { header: "Special", icons: [APP_ICONS.find((i) => i.value === "clear"), ...APP_ICONS.filter((i) => i.tone && i.tone !== t)] },
+    { header: "Special", icons: [...(clear ? [APP_ICONS.find((i) => i.value === "clear")] : []), ...APP_ICONS.filter((i) => i.tone && i.tone !== t)] },
   ];
+}
+
+// F323 (user 2026-11-20): Clear, like iOS's own clear and tinted icons, is for iOS 18 and later; phones below that
+// (the iPhone 7 on iOS 15) aren't offered it. `ios`: "15.8.8"; unknown (null) offers it.
+export function clearOffered(ios) {
+  const major = parseInt(String(ios ?? ""), 10);
+  return !Number.isFinite(major) || major >= 18;
 }

@@ -1,8 +1,8 @@
 // F323: the app icon follows the theme (core/settings.js iconFor/iconState/iconGroups, appicon.js tellIcon).
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createSettings, iconFor, iconState, iconGroups, APP_ICONS, LIGHT_PALETTES, DARK_PALETTES } from "./core/settings.js";
-import { iconMessage, tellIcon, resetTold, iconSrc } from "./appicon.js";
+import { createSettings, iconFor, iconState, iconGroups, clearOffered, APP_ICONS, LIGHT_PALETTES, DARK_PALETTES } from "./core/settings.js";
+import { iconMessage, tellIcon, resetTold, iconSrc, clearHere } from "./appicon.js";
 
 function memStorage() {
   const m = new Map();
@@ -68,6 +68,19 @@ test("the grid: this mode's themes, then Clear and the other mode's", () => {
   for (const tone of ["light", "dark"]) {
     assert.deepEqual(iconGroups(tone).flatMap((g) => g.icons.map((i) => i.value)).sort(), APP_ICONS.map((i) => i.value).sort());
   }
+});
+
+test("Clear is offered from iOS 18 on only (user 2026-11-20: not on the iPhone 7's iOS 15)", () => {
+  assert.equal(clearOffered("15.8.8"), false);
+  assert.equal(clearOffered("17.6"), false);
+  assert.equal(clearOffered("18.0"), true);
+  assert.equal(clearOffered("26.1"), true);
+  assert.equal(clearOffered(null), true);
+  assert.ok(!iconGroups("dark", { clear: false })[1].icons.some((i) => i.value === "clear"));
+  assert.equal(iconGroups("light", { clear: false })[1].icons.length, DARK_PALETTES.length);
+  const ua = (v) => `Mozilla/5.0 (iPhone; CPU iPhone OS ${v} like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148`;
+  assert.equal(clearHere(ua("15_8_8")), false);
+  assert.equal(clearHere(ua("18_1")), true);
 });
 
 test("tellIcon sends app.icon once per change, only in the apps", () => {

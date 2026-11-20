@@ -31,6 +31,21 @@ Design: https://claude.ai/artifact/H1VJYpZ2Fak6dbLMg7cCQY (approved 2026-11-20).
   (Themes: this mode's; Special: Clear + the other mode's), and the preview's small Home header. Home's header shows
   the app's icon now (screens/home.js). The website keeps everything as it was.
 
+- **Clear only on iOS 18+** (user, mid-task 2026-11-20: clear and tinted icons need iOS 18, so the iPhone 7 on
+  iOS 15 shouldn't offer it). core/settings.js `clearOffered(ios)`, appicon.js `clearHere()` reads the version from
+  the web view's user agent (iosFromUserAgent); the grid leaves Clear out below 18. The Clear sets stay in
+  Assets.car for the phones that can use them. This replaces the brief's "so it works on iOS 15-25 too".
+
+## iPhone 7 (iOS 15.8.8, jailbreak build 0.17.1-2987)
+
+`iphone7-home-icons.jpg`, top to bottom: before (Classic, the primary), Mode Dark with Match Theme on (OLED Black,
+the phone's dark theme), Match Theme off + Dark set to Clear, then back to Match Theme on + Mode Light (Classic
+again, the primary through `setAlternateIconName(nil)`). **No "You have changed the icon" alert** at any switch:
+the private `_setAlternateIconName:completionHandler:` works on iOS 15.8.8. `iphone7-app.jpg`: Theme with Match Theme
+off, the Dark Icon grid with Clear picked, Home's header showing Clear. The phone was left as found (Mode Light,
+Classic / OLED Black, Match Theme on). That run was before the iOS 18 rule above, so Clear was still in its grid
+there; after the rule it isn't (unit-tested with the iPhone 7's user agent, not re-run on the phone).
+
 ## Measured: why 73 sets, not 225
 
 On the MBA (actool, Xcode 26.3), 60pt @2x + @3x only:
@@ -64,3 +79,16 @@ The .deb went from 8.4 MB to about 28 MB.
 - Chromium, 402x874 @3x, fake bridge (`shots.mjs`): Home, Theme with Match Theme on, off (and mid-slide), the Dark
   Icon grid, Clear picked, Theme after the pick, Theme > Dark's and Light's previews, Home in Dark with Clear. The
   page sent app.icon as expected: defaults, then onScreen Gunmetal for Dark, then dark Clear, then Sepia.
+
+## Not verified
+
+- **iOS 18+ dark appearance on a real Home Screen**: no iOS 18+ jailbroken phone, and the sideload build needs the
+  user's signing. The catalog's dark renditions are checked by reading Assets.car back (test_icons.py), not by eye.
+  The iPhone 15 Pro rig (T58) wasn't finished, so not tried there.
+- **The sideload (Lite) build on a phone**: its public setAlternateIconName path and iOS's alert, and its sashed
+  icons on the Home Screen. Needs a signed install on a non-jailbroken phone. Chromium shots used the jailbreak build.
+- **iOS 15-17 with Mode Automatic** switching the icon when iOS's appearance flips while the app is open: the code
+  path (matchMedia -> applyTheme -> app.icon) is the one the Mode Dark tap took on the phone, but the system flip
+  itself wasn't driven (Control Centre can't be opened through phonectl).
+- **Clear hidden below iOS 18** on the phone itself: added after the phone run (unit-tested with its user agent).
+- The 3x shots are in the scratchpad at full size; the journal keeps downsized JPEGs (the 1 MB size guard).

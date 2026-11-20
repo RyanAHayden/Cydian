@@ -142,6 +142,7 @@ test("connect groups: each way's rows and footer (pure)", () => {
   assert.deepEqual(connectGroups("tailscale", signedIn)[0].rows.map((r) => [r.label, r.detail]), [["Tailscale", "On"], ["Open Tailscale", undefined]]);
   assert.match(connectGroups("tailscale", signedIn)[0].footer, /^Turn on the Tailscale app's VPN/);
   assert.deepEqual(connectGroups("tailscale", null, { busy: "Log in on the page" })[0].rows[0], { label: "Signing In…", detail: "Log in on the page", spin: true });
+  assert.deepEqual(connectGroups("tailscale", null)[0].rows[0], { label: "Tailscale", detail: "Checking…", spin: true }, "B167: no status yet isn't signed out");
   const picked = [];
   connectGroups("ask", null, { choose: (v) => picked.push(v) })[0].rows.forEach((r) => r.onClick());
   assert.deepEqual(picked, ["localdevvpn", "tailscale"]);

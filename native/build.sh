@@ -133,8 +133,9 @@ bundle() {
   fi
   # web/app/ goes in as it is, minus the tests and the website's zsign WebAssembly (F93: the app signs natively).
   # Test fixtures (core/fixtures/: test .p12s, a tiny IPA) stay out too; mkdeb.py/mkipa.py check refuse them.
+  # So do the Python tests (icons/test_*.py) and the __pycache__/*.pyc the gate leaves beside them.
   (cd ../web/app && find . -type f ! -name '*.test.js' ! -name '*.test.mjs' ! -name '.*' ! -path './vendor/zsign/*' \
-    ! -path './core/fixtures/*' -print0) |
+    ! -path './core/fixtures/*' ! -name 'test_*.py' ! -path '*/__pycache__/*' ! -name '*.pyc' -print0) |
     while IFS= read -r -d '' f; do mkdir -p "$app/web/$(dirname "$f")" && cp "../web/app/$f" "$app/web/$f"; done
   ../tools/buildinfo.sh "$(cd "$app/web" && pwd)" >/dev/null # version and commit for Home's footer
   # The bundled web/ must start (web/app/startup.test.js, skipped without Chromium): a module that fails to load

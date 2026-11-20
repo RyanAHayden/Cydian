@@ -45,7 +45,7 @@ test("markedVersionOnSource / markedResignJob: the installed version's IPA, or n
 test("sideload app page: Re-sign on a marked app queues the installed version's IPA; not offered once it left the source", async () => {
   const q = createAppQueue();
   let sheet = null;
-  const base = { queue: q, mode: "sideload", ready: async () => true, signedOf: async () => null, add: (j, o) => o.queue.add(j) };
+  const base = { queue: q, mode: "sideload", ready: async () => true, signedOf: async () => null, add: (j, o) => o.queue.add(j), iv: null };
   const marked = memoryAppStore([{ id: "com.x.a", version: "1" }]);
   assert.equal(await appPageAction(A, null, { ...base, store: async () => marked, ask: async (o) => { sheet = o; return o.buttons.indexOf("Re-sign"); } }), true);
   assert.deepEqual(sheet.buttons, ["Upgrade", "Re-sign", MARK_NOT_INSTALLED]);
@@ -60,7 +60,7 @@ test("website: Re-sign on a marked app signs the installed version in the browse
   const mem = memoryAppStore([{ id: "com.x.a", version: "1" }]);
   const got = [];
   let sheet = null;
-  assert.equal(await appPageAction(A, null, { mode: "site", store: async () => mem, forget: async () => assert.fail("forgot"),
+  assert.equal(await appPageAction(A, null, { mode: "site", store: async () => mem, forget: async () => assert.fail("forgot"), iv: null,
     siteInstall: async (p, v) => got.push(v.downloadURL), ask: async (o) => { sheet = o; return o.buttons.indexOf("Re-sign"); } }), true);
   assert.deepEqual(sheet.buttons, ["Upgrade", "Re-sign", MARK_NOT_INSTALLED]);
   assert.deepEqual(got, ["https://s/a1.ipa"]);

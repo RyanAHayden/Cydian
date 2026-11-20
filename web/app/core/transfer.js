@@ -42,9 +42,19 @@ async function pipe(data, stream) {
   return new Uint8Array(await out.arrayBuffer());
 }
 
-export async function encodeLink({ sources = [], settings = {}, holds = [], identity = null } = {}) {
+// F281: `versions` ({ id: version }, Ignore This Version) travels beside holds, left out while empty.
+const versionsOf = (o) => {
+  if (!o || typeof o !== "object" || Array.isArray(o)) return {};
+  const out = {};
+  for (const [id, v] of Object.entries(o)) if (id && typeof v === "string" && v) out[id] = v;
+  return out;
+};
+
+export async function encodeLink({ sources = [], settings = {}, holds = [], identity = null, versions = {} } = {}) {
+  const vs = versionsOf(versions);
   const payload = { v: 1, sources: [...new Set(sources.filter((s) => typeof s === "string" && s))], settings,
-    holds: [...new Set(holds.filter((p) => typeof p === "string" && p))], ...(identityOf(identity) ? { identity: identityOf(identity) } : {}) };
+    holds: [...new Set(holds.filter((p) => typeof p === "string" && p))], ...(identityOf(identity) ? { identity: identityOf(identity) } : {}),
+    ...(Object.keys(vs).length ? { versions: vs } : {}) };
   const gz = await pipe(new TextEncoder().encode(JSON.stringify(payload)), new CompressionStream("gzip"));
   return "ifizbox://import?d=" + toB64url(gz);
 }
@@ -67,6 +77,7 @@ export async function decodeLink(url, { gunzip = null } = {}) {
       settings: p.settings && typeof p.settings === "object" && !Array.isArray(p.settings) ? p.settings : {},
       holds: Array.isArray(p.holds) ? p.holds.filter((s) => typeof s === "string") : [],
       ...(identityOf(p.identity) ? { identity: identityOf(p.identity) } : {}),
+      ...(Object.keys(versionsOf(p.versions)).length ? { versions: versionsOf(p.versions) } : {}), // F281
     };
   } catch {
     return null;
@@ -77,7 +88,9 @@ export async function decodeLink(url, { gunzip = null } = {}) {
 // here; `shown(key)`: whether this build has that setting (the site's Device and iOS Version mean nothing in the
 // app); `holds`: the packages already ignored. Sources already listed, settings already the same and holds already
 // there are left out, so the user's own stay as they are.
-export function reviewLink(payload, { have = [], get = () => undefined, shown = () => true, holds = [] } = {}) {
+// F281: `versions` (this device's Ignore This Version, { id: version }): the link's entries not already set the same
+// come back as `versions` ({ id: version }) only when there are any, and count toward `empty`.
+export function reviewLink(payload, { have = [], get = () => undefined, shown = () => true, holds = [], versions = {} } = {}) {
   const { entries } = parseImport((payload?.sources ?? []).join("\n"));
   const sources = reviewImport(entries, have).filter((e) => e.status === "new");
   const settings = Object.entries(payload?.settings ?? {})
@@ -85,5 +98,8 @@ export function reviewLink(payload, { have = [], get = () => undefined, shown = 
     .map(([key, value]) => ({ key, from: get(key), to: value }));
   const mine = new Set(holds);
   const newHolds = [...new Set(payload?.holds ?? [])].filter((p) => !mine.has(p));
-  return { sources, settings, holds: newHolds, empty: !sources.length && !settings.length && !newHolds.length };
+  const newVersions = Object.fromEntries(Object.entries(versionsOf(payload?.versions)).filter(([id, v]) => versions?.[id] !== v));
+  const nv = Object.keys(newVersions).length;
+  return { sources, settings, holds: newHolds, ...(nv ? { versions: newVersions } : {}),
+    empty: !sources.length && !settings.length && !newHolds.length && !nv };
 }

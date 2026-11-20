@@ -122,3 +122,40 @@ test("jailbreak: rememberedApps carries I4's notes; the site and the sideload ap
   const failing = { installedApps: async () => { throw new Error("no helper"); } };
   assert.deepEqual(await rememberedApps({ mode: "jailbreak", backend: failing, store }), jbRecords);
 });
+
+// ---- F281: Ignore This Version ----
+
+test("F281 sideload: an app at its ignored version goes under Ignored Upgrades, still followed with that version known", async () => {
+  const calls = [];
+  const native = { call: async (m, p) => { calls.push([m, p]); return { scheduled: true }; } };
+  const store = async () => memoryAppStore([{ id: "delta", name: "Delta", version: "1.5", source: SRC, date: 1 },
+    { id: "utm", name: "UTM", version: "4.0", source: SRC, date: 1 }]);
+  const offer = { delta: "1.6", utm: "4.5" };
+  const lookup = async (id) => (offer[id] ? { key: `alt:${SRC}`, stanza: { version: offer[id] }, row: { name: id } } : null);
+  const settled = [];
+  const opts = { mode: "sideload", native, store, lookup, installedPkgs: async () => [], settle: (n) => settled.push(n) };
+  const up = await withAppUpgrades({ available: [], ignored: [] }, [], { ...opts, versions: { delta: "1.6" } });
+  assert.deepEqual(up.available.map((r) => r.id), ["utm"]);
+  assert.deepEqual(up.ignored.map((r) => [r.id, r.ignoredVersion]), [["delta", true]]);
+  assert.deepEqual(settled, []); // still on offer, not installed: it stays
+  await new Promise((r) => setTimeout(r, 0));
+  const watch = calls.at(-1)[1];
+  assert.deepEqual(watch.apps.map((a) => a.id), ["delta", "utm"]); // the next Delta still notifies
+  assert.deepEqual(watch.known, ["delta 1.6", "utm 4.5"]);
+  // The next version shows again, and the entry goes.
+  offer.delta = "1.7";
+  const next = await withAppUpgrades({ available: [], ignored: [] }, [], { ...opts, versions: { delta: "1.6" } });
+  assert.deepEqual(next.available.map((r) => r.id), ["delta", "utm"]);
+  assert.deepEqual(settled, [{}]);
+});
+
+test("F281: dpkg's rows filed by catalog.upgrades stay ignored; an entry the installed version reached is dropped", async () => {
+  const settled = [];
+  const up = { available: [{ id: "tweak", name: "Tweak", version: "3", installed: "2" }],
+    ignored: [{ id: "old", name: "Old", version: "2", installed: "1", ignoredVersion: true }] };
+  const out = await withAppUpgrades(up, [], { mode: "site", store: async () => memoryAppStore([]), lookup: async () => null,
+    versions: { old: "2", done: "5" }, installedPkgs: async () => [{ id: "done", installed: "5" }], settle: (n) => settled.push(n) });
+  assert.deepEqual(out.ignored.map((r) => r.id), ["old"]);
+  assert.deepEqual(out.available.map((r) => r.id), ["tweak"]);
+  assert.deepEqual(settled, [{ old: "2" }]);
+});

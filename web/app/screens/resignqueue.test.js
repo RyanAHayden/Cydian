@@ -80,7 +80,7 @@ test("app page: the Signature row, and Modify's Re-sign queues a resign job", as
     sourceUrl: "https://s/", versions: [{ version: "2.0", downloadURL: "https://s/b.ipa" }] } } };
   const q = createAppQueue();
   const add = (j, o) => o.queue.add(j);
-  const base = { queue: q, add, mode: "sideload", ready: async () => true, store: async () => ({ all: async () => [{ id: "b", version: "2.0" }] }),
+  const base = { queue: q, add, mode: "sideload", ready: async () => true, iv: null, store: async () => ({ all: async () => [{ id: "b", version: "2.0" }] }),
     signedOf: async (id) => installed.apps.find((a) => a.bundleId === id) ?? null };
   let sheet = null;
   assert.equal(await appPageAction(pkg, null, { ...base, ask: async (o) => { sheet = o; return 1; } }), true);

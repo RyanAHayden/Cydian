@@ -46,7 +46,9 @@ export async function websitePayload({ backend = getBackend(), store = settings,
         p12Name: c.p12Name ?? "", profileName: c.profileName ?? "" };
     } catch { /* no certificate stored here */ }
   }
-  return { sources, settings: values, holds: store.holds.list(), ...(id ? { identity: id } : {}) };
+  const versions = store.ignoredVersions?.all?.() ?? {}; // F281: Ignore This Version
+  return { sources, settings: values, holds: store.holds.list(), ...(id ? { identity: id } : {}),
+    ...(Object.keys(versions).length ? { versions } : {}) };
 }
 
 async function openInApp() {
@@ -75,6 +77,8 @@ export function reviewText(r) {
   }
   for (const s of r.settings) lines.push(`${labelOf(s.key)}: ${optionOf(s.key, s.to)}.`);
   if (r.holds.length) lines.push(`Ignored Upgrades: ${r.holds.length} more.`);
+  const nv = Object.keys(r.versions ?? {}).length; // F281
+  if (nv) lines.push(`Ignored versions: ${nv} more.`);
   return lines.join("\n");
 }
 
@@ -91,7 +95,7 @@ export async function reviewAndImport(url, { native = globalThis.ifizboxNative, 
   const have = await backend.sources().catch(() => []);
   const r = reviewLink(payload, {
     have, get: (k) => (store.isShown(k) ? store.get(k) : undefined), shown: (k) => store.isShown(k),
-    holds: store.holds.list(),
+    holds: store.holds.list(), versions: store.ignoredVersions?.all?.() ?? {},
   });
   // Straight away, no question (user 2026-11-17): the user asked for it by opening the link.
   const hide = hud("Importing");
@@ -116,6 +120,7 @@ export async function reviewAndImport(url, { native = globalThis.ifizboxNative, 
   }
   for (const s of r.settings) { try { store.set(s.key, s.to); } catch { /* an option this build lacks */ } }
   for (const p of r.holds) { try { await store.holds.set(p, true); } catch { /* the helper refused */ } }
+  for (const [id, v] of Object.entries(r.versions ?? {})) { try { store.ignoredVersions?.set(id, v); } catch { /* storage full */ } } // F281
   // One popup only: the HUD ends on its checkmark; anything that didn't go in is a banner, which goes by itself.
   if (hide.done) hide.done("Imported");
   else hide();

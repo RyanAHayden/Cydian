@@ -33,6 +33,7 @@ import { appJob, appNavLabel, modifyActions, resignJob, MARK_NOT_INSTALLED, dest
 import { markedVersionOnSource, markedResignJob } from "../core/appqueue.js"; // F221
 import { signatureState, signedIndex, resignWindow } from "../core/signing.js";
 import { compareVersions } from "../core/apt.js";
+import { ignoreVersionLabel, withVersionButton, versionToStore, IGNORE_VERSION } from "../core/appupdates.js"; // F281
 import { queueApp } from "./queue.js";
 import { descriptionGroup } from "./description.js";
 import { storeHeader, headerLine, storeTabs, tileRow, worksOnTile, sizeTile, sectionTile, ratingTile, updatedTile, whatsNewGroup } from "./storepage.js";
@@ -450,9 +451,10 @@ export function queueToggle(pkg, source, { queue = appQueue, store = apps, buzz 
 // website (no queue) the sheet is siteModify's.
 export async function appPageAction(pkg, source, { queue = appQueue, ask = showActionSheet, add = queueApp,
   mode = detectMode(), ready = async () => true, store = apps, version = null, signedOf = (id) => signedRecordOf(id, { mode }),
-  forget = async (id) => removeInstall(await store(), id), siteInstall = siteInstallVersion, warn = originalWarning } = {}) {
+  forget = async (id) => removeInstall(await store(), id), siteInstall = siteInstallVersion, warn = originalWarning,
+  iv = settings.ignoredVersions } = {}) {
   const app = pkg?.stanza?.ipa;
-  if (mode === "site" && app && !version) return siteModify(pkg, source, { ask, store, forget, siteInstall });
+  if (mode === "site" && app && !version) return siteModify(pkg, source, { ask, store, forget, siteInstall, iv });
   if (mode !== "sideload" || !app) return false; // F89: the website queues nothing
   let rec = null;
   try { rec = (await (await store()).all()).find((r) => r.id === app.bundleIdentifier) ?? null; } catch { /* no store */ }
@@ -474,9 +476,11 @@ export async function appPageAction(pkg, source, { queue = appQueue, ask = showA
   const state = { queued: Boolean(queue.get(job.id)), installed, newest, older: older.length > 0, signed: Boolean(signed), onSource, build: "sideload" };
   if (!state.queued && installed == null && !state.signed) return addFresh();
   // Modify (installed or queued), as Cydia's: Upgrade/Reinstall, Downgrade (then which version), or Clear.
-  const buttons = modifyActions(state);
-  const i = await ask({ title: app.name, buttons, destructive: destructiveOf(buttons) });
+  const ver = versionButtonOf(modifyActions(state), { id: job.id, installed, newest, iv: state.queued ? null : iv });
+  const { buttons } = ver;
+  const i = await ask({ title: app.name, buttons, destructive: redWith(buttons, destructiveOf(buttons)) });
   if (i < 0) return true;
+  if (ver.run(buttons[i])) return true;
   if (buttons[i] === "Clear") queue.clear(job.id);
   else if (buttons[i] === MARK_NOT_INSTALLED) await Promise.resolve().then(() => forget(app.bundleIdentifier)).catch(() => {});
   else if (buttons[i] === "Re-sign" && signed) add({ ...resignJob(signed), id: job.id, icon: job.icon }, { queue });
@@ -519,8 +523,24 @@ export function jailbreakModifyButtons({ installed = "", newest = null, held = f
     ...(older ? ["Downgrade"] : []), ...(history ? ["Version History"] : [])];
 }
 
+// F281: Ignore This Version / Stop Ignoring This Version (core/appupdates.js) on an app's sheet, after Upgrade.
+// -> { buttons, run(label) -> true when it was that button }. `iv`: core/settings.js ignoredVersions.
+export function versionButtonOf(buttons, { id, installed, newest, held = false, iv = settings.ignoredVersions } = {}) {
+  const label = id && iv ? ignoreVersionLabel({ installed, newest, ignored: iv?.get?.(id) ?? null, held }) : null;
+  return {
+    buttons: withVersionButton(buttons, label),
+    run(b) {
+      if (!label || b !== label) return false;
+      iv.set(id, versionToStore(label, newest));
+      return true;
+    },
+  };
+}
+const redWith = (buttons, more) => (buttons.includes(IGNORE_VERSION)
+  ? [...[].concat(more), buttons.indexOf(IGNORE_VERSION)].filter((i) => i >= 0) : more);
+
 export async function jailbreakModify(pkg, { install, history = null, ask = showActionSheet, store = apps, holds = settings.holds,
-  remove = removeAppFromPhone } = {}) {
+  remove = removeAppFromPhone, iv = settings.ignoredVersions } = {}) {
   const app = pkg?.stanza?.ipa;
   if (!app) return false;
   let rec = null;
@@ -531,10 +551,13 @@ export async function jailbreakModify(pkg, { install, history = null, ask = show
   const newest = versions[0]?.version ?? null;
   const older = installed ? versions.filter((x) => compareVersions(x.version, installed) < 0) : [];
   const held = holds.has(app.bundleIdentifier);
-  const buttons = jailbreakModifyButtons({ installed, newest, held, older: older.length > 0, history: Boolean(history) && versions.length > 1 });
-  const i = await ask({ title: app.name, buttons, destructive: [buttons.indexOf(IGNORE_UPGRADES), buttons.indexOf("Remove")] });
+  const ver = versionButtonOf(jailbreakModifyButtons({ installed, newest, held, older: older.length > 0, history: Boolean(history) && versions.length > 1 }),
+    { id: app.bundleIdentifier, installed, newest, held, iv });
+  const { buttons } = ver;
+  const i = await ask({ title: app.name, buttons, destructive: redWith(buttons, [buttons.indexOf(IGNORE_UPGRADES), buttons.indexOf("Remove")]) });
   if (i < 0) return true;
   const b = buttons[i];
+  if (ver.run(b)) return true;
   if (b === "Upgrade" || b === "Install") await install(versions[0]);
   else if (b === "Reinstall") await install(versions.find((x) => x.version === installed) ?? versions[0]);
   else if (b === IGNORE_UPGRADES || b === STOP_IGNORING) await holds.set(app.bundleIdentifier, b === IGNORE_UPGRADES, { dpkg: false });
@@ -558,7 +581,7 @@ async function removeAppFromPhone({ id, name }) {
 // F94: the website's Modify, for an app marked installed (core/installed.js's record): Upgrade or Reinstall resolve
 // false, so the caller installs the newest as before (browse.js packageActions: the browser signs it); Downgrade asks
 // which version and installs that one (`siteInstall`); Mark as Not Installed forgets the record. Not installed: false.
-async function siteModify(pkg, source, { ask, store, forget, siteInstall }) {
+async function siteModify(pkg, source, { ask, store, forget, siteInstall, iv = settings.ignoredVersions }) {
   const app = pkg.stanza.ipa;
   let rec = null;
   try { rec = (await (await store()).all()).find((r) => r.id === app.bundleIdentifier) ?? null; } catch { /* no store */ }
@@ -567,9 +590,12 @@ async function siteModify(pkg, source, { ask, store, forget, siteInstall }) {
   const newest = app.versions[0]?.version ?? null;
   const older = installed ? app.versions.filter((x) => x.version && compareVersions(x.version, installed) < 0) : [];
   const same = markedVersionOnSource(pkg, installed); // F221: Re-sign signs the installed version again in the browser
-  const buttons = modifyActions({ installed, newest, older: older.length > 0, onSource: Boolean(same), build: "site" });
-  const i = await ask({ title: app.name, buttons, destructive: destructiveOf(buttons) });
+  const ver = versionButtonOf(modifyActions({ installed, newest, older: older.length > 0, onSource: Boolean(same), build: "site" }),
+    { id: app.bundleIdentifier, installed, newest, iv });
+  const { buttons } = ver;
+  const i = await ask({ title: app.name, buttons, destructive: redWith(buttons, destructiveOf(buttons)) });
   if (i < 0) return true;
+  if (ver.run(buttons[i])) return true;
   if (buttons[i] === MARK_NOT_INSTALLED) { await Promise.resolve().then(() => forget(app.bundleIdentifier)).catch(() => {}); return true; }
   if (buttons[i] === "Re-sign") { await siteInstall(pkg, same, source); return true; }
   if (buttons[i] === "Downgrade") {

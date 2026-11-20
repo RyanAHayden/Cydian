@@ -10,6 +10,7 @@
 //   catalog.setHidden(names)                           // Section Visibility: sent to the worker before the next question
 //   catalog.setDevice(device, { filter })              // Works on my phone (F17, device.js): likewise
 //   catalog.installed()  catalog.upgrades(holds)       // dpkg's status file (F7): rows or null; { available, ignored }
+//   catalog.setIgnoredVersions(map, { onSettle })      // Ignore This Version (F281): { id: version }, kept in the page
 //   catalog.altSource(key)                     // an AltStore source's page data (F9, core/altstore.js), or null
 //   catalog.setStatus(text)  catalog.reloadInstalled() // the site's upload (kept on the device); the app re-reads dpkg
 //
@@ -27,6 +28,7 @@ import { isAltKey } from "./core/altstore.js";
 import { allSaved } from "./core/ipainfo.js";
 import { hiddenAltApps } from "./core/appoffer.js";
 import { detectMode } from "./core/settings.js";
+import { splitIgnoredVersions } from "./core/appupdates.js";
 
 export { ALL };
 
@@ -212,6 +214,25 @@ function setBlocked(ids) {
   for (const f of changeListeners) f();
 }
 
+// F281: Ignore This Version ({ id: version }, core/settings.js ignoredVersions). Kept here, in the page, not sent to
+// the worker: upgrades() below moves the rows at those versions under ignored (core/appupdates.js), and
+// app-updates.js does the same for the remembered apps. `onSettle(next)` is told when entries went (a newer version
+// came, or the installed one reached it), so the setting can drop them.
+let ignoredVersionMap = {};
+let ignoredVersionSettle = null;
+function setIgnoredVersions(map, { onSettle } = {}) {
+  const next = map && typeof map === "object" && !Array.isArray(map) ? { ...map } : {};
+  if (onSettle !== undefined) ignoredVersionSettle = typeof onSettle === "function" ? onSettle : null;
+  if (JSON.stringify(next) === JSON.stringify(ignoredVersionMap)) return;
+  ignoredVersionMap = next;
+  for (const f of changeListeners) f();
+}
+function settleIgnoredVersionMap(next) {
+  if (JSON.stringify(next) === JSON.stringify(ignoredVersionMap)) return;
+  ignoredVersionMap = { ...next };
+  try { ignoredVersionSettle?.(next); } catch { /* the setting stays; settled again next time */ }
+}
+
 // Works on my phone (F17): the device every row is judged for, and whether what can't work is left out. Sent like
 // the hidden sections, ahead of the next question (core/catalog.js setDevice).
 let device = null;
@@ -313,6 +334,9 @@ export const catalog = {
   setHidden,
   setHiddenAuthors,
   setBlocked, // F226
+  setIgnoredVersions, // F281
+  ignoredVersions: () => ({ ...ignoredVersionMap }),
+  settleIgnoredVersions: settleIgnoredVersionMap,
   setDevice,
   setIpaInfo, // F160
   list: (key = ALL, section = ALL) => ask("list", [key, section]),
@@ -355,7 +379,9 @@ export const catalog = {
   // { available: [row], ignored: [row] }: installed packages with a newer version on a source (core/installed.js);
   // `holds` (Ignored Upgrades) go under ignored, and so do the status file's dpkg holds, except in the app, where
   // `holds` is dpkg's own list already (core/settings.js holds.sync) and newer than the file.
-  upgrades: (holds = []) => ask("upgrades", [holds, { dpkgHolds: statusSource() !== "native" }]),
+  // F281: rows at a version set with Ignore This Version go under ignored too (`ignoredVersion: true`).
+  upgrades: async (holds = []) => splitIgnoredVersions(await ask("upgrades", [holds, { dpkgHolds: statusSource() !== "native" }]),
+    ignoredVersionMap),
   setStatus,
   reloadInstalled,
   // Whether there is a status file at all, without loading the sources (the launch badge waits on it).

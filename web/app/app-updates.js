@@ -24,7 +24,8 @@ import { getBackend } from "./backend.js";
 import { apps } from "./core/installed.js";
 import { detectMode } from "./core/settings.js";
 import { SELF_ALT_URL } from "./core/essential.js";
-import { rememberedUpgrades, mergeUpgrades, watchList, upgradeKeys, altSourceOf, SELF_ID } from "./core/appupdates.js";
+import { rememberedUpgrades, mergeUpgrades, watchList, upgradeKeys, altSourceOf, SELF_ID, splitIgnoredVersions,
+  settleIgnoredVersions } from "./core/appupdates.js";
 import { NAME } from "./brand.js";
 
 let lastSent = null;
@@ -65,23 +66,43 @@ export async function rememberedApps({ mode = detectMode(), backend = null, stor
   try { return (await b.installedApps(records)) ?? records; } catch { return records; }
 }
 
+// F281: Ignore This Version. `versions` ({ id: version }, catalog.setIgnoredVersions) moves the rows at those versions
+// under ignored, for the remembered apps as catalog.upgrades does for dpkg's; then the entries a newer version or the
+// installed one has passed are dropped through `settle(next)` (core/appupdates.js settleIgnoredVersions), the
+// installed versions taken from the records (in the jailbreak app the real ones) and dpkg's rows (`installedPkgs`).
+async function withIgnoredVersions(merged, records, { versions, settle, installedPkgs }) {
+  const out = splitIgnoredVersions(merged, versions);
+  if (!versions || !Object.keys(versions).length || typeof settle !== "function") return out;
+  const have = new Map();
+  try { for (const p of (await installedPkgs()) ?? []) if (p?.id && p.installed) have.set(p.id, String(p.installed)); } catch { /* no status file */ }
+  for (const r of records ?? []) if (r?.id && r.version && r.actual !== null) have.set(r.id, String(r.version));
+  const next = settleIgnoredVersions(versions, { upgrades: out, installedOf: (id) => have.get(id) ?? null });
+  if (JSON.stringify(next) !== JSON.stringify(versions)) { try { settle(next); } catch { /* settled again next time */ } }
+  return out;
+}
+
 export async function withAppUpgrades(upgrades, holds = [], { mode = detectMode(), native = globalThis.ifizboxNative, store = apps,
-  backend = null, lookup } = {}) {
+  backend = null, lookup, versions = catalog.ignoredVersions(), settle = catalog.settleIgnoredVersions,
+  installedPkgs = () => catalog.installed() } = {}) {
+  const iv = { versions, settle, installedPkgs };
   if (mode === "jailbreak") {
     let records;
-    try { records = (await rememberedApps({ mode, backend, store })).filter((r) => r?.actual !== null); } catch { return upgrades; }
-    if (!records.some((r) => r?.id && !r.self)) return upgrades;
+    try { records = (await rememberedApps({ mode, backend, store })).filter((r) => r?.actual !== null); } catch { return withIgnoredVersions(upgrades, [], iv); }
+    if (!records.some((r) => r?.id && !r.self)) return withIgnoredVersions(upgrades, records, iv);
     const { cands } = await candidates(records, lookup);
-    return mergeUpgrades(upgrades, rememberedUpgrades(records, (id) => cands.get(id) ?? null, holds));
+    return withIgnoredVersions(mergeUpgrades(upgrades, rememberedUpgrades(records, (id) => cands.get(id) ?? null, holds)), records, iv);
   }
   let records = [];
-  try { records = await (await store()).all(); } catch { return upgrades; }
+  try { records = await (await store()).all(); } catch { return withIgnoredVersions(upgrades, [], iv); }
   const { cands, failed } = records.length ? await candidates(records, lookup) : { cands: new Map(), failed: 0 };
-  const merged = mergeUpgrades(upgrades, rememberedUpgrades(records, (id) => cands.get(id) ?? null, holds));
+  const merged = await withIgnoredVersions(mergeUpgrades(upgrades, rememberedUpgrades(records, (id) => cands.get(id) ?? null, holds)), records, iv);
   // B47: a lookup that threw leaves the shell's last list as it is, rather than dropping apps Changes would count.
+  // F281: an app whose version on offer is ignored (Ignore This Version) is still followed, its version counted as
+  // known, so the next one notifies.
   if (mode === "sideload" && native?.call && !failed) {
-    const ignored = [...new Set([...(holds ?? []), ...merged.ignored.map((r) => r.id)])];
-    const watch = shellWatch(records, merged.available, { cands, ignored });
+    const skipped = merged.ignored.filter((r) => r.ignoredVersion);
+    const ignored = [...new Set([...(holds ?? []), ...merged.ignored.filter((r) => !r.ignoredVersion).map((r) => r.id)])];
+    const watch = shellWatch(records, [...merged.available, ...skipped], { cands, ignored });
     const json = JSON.stringify(watch);
     if (json !== lastSent) {
       lastSent = json;

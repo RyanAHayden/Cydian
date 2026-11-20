@@ -26,6 +26,7 @@ import { detectMode, TRAVELS } from "../core/settings.js";
 import { exportLine } from "../core/sourcelist.js";
 import { toBase64 } from "../core/signing.js";
 import { createWishlist } from "../core/wishlist.js";
+import { versionLines, applyVersionLines } from "../core/appupdates.js"; // F281
 import { apps, recordInstall, removeInstall } from "../core/installed.js";
 import { getBackend } from "../backend.js";
 import { loadIdentity, saveIdentity } from "../signing-client.js";
@@ -94,6 +95,7 @@ export async function collectHere({ syncCert = true, backend = getBackend(), sto
   for (const k of TRAVELS) if (store.isShown(k)) values[k] = store.get(k);
   const recs = await (await appStore()).all().catch(() => []);
   const out = { sources: [...new Set(sources)], settings: values, holds: store.holds.list(), wishlist: wishes.list(),
+    ...(store.ignoredVersions?.all && Object.keys(store.ignoredVersions.all()).length ? { ignoredVersions: versionLines(store.ignoredVersions.all()) } : {}), // F281
     apps: recs.filter((r) => r?.id && !r.self).map(({ id, name, version, key, source, sourceName, icon, date }) =>
       ({ id, name, version, key: key ?? null, source: source ?? null, sourceName: sourceName ?? null, icon: icon ?? null, date: date ?? 0 })) };
   if (!certBuild(mode)) return out; // the jailbreak app signs nothing: it leaves the account's certificate as it is
@@ -125,6 +127,9 @@ export async function applyHere(c, { backend = getBackend(), store = settings, n
   for (const [k, v] of Object.entries(c.settings)) { try { if (store.isShown(k)) store.set(k, v); } catch { /* not in this build */ } }
   for (const p of c.addHolds) await Promise.resolve(store.holds.set(p, true)).catch(() => {});
   for (const p of c.removeHolds) await Promise.resolve(store.holds.set(p, false)).catch(() => {});
+  if ((c.addVersions?.length || c.removeVersions?.length) && store.ignoredVersions) { // F281: Ignore This Version
+    try { store.ignoredVersions.replace(applyVersionLines(store.ignoredVersions.all(), { add: c.addVersions, remove: c.removeVersions })); } catch { /* next sync */ }
+  }
   for (const p of c.addWishes ?? []) { try { wishes.set(p, true); } catch { /* storage full: the next sync tries again */ } }
   for (const p of c.removeWishes ?? []) { try { wishes.set(p, false); } catch { /* as above */ } }
   if (c.identity) {

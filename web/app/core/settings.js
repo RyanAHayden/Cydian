@@ -13,6 +13,7 @@
 //   s.hiddenSections.set("Themes", true);    // Section Visibility (F24): listeners hear ("hiddenSections", list)
 //   s.hiddenAuthors.set("Jane Doe", true);  // Hide by Author (F104): listeners hear ("hiddenAuthors", list)
 //   await s.blocked.set("com.example.tweak", true, { name, installed }); // Block (F226): out of every list; jailbreak: held too
+//   s.ignoredVersions.set("com.example.tweak", "1.2"); // Ignore This Version (F281): only 1.2 hidden; null undoes
 //   s.autoMarked.set("com.example.tweak", true); // Update Automatically, for Only Packages I Mark (F70)
 //   s.recentSearches.add("snowboard");      // Search's Recent table (F100): last 5, newest first
 //   s.daemonPrefs();                         // { "ifizbox.autoInstall": "marked", … } for N7's daemon (F70)
@@ -273,6 +274,7 @@ const BLOCK_HOLDS_KEY = PREFIX + "blockHolds";
 const APP_HOLDS_KEY = PREFIX + "appHolds"; // B69: apps' Ignore Upgrades in the jailbreak app (no dpkg hold)
 const LAST_REFRESH_KEY = PREFIX + "lastRefresh"; // F270: pull to refresh's Last Updated
 const QUEUE_HINT_KEY = PREFIX + "queueHintHeld"; // F272: the Installed tab was held once; the queue's hint stops
+const IGNORED_VERSIONS_KEY = PREFIX + "ignoredVersions"; // F281: Ignore This Version, { id: version }
 
 // F100: Search's Recent table (from Zebra): the last RECENT_MAX queries, newest first, no duplicates (a query
 // already there moves to the top; case and surrounding spaces don't make a new one). Pure, for the tests.
@@ -616,6 +618,46 @@ export function createSettings({ storage = globalThis.localStorage, mode = "site
     setAuthor: (name, on) => hiddenAuthors.set(name, on),
   };
 
+  // F281: Ignore This Version: the one version on offer now hidden for a package or app ({ id: version }), so an item
+  // that is up to date already (updated outside iFizBox, a version the source writes differently) stops showing
+  // as an upgrade until a newer one comes (core/appupdates.js splitIgnoredVersions, settleIgnoredVersions). Kept on
+  // this device and synced like holds (core/account.js, core/transfer.js as "id version" lines, lines() below).
+  // Listeners hear ("ignoredVersions", { id: version }) on a change.
+  function readIgnoredVersions() {
+    try {
+      const o = JSON.parse(store.get(IGNORED_VERSIONS_KEY) || "{}");
+      if (!o || typeof o !== "object" || Array.isArray(o)) return {};
+      const out = {};
+      for (const k of Object.keys(o).sort()) if (k.trim() && typeof o[k] === "string" && o[k].trim()) out[k] = o[k].trim();
+      return out;
+    } catch {
+      return {};
+    }
+  }
+  function writeIgnoredVersions(map) {
+    const clean = {};
+    for (const k of Object.keys(map ?? {}).sort()) {
+      const v = map[k];
+      if (String(k).trim() && typeof v === "string" && v.trim() && !/\s/.test(k) && !/\s/.test(v.trim())) clean[k] = v.trim();
+    }
+    if (JSON.stringify(clean) === JSON.stringify(readIgnoredVersions())) return;
+    if (Object.keys(clean).length) store.set(IGNORED_VERSIONS_KEY, JSON.stringify(clean)); else store.remove(IGNORED_VERSIONS_KEY);
+    notify("ignoredVersions", clean);
+  }
+  const ignoredVersions = {
+    all: readIgnoredVersions,
+    get: (id) => readIgnoredVersions()[id] ?? null,
+    // `version`: the version to hide; null (or "") takes the item's back.
+    set(id, version) {
+      const map = readIgnoredVersions();
+      if (typeof version === "string" && version.trim()) map[id] = version.trim(); else delete map[id];
+      writeIgnoredVersions(map);
+    },
+    replace: (map) => writeIgnoredVersions(map && typeof map === "object" && !Array.isArray(map) ? map : {}),
+    // ["<id> <version>"]: the form account sync and Open in App links carry (a set, merged like holds).
+    lines: () => Object.entries(readIgnoredVersions()).map(([id, v]) => `${id} ${v}`),
+  };
+
   // F70: Only Packages I Mark's marks (the package page's Update Automatically), package ids kept on the device as
   // a sorted JSON list like holds; listeners hear ("autoMarked", list) on a change.
   function readMarked() {
@@ -714,6 +756,7 @@ export function createSettings({ storage = globalThis.localStorage, mode = "site
     hiddenSections,
     hiddenAuthors,
     blocked, // F226
+    ignoredVersions, // F281
     upgradeNotifications,
     deviceType,
     jailbroken: () => deviceType() !== NOT_JAILBROKEN,

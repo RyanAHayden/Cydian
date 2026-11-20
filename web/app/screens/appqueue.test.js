@@ -50,7 +50,7 @@ test("app page (F80): installed, Modify's sheet offers Upgrade (and Downgrade); 
   const store = async () => ({ all: async () => [{ id: "com.x.a", version: "1" }] });
   const added = [];
   const add = (j, o) => { added.push(j); o.queue.add(j); };
-  const base = { queue: q, add, mode: "sideload", ready: async () => true, store };
+  const base = { queue: q, add, mode: "sideload", ready: async () => true, store, iv: null }; // iv: F281's own tests
   let sheet = null;
   assert.equal(await appPageAction(pkg, null, { ...base, ask: async (o) => { sheet = o; return 0; } }), true);
   assert.deepEqual(sheet.buttons, ["Upgrade", "Mark as Not Installed"]); // F94: then Mark as Not Installed; installed 1, newest 2: Modify offers Upgrade

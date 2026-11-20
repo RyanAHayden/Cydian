@@ -38,10 +38,17 @@ export function makeFixture() {
 
 const read = (p) => (existsSync(p) ? readFileSync(p, "utf8") : null);
 
+// F308: Paid.swift's PaidTweaks.file name, or null for a name or version it refuses.
+function paidTweakFile(pkg, version) {
+  if (typeof pkg !== "string" || pkg.length > 200 || !/^[A-Za-z0-9][A-Za-z0-9+.-]*$/.test(pkg)) return null;
+  if (typeof version !== "string" || version.length > 200 || !/^[A-Za-z0-9][A-Za-z0-9.+~:_-]*$/.test(version)) return null;
+  return `${pkg}_${version.replaceAll(":", "%3A")}.deb`;
+}
+
 export function createFakeNative({ prefix, remote, net = {}, env = {}, helper = FAKE_HELPER, mode = "jailbreak",
   ipaDir = join(dirname(prefix ?? "."), "ipa-cache"), vendors = [],
   device = { udid: "00008110-000A1B2C3D4E5F60", model: "iPhone14,2" }, phoneUdid = null,
-  paidDir = join(dirname(prefix ?? "."), "paid-cache") } = {}) {
+  paidDir = join(dirname(prefix ?? "."), "paid-cache"), paidTweakDir = join(dirname(prefix ?? "."), "paid-tweaks") } = {}) {
   const calls = [];
   const keychain = new Map(); // F57
   let answerTo = null; // F63: the running apply-ask's stdin
@@ -263,6 +270,31 @@ export function createFakeNative({ prefix, remote, net = {}, env = {}, helper = 
         if (cb) return cb.startsWith(callbackScheme + ":") ? cb : null;
       }
       return null;
+    },
+    // F308: like Paid.swift's PaidTweaks: the one-time .deb kept in `paidTweakDir` as <package>_<version>.deb (older
+    // versions of that package go), in both builds.
+    "paid.download"({ url, package: pkg, version }) {
+      if (!/^https:\/\//i.test(url ?? "")) return fail("bad_url: not an https URL");
+      const file = paidTweakFile(pkg, version);
+      if (!file) return fail("bad_url: not a package name or version");
+      if (net === null) return fail("network: The Internet connection appears to be offline.");
+      let r;
+      for (const v of vendors) if ((r = v.download(url))) break;
+      r ??= netGet(url);
+      if (r.status >= 400) return fail(`not_found: HTTP ${r.status} for the download`);
+      const data = Buffer.from(r.body ?? "");
+      if (data.length > 64 << 20) return fail("too_large: more than 64 MB");
+      if (!data.subarray(0, 8).equals(Buffer.from("!<arch>\n"))) return fail("not_found: the vendor's download is not a .deb");
+      mkdirSync(paidTweakDir, { recursive: true });
+      for (const old of readdirSync(paidTweakDir)) if (old.startsWith(`${pkg}_`)) rmSync(join(paidTweakDir, old), { force: true });
+      writeFileSync(join(paidTweakDir, file), data);
+      return { body: data.toString("base64") };
+    },
+    "paid.cached"({ package: pkg, version }) {
+      const file = paidTweakFile(pkg, version);
+      if (!file) return fail("bad_url: not a package name or version");
+      const data = existsSync(join(paidTweakDir, file)) ? readFileSync(join(paidTweakDir, file)) : null;
+      return data && data.subarray(0, 8).equals(Buffer.from("!<arch>\n")) ? { body: data.toString("base64") } : null;
     },
     async "paid.install"({ url, package: pkg, version, stream }, onEvent) {
       if (mode !== "jailbreak") return fail("sideload: paid packages install with the jailbreak build");

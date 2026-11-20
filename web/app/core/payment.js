@@ -13,6 +13,7 @@
 //   parseReply(status, json)               -> { ok, data, error, recoveryUrl, invalidate }
 //   createPaymentClient({ base, request, device, credentials })  the vendor's calls, signed in or not
 //   createCredentialStore({ storage, secure })                    token and payment secret per vendor
+//   paidTweakDeb(st, { client, … }), PaidNeeded                   F308: a paid tweak's .deb for the sideload build
 //
 // Checked live on 2026-11-17 (journal/2026-11-17-f20-repo-extras): repo.chariz.com/payment_endpoint ->
 // https://chariz.com/api/sileo/, havoc.app/payment_endpoint -> https://havoc.app/api/sileo/; both answer GET /info
@@ -270,4 +271,45 @@ export function createCredentialStore({ storage = globalThis.localStorage, secur
       if (secure) await secure.remove(k(vendor)).catch(() => {});
     },
   };
+}
+
+// ---- F308: a paid tweak's .deb for the sideload build (screens/tweaks.js) -------------------------------------------
+//
+//   await paidTweakDeb(st, { client, repo, architecture, cached, download })  -> Uint8Array
+//       the .deb the vendor hands this account: `cached(st)` first (the shell's copy, kept per package and version),
+//       else package_info, then authorize_download and `download(url, st)` (the shell fetches the one-time URL and
+//       keeps the file). Throws PaidNeeded when the account has to act first: not signed in, not bought, not for sale.
+//   PaidNeeded { need: "signin" | "purchase" | "unavailable", price, packageId }
+//
+// Not bought or signed out is not an error for the screen: it offers Sign In or Buy (screens/tweaks.js offerPaid).
+// A token the vendor no longer takes (invalidate: the store forgets it) asks for Sign In again.
+export class PaidNeeded extends Error {
+  constructor(need, { price = null, packageId = "" } = {}) {
+    super(need === "signin" ? "Sign in to its seller to download this tweak."
+      : need === "purchase" ? `Buy this tweak${price ? ` (${isFreePrice(price) ? "free" : price})` : ""} to download it.`
+        : "Its seller doesn't sell this tweak right now.");
+    this.name = "PaidNeeded";
+    this.need = need;
+    this.price = price;
+    this.packageId = packageId;
+  }
+}
+
+export async function paidTweakDeb(st, { client, repo = "", architecture = "", cached = null, download } = {}) {
+  const id = st?.package;
+  const version = st?.version ?? "";
+  const hit = cached ? await Promise.resolve().then(() => cached(st)).catch(() => null) : null;
+  if (hit?.length) return hit;
+  const [signedIn, info] = await Promise.all([client.signedIn(), client.packageInfo(id)]);
+  if (!info.available) throw new PaidNeeded("unavailable", { price: info.price, packageId: id });
+  if (!signedIn) throw new PaidNeeded("signin", { price: info.price, packageId: id });
+  if (!info.purchased) throw new PaidNeeded("purchase", { price: info.price, packageId: id });
+  let url;
+  try {
+    url = await client.authorizeDownload(id, { version, repo, architecture: st?.architecture || architecture });
+  } catch (e) {
+    if (e instanceof PaymentError && e.invalidate) throw new PaidNeeded("signin", { price: info.price, packageId: id });
+    throw e;
+  }
+  return download(url, st);
 }

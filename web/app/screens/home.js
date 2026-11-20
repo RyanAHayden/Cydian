@@ -25,8 +25,8 @@ import * as browse from "./browse.js";
 import * as roulette from "./roulette.js";
 import { catalog } from "../catalog.js";
 import { footLine, versionLines, buildInfo } from "./version-foot.js";
-import { signAndInstall, signingReady, getBring, deviceStatus, getServer, statusReady } from "../signing-client.js";
-import { expiryWarning, expiryWarningDays, resignWindow } from "../core/signing.js";
+import { signAndInstall, signingReady, getBring, deviceStatus, getServer, statusReady, serverReachable } from "../signing-client.js";
+import { expiryWarning, expiryWarningDays, resignWindow, signingTile } from "../core/signing.js";
 import { rememberInstall } from "./signing.js";
 import { featuredRefs } from "./extras.js";
 import { browseList, browseListsFor, FRESH_DAYS, collection } from "../core/catalog.js";
@@ -115,15 +115,20 @@ export function installiFizBox({ offer = homeOffer({ mode: settings.mode, device
 // Home's Signing tile (Settings > Signing) where something signs: the sideload app and, F93, the website (in the
 // browser). The jailbreak app shows Themes there. F123: only while signing isn't set up (user 2026-11-18: "when
 // signing is setup it should be hidden in settings"); after that it lives in Settings > Signing alone.
+// F307: the tile itself is now certRow's solid red Signing Needs Setup (core/signing.js signingTile); this still
+// answers where and when it shows.
 export const showsSigningTile = (mode, setUp = false) => (mode === "sideload" || mode === "site") && !setUp;
 
 // F123: whether signing is set up, for the Signing tile. The website: a certificate and profile saved, password
 // right (signingReady). The sideload app: every step of Settings > Signing's walkthrough done (signing.js
 // missingStep: the certificate on the device and an https Signing Server). Anything that fails counts as not set up.
+// F307: on the website a Free Apple ID login (free-apple-id.js, kept in this browser) counts too (the approved
+// concept: the warning is for "no certificate and no login").
 export async function signingSetUp(mode, { ready = signingReady, status = () => deviceStatus(), server = getServer,
-  missing = async (st, sv) => (await import("./signing.js")).missingStep(st, sv) } = {}) {
+  missing = async (st, sv) => (await import("./signing.js")).missingStep(st, sv),
+  free = async () => (await import("./free-apple-id.js")).loadFreeIdentity() != null } = {}) {
   try {
-    if (mode === "site") return Boolean(await ready());
+    if (mode === "site") return Boolean(await ready()) || Boolean(await free());
     if (mode === "sideload") return (await missing(await status(), server())) == null;
   } catch { /* the signer didn't answer */ }
   return false;
@@ -515,24 +520,50 @@ export function paintCert(row, w) {
   row.querySelector(".cell-label").textContent = w.title;
   row.querySelector(".cell-subtitle").textContent = w.subtitle;
 }
+// F307 (concept K3, option C): the same slot holds Signing Needs Setup and Signing Server Down (core/signing.js
+// signingTile), on the website and in the sideload app; the plain Signing half-tile is gone. The jailbreak app has none.
+export const showsSigningSlot = (mode) => mode === "sideload" || mode === "site";
+// What the slot needs to know: signing set up (signingSetUp), the certificate's identity (sideload: for the expiry
+// warning) and, once set up, whether the sideload app's Signing Server answers (serverReachable). The website signs
+// in the browser and installs through its own Worker, so it has no server to check.
+export async function signingSlot(mode, { setUp = (m) => signingSetUp(m), identity = () => certIdentity(),
+  reachable = (s) => serverReachable(s), server = getServer } = {}) {
+  if (!showsSigningSlot(mode)) return { setUp: true, identity: null, serverUp: true, server: null };
+  const ok = await setUp(mode).catch(() => false);
+  if (mode !== "sideload" || !ok) return { setUp: ok, identity: null, serverUp: true, server: null };
+  const sv = server();
+  const [ident, up] = await Promise.all([identity().catch(() => null), reachable(sv).catch(() => false)]);
+  return { setUp: true, identity: ident, serverUp: Boolean(up), server: sv };
+}
+// The tile for a signingSlot answer, with Settings' expiry values (the expiry warning only where showsCertTile).
+export function slotTile(mode, slot, { get, now, certShown = showsCertTile(mode) } = {}) {
+  if (!showsSigningSlot(mode) || !slot) return null;
+  const warning = certShown && slot.identity ? certWarning(slot.identity, { ...(get ? { get } : {}), ...(now ? { now } : {}) }) : null;
+  return signingTile({ setUp: slot.setUp, serverUp: slot.serverUp, server: slot.server, warning });
+}
 // The tile, kept up to date: Home showing again (Back from Settings > Signing), the app coming back, Settings'
 // Expiry Warning, Show Expiry Warning and Re-sign Reminder, and Settings > Signing's status ("ifizbox:signing-status",
 // its identity as the detail) after an import or removal. Stops once the row leaves the page.
 function certRow() {
   const row = tileRow("stack cert", tile({ label: "", subtitle: " ", href: format(settingsRoute(["signing"])), glyph: "failed" }));
   row.hidden = true;
-  if (!showsCertTile(settings.mode)) return row;
+  if (!showsSigningSlot(settings.mode)) return row;
   let seq = 0;
   let last = null;
-  const draw = (identity) => { seq++; last = identity; paintCert(row, certWarning(identity)); };
+  const draw = (slot) => { seq++; last = slot; paintCert(row, slotTile(settings.mode, slot)); };
   const check = async () => {
     const mine = ++seq;
-    const identity = await certIdentity();
-    if (mine === seq && alive()) draw(identity);
+    const slot = await signingSlot(settings.mode);
+    if (mine === seq && alive()) draw(slot);
   };
   const onHash = () => { if (/^#\/home\/?$/.test(location.hash)) check(); };
   const onVis = () => { if (document.visibilityState !== "hidden") check(); };
-  const onStatus = (e) => { if (alive()) draw(e?.detail ?? null); };
+  // Settings > Signing's status after an import or removal: its identity at once, then the whole check again
+  const onStatus = (e) => {
+    if (!alive()) return;
+    if (last?.setUp && e?.detail) draw({ ...last, identity: e.detail });
+    check();
+  };
   const offSettings = settings.onChange((key) => {
     if (["showExpiryWarning", "expiryWarning", "resignReminder"].includes(key) && alive()) draw(last);
   });
@@ -549,6 +580,7 @@ function certRow() {
   addEventListener("hashchange", onHash);
   addEventListener("ifizbox:signing-status", onStatus);
   document.addEventListener("visibilitychange", onVis);
+  row.recheck = () => { if (alive()) check(); }; // Reload (state.redraw)
   check();
   return row;
 }
@@ -597,39 +629,26 @@ function renderRoot(body) {
     a.href = h.href;
     hintBox.replaceChildren(a);
   };
-  // F41/F93: while Not Jailbroken, a Signing tile under Browse, the way to the user's own certificate (Settings >
-  // Signing), in the sideload app and on the website. No Featured or Themes tiles (user 2026-11-18): Browse holds
-  // both (Top 25, and the Themes collection).
-  const halves = tileRow("halves", tile({ label: "Signing", href: format(settingsRoute(["signing"])), glyph: "signing" }));
-  let setUp = true; // hidden until signingSetUp answers: no tile flashing in and out once it is set up
+  // F307 (concept K3, option C): no plain Signing tile any more (it was a half-tile under Browse, and full width at the
+  // top of the locked website Home). While signing isn't set up, the solid red Signing Needs Setup tile in the
+  // certificate-expiry tile's place (certRow) is the way to Settings > Signing.
+  const slotRow = certRow();
   // F303: Why <NAME>, high on Home (why.js showsWhyTile): the website always, the installed apps until the page has
   // been opened there (F306), then Settings > About has it. Its glyph and the page's styles come from why.js.
   why.ensureWhyStyle();
   const whyRow = tileRow("stack why", tile({ label: why.WHY_TILE.label, subtitle: why.WHY_TILE.subtitle, href: why.whyHref(), glyph: "why" }));
   const drawThemes = () => {
-    const themes = showsThemes(settings.deviceType());
-    halves.hidden = lockedNow || themes || !showsSigningTile(settings.mode, setUp);
     whyRow.hidden = !why.showsWhyTile(settings.mode, why.whyOpened()); // F306: until opened, in the installed apps
-    for (const row of lockedTop) row.hidden = !showsSigningTile(settings.mode, setUp);
-  };
-  // Asked again each time Home's root comes back (Settings > Signing is on Home's stack: Back from it lands here).
-  const checkSigning = async () => {
-    if (!showsSigningTile(settings.mode)) return;
-    const now = await signingSetUp(settings.mode);
-    if (now !== setUp && halves.isConnected) { setUp = now; drawThemes(); }
   };
   const onHash = () => {
-    if (!halves.isConnected) { removeEventListener("hashchange", onHash); return; }
+    if (!whyRow.isConnected) { removeEventListener("hashchange", onHash); return; }
     if (!/^#\/home\/?$/.test(location.hash)) return;
-    checkSigning();
     if (!whyRow.hidden && !why.showsWhyTile(settings.mode, why.whyOpened())) drawThemes(); // F306: Back from Why
   };
   addEventListener("hashchange", onHash);
   const lockedNow = browsingLocked({ mode: settings.mode });
-  const lockedTop = lockedNow ? [tileRow("halves", tile({ label: "Signing", href: format(settingsRoute(["signing"])), glyph: "signing" }))] : [];
   drawHint();
   drawThemes();
-  checkSigning();
   const offHint = settings.onChange((key) => {
     if (key !== "device") return;
     if (!hintBox.isConnected) { offHint(); return; }
@@ -690,7 +709,7 @@ function renderRoot(body) {
 
   home.append(
     head,
-    certRow(), // F244: hidden unless the sideload build's certificate or profile nears its end
+    slotRow, // F244/F307 certRow(): hidden unless signing needs setup, its server is down, or the certificate nears its end
     hintBox,
     whyRow,
     tileRow("pair",
@@ -698,8 +717,6 @@ function renderRoot(body) {
       // Cydia's pair was Facebook | Twitter: here GitHub | Discord (the community)
       tile({ label: "Discord", href: DISCORD_URL, glyph: "discord", external: true })),
     ...(lockedNow ? [] : [browseRow]),
-    halves,
-    ...lockedTop,
     appRow,
     ...(debRow ? [debRow] : []),
     ...(lockedNow ? [browseRow] : []),
@@ -743,7 +760,7 @@ function renderRoot(body) {
     drawHint();
     drawThemes();
     drawApp();
-    checkSigning();
+    slotRow.recheck?.();
     await refreshState();
   };
 }

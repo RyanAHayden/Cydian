@@ -886,3 +886,22 @@ export function expiryWarning(identity, { now = new Date(), warn = EXPIRY_WARNIN
   const subtitle = `${days < 1 ? "Expires today" : `Expires in ${plural(days, "day")}`} · Renew in Signing`;
   return { stage, what, days, expires, title, subtitle };
 }
+
+// F307 (concept K3, option C): Home's one signing tile, in the certificate-expiry tile's place (screens/home.js
+// certRow), solid red (the expiry tile's "gone" look) for anything that stops installs:
+//   signingTile({ setUp, serverUp, server, warning })  -> { stage, kind, title, subtitle } | null
+// `setUp` false (no certificate or login, a half-done walkthrough included): Signing Needs Setup. Then an expired
+// certificate or profile (`warning`, expiryWarning's answer). Then `serverUp` false (a Signing Server set but down
+// or unreachable): Signing Server Down, naming its host. Last the amber/red expiry warning itself. null: no tile.
+export const SETUP_TILE = Object.freeze({ stage: "gone", kind: "setup", title: "Signing Needs Setup", subtitle: "Nothing can be installed yet" });
+export function serverDownTile(server) {
+  let host = "";
+  try { host = new URL(server).host; } catch { host = ""; }
+  return { stage: "gone", kind: "server", title: "Signing Server Down", subtitle: host ? `Can't reach ${host} · Check in Signing` : "Can't reach it · Check in Signing" };
+}
+export function signingTile({ setUp = true, serverUp = true, server = null, warning = null } = {}) {
+  if (!setUp) return { ...SETUP_TILE };
+  if (warning?.stage === "gone") return { kind: "expiry", ...warning };
+  if (serverUp === false) return serverDownTile(server);
+  return warning ? { kind: "expiry", ...warning } : null;
+}

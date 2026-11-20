@@ -104,7 +104,8 @@ class SwiftShare(unittest.TestCase):
                      "jailbreak deb: simulate-deb resolves dependencies, install-deb installs",
                      "F133: a downloaded .deb checked against its stanza's SHA256 or MD5sum",
                      "http stream: Content-Length, chunked, close-delimited, any split",
-                     "B163: a file opened in place is copied in pieces into My IPAs, big ones too, never moved"):
+                     "B163: a file opened in place is copied in pieces into My IPAs, big ones too, never moved",
+                     "B166: the hand-off trail: hops in order, lifecycle lines kept as context, capped, links without their values"):
             self.assertIn("ok   " + name, self.out.stdout)
         self.assertIn("all passed", self.out.stdout)
 
@@ -167,6 +168,25 @@ class Built(unittest.TestCase):
         with zipfile.ZipFile(ipa) as z:
             self.assertIn("Payload/iFizBox.app/PlugIns/iFizBoxShare.appex/iFizBoxShare", z.namelist())
 
+    def test_ipa_handoff(self):
+        # B166: what iOS reads to hand an .ipa to the Lite app, in the built IPA itself (not only the templates):
+        # the .ipa document type, its UTType by extension, in-place opening, and the scene manifest SceneDelegate
+        # (willConnectTo / openURLContexts) needs.
+        ipa = os.path.join(BUILD, "iFizBox.ipa")
+        if not os.path.exists(ipa) or os.path.getmtime(ipa) < os.path.getmtime(os.path.join(NATIVE, "Info-sideload.plist")):
+            self.skipTest("no fresh native build (tools/check.sh builds it after the tests, where the toolchain is)")
+        with zipfile.ZipFile(ipa) as z:
+            info = plistlib.loads(z.read("Payload/%s.app/Info.plist" % brand.NAME))
+        ipa_types = [d for d in info["CFBundleDocumentTypes"] if "com.apple.itunes.ipa" in d["LSItemContentTypes"]]
+        self.assertEqual(len(ipa_types), 1)
+        self.assertEqual(ipa_types[0]["CFBundleTypeRole"], "Viewer")
+        ut = {t["UTTypeIdentifier"]: t for t in info["UTImportedTypeDeclarations"]}["com.apple.itunes.ipa"]
+        self.assertIn("ipa", ut["UTTypeTagSpecification"]["public.filename-extension"])
+        self.assertIn("public.data", ut["UTTypeConformsTo"])
+        self.assertTrue(info["LSSupportsOpeningDocumentsInPlace"])
+        scenes = info["UIApplicationSceneManifest"]["UISceneConfigurations"]["UIWindowSceneSessionRoleApplication"]
+        self.assertEqual(scenes[0]["UISceneConfigurationName"], "Default")  # AppDelegate's configurationForConnecting
+
 
 class Wiring(unittest.TestCase):
     def test_shell(self):
@@ -204,6 +224,35 @@ class Wiring(unittest.TestCase):
         ipa = [d for d in side["CFBundleDocumentTypes"] if "com.apple.itunes.ipa" in d["LSItemContentTypes"]][0]
         self.assertEqual(ipa["LSHandlerRank"], "Owner")
         self.assertTrue(side["LSSupportsOpeningDocumentsInPlace"])  # Files' On My iPhone needs it with UIFileSharingEnabled
+
+    def test_open_trail(self):
+        # B166: every hop from iOS to the page writes a line (OpenLog), a file nothing takes is an alert, and the page
+        # takes the trail into Settings > Console Logs.
+        app = read("Sources", "App.swift")
+        scene = app[app.index("final class SceneDelegate"):app.index("enum Incoming")]
+        connect = scene[scene.index("willConnectTo"):scene.index("Replaced.watch()")]
+        self.assertIn("for c in options.urlContexts", connect)  # every URL a cold launch brings, not just the first
+        self.assertIn("OpenLog.hop(", connect)
+        self.assertIn("OpenLog.scene(", connect)
+        opened = scene[scene.index("openURLContexts"):]
+        self.assertLess(opened.index("OpenLog.hop("), opened.index("Incoming.receive("))
+        delegate = app[app.index("final class AppDelegate"):app.index("final class SceneDelegate")]
+        self.assertIn("open url: URL", delegate)
+        self.assertLess(delegate.index("OpenLog.hop("), delegate.index("Incoming.receive("))
+        incoming = app[app.index("enum Incoming"):app.index("enum OtherLink")]
+        recv = incoming[incoming.index("static func receive("):incoming.index("static func openLogReady(")]
+        self.assertIn("url.isFileURL", recv)
+        self.assertIn("OpenTrail.unhandled(", recv)
+        self.assertIn('"app.takeOpenLog"', incoming)
+        bridge = read("share", "App", "ShareBridge.swift")
+        self.assertIn("enum OpenLog", bridge)
+        self.assertGreaterEqual(bridge.count("OpenLog.hop("), 10)
+        self.assertIn("OpenLog.hop(", read("Sources", "MyIPAs.swift"))
+        with open(os.path.join(REPO, "web", "app", "incoming.js")) as f:
+            page = f.read()
+        self.assertIn('"app.takeOpenLog"', page)
+        self.assertIn('"ifizbox:openlog"', page)
+        self.assertIn("ifizbox:openlog", app)
 
     def test_page(self):
         with open(os.path.join(REPO, "web", "app", "incoming.js")) as f:

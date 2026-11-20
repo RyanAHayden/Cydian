@@ -60,10 +60,13 @@ test("startIncoming takes the pending link at start and again on ifizbox:url", a
   try {
     startIncoming({ native });
     await new Promise((r) => setTimeout(r, 10));
-    assert.deepEqual(calls, ["app.takeURL", "app.takeURL"]); // one link, then none left
+    const urls = () => calls.filter((m) => m === "app.takeURL");
+    assert.deepEqual(urls(), ["app.takeURL", "app.takeURL"]); // one link, then none left
+    assert.ok(calls.includes("app.takeOpenLog")); // B166: the hand-off trail, after the links
     assert.equal(typeof listeners["ifizbox:url"], "function");
+    assert.equal(typeof listeners["ifizbox:openlog"], "function");
     await listeners["ifizbox:url"]();
-    assert.equal(calls.length, 3);
+    assert.equal(urls().length, 3);
   } finally { globalThis.addEventListener = saved; }
   startIncoming({ native: null }); // the website: nothing to listen to
 });

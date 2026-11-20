@@ -42,12 +42,36 @@ export function startIncoming({ native = globalThis.ifizboxNative } = {}) {
         if (!r?.url) return;
         await handleIncoming(r.url, { native });
       }
-    } finally { busy = false; }
+    } finally { busy = false; trail(); }
   };
+  const trail = () => { takeOpenLog({ native }).catch(() => {}); };
+  addEventListener("ifizbox:openlog", trail);
   addEventListener("ifizbox:url", take);
   const receiving = onReceiving();
   addEventListener("ifizbox:receiving", (e) => receiving(e.detail));
   take();
+}
+
+// B166: the shell's trail of a hand-off (native/share/App/ShareBridge.swift OpenLog: every hop from iOS's scene
+// callbacks to the page, "error: …" where one failed) into Settings > Console Logs, one entry per take, so a report
+// of "nothing happened" shows where it stopped. Taken at start, after each link and on "ifizbox:openlog".
+//   await takeOpenLog({ native, logs }) -> the entry added, or null (no lines, an older shell)
+export async function takeOpenLog({ native = globalThis.ifizboxNative, logs = null } = {}) {
+  let r = null;
+  try { r = await native.call("app.takeOpenLog", {}); } catch { return null; } // an older shell
+  const lines = Array.isArray(r?.lines) ? r.lines.map(String) : [];
+  if (!lines.length) return null;
+  const store = logs ?? (await import("./queue.js")).runLogs;
+  return store.add({ title: openLogTitle(lines), code: lines.some((l) => /\berror: /.test(l)) ? 1 : 0, text: lines.join("\n") });
+}
+
+// "Open in iFizBox: <file>" from the first "took <file>" line, else "Open in iFizBox".
+export function openLogTitle(lines) {
+  for (const l of lines) {
+    const m = /(?:SharedInbox|MyIPAs): took (.+?)(?: \(|$)/.exec(l);
+    if (m) return `Open in ${NAME}: ${m[1].slice(0, 80)}`;
+  }
+  return `Open in ${NAME}`;
 }
 
 // B163: a file another app handed over is being copied in (a 185 MB IPA from Safari takes a while): the shell sends

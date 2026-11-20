@@ -13,10 +13,10 @@ to 0.17.1.
 | Brief's check | Result |
 |---|---|
 | iFizBox stays open after iOS's prompt, with the "Finishing the update" line on the progress page | Yes: "Finishing the update: waiting for iOS to download the new iFizBox", button locked on "Waiting for iOS" (`r29-cancel-0.png`, `r29-w-1.png`) |
-| It closes only after iOS has the IPA | Yes. Phone log (`syslog-excerpt.txt`): iOS's download of `/sign/host/<t>/app.ipa` ends 18:04:21.69 ("Waiting for installation to complete"), iFizBox logs `self-close: exiting in 0.6 s` at 18:04:23.65 (the next 2 s status poll), `Process exited ... voluntary` at 18:04:24.73, installd starts the install at 18:04:24.89 and succeeds at 18:04:25.15. No `guessed` line, so it was the server's `finished` mark. |
-| Another app installing at the same time | A filler app (the same build re-signed as `com.ryha.r29filler`) was installed over and over through go-ios. One of those installs ran 18:04:18 to 18:04:23, across iOS's download and iFizBox closing. Run 1 the same: 18:00:17 to 18:00:22. |
+| It closes only after iOS has the IPA | Yes. Phone log of run 2 (`syslog-excerpt.txt`): appstored's download of `/sign/host/<t>/app.ipa` completes at 18:04:21.69 ("Beginning installation", "Waiting for installation to complete"). iFizBox logs `self-close: exiting in 0.6 s` at 18:04:23.65 (the next 2 s status poll), SpringBoard reports `Process exited ... voluntary` at 18:04:24.73. installd then installs the placeholder (18:04:24.89 to 18:04:25.15) and promotes it to the real app (18:04:42.00 to 18:04:48.48; the gap is iOS's queue, busy with the filler installs). The capture's filter (`-e "install: \|self-close\|..."`) keeps every `self-close:` line, and B208's give-up line (`self-close: iOS began the download 60 s ago ...`) isn't there; it also can't fire 3 s after the start. So the close came from the server's `finished` mark. |
+| Another app installing at the same time | A filler app (the same build re-signed as `com.ryha.r29filler`) was installed over and over through go-ios. The loop's timestamps for run 2 are in `filler-run2.txt`: install 5 ran 18:04:18 to 18:04:23 (across iOS's download and iFizBox closing), installs 6 to 10 ran until 18:04:50 (across iFizBox's own install). Run 1 was the same: 18:00:17 to 18:00:22. The phone-log capture didn't keep the filler's lines (its filter matched `com.ryha.ifizbox`, not the filler's ID), so the overlap rests on the loop's own timestamps. |
 | Opens on the new version the first time | Yes, twice: `ios apps` says 0.17.1 (2850), and the first launch's Home footer says "Version 0.17.1 (2850)" (`r29-b-open-footer.png`). No "didn't finish installing" banner; the "0.17.2 is out." banner is right, since 0.17.2 is newer. |
-| Cancel iOS's prompt once: Try Again after about 2 min | Yes. Cancel at 17:56:28; at 17:58:39 the page showed "The update didn't start: iOS didn't download the new iFizBox. If Install was pressed, try again." with Try Again (`r29-cancel-140s.png`). The 60 s shot still showed the wait. Try Again opened iOS's prompt again, and Install there made run 1. |
+| Cancel iOS's prompt once: Try Again after about 2 min | Yes. Cancel at 17:56:28; at 17:58:39 the page showed "The update didn't start: iOS didn't download the new iFizBox. If Install was pressed, try again." with Try Again (`r29-cancel-140s.png`). The 60 s shot still showed the wait (`r29-cancel-60s.png`). Try Again opened iOS's prompt again (`r29-retry-a.png`), and Install there made run 1. |
 
 ## How it was set up
 
@@ -42,6 +42,7 @@ to 0.17.1.
   (up to 25 MB)." (`r29-run2-c.png`). That's why the B83 checks used 0.17.1 as the new version.
 - **B216 (filed, low)**: Version History's sheet in the Lite build with a certificate says "A sideloader signs it on
   the iPhone with your Apple ID." although iFizBox signs it itself there.
+- Both were filed with `run plan add` (the two `plan/TODO.md` lines on this branch).
 - Small, not filed: after the cancelled prompt the log said "Sent iFizBox to iOS / 1 installed" before the wait
   ended in "didn't start". The Failed line and Try Again then correct it.
 
@@ -60,6 +61,8 @@ to 0.17.1.
 - **The `stalled` path and the B208 backstops** (60 s `downloadGuess`, the 15 s page hint): the download took about
   1 s at 195 Mbps on Wi-Fi, so these never came up. A slow network would be needed.
 - **The background case**: iFizBox stayed in front the whole time; nobody pressed Home while it waited.
-- **The installed release builds' own code**: the update was driven by this branch's code (plus B214's fix), not by
-  the 0.17.1 release's. The user's 0.17.1 can't run the queue at all (B214).
+- **A release-to-release upgrade**: the update was driven by this branch's code (plus B214's fix), not by a
+  released build. No release could do it today: 0.17.1 can't run the queue at all (B214), and from anything older the
+  only target, 0.17.2, is over the server's 25 MB (B215). Once B215 lands and a release newer than one with B214's
+  fix is out, a plain Upgrade on the phone is the check that's left.
 - **The "This iPhone" route** (local idevice install): not part of B83 and not used here.

@@ -12,3 +12,5 @@
 18:04:24.729971 SpringBoard{SpringBoard}[37] <NOTICE>: Process exited: <FBApplicationProcess: 0x7d87357000; app<com.ryha.ifizbox>:895(v9B7)> -> <RBSProcessExitContext| voluntary>
 18:04:24.890962 installd{MobileInstallation}[303] <NOTICE>: com.ryha.ifizbox/FEEDEEEE-DDDD-CCCC-BBBB-0000000001F5:7:2:1:1:Start : Install (Parallel Placeholder)
 18:04:25.150621 installd{MobileInstallation}[303] <NOTICE>: com.ryha.ifizbox/FEEDEEEE-DDDD-CCCC-BBBB-0000000001F5:7:2:2:1:Success (End) : Install (Parallel Placeholder)
+18:04:42.004033 installd{MobileInstallation}[303] <NOTICE>: com.ryha.ifizbox/FEEDEEEE-DDDD-CCCC-BBBB-0000000001F5:7:7:1:1:Start : Install (Promote From Placeholder)
+18:04:48.476762 installd{MobileInstallation}[303] <NOTICE>: com.ryha.ifizbox/FEEDEEEE-DDDD-CCCC-BBBB-0000000001F5:7:7:2:1:Success (End) : Install (Promote From Placeholder)

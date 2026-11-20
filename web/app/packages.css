@@ -1,21 +1,95 @@
 /* F5: Sections, package lists, Search, the package page, depictions and the modal sheet. Sizes are the kit's @2x
-   halved, or Cydia's points (docs/cydia.md); colours from the kit's layers as named, else the theme's variables. */
+   halved, or Cydia's points (docs/cydia.md); colours from the kit's layers as named, else the theme's variables.
+   Each section below keeps its layout in plain rules and paints in a look-only stretch after them (docs/eras.md):
+   ios6-css.test.js fails if a rule in a stretch sets anything but paint and type. */
+
+/* ==== look-only { ==== iOS 6's decorations for the search bar, scope bar, Filter, action sheet and store header, as
+   tokens so an era (docs/eras.md) swaps values instead of undoing them. The modal sheet paints with --plain and the
+   nav bar's tokens (ios6.css); palettes.css still paints the light palettes' search bar and store header with rules
+   of its own. */
+:root {
+  /* "grey search bar": the bar with its 1px line under it, the field (white, the magnifier, edges, inner shadow) */
+  --search-bar: linear-gradient(#81919f, #81919f) bottom / 100% 1px no-repeat, linear-gradient(#b5b9bd, #d3dbdf 7%, #b3bdc5);
+  --search-bar-scoped: linear-gradient(#b5b9bd, #d3dbdf 7%, #b3bdc5); /* over a scope bar: the line moves under it */
+  --search-field: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='%2393979d' fill-rule='evenodd' d='M6.5 0a6.5 6.5 0 0 1 5.3 10.3l4 4-1.5 1.5-4-4A6.5 6.5 0 1 1 6.5 0zm0 2a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9z'/%3E%3C/svg%3E") 10px 50% / 14px 14px no-repeat;
+  --search-field-edge: #a3afb9; --search-field-edge-top: #7b8fa3;
+  --search-field-shadow: inset 0 1.5px 2px rgba(35,31,32,.45);
+  --search-text: #000; --search-hint: #b4b3b4;
+  --search-clear: #b4b4b4 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpath d='M2 2l6 6M8 2l-6 6' stroke='%23fff' stroke-width='1.8' stroke-linecap='round'/%3E%3C/svg%3E") center / 9px 9px no-repeat;
+  /* Its Cancel: UISearchBarCancelButton(Pressed) */
+  --search-cancel: linear-gradient(#8d9baf, #647792); --search-cancel-pressed: linear-gradient(#778497, #566780);
+  --search-cancel-edge: #4b5b73; --search-cancel-edge-top: #3c4b61; --search-cancel-edge-bottom: #455872;
+  --search-cancel-text: #fff; --search-cancel-emboss: 0 -1px 0 rgba(0,0,0,.45);
+  --search-cancel-shadow: 0 1px 0 rgba(255,255,255,.3);
+  /* Scope bar: the bar under the field, UISegmentBar's segments (and Filter, drawn as one) */
+  --search-scope: linear-gradient(#81919f, #81919f) bottom / 100% 1px no-repeat, linear-gradient(#b3bdc5, #aab5be);
+  --scope-seg: linear-gradient(#abbacd, #6581a4);
+  --scope-seg-edge: #505e70; --scope-seg-edge-top: #3b4046; --scope-seg-edge-bottom: #586f8f;
+  --scope-seg-divider: #5e7597;
+  --scope-seg-text: #fff; --scope-seg-emboss: 0 -1px 0 rgba(0,0,0,.45);
+  --scope-seg-shadow: 0 1px 0 rgba(255,255,255,.3);
+  --scope-seg-selected: linear-gradient(#97a9c1, #41618e);
+  --scope-seg-selected-edge: #3e4e64; --scope-seg-selected-edge-top: #343a42; --scope-seg-selected-edge-bottom: #38547b;
+  --scope-seg-selected-divider: #43597b;
+  /* dark: black in every palette, so not a palette (--dk-*) token; the rest is ios6.css's --dk-btn* */
+  --scope-seg-dark-selected-edge: #000; --scope-seg-dark-divider: #000;
+  /* Filter: a blue Done while its panel is open (the nav bar's Done colours), and the panel's pinstripes */
+  --scope-done: linear-gradient(#79a1f3, #3b71e1 49%, #215fdd 51%, #2361dd);
+  --scope-done-pressed: linear-gradient(#5f86d6, #2a5bc0 49%, #164bb8 51%, #184db9);
+  --scope-done-edge: #1f3f86; --scope-done-edge-top: #30363e;
+  --filter-ground: repeating-linear-gradient(90deg, var(--pin-dark) 0 2.5px, var(--pin-light) 2.5px 8px) var(--pin-light);
+  --filter-shadow: inset 0 3px 3px -2px rgba(0,0,0,.35);
+  /* Action sheet: UIAlertSheetDefault* (light) and UIAlertSheetBlack* (dark) */
+  --action-dim: rgba(0,0,0,.4);
+  --action-sheet:
+    linear-gradient(#3f4347, #3f4347) top / 100% 1px no-repeat,
+    linear-gradient(rgba(255,255,255,.84), rgba(255,255,255,.84)) 0 1px / 100% .5px no-repeat,
+    linear-gradient(rgba(172,177,185,.84) 1.5px, rgba(142,148,158,.84) 12px, rgba(107,113,123,.84) 26px, rgba(92,98,109,.84) 33px);
+  --action-title: #fff; --action-title-emboss: 0 -1px 0 rgba(0,0,0,.5);
+  --action-btn: linear-gradient(#fff, #fafafa 7%, #ebebec 23%, #d9d9db 38%, #c9cacc 54%, #c2c3c5 69%, #c5c6c7 77%, #cdcdcf 85%, #dcdcdd 92%, #e3e3e3);
+  --action-btn-text: #000; --action-btn-emboss: 0 1px 0 rgba(255,255,255,.6);
+  --action-btn-edge: rgba(0,0,0,.8);
+  --action-btn-shadow: inset 0 0 1.5px 1px rgba(0,0,0,.35), 0 1px 0 rgba(211,211,211,.23);
+  --action-btn-pressed: linear-gradient(#91a2f0, #7a90ec 7%, #6a82ea 23%, #4c69e6 38%, #2d4fe1 54%, #1036de 69%, #022bdc 77%, #0c33dd 85%, #2649df 92%, #3252e3);
+  --action-btn-pressed-text: #fff; --action-btn-pressed-emboss: 0 -1px 0 rgba(0,0,0,.4);
+  --action-destructive: linear-gradient(#f59a9a, #e45c5c 30%, #cf1f1f 69%, #d52f2f);
+  --action-destructive-text: #fff; --action-destructive-emboss: 0 -1px 0 rgba(0,0,0,.4);
+  --action-cancel-text: #fff;
+  --action-cancel: linear-gradient(#7e8288, #65676d 7%, #565a60 23%, #484b52 38%, #3b3f47 54%, #2e333b 69%, #2b3038 77%, #2c3139 85%, #333941 92%, #383f46);
+  --action-cancel-pressed: linear-gradient(#5f6268, #3a3d43 50%, #1c2027);
+  --action-cancel-emboss: 0 -1px 0 rgba(0,0,0,.5);
+  --dk-action-sheet: /* UIAlertSheetBlackBackground: #232323 edge, #6a6a6a -> #040404 */
+    linear-gradient(rgba(35,35,35,.89), rgba(35,35,35,.89)) top / 100% 1px no-repeat,
+    linear-gradient(rgba(167,167,167,.82), rgba(167,167,167,.82)) 0 1px / 100% .5px no-repeat,
+    linear-gradient(rgba(106,106,106,.73) 1.5px, rgba(81,81,81,.7) 12px, rgba(44,44,44,.65) 24px, rgba(9,9,9,.62) 36px, rgba(1,1,1,.6));
+  --dk-action-btn: linear-gradient(#fbfbfb, #f5f5f5 15%, #f0f0f0 38%, #eee 46%, #e4e4e4 54%, #e4e4e4); /* UIAlertSheetBlackButton */
+  --dk-action-cancel: linear-gradient(#878787, #686868 7%, #545454 23%, #383838 38%, #1a1a1a 54%, #020202 69%, #000 77%, #131313);
+  /* Store header (the package page as the iOS 6 App Store's): the light band, its emboss and the line under it */
+  --store-head: linear-gradient(#fdfdfd, #e6e8eb); --store-head-edge: #b0b4ba; --store-head-emboss: 0 1px 0 #fff;
+}
+/* ==== } look-only ==== */
 
 /* ---- "folder.png", redrawn: a #8e8e93 rounded square with a white folder; Cydia puts the section's count in it
    (12pt bold, in the folder's grey). ---- */
-.folder {
-  position: relative; flex: none; width: 32px; height: 32px; display: grid; place-items: center;
-  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%238e8e93'/%3E%3Cpath d='M5.5 10V7.2c0-.7.5-1.2 1.2-1.2h7.6c.5 0 .9.3 1.1.7L16.2 8H25c.7 0 1.2.5 1.2 1.2V10z' fill='%23eaeaeb'/%3E%3Crect x='3' y='9.5' width='26' height='17.5' rx='1.6' fill='%23fff'/%3E%3C/svg%3E") center / 32px 32px no-repeat;
-}
-.folder-count { margin-top: 5px; font-size: 12px; font-weight: bold; line-height: 1; color: #8e8e93; letter-spacing: -.02em; }
+.folder { position: relative; flex: none; width: 32px; height: 32px; display: grid; place-items: center; }
+.folder-count { margin-top: 5px; }
 .all-sources-row .cell-inner { min-height: 53px; }
 .sections .cell-inner { min-height: 46px; padding-left: 7px; gap: 9px; } /* folder at (7,7), name at x 48 */
-.sections .cell-label { flex: 1; min-width: 0; font-size: 18px; line-height: 22px; }
+.sections .cell-label { flex: 1; min-width: 0; }
+/* ==== look-only { ==== folder */
+.folder {
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%238e8e93'/%3E%3Cpath d='M5.5 10V7.2c0-.7.5-1.2 1.2-1.2h7.6c.5 0 .9.3 1.1.7L16.2 8H25c.7 0 1.2.5 1.2 1.2V10z' fill='%23eaeaeb'/%3E%3Crect x='3' y='9.5' width='26' height='17.5' rx='1.6' fill='%23fff'/%3E%3C/svg%3E") center / 32px 32px no-repeat;
+}
+.folder-count { font-size: 12px; font-weight: bold; line-height: 1; color: #8e8e93; letter-spacing: -.02em; }
+.sections .cell-label { font-size: 18px; line-height: 22px; }
+/* ==== } look-only ==== */
 
 /* ---- the virtualised list (nav/vlist.js) ---- */
 .vlist { position: relative; contain: layout; }
 .vlist-row, .vlist-header { position: absolute; top: 0; left: 0; right: 0; }
 .vlist-header { z-index: 1; }
+.vlist-sticky { position: sticky; top: 0; z-index: 2; margin-bottom: -23px; } /* top: 0 is just under the nav: sticky offsets count from inside the scroller's padding */
+/* ==== look-only { ==== the virtualised list */
 /* Placeholder rows under a package list: a fast fling can outrun drawing the real rows (they're placed once a frame),
    so the gap shows rows still loading instead of blank space. The real rows cover them; the list is only as tall
    as its items, so they stop where the list ends. */
@@ -23,135 +97,185 @@
   background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='260' height='58'%3E%3Cg fill='%23808080'%3E%3Crect x='9' y='13' width='32' height='32' rx='7' fill-opacity='.22'/%3E%3Crect x='51' y='15' width='130' height='13' rx='4' fill-opacity='.2'/%3E%3Crect x='51' y='34' width='190' height='9' rx='3' fill-opacity='.13'/%3E%3C/g%3E%3C/svg%3E") 0 0 / 260px 58px repeat-y,
     linear-gradient(transparent 57px, var(--keyline) 57px) 0 0 / 100% 58px repeat-y, var(--plain);
 }
-.vlist-sticky { position: sticky; top: 0; z-index: 2; margin-bottom: -23px; } /* top: 0 is just under the nav: sticky offsets count from inside the scroller's padding */
+/* ==== } look-only ==== */
 
 /* Package rows: 58px, the 32px icon, name in bold with the version beside it, the short description under. */
-.pkg-row { height: 58px; contain: strict; background: var(--plain); border-bottom: 1px solid var(--keyline); }
+.pkg-row { height: 58px; contain: strict; }
 .pkg-row > .cell-inner { height: 100%; min-height: 0; gap: 10px; padding: 0 12px 0 9px; }
 .pkg-row > .cell-inner::after { /* the disclosure chevron, as on every Cydia package cell */
-  content: ""; flex: none; width: 9px; height: 13px; background: var(--chevron) center / contain no-repeat;
+  flex: none; width: 9px; height: 13px;
 }
+.pkg-icon {
+  position: relative; flex: none; width: 32px; height: 32px; overflow: hidden; display: grid; place-items: center;
+}
+.pkg-icon img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.pkg-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.pkg-top { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+.pkg-name { flex: 0 1 auto; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.pkg-version {
+  flex: none; margin-left: auto; max-width: 45%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+}
+.pkg-desc { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+/* ==== look-only { ==== Package rows */
+.pkg-row { background: var(--plain); border-bottom: 1px solid var(--keyline); }
+.pkg-row > .cell-inner::after { content: ""; background: var(--chevron) center / contain no-repeat; }
 .pkg-row > .cell-inner.is-pressed::after {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 17.5 26.4'%3E%3Cpath fill='%23fff' d='M.07 4.23 9.12 13.27 0 22.26 4.12 26.38 17.47 13.03 4.43 0Z'/%3E%3C/svg%3E");
 }
-.pkg-icon {
-  position: relative; flex: none; width: 32px; height: 32px; border-radius: 7px; overflow: hidden;
-  display: grid; place-items: center; background: #8c99b3; box-shadow: 0 1px 2px rgba(0,0,0,.3);
-}
+.pkg-icon { border-radius: 7px; background: #8c99b3; box-shadow: 0 1px 2px rgba(0,0,0,.3); }
 .pkg-letter { font-size: 16px; font-weight: bold; color: #fff; text-shadow: 0 -1px 0 rgba(0,0,0,.3); }
-.pkg-icon img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; background: #fff; }
+.pkg-icon img { opacity: 0; background: #fff; }
 .pkg-icon img.loaded { opacity: 1; }
-.pkg-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.pkg-top { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
-.pkg-name { flex: 0 1 auto; min-width: 0; font-size: 17px; font-weight: bold; line-height: 21px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.pkg-version { flex: none; margin-left: auto; max-width: 45%; font-size: 13px; color: var(--subtitle); text-align: right; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.pkg-desc { font-size: 14px; line-height: 17px; color: var(--subtitle); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.pkg-name { font-size: 17px; font-weight: bold; line-height: 21px; }
+.pkg-version { font-size: 13px; color: var(--subtitle); text-align: right; }
+.pkg-desc { font-size: 14px; line-height: 17px; color: var(--subtitle); }
+/* ==== } look-only ==== */
 
 /* ---- loading ---- */
-.loading { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 40px 20px; font-size: 17px; color: var(--head); text-shadow: var(--emboss); }
+.loading { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 40px 20px; }
 .loading-spinner { /* UIActivityIndicatorViewStyleGray (nav/spinner.js), turned a spoke at a time */
-  width: 20px; height: 20px; flex: none; background: var(--spinner-gray) center / 20px no-repeat;
-  animation: hud-spin .96s linear infinite;
+  width: 20px; height: 20px; flex: none; animation: hud-spin .96s linear infinite;
 }
 .depiction-slot .loading { margin: 20px; }
 .page-body > .loading { height: 72%; margin: 0 20px; } /* a page still loading: the spinner in the middle (user 2026-11-17) */
+/* ==== look-only { ==== loading */
+.loading { font-size: 17px; color: var(--head); text-shadow: var(--emboss); }
+.loading-spinner { background: var(--spinner-gray) center / 20px no-repeat; }
+/* ==== } look-only ==== */
 
 /* ---- "grey search bar": 44px, #b5b9bd -> #d3dbdf (7%) -> #b3bdc5, a 1px #81919f line under it; the field is
    30px, 15px corners, white, a #7b8fa3 -> #a3afb9 edge and a soft inner shadow; the #93979d magnifier. ---- */
-.search-bar {
-  height: 44px; margin: 0; padding: 7px 5px; display: flex;
-  background: linear-gradient(#81919f, #81919f) bottom / 100% 1px no-repeat, linear-gradient(#b5b9bd, #d3dbdf 7%, #b3bdc5);
-}
-.search-field {
-  flex: 1; display: flex; align-items: center; height: 30px; padding: 0 10px 0 29px; border-radius: 15px;
-  background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='%2393979d' fill-rule='evenodd' d='M6.5 0a6.5 6.5 0 0 1 5.3 10.3l4 4-1.5 1.5-4-4A6.5 6.5 0 1 1 6.5 0zm0 2a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9z'/%3E%3C/svg%3E") 10px 50% / 14px 14px no-repeat;
-  border: 1px solid #a3afb9; border-top-color: #7b8fa3;
-  box-shadow: inset 0 1.5px 2px rgba(35,31,32,.45);
-}
+.search-bar { height: 44px; margin: 0; padding: 7px 5px; display: flex; }
+.search-field { flex: 1; display: flex; align-items: center; height: 30px; padding: 0 10px 0 29px; }
 .search-field input {
-  flex: 1; min-width: 0; height: 100%; padding: 0; border: 0; outline: none; background: none;
-  font: inherit; font-size: 16px; color: #000; -webkit-user-select: text; user-select: text; -webkit-appearance: none; appearance: none;
+  flex: 1; min-width: 0; height: 100%; padding: 0; -webkit-user-select: text; user-select: text;
+  -webkit-appearance: none; appearance: none;
 }
-.search-field input::placeholder { color: #b4b3b4; }
 .search-field input::-webkit-search-decoration { -webkit-appearance: none; }
-html[data-theme="dark"] .search-bar {
-  background: linear-gradient(var(--dk-search-line), var(--dk-search-line)) bottom / 100% 1px no-repeat, var(--dk-search-bar);
-}
-html[data-theme="dark"] .search-field { background-color: var(--dk-field); border-color: var(--dk-field-edge); }
-html[data-theme="dark"] .search-field input { color: var(--text); }
 /* Its Cancel, from the 4S's UISearchBarCancelButton(Pressed): shown while the field is focused or holds text. */
 .search-cancel {
-  display: none; flex: none; height: 30px; margin: 0 0 0 6px; padding: 0 9px; cursor: pointer; touch-action: manipulation;
-  font: inherit; font-size: 12px; font-weight: bold; line-height: 28px; color: #fff; text-shadow: 0 -1px 0 rgba(0,0,0,.45);
-  border: 1px solid #4b5b73; border-top-color: #3c4b61; border-bottom-color: #455872; border-radius: 5px;
-  background: linear-gradient(#8d9baf, #647792); background-origin: border-box;
-  box-shadow: 0 1px 0 rgba(255,255,255,.3);
+  display: none; flex: none; height: 30px; margin: 0 0 0 6px; padding: 0 9px; cursor: pointer;
+  touch-action: manipulation;
 }
-.search-cancel:active { background: linear-gradient(#778497, #566780); background-origin: border-box; }
 .search-bar:has(input:focus) .search-cancel, .search-bar:has(input:not(:placeholder-shown)) .search-cancel { display: block; }
-html[data-theme="dark"] .search-cancel { border-color: var(--dk-btn-edge); background: var(--dk-btn); background-origin: border-box; }
-html[data-theme="dark"] .search-cancel:active { background: var(--dk-btn-pressed); background-origin: border-box; }
 .search-note:empty { display: none; }
 .search-note { margin: 30px 20px; }
 /* F100: Recent's Clear sits at the right of the group header, in the header's own colour and emboss. */
 .search-recent { padding-bottom: 10px; }
 .search-recent .group-header { display: flex; justify-content: space-between; align-items: baseline; }
-.recent-clear { border: 0; padding: 0 0 0 12px; background: none; font: inherit; font-size: 15px; font-weight: normal; color: var(--head); text-shadow: var(--emboss); }
+.recent-clear { padding: 0 0 0 12px; }
+/* ==== look-only { ==== grey search bar */
+.search-bar { background: var(--search-bar); }
+.search-field {
+  border-radius: 15px; background: var(--search-field);
+  border: 1px solid var(--search-field-edge); border-top-color: var(--search-field-edge-top); box-shadow: var(--search-field-shadow);
+}
+.search-field input { border: 0; outline: none; background: none; font: inherit; font-size: 16px; color: var(--search-text); }
+.search-field input::placeholder { color: var(--search-hint); }
+html[data-theme="dark"] .search-bar {
+  background: linear-gradient(var(--dk-search-line), var(--dk-search-line)) bottom / 100% 1px no-repeat, var(--dk-search-bar);
+}
+html[data-theme="dark"] .search-field { background-color: var(--dk-field); border-color: var(--dk-field-edge); }
+html[data-theme="dark"] .search-field input { color: var(--text); }
+.search-cancel {
+  font: inherit; font-size: 12px; font-weight: bold; line-height: 28px; color: var(--search-cancel-text);
+  text-shadow: var(--search-cancel-emboss); border: 1px solid var(--search-cancel-edge); border-top-color: var(--search-cancel-edge-top);
+  border-bottom-color: var(--search-cancel-edge-bottom); border-radius: 5px; background: var(--search-cancel);
+  background-origin: border-box; box-shadow: var(--search-cancel-shadow);
+}
+.search-cancel:active { background: var(--search-cancel-pressed); background-origin: border-box; }
+html[data-theme="dark"] .search-cancel { border-color: var(--dk-btn-edge); background: var(--dk-btn); background-origin: border-box; }
+html[data-theme="dark"] .search-cancel:active { background: var(--dk-btn-pressed); background-origin: border-box; }
+.recent-clear {
+  border: 0; background: none; font: inherit; font-size: 15px; font-weight: normal; color: var(--head);
+  text-shadow: var(--emboss);
+}
+/* ==== } look-only ==== */
 
 /* ---- the package page ---- */
 .group-footer { white-space: pre-line; }
-/* F314: a paid package's Download .deb on the site, greyed: its footer says where it installs instead */
-.deb-paid .cell-label { color: var(--subtitle); }
 .pkg-head-table { display: block; }
 .pkg-head { display: flex; align-items: center; gap: 12px; padding: 10px; position: relative; min-height: 84px; }
-.pkg-icon.large { width: 64px; height: 64px; border-radius: 12px; }
-.pkg-icon.large .pkg-letter { font-size: 30px; }
+.pkg-icon.large { width: 64px; height: 64px; }
 .pkg-head-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; padding-right: 40px; }
-.pkg-head-name { font-size: 17px; font-weight: bold; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.pkg-head-name { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.pkg-head-size { position: absolute; right: 10px; bottom: 8px; }
+.pkg-description {
+  padding: 10px 12px; white-space: pre-wrap; overflow-wrap: anywhere; -webkit-user-select: text; user-select: text;
+}
+/* ==== look-only { ==== the package page */
+/* F314: a paid package's Download .deb on the site, greyed: its footer says where it installs instead */
+.deb-paid .cell-label { color: var(--subtitle); }
+.pkg-icon.large { border-radius: 12px; }
+.pkg-icon.large .pkg-letter { font-size: 30px; }
+.pkg-head-name { font-size: 17px; font-weight: bold; }
 .pkg-head-version { font-size: 14px; color: var(--detail); }
-.pkg-head-size { position: absolute; right: 10px; bottom: 8px; font-size: 12px; color: var(--subtitle); }
-.pkg-description { padding: 10px 12px; font-size: 15px; line-height: 20px; white-space: pre-wrap; overflow-wrap: anywhere; -webkit-user-select: text; user-select: text; }
+.pkg-head-size { font-size: 12px; color: var(--subtitle); }
+.pkg-description { font-size: 15px; line-height: 20px; }
 a.cell-inner.download .cell-label { color: var(--detail); }
+/* ==== } look-only ==== */
 
 /* ---- Sileo depictions, drawn natively (screens/depiction.js) ---- */
 .dep-card { padding: 4px 0; overflow: hidden; }
-.dep { --dep-tint: var(--detail); font-size: 15px; line-height: 20px; color: var(--text); overflow-wrap: anywhere; }
+.dep { overflow-wrap: anywhere; }
 .dep-header-image { display: block; width: 100%; max-height: 180px; object-fit: cover; }
 .dep-stack { display: flex; flex-direction: column; }
 .dep-stack.row { flex-direction: row; align-items: center; }
 .dep-stack.row > * { flex: 1; min-width: 0; }
-.dep-layer { display: grid; } .dep-layer > * { grid-area: 1 / 1; }
-.dep-header { margin: 10px 12px 4px; font-size: 19px; line-height: 23px; font-weight: bold; }
-.dep-subheader { margin: 2px 12px 6px; font-size: 15px; color: var(--subtitle); } .dep-subheader.bold { font-weight: bold; color: var(--text); }
+.dep-layer { display: grid; }
+.dep-layer > * { grid-area: 1 / 1; }
+.dep-header { margin: 10px 12px 4px; }
+.dep-subheader { margin: 2px 12px 6px; }
 .dep-label { margin: 4px 12px; }
 .dep-markdown { padding: 2px 12px; -webkit-user-select: text; user-select: text; }
 .dep-markdown p { margin: 6px 0; }
-.dep-markdown h3, .dep-markdown h4, .dep-markdown h5, .dep-markdown h6 { margin: 10px 0 4px; font-size: 16px; }
+.dep-markdown h3, .dep-markdown h4, .dep-markdown h5, .dep-markdown h6 { margin: 10px 0 4px; }
 .dep-markdown ul, .dep-markdown ol { margin: 6px 0; padding-left: 22px; }
 .dep-markdown img { max-width: 100%; height: auto; }
-.dep-markdown code { font-family: Menlo, Courier, monospace; font-size: 13px; }
-.dep a { color: var(--dep-tint); text-decoration: none; }
-.dep-image { padding: 6px 12px; } .dep-image img { max-width: 100%; height: auto; }
+.dep-image { padding: 6px 12px; }
+.dep-image img { max-width: 100%; height: auto; }
 .dep-shots { display: flex; gap: 10px; padding: 8px 12px; overflow-x: auto; touch-action: pan-x pan-y; overscroll-behavior-x: contain; }
-.dep-shots img { flex: none; object-fit: cover; background: rgba(127,127,127,.15); }
-.dep-row { display: flex; align-items: center; gap: 8px; min-height: 43px; padding: 0 12px; border-top: 1px solid var(--divider); }
-.dep-row-title { flex: 1; font-weight: bold; } .dep-row-text { color: var(--detail); text-align: right; }
-.dep-button-row { font-weight: bold; }
-.dep-button-row::after { content: ""; margin-left: auto; flex: none; width: 9px; height: 13px; background: var(--chevron) center / contain no-repeat; }
-.dep-button { display: block; margin: 6px 12px; padding: 10px; border-radius: 8px; text-align: center; font-weight: bold; color: #fff !important; background: var(--dep-tint); }
+.dep-shots img { flex: none; object-fit: cover; }
+.dep-row { display: flex; align-items: center; gap: 8px; min-height: 43px; padding: 0 12px; }
+.dep-row-title { flex: 1; }
+.dep-button-row::after { margin-left: auto; flex: none; width: 9px; height: 13px; }
+.dep-button { display: block; margin: 6px 12px; padding: 10px; }
 /* B18: Sileo's isLink buttons are plain tint-colour links; a nested view brings its own margins. */
-.dep-button.link { padding: 0; border-radius: 0; text-align: inherit; font-weight: normal; color: var(--dep-tint) !important; background: none; }
+.dep-button.link { padding: 0; }
 .dep-button.has-view { margin: 0; }
 .dep-button.has-view:not(.link) { margin: 6px 12px; }
+.dep-button-row.disabled, .dep-button.disabled { pointer-events: none; }
+.dep-separator { margin: 6px 12px; }
+/* ==== look-only { ==== Sileo depictions, drawn natively */
+.dep { --dep-tint: var(--detail); font-size: 15px; line-height: 20px; color: var(--text); }
+.dep-header { font-size: 19px; line-height: 23px; font-weight: bold; }
+.dep-subheader { font-size: 15px; color: var(--subtitle); }
+.dep-subheader.bold { font-weight: bold; color: var(--text); }
+.dep-markdown h3, .dep-markdown h4, .dep-markdown h5, .dep-markdown h6 { font-size: 16px; }
+.dep-markdown code { font-family: Menlo, Courier, monospace; font-size: 13px; }
+.dep a { color: var(--dep-tint); text-decoration: none; }
+.dep-shots img { background: rgba(127,127,127,.15); }
+.dep-row { border-top: 1px solid var(--divider); }
+.dep-row-title { font-weight: bold; }
+.dep-row-text { color: var(--detail); text-align: right; }
+.dep-button-row { font-weight: bold; }
+.dep-button-row::after { content: ""; background: var(--chevron) center / contain no-repeat; }
+.dep-button {
+  border-radius: 8px; text-align: center; font-weight: bold; color: #fff !important; background: var(--dep-tint);
+}
+.dep-button.link {
+  border-radius: 0; text-align: inherit; font-weight: normal; color: var(--dep-tint) !important; background: none;
+}
 .dep-button.link .dep-label { color: inherit !important; }
-.dep-button-row.disabled, .dep-button.disabled { opacity: .5; pointer-events: none; }
-.dep-separator { margin: 6px 12px; border: 0; border-top: 1px solid var(--divider); }
+.dep-button-row.disabled, .dep-button.disabled { opacity: .5; }
+.dep-separator { border: 0; border-top: 1px solid var(--divider); }
+/* ==== } look-only ==== */
 
 /* DepictionTabView's tabs: the store page's segmented control (ios6.css .store-segmented), at the old margins. */
 .dep-tabs > .store-segmented { margin: 8px 12px; }
 
 /* ---- the modal sheet (nav/sheet.js): its own blue nav bar with Done, slid up by transform ---- */
-.sheet { position: fixed; inset: 0; z-index: 25; display: flex; flex-direction: column; background: var(--plain); will-change: transform; }
+.sheet { position: fixed; inset: 0; z-index: 25; display: flex; flex-direction: column; will-change: transform; }
 html.native .navbar.sheet-bar { display: block; } /* the app hides the web nav bar, not a sheet's */
 .sheet-bar-row {
   position: absolute; left: 0; right: 0; top: env(safe-area-inset-top); height: 44px;
@@ -161,11 +285,17 @@ html.native .navbar.sheet-bar { display: block; } /* the app hides the web nav b
 .sheet-right { justify-self: end; display: flex; }
 .sheet-body { flex: 1; position: relative; min-height: 0; padding-bottom: var(--safe-bottom); }
 .sheet-body > .sheet-scroll { position: absolute; inset: 0; }
-.depiction-frame { display: block; width: 100%; height: 100%; border: 0; background: #fff; }
+.depiction-frame { display: block; width: 100%; height: 100%; }
+/* ==== look-only { ==== the modal sheet */
+.sheet { background: var(--plain); }
+.depiction-frame { border: 0; background: #fff; }
+/* ==== } look-only ==== */
 
 /* ---- Changes tab (screens/changes.js): the version reads "New 1.0" or "Updated 1.2" (iFizBox's addition) ---- */
+/* ==== look-only { ==== Changes tab */
 .pkg-row[data-change="new"] .pkg-version::before { content: "New "; font-weight: bold; }
 .pkg-row[data-change="updated"] .pkg-version::before { content: "Updated "; font-weight: bold; }
+/* ==== } look-only ==== */
 
 /* ---- Works on my phone (F17): the switch row above the Sections list and Search's results ---- */
 .compat-filter .cell-inner { min-height: 50px; }
@@ -173,35 +303,39 @@ html.native .navbar.sheet-bar { display: block; } /* the app hides the web nav b
 /* ---- Search's scope bar (F35): iOS 6's UISearchBar scope buttons under the field. The bar runs on in the search
    bar's grey and takes its bottom line; the segments are UISegmentBar's (UISegmentBarButton*.png, 30pt): a
    #3b4046 top edge, #abbacd -> #6581a4 inside (selected #97a9c1 -> #41618e), #586f8f under, 30% white below. ---- */
-.search-bar.has-scope { background: linear-gradient(#b5b9bd, #d3dbdf 7%, #b3bdc5); }
-.search-scope {
-  display: flex; gap: 6px; height: 44px; padding: 7px 5px; align-items: flex-start;
-  background: linear-gradient(#81919f, #81919f) bottom / 100% 1px no-repeat, linear-gradient(#b3bdc5, #aab5be);
-}
-.scope-segments { flex: 1; min-width: 0; display: flex; border-radius: 5px; box-shadow: 0 1px 0 rgba(255,255,255,.3); }
+.search-scope { display: flex; gap: 6px; height: 44px; padding: 7px 5px; align-items: flex-start; }
+.scope-segments { flex: 1; min-width: 0; display: flex; }
 .scope-segment, .scope-filter {
   flex: 1; min-width: 0; height: 30px; padding: 0 4px; margin: 0; cursor: pointer; touch-action: manipulation;
-  font: inherit; font-size: 12px; font-weight: bold; line-height: 28px; color: #fff; white-space: nowrap;
-  overflow: hidden; text-overflow: ellipsis; text-shadow: 0 -1px 0 rgba(0,0,0,.45);
-  border: 1px solid #505e70; border-top-color: #3b4046; border-bottom-color: #586f8f; border-radius: 0;
-  background: linear-gradient(#abbacd, #6581a4); background-origin: border-box;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.scope-segment + .scope-segment { border-left-color: #5e7597; }
+.scope-filter { flex: none; padding: 0 10px; }
+/* ==== look-only { ==== Search's scope bar */
+.search-bar.has-scope { background: var(--search-bar-scoped); }
+.search-scope { background: var(--search-scope); }
+.scope-segments { border-radius: 5px; box-shadow: var(--scope-seg-shadow); }
+.scope-segment, .scope-filter {
+  font: inherit; font-size: 12px; font-weight: bold; line-height: 28px; color: var(--scope-seg-text);
+  text-shadow: var(--scope-seg-emboss); border: 1px solid var(--scope-seg-edge); border-top-color: var(--scope-seg-edge-top);
+  border-bottom-color: var(--scope-seg-edge-bottom); border-radius: 0; background: var(--scope-seg);
+  background-origin: border-box;
+}
+.scope-segment + .scope-segment { border-left-color: var(--scope-seg-divider); }
 .scope-segment:first-child { border-radius: 5px 0 0 5px; }
 .scope-segment:last-child { border-radius: 0 5px 5px 0; }
 .scope-segment.selected, .scope-segment:active, .scope-filter.selected, .scope-filter:active {
-  border-color: #3e4e64; border-top-color: #343a42; border-bottom-color: #38547b;
-  background: linear-gradient(#97a9c1, #41618e); background-origin: border-box;
+  border-color: var(--scope-seg-selected-edge); border-top-color: var(--scope-seg-selected-edge-top);
+  border-bottom-color: var(--scope-seg-selected-edge-bottom); background: var(--scope-seg-selected); background-origin: border-box;
 }
-.scope-segment.selected + .scope-segment { border-left-color: #43597b; }
-.scope-filter { flex: none; padding: 0 10px; border-radius: 5px; box-shadow: 0 1px 0 rgba(255,255,255,.3); }
+.scope-segment.selected + .scope-segment { border-left-color: var(--scope-seg-selected-divider); }
+.scope-filter { border-radius: 5px; box-shadow: var(--scope-seg-shadow); }
 /* Filter becomes a blue Done while its panel is open (the nav bar's Done colours, sources.css). */
 .scope-filter.done, html[data-theme="dark"] .scope-filter.done {
-  border-color: #1f3f86; border-top-color: #30363e;
-  background: linear-gradient(#79a1f3, #3b71e1 49%, #215fdd 51%, #2361dd); background-origin: border-box;
+  border-color: var(--scope-done-edge); border-top-color: var(--scope-done-edge-top);
+  background: var(--scope-done); background-origin: border-box;
 }
 .scope-filter.done:active, html[data-theme="dark"] .scope-filter.done:active {
-  background: linear-gradient(#5f86d6, #2a5bc0 49%, #164bb8 51%, #184db9); background-origin: border-box;
+  background: var(--scope-done-pressed); background-origin: border-box;
 }
 html[data-theme="dark"] .search-bar.has-scope { background: var(--dk-search-bar); }
 html[data-theme="dark"] .search-scope { background: linear-gradient(var(--dk-search-line), var(--dk-search-line)) bottom / 100% 1px no-repeat, var(--dk-search-fill); }
@@ -210,18 +344,23 @@ html[data-theme="dark"] .scope-segment, html[data-theme="dark"] .scope-filter {
 }
 html[data-theme="dark"] .scope-segment.selected, html[data-theme="dark"] .scope-segment:active,
 html[data-theme="dark"] .scope-filter.selected, html[data-theme="dark"] .scope-filter:active {
-  border-color: #000; background: var(--dk-btn-pressed); background-origin: border-box;
+  border-color: var(--scope-seg-dark-selected-edge); background: var(--dk-btn-pressed); background-origin: border-box;
 }
 html[data-theme="dark"] .scope-segments, html[data-theme="dark"] .scope-filter { box-shadow: 0 1px 0 var(--dk-ctl-hi); }
 .filter-sheet .filter-clear .cell-label { color: var(--detail); }
+/* ==== } look-only ==== */
 
 /* ---- Compatibility marks (F35): a small round mark beside every package, like the old Cydia tweak that drew a
    check or an X: green check works, red X doesn't, grey ? the package doesn't say. Drawn as SVG; Settings > Show
    Compatibility Marks hides them (html[data-compat-marks="off"], browse.js). ---- */
-.compat-mark { flex: none; align-self: center; width: 14px; height: 14px; background: center / contain no-repeat; }
+.compat-mark { flex: none; align-self: center; width: 14px; height: 14px; }
 .compat-mark:not([data-mark]) { display: none; }
 html[data-compat-marks="off"] .compat-mark { display: none; }
 .compat-mark.large { width: 18px; height: 18px; }
+.pkg-head-top { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.pkg-head-top .pkg-head-name { min-width: 0; }
+/* ==== look-only { ==== Compatibility marks */
+.compat-mark { background: center / contain no-repeat; }
 .compat-mark[data-mark="works"] {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'%3E%3ClinearGradient id='g' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%2384d65e'/%3E%3Cstop offset='1' stop-color='%23329c1c'/%3E%3C/linearGradient%3E%3Ccircle cx='14' cy='14' r='13' fill='url(%23g)' stroke='%23267a16' stroke-width='1.5'/%3E%3Cpath d='M8 14.5l4 4 8-9' fill='none' stroke='%23fff' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
 }
@@ -239,18 +378,18 @@ html[data-compat-marks="off"] .compat-mark { display: none; }
 /* An exact match that can't work (Search, F35): the name in red, the reason under it. */
 .pkg-name.incompatible { color: #c0392b; }
 html[data-theme="dark"] .pkg-name.incompatible { color: var(--dk-bad); }
-.pkg-head-top { display: flex; align-items: center; gap: 6px; min-width: 0; }
-.pkg-head-top .pkg-head-name { min-width: 0; }
-html[data-theme="dark"] .scope-segment + .scope-segment, html[data-theme="dark"] .scope-segment.selected + .scope-segment { border-left-color: #000; }
+html[data-theme="dark"] .scope-segment + .scope-segment, html[data-theme="dark"] .scope-segment.selected + .scope-segment { border-left-color: var(--scope-seg-dark-divider); }
+/* ==== } look-only ==== */
 
 /* Search's Filter panel (screens/search.js): drops down from under the scope bar over the results only, between the
    scope bar and the tab bar; scrolls on its own. */
 .filter-drop { position: fixed; left: 0; right: 0; bottom: var(--tab-h); z-index: 2; overflow: hidden; }
 .filter-drop-inner {
   position: absolute; inset: 0; overflow-y: auto; overscroll-behavior: contain; padding-bottom: 20px;
-  background: repeating-linear-gradient(90deg, var(--pin-dark) 0 2.5px, var(--pin-light) 2.5px 8px) var(--pin-light);
-  box-shadow: inset 0 3px 3px -2px rgba(0,0,0,.35);
 }
+/* ==== look-only { ==== Search's Filter panel */
+.filter-drop-inner { background: var(--filter-ground); box-shadow: var(--filter-shadow); }
+/* ==== } look-only ==== */
 
 /* ---- The action sheet (nav/actionsheet.js, F29): UIActionSheet's default style, from the 4S's UIAlertSheet* art.
    Panel (UIAlertSheetDefaultBackground, 84% opaque): a 1pt #3f4347 top edge, half a point of white, then
@@ -259,16 +398,11 @@ html[data-theme="dark"] .scope-segment + .scope-segment, html[data-theme="dark"]
    in the art); pressed (…ButtonPressed) #91a2f0 -> #022bdc -> #3252e3 with white text. Cancel
    (…CancelButton) #7e8288 -> #2b3038 -> #383f46, white text, after a wider gap. Black style in the dark theme. ---- */
 .action-scrim { position: fixed; inset: 0; z-index: 30; }
-.action-dim { position: absolute; inset: 0; background: rgba(0,0,0,.4); }
+.action-dim { position: absolute; inset: 0; }
 .action-sheet {
   position: absolute; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column; gap: 11px;
-  padding: 21px 21px calc(22px + var(--safe-bottom));
-  max-height: calc(100% - 20px - env(safe-area-inset-top)); overflow: hidden;
-  background:
-    linear-gradient(#3f4347, #3f4347) top / 100% 1px no-repeat,
-    linear-gradient(rgba(255,255,255,.84), rgba(255,255,255,.84)) 0 1px / 100% .5px no-repeat,
-    linear-gradient(rgba(172,177,185,.84) 1.5px, rgba(142,148,158,.84) 12px, rgba(107,113,123,.84) 26px, rgba(92,98,109,.84) 33px);
-  will-change: transform;
+  padding: 21px 21px calc(22px + var(--safe-bottom)); max-height: calc(100% - 20px - env(safe-area-inset-top));
+  overflow: hidden; will-change: transform;
 }
 /* The choices scroll here, Cancel pinned below; the padding keeps the buttons' outer shadow from clipping */
 .action-list {
@@ -277,95 +411,105 @@ html[data-theme="dark"] .scope-segment + .scope-segment, html[data-theme="dark"]
 }
 .action-list::-webkit-scrollbar { display: none; }
 body:has(.action-scrim) .scroll-indicator { z-index: 31; } /* the iOS 6 indicator (nav/scroller.js) over the sheet */
-.action-title {
-  margin: -6px 0 2px; font-size: 13px; line-height: 17px; text-align: center; color: #fff;
-  text-shadow: 0 -1px 0 rgba(0,0,0,.5); white-space: pre-line; overflow-wrap: anywhere;
-}
+.action-title { margin: -6px 0 2px; white-space: pre-line; overflow-wrap: anywhere; }
 .action-button {
   flex: none; height: 44px; min-height: 44px; padding: 0 12px; margin: 0; cursor: pointer; touch-action: manipulation;
-  font: inherit; font-size: 20px; font-weight: bold; line-height: 40px; color: #000; text-shadow: 0 1px 0 rgba(255,255,255,.6);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  border: 1px solid rgba(0,0,0,.8); border-radius: 10px;
-  box-shadow: inset 0 0 1.5px 1px rgba(0,0,0,.35), 0 1px 0 rgba(211,211,211,.23);
-  background: linear-gradient(#fff, #fafafa 7%, #ebebec 23%, #d9d9db 38%, #c9cacc 54%, #c2c3c5 69%, #c5c6c7 77%, #cdcdcf 85%, #dcdcdd 92%, #e3e3e3);
-  background-origin: border-box;
+}
+.action-button.cancel { margin-top: 14px; }
+/* ==== look-only { ==== The action sheet */
+.action-dim { background: var(--action-dim); }
+.action-sheet { background: var(--action-sheet); }
+.action-title {
+  font-size: 13px; line-height: 17px; text-align: center; color: var(--action-title); text-shadow: var(--action-title-emboss);
+}
+.action-button {
+  font: inherit; font-size: 20px; font-weight: bold; line-height: 40px; color: var(--action-btn-text);
+  text-shadow: var(--action-btn-emboss); border: 1px solid var(--action-btn-edge); border-radius: 10px;
+  box-shadow: var(--action-btn-shadow); background: var(--action-btn); background-origin: border-box;
 }
 .action-button:active {
-  color: #fff; text-shadow: 0 -1px 0 rgba(0,0,0,.4);
-  background: linear-gradient(#91a2f0, #7a90ec 7%, #6a82ea 23%, #4c69e6 38%, #2d4fe1 54%, #1036de 69%, #022bdc 77%, #0c33dd 85%, #2649df 92%, #3252e3);
-  background-origin: border-box;
+  color: var(--action-btn-pressed-text); text-shadow: var(--action-btn-pressed-emboss);
+  background: var(--action-btn-pressed); background-origin: border-box;
 }
-.action-button.destructive {
-  color: #fff; text-shadow: 0 -1px 0 rgba(0,0,0,.4); /* UIAlertSheetDefaultDestroyButton: Cydia's Remove isn't one */
-  background: linear-gradient(#f59a9a, #e45c5c 30%, #cf1f1f 69%, #d52f2f); background-origin: border-box;
+.action-button.destructive { /* UIAlertSheetDefaultDestroyButton: Cydia's Remove isn't one */
+  color: var(--action-destructive-text); text-shadow: var(--action-destructive-emboss);
+  background: var(--action-destructive); background-origin: border-box;
 }
 .action-button.cancel {
-  margin-top: 14px; color: #fff; text-shadow: 0 -1px 0 rgba(0,0,0,.5);
-  background: linear-gradient(#7e8288, #65676d 7%, #565a60 23%, #484b52 38%, #3b3f47 54%, #2e333b 69%, #2b3038 77%, #2c3139 85%, #333941 92%, #383f46);
-  background-origin: border-box;
+  color: var(--action-cancel-text); text-shadow: var(--action-cancel-emboss);
+  background: var(--action-cancel); background-origin: border-box;
 }
-.action-button.cancel:active { background: linear-gradient(#5f6268, #3a3d43 50%, #1c2027); background-origin: border-box; }
-html[data-theme="dark"] .action-sheet { /* UIAlertSheetBlackBackground: #232323 edge, #6a6a6a -> #040404 */
-  background:
-    linear-gradient(rgba(35,35,35,.89), rgba(35,35,35,.89)) top / 100% 1px no-repeat,
-    linear-gradient(rgba(167,167,167,.82), rgba(167,167,167,.82)) 0 1px / 100% .5px no-repeat,
-    linear-gradient(rgba(106,106,106,.73) 1.5px, rgba(81,81,81,.7) 12px, rgba(44,44,44,.65) 24px, rgba(9,9,9,.62) 36px, rgba(1,1,1,.6));
+.action-button.cancel:active { background: var(--action-cancel-pressed); background-origin: border-box; }
+html[data-theme="dark"] .action-sheet { background: var(--dk-action-sheet); }
+html[data-theme="dark"] .action-button:not(.cancel):not(.destructive):not(:active) {
+  background: var(--dk-action-btn); background-origin: border-box;
 }
-html[data-theme="dark"] .action-button:not(.cancel):not(.destructive):not(:active) { /* UIAlertSheetBlackButton */
-  background: linear-gradient(#fbfbfb, #f5f5f5 15%, #f0f0f0 38%, #eee 46%, #e4e4e4 54%, #e4e4e4); background-origin: border-box;
-}
-html[data-theme="dark"] .action-button.cancel { /* UIAlertSheetBlackCancelButton */
-  background: linear-gradient(#878787, #686868 7%, #545454 23%, #383838 38%, #1a1a1a 54%, #020202 69%, #000 77%, #131313); background-origin: border-box;
-}
+html[data-theme="dark"] .action-button.cancel { background: var(--dk-action-cancel); background-origin: border-box; }
+/* ==== } look-only ==== */
 
 /* ---- Version History (F29, browse.js renderVersions): one cell per version, version and marks on top, sources or
    date and size beside, release notes under; versions this iPhone can't run are greyed ---- */
 .version-row .cell-inner { flex-direction: column; align-items: stretch; gap: 2px; padding-top: 9px; padding-bottom: 9px; }
 .version-top { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
-.version-top .cell-label { flex: 0 1 auto; min-width: 0; font-weight: bold; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.version-top .cell-detail { margin-left: auto; font-size: 14px; }
-.version-tag {
-  flex: none; padding: 0 4px; border: 1px solid currentColor; border-radius: 4px;
-  font-size: 10px; font-weight: bold; line-height: 13px; color: var(--detail); white-space: nowrap;
+.version-top .cell-label {
+  flex: 0 1 auto; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
 }
-.version-sub { font-size: 14px; color: var(--subtitle); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.version-notes { margin: 2px 0 0; font-size: 14px; line-height: 18px; color: var(--text); white-space: pre-line; overflow-wrap: anywhere; }
+.version-top .cell-detail { margin-left: auto; }
+.version-tag { flex: none; padding: 0 4px; white-space: nowrap; }
+.version-sub { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.version-notes { margin: 2px 0 0; white-space: pre-line; overflow-wrap: anywhere; }
+/* ==== look-only { ==== Version History */
+.version-top .cell-label { font-weight: bold; }
+.version-top .cell-detail { font-size: 14px; }
+.version-tag {
+  border: 1px solid currentColor; border-radius: 4px; font-size: 10px; font-weight: bold; line-height: 13px;
+  color: var(--detail);
+}
+.version-sub { font-size: 14px; color: var(--subtitle); }
+.version-notes { font-size: 14px; line-height: 18px; color: var(--text); }
 .version-row.unavailable .cell-label, .version-row.unavailable .version-notes { color: var(--subtitle); }
+/* ==== } look-only ==== */
 
 /* The section index (nav/sectionindex.js): UITableView's, 12px bold slate letters spread down the right edge
    between the bars; held, a grey rounded backing behind them. */
 .section-index {
-  position: absolute; z-index: 4; right: 0; top: calc(var(--nav-h) + 6px); bottom: calc(var(--tab-h) + 6px); width: 18px;
-  margin-right: max(2px, env(safe-area-inset-right)); display: flex; flex-direction: column; justify-content: space-between;
-  align-items: center; padding: 4px 0; border-radius: 9px; touch-action: none; -webkit-user-select: none; user-select: none;
-  font-size: 11px; font-weight: bold; line-height: 1; color: #59657a; cursor: pointer;
+  position: absolute; z-index: 4; right: 0; top: calc(var(--nav-h) + 6px); bottom: calc(var(--tab-h) + 6px);
+  width: 18px; margin-right: max(2px, env(safe-area-inset-right)); display: flex; flex-direction: column;
+  justify-content: space-between; align-items: center; padding: 4px 0; touch-action: none; -webkit-user-select: none;
+  user-select: none; cursor: pointer;
 }
 /* B51: while the reload bar shows (html.has-reload, ios6.css), the index ends above the strip, not behind it: UIKit's
    index spans the table's visible part (Cydia has no strip, so its index is never covered). Only the index's letters
    close up; the list and its scroll position stay where they are. Over a sheet the strip leaves the tab bar, but
    then the sheet covers the index anyway. */
 html.has-reload .section-index { bottom: calc(var(--tab-h) + 44px + 6px); }
+:is(.page-body, .search-results)[data-section-index] .pkg-row > .cell-inner { padding-right: 26px; } /* rows end before the index, as UITableView's */
+/* ==== look-only { ==== The section index */
+.section-index { border-radius: 9px; font-size: 11px; font-weight: bold; line-height: 1; color: #59657a; }
 .section-index.held { background: rgba(0,0,0,.18); }
 html[data-theme="dark"] .section-index { color: var(--dk-index); }
 html[data-theme="dark"] .section-index.held { background: rgba(255,255,255,.15); }
-:is(.page-body, .search-results)[data-section-index] .pkg-row > .cell-inner { padding-right: 26px; } /* rows end before the index, as UITableView's */
+/* ==== } look-only ==== */
 
 /* Before the app's first page (index.html #boot): the pinstripes between the bars with Loading in the middle. */
+.boot { position: fixed; inset: 0; z-index: 2; display: flex; align-items: center; justify-content: center; }
+/* ==== look-only { ==== Before the app's first page */
 .boot {
-  position: fixed; inset: 0; z-index: 2; display: flex; align-items: center; justify-content: center;
   background: repeating-linear-gradient(90deg, var(--pin-dark) 0 2.5px, var(--pin-light) 2.5px 8px) var(--pin-light);
 }
+/* ==== } look-only ==== */
 
 /* The clear button iOS 6 puts in a search field with text in it (Cydia's search on the 4S: ref/4s/screens/search-85.png):
    a grey circle with a white x at the field's right end. Drawn here since WebKit on iOS shows none; app.js clears
    the field on a tap there. */
 .search-field input::-webkit-search-cancel-button { -webkit-appearance: none; display: none; }
-.search-field::after {
-  content: ""; display: none; flex: none; width: 19px; height: 19px; margin: 0 -5px 0 6px; border-radius: 50%;
-  background: #b4b4b4 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpath d='M2 2l6 6M8 2l-6 6' stroke='%23fff' stroke-width='1.8' stroke-linecap='round'/%3E%3C/svg%3E") center / 9px 9px no-repeat;
-}
+.search-field::after { display: none; flex: none; width: 19px; height: 19px; margin: 0 -5px 0 6px; }
 .search-field:has(input:not(:placeholder-shown))::after { display: block; }
+/* ==== look-only { ==== the search field's clear button */
+.search-field::after { content: ""; border-radius: 50%; background: var(--search-clear); }
 html[data-theme="dark"] .search-field::after { background-color: var(--dk-clear); }
+/* ==== } look-only ==== */
 
 /* Search's root page: the bar and scope row fixed at the top, the results their own scroller below. C10: every page
    with the shared search bar (nav/searchbar.js pinned): Sources, Changes, Installed, My IPAs. Whatever a page pins
@@ -375,7 +519,7 @@ html[data-theme="dark"] .search-field::after { background-color: var(--dk-clear)
 .search-root > :not(.search-results) { flex: none; }
 .search-results { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior-y: contain; position: relative; }
 .page-body.search-root:has(> .search-results)::before { display: none; } /* the always-bounce spacer (ios6.css) belongs to the results now */
-.search-results::before { content: ""; float: left; width: 1px; margin-right: -1px; height: calc(100% + 1px); }
+.search-results::before { float: left; width: 1px; margin-right: -1px; height: calc(100% + 1px); }
 /* B125: the results scroller runs to the bottom of the screen and scrolls under the tab bar, as every page body does;
    the tab bar's room (and .page-body's 20px after the last row) is its own bottom padding. Left on the page body, that
    padding ended the scroller a tab bar + 20px up, and the body's white showed as a strip over the last row. The end
@@ -383,17 +527,33 @@ html[data-theme="dark"] .search-field::after { background-color: var(--dk-clear)
 .page-body.search-root:has(> .search-results) { padding-bottom: 0; }
 .search-root > .search-results { padding-bottom: calc(var(--tab-h) + 20px); }
 .page-body.search-root:has(> .search-results)::after { display: none; }
-html.has-manage-toolbar .search-results::after { content: ""; display: block; clear: both; height: 44px; }
+html.has-manage-toolbar .search-results::after { display: block; clear: both; height: 44px; }
+/* ==== look-only { ==== Search's root page */
+.search-results::before { content: ""; }
+html.has-manage-toolbar .search-results::after { content: ""; }
+/* ==== } look-only ==== */
 
 /* F91: a signature's days left (Installed, Changes' Needs Re-sign, the app page's Signature row): the tab bar's red
    count badge (ios6.css .badge, its gloss and shadow) without the white ring, in green outside the re-sign window,
    amber inside it and red once expired. */
-.sig-pill,
-.cell[class*="sig-row-"] .cell-detail,
-.pkg-row[data-change="resign"] .pkg-version {
-  display: inline-block; flex: none; align-self: center; min-width: 20px; height: 20px; padding: 0 7px; border-radius: 10px;
-  font-size: 13px; font-weight: bold; line-height: 20px; letter-spacing: -.02em; color: #fff; text-align: center;
-  box-shadow: 0 1px 1.5px rgba(0,0,0,.45);
+.sig-pill, .cell[class*="sig-row-"] .cell-detail, .pkg-row[data-change="resign"] .pkg-version {
+  display: inline-block; flex: none; align-self: center; min-width: 20px; height: 20px; padding: 0 7px;
+}
+/* F103: Sileo's RatingView, ReviewView and WebView. Stars are drawn the iOS 6 App Store way: five grey stars, the
+   filled ones dark, clipped to the rating (a fraction shows as part of a star). */
+.dep-rating { margin: 4px 12px; }
+.dep-stars { position: relative; display: inline-block; flex: none; vertical-align: middle; width: 70px; height: 14px; }
+.dep-stars-fill { position: absolute; inset: 0 auto 0 0; }
+.dep-review { margin: 6px 10px; padding: 8px 10px; }
+.dep-review-head { display: flex; align-items: center; gap: 8px; }
+.dep-review-title { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.dep-review-body { padding: 0; }
+.dep-web { padding: 6px 12px; }
+.dep-web iframe { display: inline-block; max-width: 100%; height: auto; }
+/* ==== look-only { ==== a signature's days left */
+.sig-pill, .cell[class*="sig-row-"] .cell-detail, .pkg-row[data-change="resign"] .pkg-version {
+  border-radius: 10px; font-size: 13px; font-weight: bold; line-height: 20px; letter-spacing: -.02em; color: #fff;
+  text-align: center; box-shadow: 0 1px 1.5px rgba(0,0,0,.45);
   background: linear-gradient(#b8eda6, #4fc232 48.8%, #3cb11d 50.5%, #24900a); /* ok */
 }
 .sig-pill[data-sig="soon"], .cell.sig-row-soon .cell-detail, .pkg-row[data-change="resign"][data-sig="soon"] .pkg-version {
@@ -405,47 +565,49 @@ html.has-manage-toolbar .search-results::after { content: ""; display: block; cl
 .pkg-row[data-change="resign"] .pkg-version::before { content: none; }
 /* F221: an app marked as installed: no expiry known, a grey "?" with the same gloss (the grey of the pills' family). */
 .sig-pill[data-sig="unknown"] { background: linear-gradient(#d4d4d4, #9a9a9a 48.8%, #8c8c8c 50.5%, #6e6e6e); background-origin: border-box; }
-/* F103: Sileo's RatingView, ReviewView and WebView. Stars are drawn the iOS 6 App Store way: five grey stars, the
-   filled ones dark, clipped to the rating (a fraction shows as part of a star). */
-.dep-rating { margin: 4px 12px; line-height: 0; }
+.dep-rating { line-height: 0; }
 .dep-stars {
   --star: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath fill='%23c4c4c4' d='M10 1l2.6 6.2 6.9.4-5.3 4.4 1.7 6.6L10 15l-5.9 3.6 1.7-6.6L.5 7.6l6.9-.4z'/%3E%3C/svg%3E");
   --star-on: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath fill='%23666' d='M10 1l2.6 6.2 6.9.4-5.3 4.4 1.7 6.6L10 15l-5.9 3.6 1.7-6.6L.5 7.6l6.9-.4z'/%3E%3C/svg%3E");
-  position: relative; display: inline-block; flex: none; vertical-align: middle; width: 70px; height: 14px;
   background: var(--star) left center / 14px 14px repeat-x;
 }
-.dep-stars-fill { position: absolute; inset: 0 auto 0 0; background: var(--star-on) left center / 14px 14px repeat-x; }
-.dep-review { margin: 6px 10px; padding: 8px 10px; background: var(--table); border: 1px solid var(--table-edge); border-radius: 9.5px;
-  box-shadow: inset 0 .5px .5px var(--table-inset); }
-.dep-review-head { display: flex; align-items: center; gap: 8px; }
-.dep-review-title { flex: 1; min-width: 0; font-weight: bold; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.dep-stars-fill { background: var(--star-on) left center / 14px 14px repeat-x; }
+.dep-review {
+  background: var(--table); border: 1px solid var(--table-edge); border-radius: 9.5px;
+  box-shadow: inset 0 .5px .5px var(--table-inset);
+}
+.dep-review-title { font-weight: bold; }
 .dep-review-author { font-size: 13px; line-height: 17px; color: var(--subtitle); }
-.dep-review-body { padding: 0; }
-.dep-web { padding: 6px 12px; line-height: 0; }
-.dep-web iframe { display: inline-block; max-width: 100%; height: auto; border: 0; background: #fff; }
+.dep-web { line-height: 0; }
+.dep-web iframe { border: 0; background: #fff; }
+/* ==== } look-only ==== */
 
 /* F125: Installed's Wish List page (screens/installed.js): package rows with sources.css's Edit and swipe Delete
    (.source-row's red minus and Delete); the chevron and the version make room as they do on a source row. */
 .wish-row > .cell-inner::after, .wish-row .pkg-version { transition: opacity .2s ease; }
+/* ==== look-only { ==== Installed's Wish List page */
 .editing .wish-row > .cell-inner::after, .wish-row.armed > .cell-inner::after, .wish-row.armed .pkg-version { opacity: 0; }
+/* ==== } look-only ==== */
 
 /* ---- F126: Cydia's package icons (PackageCell): the section icon (or unknown.png) behind the package's own, and a
    badge half the icon's size centred 11/32 of the way in from its corner (Cydia: 32 pt icon at (25,25), 16 pt badge
    at (36,36)). The artwork is Cydia's own (icons/sections/, GPLv3) and draws its own rounded corners. */
 .pkg-art { position: relative; flex: none; display: block; width: 32px; height: 32px; }
 .pkg-art.large { width: 64px; height: 64px; }
-.pkg-icon.cy { width: 100%; height: 100%; box-shadow: none; background: transparent center / cover no-repeat; }
+.pkg-icon.cy { width: 100%; height: 100%; }
 .pkg-badge { position: absolute; left: 19px; top: 19px; width: 16px; height: 16px; pointer-events: none; }
 .pkg-art.large .pkg-badge { left: 38px; top: 38px; width: 32px; height: 32px; }
 .pkg-badge[hidden], .pkg-badge.section { display: none; }
 .pkg-art.own .pkg-badge.section:not([hidden]) { display: block; }
+/* ==== look-only { ==== Cydia's package icons */
+.pkg-icon.cy { box-shadow: none; background: transparent center / cover no-repeat; }
+/* ==== } look-only ==== */
 
 /* F127: Installed's User | Expert | Recent in the nav bar, as Cydia's bar-style UISegmentedControl on the 4S
    (ref/4s/screens/cydia-installed-user.png: 167pt wide, 30pt high, centred in place of the title), drawn with
    Search's segments. */
-.nav-title.nav-title-view { display: flex; justify-content: center; line-height: normal; overflow: visible; max-width: none; }
+.nav-title.nav-title-view { display: flex; justify-content: center; overflow: visible; max-width: none; }
 .nav-segments { display: flex; width: 167px; }
-.nav-segments .scope-segments { box-shadow: 0 1px 0 rgba(255,255,255,.25); }
 /* With the A–Z index down the right edge (User, Expert), the rows and the search bar above the list stop short of it,
    as UISearchBar does over an indexed table on iOS 6. */
 .page-body[data-section-index] > .installed-search, .page-body[data-section-index] > .installed-scope { padding-right: 24px; }
@@ -454,6 +616,10 @@ html.has-manage-toolbar .search-results::after { content: ""; display: block; cl
 .search-root:has(> .search-results[data-section-index]) > :is(.search-bar, .search-scope) { padding-right: 24px; }
 .search-results[data-section-index] > .installed-top { margin-right: 24px; }
 .page-body[data-section-index] > .list-search { padding-right: 24px; } /* F124: Browse's list search ends before the A–Z index */
+/* ==== look-only { ==== Installed's segmented title and Wish List button */
+.nav-title.nav-title-view { line-height: normal; }
+.nav-segments .scope-segments { box-shadow: 0 1px 0 rgba(255,255,255,.25); }
+/* ==== } look-only ==== */
 
 /* F147: Installed's Wish List bar button (screens/installed.js): beside the segmented title the name may end in "…",
    the count stays whole. */
@@ -468,145 +634,218 @@ html.has-manage-toolbar .search-results::after { content: ""; display: block; cl
    (browse.js heroTint) with a soft light behind the icon and the bars' gloss on the top half, the icon reflected
    under it, the words to its right, the store's price button at the bottom. The whole card is the link. */
 .browse-hero-slot { margin: 10px 10px 0; }
-.browse-hero { position: relative; display: flex; gap: 16px; min-height: 140px; padding: 16px 12px 12px 16px; border-radius: 9.5px;
-  overflow: hidden; border: 1px solid rgba(0,0,0,.55); color: #fff; text-decoration: none;
-  background: linear-gradient(rgba(255,255,255,.16), rgba(255,255,255,.04) 50%, rgba(255,255,255,0) 50%),
-    radial-gradient(circle at 46px 52px, rgba(255,255,255,.3), rgba(255,255,255,0) 90px),
-    linear-gradient(var(--hero-a, #5a6b82), var(--hero-b, #2e3a4b));
-  background-origin: border-box; box-shadow: inset 0 1px 0 rgba(255,255,255,.35), 0 1px 0 rgba(255,255,255,.6); }
-.browse-hero-icon { position: relative; flex: none; width: 72px; height: 72px; border-radius: 12.5px; overflow: hidden;
-  background: center / cover no-repeat; box-shadow: 0 2px 4px rgba(0,0,0,.55);
-  -webkit-box-reflect: below 2px linear-gradient(transparent 62%, rgba(255,255,255,.3)); }
-.browse-hero-icon img, .browse-icon-row .cell-icon img, .roulette-icon img { position: absolute; inset: 0; width: 100%; height: 100%;
-  object-fit: cover; opacity: 0; background: #fff; }
-.browse-hero-icon img.loaded, .browse-icon-row .cell-icon img.loaded, .roulette-icon img.loaded { opacity: 1; }
-.browse-hero-words { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; text-shadow: 0 -1px 0 rgba(0,0,0,.45); }
-.browse-hero-kicker { font-size: 11px; font-weight: bold; letter-spacing: .08em; color: rgba(255,255,255,.8); }
-.browse-hero-name { font-size: 24px; font-weight: bold; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.browse-hero-desc { font-size: 13px; line-height: 17px; color: rgba(255,255,255,.9);
-  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.browse-hero {
+  position: relative; display: flex; gap: 16px; min-height: 140px; padding: 16px 12px 12px 16px; overflow: hidden;
+}
+.browse-hero-icon {
+  position: relative; flex: none; width: 72px; height: 72px; overflow: hidden;
+  -webkit-box-reflect: below 2px linear-gradient(transparent 62%, rgba(255,255,255,.3));
+}
+.browse-hero-icon img, .browse-icon-row .cell-icon img, .roulette-icon img {
+  position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
+}
+.browse-hero-words { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.browse-hero-name { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.browse-hero-desc { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .browse-hero-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: auto; padding-top: 8px; min-height: 24px; }
-.browse-hero-meta { min-width: 0; font-size: 12px; color: rgba(255,255,255,.8); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.browse-hero.is-loading .ph-bar, .browse-hero.is-loading .ph-box { background: rgba(255,255,255,.18); }
-.browse-hero.is-loading .browse-hero-icon { box-shadow: none; -webkit-box-reflect: none; }
+.browse-hero-meta { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.browse-hero.is-loading .browse-hero-icon { -webkit-box-reflect: none; }
 /* Held (app.js PRESSABLE, 140 ms on a quick tap): the whole banner goes down, as the iOS 6 App Store's did: a flat
    dark veil over the card, above the icon and words, clipped by the card's radius. No glow or highlight. */
-.browse-hero::after { content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none; background: rgba(0,0,0,.3); opacity: 0; }
-.browse-hero.is-pressed::after { opacity: 1; }
+.browse-hero::after { position: absolute; inset: 0; z-index: 1; pointer-events: none; }
 /* The iOS 6 App Store's price button (FREE / VIEW): grey-blue outline, a pale gradient, embossed slate text. The
    card or cell around it is the link, so pressing that presses it. Drawn from memory of the store: the kit has none. */
-.store-btn { flex: none; display: inline-flex; align-items: center; height: 24px; padding: 0 9px; border-radius: 4px;
-  font: bold 12px/1 "Helvetica Neue", Helvetica, sans-serif; color: #5d6b81; text-shadow: 0 1px 0 #fff;
-  border: 1px solid #8f9aab; background: linear-gradient(#fdfdfe, #e2e6ec); background-origin: border-box; }
-a:active .store-btn { background: linear-gradient(#d6dbe3, #eceff3); background-origin: border-box; box-shadow: inset 0 1px 2px rgba(0,0,0,.25); }
+.store-btn { flex: none; display: inline-flex; align-items: center; height: 24px; padding: 0 9px; }
 /* The store cell (Roulette's "You landed on"): icon, name over author · section, the price button. */
 .store-cell { min-height: 79px; gap: 11px; padding-top: 11px; padding-bottom: 11px; }
-.store-meta { font-size: 13px; color: var(--subtitle); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.store-desc { display: block; min-height: 0; padding-top: 9px; padding-bottom: 10px; font-size: 15px; line-height: 19px; }
+.store-meta { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.store-desc { display: block; min-height: 0; padding-top: 9px; padding-bottom: 10px; }
 /* Roulette's grey pill (Wish List). */
-.roulette-pill { flex: none; display: inline-flex; align-items: center; height: 24px; padding: 0 10px; border-radius: 4px;
-  font: bold 12px/1 "Helvetica Neue", Helvetica, sans-serif; color: #385487; text-shadow: 0 1px 0 #fff; cursor: pointer;
-  border: 1px solid #8c8c8c; background: linear-gradient(#fdfdfd, #e3e3e3 50%, #d8d8d8 51%, #e4e4e4); background-origin: border-box; }
-.roulette-pill:active { filter: brightness(.85); }
+.roulette-pill {
+  flex: none; display: inline-flex; align-items: center; height: 24px; padding: 0 10px; cursor: pointer;
+}
 /* Rows with a section icon (Collections, New This Week, the Roulette row): the icon draws its own corners. */
-.browse-icon-row .cell-icon { position: relative; overflow: hidden; background: transparent center / cover no-repeat; }
+.browse-icon-row .cell-icon { position: relative; overflow: hidden; }
 .browse-icon-row .cell-inner, .browse-ph { min-height: 58px; }
 .browse-ph .ph-icon { margin-right: 0; }
 .browse-head { display: flex; justify-content: space-between; align-items: baseline; }
-.browse-see-all { border: 0; background: none; padding: 0; font: 14px "Helvetica Neue", Helvetica, sans-serif; color: #385487;
-  text-shadow: var(--emboss); cursor: pointer; }
+.browse-see-all { padding: 0; cursor: pointer; }
 /* Top 25: the rank before the icon. */
-.browse-ranked .pkg-rank { flex: none; width: 20px; margin-right: -4px; font-size: 15px; font-weight: bold; color: var(--subtitle); text-align: right; }
-.browse-list-footer { margin: 12px 10px; font-size: 14px; text-align: center; color: var(--subtitle); }
+.browse-ranked .pkg-rank { flex: none; width: 20px; margin-right: -4px; }
+.browse-list-footer { margin: 12px 10px; }
+/* ==== look-only { ==== Browse */
+.browse-hero {
+  border-radius: 9.5px; border: 1px solid rgba(0,0,0,.55); color: #fff; text-decoration: none;
+  background: linear-gradient(rgba(255,255,255,.16), rgba(255,255,255,.04) 50%, rgba(255,255,255,0) 50%), radial-gradient(circle at 46px 52px, rgba(255,255,255,.3), rgba(255,255,255,0) 90px), linear-gradient(var(--hero-a, #5a6b82), var(--hero-b, #2e3a4b));
+  background-origin: border-box; box-shadow: inset 0 1px 0 rgba(255,255,255,.35), 0 1px 0 rgba(255,255,255,.6);
+}
+.browse-hero-icon {
+  border-radius: 12.5px; background: center / cover no-repeat; box-shadow: 0 2px 4px rgba(0,0,0,.55);
+}
+.browse-hero-icon img, .browse-icon-row .cell-icon img, .roulette-icon img { opacity: 0; background: #fff; }
+.browse-hero-icon img.loaded, .browse-icon-row .cell-icon img.loaded, .roulette-icon img.loaded { opacity: 1; }
+.browse-hero-words { text-shadow: 0 -1px 0 rgba(0,0,0,.45); }
+.browse-hero-kicker { font-size: 11px; font-weight: bold; letter-spacing: .08em; color: rgba(255,255,255,.8); }
+.browse-hero-name { font-size: 24px; font-weight: bold; }
+.browse-hero-desc { font-size: 13px; line-height: 17px; color: rgba(255,255,255,.9); }
+.browse-hero-meta { font-size: 12px; color: rgba(255,255,255,.8); }
+.browse-hero.is-loading .ph-bar, .browse-hero.is-loading .ph-box { background: rgba(255,255,255,.18); }
+.browse-hero.is-loading .browse-hero-icon { box-shadow: none; }
+.browse-hero::after { content: ""; background: rgba(0,0,0,.3); opacity: 0; }
+.browse-hero.is-pressed::after { opacity: 1; }
+.store-btn {
+  border-radius: 4px; font: bold 12px/1 "Helvetica Neue", Helvetica, sans-serif; color: #5d6b81;
+  text-shadow: 0 1px 0 #fff; border: 1px solid #8f9aab; background: linear-gradient(#fdfdfe, #e2e6ec);
+  background-origin: border-box;
+}
+a:active .store-btn { background: linear-gradient(#d6dbe3, #eceff3); background-origin: border-box; box-shadow: inset 0 1px 2px rgba(0,0,0,.25); }
+.store-meta { font-size: 13px; color: var(--subtitle); }
+.store-desc { font-size: 15px; line-height: 19px; }
+.roulette-pill {
+  border-radius: 4px; font: bold 12px/1 "Helvetica Neue", Helvetica, sans-serif; color: #385487;
+  text-shadow: 0 1px 0 #fff; border: 1px solid #8c8c8c;
+  background: linear-gradient(#fdfdfd, #e3e3e3 50%, #d8d8d8 51%, #e4e4e4); background-origin: border-box;
+}
+.roulette-pill:active { filter: brightness(.85); }
+.browse-icon-row .cell-icon { background: transparent center / cover no-repeat; }
+.browse-see-all {
+  border: 0; background: none; font: 14px "Helvetica Neue", Helvetica, sans-serif; color: #385487;
+  text-shadow: var(--emboss);
+}
+.browse-ranked .pkg-rank { font-size: 15px; font-weight: bold; color: var(--subtitle); text-align: right; }
+.browse-list-footer { font-size: 14px; text-align: center; color: var(--subtitle); }
+/* ==== } look-only ==== */
 
 /* ---- F154: Tweak Roulette (screens/roulette.js): iOS 6's UIPickerView, three wheels behind a blue band. ---- */
 .roulette-stats { display: flex; margin: 12px 10px 10px; }
-.roulette-stat { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 1px; color: var(--head); text-shadow: var(--emboss); }
-.roulette-stat b { font-size: 20px; }
-.roulette-stat span { font-size: 12px; }
-.roulette-picker { position: relative; display: flex; gap: 6px; height: 220px; margin: 0 10px; padding: 0 9px; border-radius: 9px; overflow: hidden;
-  border: 1px solid #1c1f24; background: linear-gradient(#7b818c, #3a3f48 8%, #2b2f36 50%, #3a3f48 92%, #7b818c); background-origin: border-box;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.3); }
-.roulette-wheel { position: relative; flex: 1; min-width: 0; margin: 10px 0; overflow: hidden; border-radius: 3px; background: #fff;
-  box-shadow: inset 0 0 0 1px rgba(0,0,0,.55); }
+.roulette-stat { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 1px; }
+.roulette-picker {
+  position: relative; display: flex; gap: 6px; height: 220px; margin: 0 10px; padding: 0 9px; overflow: hidden;
+}
+.roulette-wheel { position: relative; flex: 1; min-width: 0; margin: 10px 0; overflow: hidden; }
 .roulette-wheel.w2 { flex: .75; }
 .roulette-wheel { touch-action: none; cursor: grab; -webkit-user-select: none; user-select: none; } /* turned by finger (screens/roulette.js dragWheel) */
-.roulette-wheel::after { content: ""; position: absolute; inset: 0; pointer-events: none;
-  background: linear-gradient(rgba(40,40,46,.85), rgba(255,255,255,0) 30%, rgba(255,255,255,0) 70%, rgba(40,40,46,.85)); }
+.roulette-wheel::after { position: absolute; inset: 0; pointer-events: none; }
 .roulette-reel { position: absolute; left: 0; right: 0; top: 0; will-change: transform; }
-.roulette-slot { display: flex; align-items: center; gap: 6px; height: 40px; padding: 0 8px; font-size: 15px; font-weight: bold; color: #111;
-  white-space: nowrap; overflow: hidden; }
+.roulette-slot {
+  display: flex; align-items: center; gap: 6px; height: 40px; padding: 0 8px; white-space: nowrap; overflow: hidden;
+}
 .roulette-slot img { flex: none; width: 22px; height: 22px; }
 .roulette-slot span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.roulette-band { position: absolute; left: 4px; right: 4px; top: 90px; height: 40px; pointer-events: none; border-radius: 3px;
-  border: 1px solid rgba(40,60,110,.75);
-  background: linear-gradient(rgba(220,228,245,.55), rgba(160,178,220,.35) 50%, rgba(120,145,205,.4) 51%, rgba(170,188,228,.45));
-  background-origin: border-box; box-shadow: 0 1px 3px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.6); }
-.roulette-spin { display: flex; align-items: center; justify-content: center; width: calc(100% - 20px); height: 46px; margin: 14px 10px 0;
-  border-radius: 9px; font: bold 20px/1 "Helvetica Neue", Helvetica, sans-serif; color: #fff; text-shadow: 0 -1px 0 rgba(0,0,0,.4);
-  border: 1px solid #1d6a19; background: linear-gradient(#8fd96f, #3bab2f 50%, #2b9b21 51%, #35a52a); background-origin: border-box;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.35); cursor: pointer; }
-.roulette-spin:active:not(:disabled) { background: linear-gradient(#5fb447, #23861a 50%, #187610 51%, #1f8015); background-origin: border-box; }
-.roulette-spin:disabled { opacity: .8; cursor: default; }
-.roulette-icon { position: relative; flex: none; width: 57px; height: 57px; border-radius: 10px; overflow: hidden;
-  background: center / cover no-repeat; box-shadow: 0 1px 3px rgba(0,0,0,.5); }
+.roulette-band { position: absolute; left: 4px; right: 4px; top: 90px; height: 40px; pointer-events: none; }
+.roulette-spin {
+  display: flex; align-items: center; justify-content: center; width: calc(100% - 20px); height: 46px;
+  margin: 14px 10px 0; cursor: pointer;
+}
+.roulette-spin:disabled { cursor: default; }
+.roulette-icon { position: relative; flex: none; width: 57px; height: 57px; overflow: hidden; }
 .roulette-actions { justify-content: flex-end; gap: 8px; }
+/* ==== look-only { ==== Tweak Roulette */
+.roulette-stat { color: var(--head); text-shadow: var(--emboss); }
+.roulette-stat b { font-size: 20px; }
+.roulette-stat span { font-size: 12px; }
+.roulette-picker {
+  border-radius: 9px; border: 1px solid #1c1f24;
+  background: linear-gradient(#7b818c, #3a3f48 8%, #2b2f36 50%, #3a3f48 92%, #7b818c); background-origin: border-box;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.3);
+}
+.roulette-wheel { border-radius: 3px; background: #fff; box-shadow: inset 0 0 0 1px rgba(0,0,0,.55); }
+.roulette-wheel::after {
+  content: "";
+  background: linear-gradient(rgba(40,40,46,.85), rgba(255,255,255,0) 30%, rgba(255,255,255,0) 70%, rgba(40,40,46,.85));
+}
+.roulette-slot { font-size: 15px; font-weight: bold; color: #111; }
+.roulette-band {
+  border-radius: 3px; border: 1px solid rgba(40,60,110,.75);
+  background: linear-gradient(rgba(220,228,245,.55), rgba(160,178,220,.35) 50%, rgba(120,145,205,.4) 51%, rgba(170,188,228,.45));
+  background-origin: border-box; box-shadow: 0 1px 3px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.6);
+}
+.roulette-spin {
+  border-radius: 9px; font: bold 20px/1 "Helvetica Neue", Helvetica, sans-serif; color: #fff;
+  text-shadow: 0 -1px 0 rgba(0,0,0,.4); border: 1px solid #1d6a19;
+  background: linear-gradient(#8fd96f, #3bab2f 50%, #2b9b21 51%, #35a52a); background-origin: border-box;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.35);
+}
+.roulette-spin:active:not(:disabled) { background: linear-gradient(#5fb447, #23861a 50%, #187610 51%, #1f8015); background-origin: border-box; }
+.roulette-spin:disabled { opacity: .8; }
+.roulette-icon { border-radius: 10px; background: center / cover no-repeat; box-shadow: 0 1px 3px rgba(0,0,0,.5); }
+/* ==== } look-only ==== */
 
 /* F165: a long description in its own group (screens/description.js): collapsed it shows its first 6 lines (20px each
    inside 10px padding) with the 6th fading out; the "More"/"Less" row under it is Permissions' .perm-more. */
+.desc-text.collapsed { max-height: 140px; overflow: hidden; }
+.desc-link { overflow-wrap: anywhere; }
+/* ==== look-only { ==== a long description in its own group */
 .desc-cell { list-style: none; }
-.desc-text.collapsed { max-height: 140px; overflow: hidden;
-  -webkit-mask-image: linear-gradient(to bottom, #000 110px, transparent 130px); mask-image: linear-gradient(to bottom, #000 110px, transparent 130px); }
-.desc-link { color: #385487; overflow-wrap: anywhere; }
+.desc-text.collapsed {
+  -webkit-mask-image: linear-gradient(to bottom, #000 110px, transparent 130px);
+  mask-image: linear-gradient(to bottom, #000 110px, transparent 130px);
+}
+.desc-link { color: #385487; }
 html[data-theme="dark"] .desc-link { color: var(--dk-link); }
+/* ==== } look-only ==== */
 
 /* ---- F181: the package page as the iOS 6 App Store's (screens/storepage.js; journal/F181/concept/). The header band
    across the page, the large glossy icon with its reflection, orange stars, the sideways info tiles, What's New, the
    Reviews tab's ratings card and review cells, the screenshot strip's page dots and its tap-to-zoom layer. Nothing
    here animates but transform and opacity (120 Hz). ---- */
-.store-head {
-  /* B41: 21px each side, the grouped rows' content line (10px group margin + 1px border + 10px cell padding), so
-     the icon and an app page's Share sit in from the edges as the rows below do. */
-  display: flex; gap: 12px; padding: 14px 21px 30px; color: var(--text); text-shadow: 0 1px 0 #fff;
-  background: linear-gradient(#fdfdfd, #e6e8eb); border-bottom: 1px solid #b0b4ba;
-}
-html[data-theme="dark"] .store-head { text-shadow: var(--emboss); background: var(--dk-store-head); border-bottom-color: var(--table-edge); }
+/* B41: 21px each side, the grouped rows' content line (10px group margin + 1px border + 10px cell padding), so the icon
+   and an app page's Share sit in from the edges as the rows below do. */
+.store-head { display: flex; gap: 12px; padding: 14px 21px 30px; }
 .store-icon {
   position: relative; flex: none; width: 72px; height: 72px; align-self: flex-start;
   -webkit-box-reflect: below 2px linear-gradient(transparent 62%, rgba(255,255,255,.35));
 }
 .store-icon .pkg-art.large, .store-icon .pkg-icon.large { width: 72px; height: 72px; }
-.store-icon .pkg-icon { border-radius: 12.5px; box-shadow: 0 1px 3px rgba(0,0,0,.45); }
-.store-icon .pkg-icon.cy { box-shadow: none; }
 .store-icon .pkg-art.large .pkg-badge { left: 43px; top: 43px; width: 36px; height: 36px; z-index: 2; }
-.store-icon .pkg-icon.large .pkg-letter { font-size: 34px; }
 /* iOS 6's icon gloss: the white ellipse over the top half, clipped to the icon's corners, under the badge. */
-.store-icon-gloss {
-  position: absolute; left: 0; top: 0; width: 72px; height: 72px; border-radius: 12.5px; pointer-events: none; z-index: 1;
-  background: radial-gradient(ellipse 130% 65% at 50% -8%, rgba(255,255,255,.55), rgba(255,255,255,.18) 70%, rgba(255,255,255,0) 71%);
-}
+.store-icon-gloss { position: absolute; left: 0; top: 0; width: 72px; height: 72px; pointer-events: none; z-index: 1; }
 .store-head-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .store-head-top { display: flex; align-items: center; gap: 6px; min-width: 0; }
-.store-head-name { min-width: 0; font-size: 17px; font-weight: bold; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.store-head-author { font-size: 13px; color: var(--head); text-decoration: none; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-a.store-head-author:active { color: var(--detail); }
-.store-head-rating { margin-top: 3px; display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--subtitle); }
+.store-head-name { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.store-head-author { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.store-head-rating { margin-top: 3px; display: flex; align-items: center; gap: 4px; }
 /* F206: the row is there from the first paint (grey empty stars), the same height filled, empty or "No Ratings". */
-.store-head-rating { height: 15px; line-height: 15px; white-space: nowrap; }
+.store-head-rating { height: 15px; white-space: nowrap; }
 .store-head-rating[hidden] { display: none; }
+/* ==== look-only { ==== the package page as the iOS 6 App Store's */
+.store-head {
+  color: var(--text); text-shadow: var(--store-head-emboss); background: var(--store-head);
+  border-bottom: 1px solid var(--store-head-edge);
+}
+html[data-theme="dark"] .store-head { text-shadow: var(--emboss); background: var(--dk-store-head); border-bottom-color: var(--table-edge); }
+.store-icon .pkg-icon { border-radius: 12.5px; box-shadow: 0 1px 3px rgba(0,0,0,.45); }
+.store-icon .pkg-icon.cy { box-shadow: none; }
+.store-icon .pkg-icon.large .pkg-letter { font-size: 34px; }
+.store-icon-gloss {
+  border-radius: 12.5px;
+  background: radial-gradient(ellipse 130% 65% at 50% -8%, rgba(255,255,255,.55), rgba(255,255,255,.18) 70%, rgba(255,255,255,0) 71%);
+}
+.store-head-name { font-size: 17px; font-weight: bold; }
+.store-head-author { font-size: 13px; color: var(--head); text-decoration: none; }
+a.store-head-author:active { color: var(--detail); }
+.store-head-rating { font-size: 12px; color: var(--subtitle); }
+.store-head-rating { line-height: 15px; }
 .store-head-line { font-size: 11px; color: var(--subtitle); }
+/* ==== } look-only ==== */
 
 /* Stars: five grey ones, the filled part orange (the concept's #e08a1e), clipped to the rating. */
 .store-stars {
+  position: relative; display: inline-block; flex: none; vertical-align: middle; width: 65px; height: 13px;
+}
+.store-stars.small { width: 50px; height: 10px; }
+.store-stars-fill { position: absolute; inset: 0 auto 0 0; }
+/* ==== look-only { ==== Stars */
+.store-stars {
   --star: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath fill='%23c4c4c4' d='M10 1l2.6 6.2 6.9.4-5.3 4.4 1.7 6.6L10 15l-5.9 3.6 1.7-6.6L.5 7.6l6.9-.4z'/%3E%3C/svg%3E");
   --star-on: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath fill='%23e08a1e' d='M10 1l2.6 6.2 6.9.4-5.3 4.4 1.7 6.6L10 15l-5.9 3.6 1.7-6.6L.5 7.6l6.9-.4z'/%3E%3C/svg%3E");
-  position: relative; display: inline-block; flex: none; vertical-align: middle; width: 65px; height: 13px;
   background: var(--star) left center / 13px 13px repeat-x;
 }
-.store-stars.small { width: 50px; height: 10px; background-size: 10px 10px; }
-.store-stars-fill { position: absolute; inset: 0 auto 0 0; background: var(--star-on) left center / 13px 13px repeat-x; }
+.store-stars.small { background-size: 10px 10px; }
+.store-stars-fill { background: var(--star-on) left center / 13px 13px repeat-x; }
 .store-stars.small .store-stars-fill { background-size: 10px 10px; }
 html[data-theme="dark"] .store-stars { --star: var(--dk-star-off); }
+/* ==== } look-only ==== */
 
 /* The panes under the segmented control: the one chosen shows. */
 .store-pane[hidden] { display: none; }
@@ -619,7 +858,6 @@ html[data-theme="dark"] .store-stars { --star: var(--dk-star-off); }
 .store-tiles {
   display: flex; margin: 16px 10px 0; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x proximity;
   -webkit-overflow-scrolling: touch; scrollbar-width: none;
-  background: var(--table); border: 1px solid var(--table-edge); border-radius: 9.5px; box-shadow: inset 0 .5px .5px var(--table-inset);
 }
 .store-tiles:empty { display: none; }
 .store-tiles::-webkit-scrollbar { display: none; }
@@ -627,34 +865,41 @@ html[data-theme="dark"] .store-stars { --star: var(--dk-star-off); }
   flex: 1 1 0; min-width: 0; padding: 8px 4px 9px; box-sizing: border-box; display: flex; flex-direction: column; align-items: center;
   gap: 3px; scroll-snap-align: start;
 }
-.store-tile + .store-tile { box-shadow: inset 1px 0 0 var(--divider), inset 2px 0 0 var(--divider-hi); padding-left: 6px; }
+.store-tile + .store-tile { padding-left: 6px; }
 .store-tiles[data-count="5"] .store-tile, .store-tiles[data-count="6"] .store-tile { flex: none; width: 29%; }
+.store-tile-value { max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.store-tile-sub { max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.store-tiles + .group { margin-top: 20px; }
+.store-tile > .store-stars.small { margin: 1px 0; }
+/* B184: the Works On verdict ("Not Your iPhone ✗", "Needs Jailbreak ✗") wraps rather than cut off in a narrow tile. */
+.store-tile-sub[data-ok] { white-space: normal; text-overflow: clip; overflow-wrap: anywhere; }
+/* ==== look-only { ==== the info tiles as ONE iOS 6 grouped card */
+.store-tiles {
+  background: var(--table); border: 1px solid var(--table-edge); border-radius: 9.5px;
+  box-shadow: inset 0 .5px .5px var(--table-inset);
+}
+.store-tile + .store-tile { box-shadow: inset 1px 0 0 var(--divider), inset 2px 0 0 var(--divider-hi); }
 .store-tile-label { font-size: 10px; font-weight: bold; letter-spacing: .05em; text-transform: uppercase; color: var(--subtitle); }
-.store-tile-value { max-width: 100%; font-size: 15px; font-weight: bold; color: var(--text); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.store-tile-sub { max-width: 100%; font-size: 10px; color: var(--subtitle); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.store-tile-value { font-size: 15px; font-weight: bold; color: var(--text); }
+.store-tile-sub { font-size: 10px; color: var(--subtitle); }
 .store-tile-sub[data-ok="true"] { color: #3a8a2e; font-weight: bold; }
 .store-tile-sub[data-ok="false"] { color: #c8231a; font-weight: bold; }
 html[data-theme="dark"] .store-tile-sub[data-ok="true"] { color: var(--dk-ok); }
 html[data-theme="dark"] .store-tile-sub[data-ok="false"] { color: var(--dk-bad); }
-.store-tiles + .group { margin-top: 20px; }
 /* F206: the Rating tile's placeholder (a dash over grey stars) and its filled and "No Ratings" forms are one height:
    the stars (10px + 1px above and below) take the sub line's 12px. */
 .store-tile-sub { line-height: 12px; }
-.store-tile > .store-stars.small { margin: 1px 0; }
 .store-tile[data-pending="true"] .store-tile-value { color: var(--subtitle); }
-/* B184: the Works On verdict ("Not Your iPhone ✗", "Needs Jailbreak ✗") wraps rather than cut off in a narrow tile. */
-.store-tile-sub[data-ok] { white-space: normal; text-overflow: clip; text-align: center; overflow-wrap: anywhere; }
+.store-tile-sub[data-ok] { text-align: center; }
+/* ==== } look-only ==== */
 
 /* The screenshot strip's page dots (altstore.js galleryGroup): 7px, 7px apart, the one in view dark. */
 .shot-dots { display: flex; justify-content: center; gap: 7px; margin-top: 8px; }
 .shot-dots[hidden] { display: none; }
-.shot-dot { width: 7px; height: 7px; border-radius: 50%; background: #9aa3b3; }
-.shot-dot.on { background: #4c566c; }
-html[data-theme="dark"] .shot-dot { background: var(--dk-dot); }
-html[data-theme="dark"] .shot-dot.on { background: var(--head); }
+.shot-dot { width: 7px; height: 7px; }
 .alt-shot { cursor: zoom-in; }
 /* Tap-to-zoom: the pictures on black at full size, sideways and snapping; a tap closes it. */
-.shot-zoom { position: fixed; inset: 0; z-index: 40; background: #000; will-change: opacity; }
+.shot-zoom { position: fixed; inset: 0; z-index: 40; will-change: opacity; }
 .shot-zoom-track {
   display: flex; width: 100%; height: 100%; overflow-x: auto; scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
@@ -665,47 +910,77 @@ html[data-theme="dark"] .shot-dot.on { background: var(--head); }
   padding: env(safe-area-inset-top) env(safe-area-inset-right) var(--safe-bottom) env(safe-area-inset-left);
 }
 .shot-zoom-img { max-width: 100%; max-height: 100%; object-fit: contain; will-change: transform; }
+/* ==== look-only { ==== The screenshot strip's page dots */
+.shot-dot { border-radius: 50%; background: #9aa3b3; }
+.shot-dot.on { background: #4c566c; }
+html[data-theme="dark"] .shot-dot { background: var(--dk-dot); }
+html[data-theme="dark"] .shot-dot.on { background: var(--head); }
+.shot-zoom { background: #000; }
+/* ==== } look-only ==== */
 
 /* What's New: the version on the left, its date on the right; the notes, then Version History, in one card. */
 .store-whatsnew-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
-.store-whatsnew-date { flex: none; font-size: 14px; font-weight: normal; }
+.store-whatsnew-date { flex: none; }
 .store-whatsnew-cell { padding: 10px 12px; }
 .store-whatsnew-text { padding: 0; white-space: pre-wrap; }
+/* ==== look-only { ==== What's New */
+.store-whatsnew-date { font-size: 14px; font-weight: normal; }
+/* ==== } look-only ==== */
 
 /* The Reviews tab: the average big beside the 5-to-1 bars, then the review cells. */
 .store-ratings-top { display: flex; align-items: center; gap: 16px; padding: 12px; }
 .store-ratings-avg { flex: none; width: 84px; display: flex; flex-direction: column; align-items: center; gap: 2px; }
-.store-ratings-big { font-size: 40px; font-weight: bold; line-height: 44px; letter-spacing: -.02em; color: var(--text); }
-.store-ratings-count { font-size: 12px; color: var(--subtitle); }
-.store-ratings-from { padding: 11px 12px; font-size: 13px; color: var(--subtitle); border-top: 1px solid var(--divider); box-shadow: inset 0 1px 0 var(--divider-hi); }
+.store-ratings-from { padding: 11px 12px; }
 /* F206: the five bars are always drawn, each a real button (32px + its 1px divider), iOS 6 style: five small stars
    (the rating's dark #6d6d6d, the rest light grey), the grey bar, the count in bold, a chevron. Pressed: a grey wash;
    the row filtering the list: iOS 6's selection blue. Only the fill's transform animates. */
 .store-ratings-top { padding: 0 0 0 12px; gap: 10px; }
 .store-ratings-avg { padding: 10px 0; }
-.store-ratings-count { min-height: 15px; text-align: center; }
-.store-bars { flex: 1; min-width: 0; display: flex; flex-direction: column; font-size: 10px; color: var(--subtitle); border-left: 1px solid var(--divider); }
+.store-ratings-count { min-height: 15px; }
+.store-bars { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .store-bar {
-  display: flex; align-items: center; gap: 6px; width: 100%; min-height: 32px; box-sizing: border-box; padding: 0 10px 0 8px;
-  margin: 0; border: 0; background: none; font: inherit; color: inherit; text-align: left; cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
+  display: flex; align-items: center; gap: 6px; width: 100%; min-height: 32px; box-sizing: border-box;
+  padding: 0 10px 0 8px; margin: 0; cursor: pointer; -webkit-tap-highlight-color: transparent;
 }
+.store-bar:disabled { cursor: default; }
+.store-bar-stars { flex: none; display: flex; gap: 1px; white-space: nowrap; }
+.store-bar-track { position: relative; flex: 1; height: 7px; overflow: hidden; }
+.store-bar-fill { position: absolute; inset: 0; transform-origin: left center; transition: transform .3s ease-out; }
+.store-bar-n { flex: none; min-width: 18px; }
+.store-bar-chevron { flex: none; width: 7px; height: 10px; }
+.store-ratings-hint { margin-bottom: 0; }
+.store-reviews-none { padding: 14px 12px; }
+.store-review { display: flex; flex-direction: column; gap: 3px; padding: 10px 12px; }
+.store-review-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.store-review-title { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.store-review-text { padding: 0; }
+.store-review-response { margin-top: 4px; padding: 7px 9px; }
+/* ==== look-only { ==== The Reviews tab */
+.store-ratings-big { font-size: 40px; font-weight: bold; line-height: 44px; letter-spacing: -.02em; color: var(--text); }
+.store-ratings-count { font-size: 12px; color: var(--subtitle); }
+.store-ratings-from {
+  font-size: 13px; color: var(--subtitle); border-top: 1px solid var(--divider);
+  box-shadow: inset 0 1px 0 var(--divider-hi);
+}
+.store-ratings-count { text-align: center; }
+.store-bars { font-size: 10px; color: var(--subtitle); border-left: 1px solid var(--divider); }
+.store-bar { border: 0; background: none; font: inherit; color: inherit; text-align: left; }
 .store-bar + .store-bar { border-top: 1px solid var(--divider); }
-.store-bar:disabled { cursor: default; color: inherit; }
+.store-bar:disabled { color: inherit; }
 .store-bar:not(:disabled):active, .store-bar.is-pressed { background: rgba(0,0,0,.09); }
 .store-bar.selected, .store-bar.selected:active { background: var(--select); color: #fff; }
-.store-bar-stars { flex: none; display: flex; gap: 1px; font-size: 10px; line-height: 10px; letter-spacing: 0; white-space: nowrap; }
+.store-bar-stars { font-size: 10px; line-height: 10px; letter-spacing: 0; }
 .store-bar-star { color: #cfcfcf; }
 .store-bar-star.on { color: #6d6d6d; }
 .store-bar.selected .store-bar-star { color: rgba(255,255,255,.45); }
 .store-bar.selected .store-bar-star.on { color: #fff; }
-.store-bar-track { position: relative; flex: 1; height: 7px; border-radius: 4px; overflow: hidden; background: #dcdcdc; box-shadow: inset 0 1px 1px rgba(0,0,0,.2); }
-.store-bar-fill { position: absolute; inset: 0; transform-origin: left center; background: linear-gradient(#9a9a9a, #6d6d6d); transition: transform .3s ease-out; }
+.store-bar-track { border-radius: 4px; background: #dcdcdc; box-shadow: inset 0 1px 1px rgba(0,0,0,.2); }
+.store-bar-fill { background: linear-gradient(#9a9a9a, #6d6d6d); }
 .store-bar.selected .store-bar-track { background: rgba(255,255,255,.35); box-shadow: none; }
 .store-bar.selected .store-bar-fill { background: #fff; }
-.store-bar-n { flex: none; min-width: 18px; text-align: right; font-size: 12px; font-weight: bold; color: var(--text); }
+.store-bar-n { text-align: right; font-size: 12px; font-weight: bold; color: var(--text); }
 .store-bar.selected .store-bar-n { color: #fff; }
-.store-bar-chevron { flex: none; width: 7px; height: 10px; background: var(--chevron) center / contain no-repeat; }
+.store-bar-chevron { background: var(--chevron) center / contain no-repeat; }
 .store-bar:disabled .store-bar-chevron { opacity: .4; }
 .store-bar.selected .store-bar-chevron {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 17.5 26.4'%3E%3Cpath fill='%23fff' d='M.07 4.23 9.12 13.27 0 22.26 4.12 26.38 17.47 13.03 4.43 0Z'/%3E%3C/svg%3E");
@@ -713,26 +988,28 @@ html[data-theme="dark"] .shot-dot.on { background: var(--head); }
 html[data-theme="dark"] .store-bar-star { color: var(--dk-dot); }
 html[data-theme="dark"] .store-bar-star.on { color: var(--dk-index); }
 html[data-theme="dark"] .store-bar:not(:disabled):active, html[data-theme="dark"] .store-bar.is-pressed { background: rgba(255,255,255,.15); }
-.store-ratings-hint { margin-bottom: 0; }
-.store-reviews-none { padding: 14px 12px; text-align: center; font-size: 15px; color: var(--subtitle); }html[data-theme="dark"] .store-bar-track { background: var(--dk-track); box-shadow: inset 0 1px 1px rgba(0,0,0,.6); }
+.store-reviews-none { text-align: center; font-size: 15px; color: var(--subtitle); }
+html[data-theme="dark"] .store-bar-track { background: var(--dk-track); box-shadow: inset 0 1px 1px rgba(0,0,0,.6); }
 html[data-theme="dark"] .store-bar-fill { background: var(--dk-bar-fill); }
-.store-review { display: flex; flex-direction: column; gap: 3px; padding: 10px 12px; }
 .store-review + .store-review { border-top: 1px solid var(--divider); box-shadow: inset 0 1px 0 var(--divider-hi); }
-.store-review-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-.store-review-title { min-width: 0; font-size: 15px; font-weight: bold; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.store-review-title { font-size: 15px; font-weight: bold; }
 .store-review-by { font-size: 12px; color: var(--subtitle); }
-.store-review-text { padding: 0; font-size: 14px; line-height: 18px; }
+.store-review-text { font-size: 14px; line-height: 18px; }
 .store-review-response {
-  margin-top: 4px; padding: 7px 9px; border-radius: 6px; font-size: 13px; line-height: 17px; color: var(--head);
-  background: #e9ecf1; border: 1px solid #ccd2db;
+  border-radius: 6px; font-size: 13px; line-height: 17px; color: var(--head); background: #e9ecf1;
+  border: 1px solid #ccd2db;
 }
 html[data-theme="dark"] .store-review-response { background: var(--dk-inset-box); border-color: var(--table-edge); }
+/* ==== } look-only ==== */
 
 /* The Related tab's rows: the package's icon in the cell's icon box. B41: the picture fills the box over the letter
    tile and stays hidden until it loads (ui.js removes it when it fails), so the letter shows otherwise. */
 .store-related-icon { position: relative; overflow: hidden; }
-.store-related-icon img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; background: #fff; opacity: 0; }
+.store-related-icon img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+/* ==== look-only { ==== The Related tab's rows */
+.store-related-icon img { background: #fff; opacity: 0; }
 .store-related-icon img.loaded { opacity: 1; }
+/* ==== } look-only ==== */
 
 /* F193: swipe a package row left to queue it (nav/rowswipe.js). The row's content slides over the pinstripes, sunk
    in, with UITableView's editing control on the right (the kit's "Add Icon (green)" and "remove Icon",
@@ -740,44 +1017,49 @@ html[data-theme="dark"] .store-review-response { background: var(--dk-inset-box)
    armed. Cancel (a queued row) is the same control in grey with an x. pan-y: horizontal moves are ours, vertical the
    list's. Transform and opacity only. */
 .pkg-row { touch-action: pan-y; }
-.pkg-row.swiping > .cell-inner { position: relative; z-index: 1; background-color: var(--plain); will-change: transform; }
-.row-swipe {
-  display: none; position: absolute; inset: 0;
-  background: repeating-linear-gradient(90deg, var(--pin-dark) 0 2.5px, var(--pin-light) 2.5px 8px) var(--pin-light);
-  box-shadow: inset 0 3px 4px -2px rgba(0,0,0,.45), inset 0 -2px 3px -2px rgba(0,0,0,.3);
-}
+.pkg-row.swiping > .cell-inner { position: relative; z-index: 1; will-change: transform; }
+.row-swipe { display: none; position: absolute; inset: 0; }
 .pkg-row.swiping > .row-swipe { display: block; }
 .row-swipe-control {
   position: absolute; top: 50%; right: 24px; width: 23px; height: 23px; margin-top: -11.5px; box-sizing: border-box;
-  border: 2px solid #fff; border-radius: 50%; overflow: hidden;
-  background: linear-gradient(#51b14f, #3ba739 46.5%); background-origin: border-box;
-  box-shadow: 0 1.5px 3.5px rgba(0,0,0,.5);
-  transform: scale(.85); transition: transform .16s ease-out, opacity .16s ease-out;
+  overflow: hidden; transform: scale(.85); transition: transform .16s ease-out, opacity .16s ease-out;
 }
-.row-swipe:not([data-kind]) .row-swipe-control, .row-swipe[data-kind=""] .row-swipe-control { opacity: 0; } /* still asking what it does */
 .row-swipe.armed .row-swipe-control { transform: scale(1.18); }
 /* The lower gloss: from the middle down, its top edge arched (the kit's "gloss" shape). */
-.row-swipe-control::before {
-  content: ""; position: absolute; left: -2px; right: -2px; top: 50%; bottom: -2px;
-  border-radius: 50% 50% 0 0 / 5px 5px 0 0; background: linear-gradient(#0f930d, #1f9b1d);
-}
+.row-swipe-control::before { position: absolute; left: -2px; right: -2px; top: 50%; bottom: -2px; }
 /* The glyph: the kit's 13 x 3pt white bars, a 0.5pt dark line above (color-burn at 30%, drawn as plain black). */
+.row-swipe-control::after { position: absolute; inset: 0; }
+.row-swipe[data-kind="remove"] .row-swipe-control::before, .row-swipe[data-kind="cancel"] .row-swipe-control::before { display: none; }
+.row-swipe[data-kind="cancel"] .row-swipe-control::after { transform: rotate(45deg); }
+/* The first-run hint shows the control at rest size. */
+.row-swipe.hint .row-swipe-control { transform: none; transition-duration: 0s; }
+/* ==== look-only { ==== swipe a package row left to queue it */
+.pkg-row.swiping > .cell-inner { background-color: var(--plain); }
+.row-swipe {
+  background: repeating-linear-gradient(90deg, var(--pin-dark) 0 2.5px, var(--pin-light) 2.5px 8px) var(--pin-light);
+  box-shadow: inset 0 3px 4px -2px rgba(0,0,0,.45), inset 0 -2px 3px -2px rgba(0,0,0,.3);
+}
+.row-swipe-control {
+  border: 2px solid #fff; border-radius: 50%; background: linear-gradient(#51b14f, #3ba739 46.5%);
+  background-origin: border-box; box-shadow: 0 1.5px 3.5px rgba(0,0,0,.5);
+}
+.row-swipe:not([data-kind]) .row-swipe-control, .row-swipe[data-kind=""] .row-swipe-control { opacity: 0; } /* still asking what it does */
+.row-swipe-control::before {
+  content: ""; border-radius: 50% 50% 0 0 / 5px 5px 0 0; background: linear-gradient(#0f930d, #1f9b1d);
+}
 .row-swipe-control::after {
-  content: ""; position: absolute; inset: 0;
+  content: "";
   background: linear-gradient(#fff, #fff) center / 13px 3px no-repeat, linear-gradient(#fff, #fff) center / 3px 13px no-repeat;
   filter: drop-shadow(0 -.5px 0 rgba(0,0,0,.3));
 }
 .row-swipe[data-kind="remove"] .row-swipe-control {
   background: linear-gradient(#dd878d, #c73741 48%, #bd1321 50%, #bd1321); background-origin: border-box;
 }
-.row-swipe[data-kind="remove"] .row-swipe-control::before, .row-swipe[data-kind="cancel"] .row-swipe-control::before { display: none; }
 .row-swipe[data-kind="remove"] .row-swipe-control::after { background: linear-gradient(#fff, #fff) center / 13px 3px no-repeat; }
 .row-swipe[data-kind="cancel"] .row-swipe-control {
   background: linear-gradient(#c2c2c2, #8d8d8d 48%, #7b7b7b 50%, #7b7b7b); background-origin: border-box;
 }
-.row-swipe[data-kind="cancel"] .row-swipe-control::after { transform: rotate(45deg); }
-/* The first-run hint shows the control at rest size. */
-.row-swipe.hint .row-swipe-control { transform: none; transition-duration: 0s; }
+/* ==== } look-only ==== */
 
 /* F222: Installed's Manage (screens/installed.js). Each row gets UIKit's multi-select circle where the red minus goes
    (sources.css .del-toggle), slid in with the row's content. Sampled from the 4S's UIRemoveControlMulti* art (29pt
@@ -786,30 +1068,12 @@ html[data-theme="dark"] .store-review-response { background: var(--dk-inset-box)
    UITableView's pale blue multi-select fill (as My IPAs' Edit, myipas.css). */
 .manage-check {
   position: absolute; left: 10px; top: 50%; width: 23px; height: 23px; margin-top: -11.5px; box-sizing: border-box;
-  border-radius: 50%; border: 2px solid rgba(0,0,0,.1); pointer-events: none;
-  transform: translateX(-40px); transition: transform .3s ease-in-out;
+  pointer-events: none; transform: translateX(-40px); transition: transform .3s ease-in-out;
 }
 .managing .manage-check { transform: none; }
-.manage-row.picked .manage-check {
-  border-color: #fff; box-shadow: 0 1px 2.5px rgba(0,0,0,.7);
-  background:
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 38 38'%3E%3Cpath d='M11 17 19.5 26.5 28 7.5' fill='none' stroke='%23500008' stroke-opacity='.45' stroke-width='6' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M11 18.5 19.5 28 28 9' fill='none' stroke='%23fff' stroke-width='6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 100% 100% no-repeat padding-box,
-    linear-gradient(#bb646e, #a4313e 50%, #900413 50%, #900413) padding-box;
-}
 .managing .installed-app .cell-inner { transform: translateX(37px); width: calc(100% - 37px); }
-.managing .installed-app .cell-inner.chevron::after { opacity: 0; }
-.managing .manage-row.picked, .managing .manage-row.picked .cell-inner { background-color: #e1e8f5; }
-html[data-theme="dark"] .manage-check { border-color: rgba(255,255,255,.18); } /* a picked one keeps its white rim (0,3,0 wins) */
-html[data-theme="dark"] .managing .manage-row.picked, html[data-theme="dark"] .managing .manage-row.picked .cell-inner { background-color: rgba(255,255,255,.15); }
 /* The grey line above the list: "2 selected · 5 apps · 1 expiring · 3 updates". */
-.manage-summary {
-  margin: 0; padding: 7px 10px; font-size: 14px; line-height: 18px; text-align: center; color: #7f7f7f;
-  border-bottom: 1px solid #e0e0e0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
-}
-html[data-theme="dark"] .manage-summary { color: var(--subtitle); border-bottom-color: var(--divider); }
-/* The empty state's way to Install IPAs, Home's tile. */
-p.empty a { color: #385487; text-decoration: none; }
-html[data-theme="dark"] p.empty a { color: var(--dk-link); }
+.manage-summary { margin: 0; padding: 7px 10px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 /* F269: the Install IPAs row above the apps: a plain cell like theirs, its tile lined up with their icons (not the
    Settings rows' 3pt nudge); gone while Manage is on. */
 .install-ipas-top .install-ipas-row .cell-icon.row-icon { margin: 0; }
@@ -822,15 +1086,39 @@ html[data-theme="dark"] p.empty a { color: var(--dk-link); }
   position: fixed; left: 0; right: 0; bottom: var(--tab-h); z-index: 2; height: 44px; box-sizing: border-box;
   display: flex; align-items: center; justify-content: space-between; gap: 10px;
   padding: 0 max(6px, env(safe-area-inset-right)) 0 max(6px, env(safe-area-inset-left));
-  background:
-    linear-gradient(#eff2f7, #eff2f7) top / 100% 1px no-repeat,
-    linear-gradient(#bdcbdc, #597498);
-  opacity: 0; transform: translate3d(0,100%,0); pointer-events: none;
+  transform: translate3d(0,100%,0); pointer-events: none;
   transition: transform .3s cubic-bezier(.25,.1,.25,1), opacity .3s cubic-bezier(.25,.1,.25,1);
 }
-.manage-toolbar.shown { opacity: 1; transform: none; pointer-events: auto; }
-html[data-theme="dark"] .manage-toolbar { background: var(--dk-nav-bar); }
+.manage-toolbar.shown { transform: none; pointer-events: auto; }
 .manage-toolbar .bar-button { flex: none; }
+.manage-toolbar .bar-button:disabled { cursor: default; }
+html.has-manage-toolbar .page-body::after { display: block; flex: none; clear: both; height: 44px; }
+.dep-piracy .dep-label { margin: 4px 0; }
+/* ==== look-only { ==== Installed's Manage */
+.manage-check { border-radius: 50%; border: 2px solid rgba(0,0,0,.1); }
+.manage-row.picked .manage-check {
+  border-color: #fff; box-shadow: 0 1px 2.5px rgba(0,0,0,.7);
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 38 38'%3E%3Cpath d='M11 17 19.5 26.5 28 7.5' fill='none' stroke='%23500008' stroke-opacity='.45' stroke-width='6' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M11 18.5 19.5 28 28 9' fill='none' stroke='%23fff' stroke-width='6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 100% 100% no-repeat padding-box,
+    linear-gradient(#bb646e, #a4313e 50%, #900413 50%, #900413) padding-box;
+}
+.managing .installed-app .cell-inner.chevron::after { opacity: 0; }
+.managing .manage-row.picked, .managing .manage-row.picked .cell-inner { background-color: #e1e8f5; }
+html[data-theme="dark"] .manage-check { border-color: rgba(255,255,255,.18); } /* a picked one keeps its white rim (0,3,0 wins) */
+html[data-theme="dark"] .managing .manage-row.picked, html[data-theme="dark"] .managing .manage-row.picked .cell-inner { background-color: rgba(255,255,255,.15); }
+.manage-summary {
+  font-size: 14px; line-height: 18px; text-align: center; color: #7f7f7f; border-bottom: 1px solid #e0e0e0;
+}
+html[data-theme="dark"] .manage-summary { color: var(--subtitle); border-bottom-color: var(--divider); }
+/* The empty state's way to Install IPAs, Home's tile. */
+p.empty a { color: #385487; text-decoration: none; }
+html[data-theme="dark"] p.empty a { color: var(--dk-link); }
+.manage-toolbar {
+  background: linear-gradient(#eff2f7, #eff2f7) top / 100% 1px no-repeat, linear-gradient(#bdcbdc, #597498);
+  opacity: 0;
+}
+.manage-toolbar.shown { opacity: 1; }
+html[data-theme="dark"] .manage-toolbar { background: var(--dk-nav-bar); }
 .manage-toolbar .bar-button.manage-delete:not(.back):not(.done) {
   border-color: #5e0909; border-top-color: #3a0606;
   background: linear-gradient(#e46a6a, #c51f1f 49%, #b30f0f 50%, #bd1a1a); background-origin: border-box;
@@ -838,21 +1126,25 @@ html[data-theme="dark"] .manage-toolbar { background: var(--dk-nav-bar); }
 .manage-toolbar .bar-button.manage-delete:not(.back):not(.done):is(:active, .is-pressed) {
   background: linear-gradient(#bf4c4c, #9c1414 49%, #880909 50%, #941010); background-origin: border-box;
 }
-.manage-toolbar .bar-button:disabled { opacity: .5; cursor: default; }
-html.has-manage-toolbar .page-body::after { content: ""; display: block; flex: none; clear: both; height: 44px; }
+.manage-toolbar .bar-button:disabled { opacity: .5; }
+html.has-manage-toolbar .page-body::after { content: ""; }
 /* F228: the package page's Source Warning card (screens/depiction.js piracyBanner): a review card, its title red. */
 .dep-piracy .dep-review-title { color: #c0392b; }
 html[data-theme="dark"] .dep-piracy .dep-review-title { color: var(--dk-bad); }
-.dep-piracy .dep-label { margin: 4px 0; }
+/* ==== } look-only ==== */
 
 /* F233: Sources' refresh, one row per source (no count strip over the list: the reload bar says what is happening).
    A row the run hasn't reached: grey "Waiting" where its count goes; no count, no chevron yet. */
-.row-waiting { flex: none; font-size: 14px; color: var(--subtitle); }
+.row-waiting { flex: none; }
 .source-row.is-waiting .cell-count { display: none; }
 .source-row.is-waiting .cell-inner.chevron::after { display: none; }
 /* A row that failed: the tab bar's red badge (ios6.css .badge's gloss) with "!", the reason in red under its name
    (sources.css .cell-error). B177: it keeps its chevron: a tap opens its page, with the whole error and Refresh. */
+.source-row.is-failed .cell-count.row-failed-badge { min-width: 20px; padding: 0 6px; }
+/* ==== look-only { ==== Sources' refresh, one row per source */
+.row-waiting { font-size: 14px; color: var(--subtitle); }
 .source-row.is-failed .cell-count.row-failed-badge {
-  min-width: 20px; padding: 0 6px; font-size: 13px; letter-spacing: -.02em;
-  background: linear-gradient(#f7b3b7, #e92d35 48.8%, #e70f19 50.5%, #c50103); box-shadow: 0 1px 1.5px rgba(0,0,0,.45);
+  font-size: 13px; letter-spacing: -.02em; background: linear-gradient(#f7b3b7, #e92d35 48.8%, #e70f19 50.5%, #c50103);
+  box-shadow: 0 1px 1.5px rgba(0,0,0,.45);
 }
+/* ==== } look-only ==== */

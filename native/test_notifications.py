@@ -46,6 +46,22 @@ class Notifications(unittest.TestCase):
         self.assertIn("removeDeliveredNotifications(withIdentifiers: [upgradesID])", self.src)
         self.assertIn("Notifications.register(self)", read("Sources", "Bridge.swift"))
 
+    def test_one_badge_setter(self):
+        # B158: every icon badge goes through Notifications.setIcon (UpdateCheck.BadgeSync), so counts land in the
+        # order asked and the latest wins; nothing else sets the badge directly.
+        self.assertIn("setIcon(n, ask: true)", self.src)
+        self.assertIn("UpdateCheck.BadgeSync()", self.src)
+        bg = read("Sources", "BackgroundCheck.swift")
+        self.assertIn("Notifications.setIcon(n)", bg)
+        self.assertIn("Notifications.setIcon(badge)", bg)
+        for name in ("BackgroundCheck.swift", "Notifications.swift"):
+            src = read("Sources", name)
+            self.assertEqual(src.count("setBadgeCount("), 1 if name == "Notifications.swift" else 0, name)
+            self.assertEqual(src.count("applicationIconBadgeNumber = "), 1 if name == "Notifications.swift" else 0, name)
+        app = read("..", "web", "app", "app.js")
+        self.assertIn("upgradeNotices.updated();", app)
+        self.assertNotIn('call("app.badge", { count: 0 })', app)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -85,3 +85,44 @@ test("sideload: the icon badge is set to every recount, 0 included and on any ta
   up.badge("home", 5); // not Changes' count
   assert.deepEqual(calls, [1, 1, 0]);
 });
+
+// B158: iFizBox 0.12.0 knew 0.13.0 was out (Changes showed 1) but the Home Screen icon had no badge.
+test("B158: the first launch after an update clears the icon, then puts Changes' count straight back", () => {
+  for (const mode of ["sideload", "jailbreak"]) {
+    const calls = [];
+    const native = { mode, call: async (m, p) => { if (m === "app.badge") calls.push(p.count); } };
+    const up = createUpgradeNotices({ native, current: () => ({ tab: "home", path: [] }), win: { location: { hash: "#/home" } } });
+    up.badge("changes", 1); // Changes counted iFizBox's own next update before app.js saw the new version
+    up.updated();
+    assert.deepEqual(calls, [1, 0, 1], mode); // the last word is the count, not 0
+    up.badge("changes", 1); // and every recount sets it again, jailbreak too (it used to skip an unchanged count)
+    assert.deepEqual(calls, [1, 0, 1, 1], mode);
+  }
+  const calls = [];
+  const native = { mode: "sideload", call: async (m, p) => { if (m === "app.badge") calls.push(p.count); } };
+  const up = createUpgradeNotices({ native, current: () => null, win: { location: { hash: "#/home" } } });
+  up.updated(); // nothing counted yet: only the clear; Changes' count follows when it comes
+  up.badge("changes", 1);
+  assert.deepEqual(calls, [0, 1]);
+});
+
+test("B158: back in the foreground the icon gets Changes' last count again", () => {
+  const listeners = [];
+  const doc = { visibilityState: "hidden", addEventListener: (t, f) => listeners.push([t, f]) };
+  const calls = [];
+  const native = { mode: "sideload", call: async (m, p) => { if (m === "app.badge") calls.push(p.count); } };
+  const win = { location: { hash: "#/home" }, document: doc, addEventListener: () => {} };
+  const up = createUpgradeNotices({ native, current: () => null, win });
+  assert.equal(up.shown(), false); // nothing counted yet: nothing to set
+  up.start();
+  up.badge("changes", 1);
+  doc.visibilityState = "visible";
+  for (const [t, f] of listeners) if (t === "visibilitychange") f();
+  assert.deepEqual(calls, [1, 1]);
+  // the jailbreak app leaves a 0 to its Changes-tab rule (the daemon's badge may be newer)
+  const jb = createUpgradeNotices({ native: { mode: "jailbreak", call: async () => {} }, current: () => null, win: { location: { hash: "#/home" } } });
+  jb.badge("changes", 0);
+  assert.equal(jb.shown(), false);
+  jb.badge("changes", 2);
+  assert.equal(jb.shown(), true);
+});

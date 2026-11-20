@@ -158,5 +158,39 @@ test("B124: the app's own update handed to iOS comes off the badge") {
     check(UpdateCheck.updates(moved, offers: offers).isEmpty, "no second find")
 }
 
+test("B158: the icon badge is the latest count, set one at a time") {
+    // The page's launch counts: a 0 (before iFizBox's own row was read, or the first launch after an update) then
+    // Changes' 1. Whichever permission check answers first, the icon ends at 1.
+    var s = UpdateCheck.BadgeSync()
+    s.want(0)
+    s.want(1)
+    check(s.start() == 1, "the latest count is set")
+    check(s.start() == nil, "the older call has nothing left to set")
+    check(s.done() == nil && !s.busy, "idle after")
+    // A count arriving while iOS is still setting the last one is set right after it, never before.
+    s.want(1)
+    check(s.start() == 1, "first")
+    s.want(0)
+    check(s.start() == nil, "waits for the one in flight")
+    s.want(2)
+    check(s.done() == 2, "then the latest: \(s)")
+    check(s.done() == nil, "then nothing")
+    // The same count again is set again (the background run or a delivered notification may have changed the icon).
+    s.want(1); check(s.start() == 1, "set"); check(s.done() == nil, "done")
+    s.want(1); check(s.start() == 1, "set again")
+    _ = s.done()
+    // A bad count is 0, never negative.
+    s.want(-4); check(s.start() == 0, "clamped")
+    // Changes' count with iFizBox's own update in it reaches the icon: the count is what the page sends.
+    var c = UpdateCheck.Counts(pageCount: 1, pageKeys: ["com.ryha.ifizbox 0.13.0"], found: [])
+    s = UpdateCheck.BadgeSync()
+    s.want(c.badge)
+    check(s.start() == 1, "the app's own update badges the icon")
+    // and only a hand-off to iOS takes it off
+    c = UpdateCheck.without(["com.ryha.ifizbox"], c)
+    s.want(c.badge)
+    check(s.done() == 0, "handed off: 0")
+}
+
 print(failures == 0 ? "all passed" : "\(failures) failed")
 exit(failures == 0 ? 0 : 1)

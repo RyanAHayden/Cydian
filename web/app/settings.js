@@ -33,7 +33,7 @@ export function createUpgradeNotices({ settings, native = globalThis.ifizboxNati
     return true;
   }
 
-  return {
+  const api = {
     // Same arguments as ctx.setBadge. Returns true when it asked the shell to clear the icon badge.
     badge(tab, n) {
       if (tab !== "changes") return false;
@@ -45,24 +45,45 @@ export function createUpgradeNotices({ settings, native = globalThis.ifizboxNati
         cleared = next === 0;
         return next === 0;
       }
-      // the app icon shows the count too (Settings > App Icon Badge), not only the daemon's background checks
-      if (on && next > 0 && next !== count) Promise.resolve(native.call("app.badge", { count: next })).catch(() => {});
+      // the app icon shows the count too (Settings > App Icon Badge), not only the daemon's background checks; B158:
+      // on every count above 0, not only a changed one, so a 0 set meanwhile (the daemon, the first launch after an
+      // update) never outlives the recount
+      if (on && next > 0) Promise.resolve(native.call("app.badge", { count: next })).catch(() => {});
       // the icon's long-press menu offers Upgrade All while there are upgrades (sideload: native Shortcut)
       if (on && next !== count) Promise.resolve(native.call("app.shortcuts", { upgrades: next })).catch(() => {});
       count = next;
       if (count > 0) cleared = false;
       return clear();
     },
+    // B158: iFizBox has just updated itself (app.js, the first launch of a new version): the icon badge counted that
+    // very update, so it goes, and Changes' count, when it has counted already, goes straight back on (before, the
+    // 0 could come after Changes' count and leave the icon bare while Changes showed an upgrade).
+    updated() {
+      if (!on) return false;
+      Promise.resolve(native.call("app.badge", { count: 0 })).catch(() => {});
+      if (count > 0) Promise.resolve(native.call("app.badge", { count })).catch(() => {});
+      cleared = !(count > 0);
+      return true;
+    },
+    // B158: back in the foreground, the icon shows Changes' last count again (a background run or a delivered
+    // notification may have set another meanwhile). Returns true when it sent one.
+    shown() {
+      if (!on || count == null || (!mirror && count === 0)) return false;
+      Promise.resolve(native.call("app.badge", { count })).catch(() => {});
+      return true;
+    },
     // Returns true when it looked at the launch state (jailbreak app only).
     start() {
       if (!on) return false;
       win?.addEventListener?.("hashchange", () => setTimeout(clear, 0)); // after the router has moved
+      win?.document?.addEventListener?.("visibilitychange", () => { if (win.document.visibilityState === "visible") api.shown(); });
       if (settings?.isShown?.("upgradeNotifications") && settings.get("upgradeNotifications") === false) {
         settings.upgradeNotifications.sync().catch(() => {});
       }
       return true;
     },
   };
+  return api;
 }
 
 // F70: N7's daemon (native/daemon/) reads the automatic-install settings from the app's preferences

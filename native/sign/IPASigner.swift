@@ -30,6 +30,12 @@ final class IPASigner {
     // F196: true once the progress page's Cancel was tapped (SignJob): signing stops at the next file or bundle with
     // code "cancelled", and nothing is written.
     var stop: () -> Bool = { false }
+    // R41: how the files signing changed go into the new IPA: 0 stores them (an IPA iOS fetches from this phone's
+    // own install server), 1 (the default) deflates fast, 6 small (an IPA uploaded to a server). Level 6 ran at
+    // 12 MB/s on the iPhone 7 and was most of the time a big app took to sign.
+    var level: Int32 = 1
+    // R41: read the IPA on this many threads at once (inflating and hashing every file); 1 for one at a time.
+    var readers = max(1, min(ProcessInfo.processInfo.activeProcessorCount, 4))
 
     init(profile: Profile, identity: SigningIdentity) {
         self.profile = profile
@@ -40,6 +46,10 @@ final class IPASigner {
         case entry(ZipEntry, sha1: Data, sha256: Data)
         case data(Data, mode: UInt32)
         case symlink(String, ZipEntry)
+        // R41: a signed binary, kept in a file until the IPA is written (all of them in memory at once got a big
+        // app killed by iOS), with its CRC and, when a CodeResources seals it, its hashes.
+        // `packed`: the file holds it deflated (its size), nil: as it is.
+        case spilled(URL, size: UInt64, crc: UInt32, packed: UInt64?, sha1: Data?, sha256: Data?, mode: UInt32)
     }
 
     private struct BundleInfo {
@@ -51,6 +61,32 @@ final class IPASigner {
 
     func sign(_ input: URL, to output: URL, progress: ((String, Double) -> Void)? = nil) throws -> SignedApp {
         let zip = try ZipReader(url: input)
+        let parts = output.deletingLastPathComponent().appendingPathComponent(".\(output.lastPathComponent).parts")
+        try? FileManager.default.removeItem(at: parts)
+        defer { try? FileManager.default.removeItem(at: parts) }
+        var spills = 0
+        let mutex = NSLock() // spills and fixedArm64e: binaries are signed on several threads (signLoose)
+        // A signed binary: in memory when small, else in its own file under `parts`. `sealed`: a CodeResources lists
+        // it (every binary but the app's own executable), so its hashes are taken now, while it's in memory.
+        func hold(_ d: Data, mode: UInt32, sealed: Bool) throws -> File {
+            if d.count < 1 << 20 { return .data(d, mode: mode) }
+            mutex.lock()
+            if spills == 0 { try? FileManager.default.createDirectory(at: parts, withIntermediateDirectories: true) }
+            spills += 1
+            let u = parts.appendingPathComponent("\(spills)")
+            mutex.unlock()
+            var packed: UInt64?
+            if level > 0 {
+                let z = try deflateBlocks(d, level: level)
+                try z.write(to: u)
+                packed = UInt64(z.count)
+            } else {
+                try d.write(to: u)
+            }
+            var h1: Data?, h2: Data?
+            if sealed { var h = Hasher2(); h.update(d); (h1, h2) = h.final() }
+            return .spilled(u, size: UInt64(d.count), crc: crc32Of(d), packed: packed, sha1: h1, sha256: h2, mode: mode)
+        }
         for e in zip.entries where e.name.hasPrefix("/") || e.name.split(separator: "/").contains("..") || e.name.contains("\\") {
             throw SignError("bad_ipa", "The IPA has a file outside its folder (\(e.name)).")
         }
@@ -158,30 +194,17 @@ final class IPASigner {
 
         // One pass over every kept file: hashes for CodeResources, and which ones are Mach-O.
         var files = [String: File]()
-        var order = [String]()
         var machos = Set<String>()
         let kept = zip.entries.filter { !gone($0.name) }
+        let order = kept.map(\.name)
         let totalBytes = max(1, kept.reduce(UInt64(0)) { $0 + $1.size })
-        var doneBytes: UInt64 = 0
-        for e in kept {
-            order.append(e.name)
-            if e.isDirectory { continue }
-            if e.isSymlink {
-                files[e.name] = .symlink(String(decoding: try zip.data(e, limit: 4096), as: UTF8.self), e)
-                continue
-            }
-            var h = Hasher2()
-            var head = [UInt8]()
-            try zip.read(e) { piece in
-                if head.count < 4 { head += piece.prefix(4 - head.count) }
-                h.update(piece)
-            }
-            let (s1, s256) = h.final()
-            files[e.name] = .entry(e, sha1: s1, sha256: s256)
-            if e.name.hasPrefix(appDir) && MachO.isMachO(head) { machos.insert(e.name) }
-            doneBytes += e.size
-            progress?("reading", Double(doneBytes) / Double(totalBytes))
-            if stop() { throw SignJob.cancelledError }
+        for e in kept where e.isSymlink && !e.isDirectory {
+            files[e.name] = .symlink(String(decoding: try zip.data(e, limit: 4096), as: UTF8.self), e)
+        }
+        let read = try readAll(zip, kept.filter { !$0.isDirectory && !$0.isSymlink }, total: totalBytes, progress: progress)
+        for (e, r) in read {
+            files[e.name] = .entry(e, sha1: r.sha1, sha256: r.sha256)
+            if e.name.hasPrefix(appDir) && r.macho { machos.insert(e.name) }
         }
         log("Read \(kept.count) files (\(ByteCountFormatter.string(fromByteCount: Int64(totalBytes), countStyle: .file))), \(machos.count) Mach-O, \(bundles.count) bundles to sign")
         for (path, d) in changed { files[path] = .data(d, mode: 0o100644) }
@@ -199,7 +222,7 @@ final class IPASigner {
         func fixed(_ path: String, _ data: Data) -> Data {
             guard options.fixArm64e else { return data }
             let (d, changed) = Arm64e.fixup(data)
-            if changed { fixedArm64e.append(String(path.dropFirst(appDir.count))) }
+            if changed { mutex.lock(); fixedArm64e.append(String(path.dropFirst(appDir.count))); mutex.unlock() }
             return d
         }
 
@@ -215,16 +238,22 @@ final class IPASigner {
             // Loose Mach-Os of this bundle (dylibs in Frameworks/, helpers): signed with no entitlements.
             // B65: each one moves the bar within the bundle's share, so a big main bundle doesn't sit at "Signing 50%".
             let loose = machos.sorted().filter { p in p.hasPrefix(dir) && p != exe && !inner.contains(where: { p.hasPrefix($0) }) }
-            for (k, path) in loose.enumerated() {
+            // R41: side by side on `readers` threads (a game's 128 emulator cores, a framework's dylibs)
+            let current = files
+            let signedLoose = try parallel(loose.count, zip, done: { k in
                 if k > 0 { progress?("signing", (Double(n) + Double(k) / Double(loose.count + 1)) / Double(dirs.count)) }
-                if stop() { throw SignJob.cancelledError }
-                let data = fixed(path, try contents(path, files, zip))
-                guard let ft = MachO.filetype(data), [2, 6, 8].contains(ft) else { continue } // executables, dylibs, bundles
+                return !self.stop()
+            }) { k, reader -> File? in
+                let path = loose[k]
+                let data = fixed(path, try self.contents(path, current, reader))
+                guard let ft = MachO.filetype(data), [2, 6, 8].contains(ft) else { return nil } // executables, dylibs, bundles
                 let name = String(path.split(separator: "/").last!)
                 let ident = name.hasSuffix(".dylib") ? String(name.dropLast(6)) : name
-                files[path] = .data(try MachO.sign(data, CodeSignParams(identifier: ident, team: profile.team), identity, time: time),
-                                    mode: mode(path, files))
+                let m = self.mode(path, current)
+                return try hold(try MachO.sign(consume data, CodeSignParams(identifier: ident, team: self.profile.team), self.identity,
+                                               time: self.time), mode: m, sealed: true)
             }
+            for (k, f) in signedLoose.enumerated() { if let f = f { files[loose[k]] = f } }
             if !loose.isEmpty { progress?("signing", (Double(n) + Double(loose.count) / Double(loose.count + 1)) / Double(dirs.count)) }
             if isApp { files[dir + "embedded.mobileprovision"] = .data(profile.data, mode: 0o100644) }
             let infoData = try contents(dir + "Info.plist", files, zip)
@@ -236,7 +265,8 @@ final class IPASigner {
                 let params = CodeSignParams(identifier: id, team: profile.team,
                                             entitlements: isApp ? profile.entitlements(for: keep ? entID : id) : nil,
                                             infoPlist: infoData, codeResources: resources)
-                files[exe] = .data(try MachO.sign(data, params, identity, time: time), mode: mode(exe, files))
+                let m = mode(exe, files)
+                files[exe] = try hold(try MachO.sign(consume data, params, identity, time: time), mode: m, sealed: dir != appDir)
             }
             let rel = dir == appDir ? String(appDir.dropFirst(8).dropLast()) : String(dir.dropFirst(appDir.count).dropLast())
             log("Signed \(rel) (\(id))" + (isApp ? ", with the profile's entitlements" : ""))
@@ -249,24 +279,133 @@ final class IPASigner {
         // Write: kept entries in their order (copied raw when untouched), then the new files.
         let out = try ZipWriter(url: output)
         var written = Set<String>()
+        var folders = [String: ZipEntry]()
+        for e in kept where e.isDirectory { folders[e.name] = e }
         for name in order + newPaths(files, order) where !written.contains(name) {
             written.insert(name)
             if name.hasSuffix("/") {
-                if let e = kept.first(where: { $0.name == name }) { try out.copy(e, from: zip) }
+                if let e = folders[name] { try out.copy(e, from: zip) }
                 continue
             }
             switch files[name] {
             case .entry(let e, _, _)?: try out.copy(e, from: zip)
             case .symlink(_, let e)?: try out.copy(e, from: zip)
-            case .data(let d, let m)?: try out.add(name, d, mode: m)
+            case .data(let d, let m)?: try out.add(name, d, mode: m, level: level)
+            case .spilled(let u, let size, let crc, let packed, _, _, let m)?:
+                try out.add(name, file: u, size: size, crc: crc, packed: packed, mode: m)
+                try? FileManager.default.removeItem(at: u)
             case nil: break
             }
+            if stop() { throw SignJob.cancelledError }
         }
         out.close()
         return SignedApp(bundleID: newID, originalBundleID: oldID,
                          name: main.plist["CFBundleDisplayName"] as? String ?? main.plist["CFBundleName"] as? String ?? "",
                          version: main.plist["CFBundleShortVersionString"] as? String ?? main.plist["CFBundleVersion"] as? String ?? "",
                          removed: removed.sorted(), fixedArm64e: fixedArm64e.sorted(), skipped: skipped.sorted())
+    }
+
+    private struct Read { let sha1: Data, sha256: Data, macho: Bool }
+
+    // R41: body(i, reader) for every i in 0..<n on `readers` threads, each with its own handle on the IPA, in order of
+    // i as threads come free. `done(k)` runs on the calling thread (its callers expect that thread) each time it has
+    // finished one, with how many have finished in all; false stops the rest (SignJob.cancelledError). The results,
+    // by i.
+    private func parallel<T>(_ n: Int, _ zip: ZipReader, done: @escaping (Int) -> Bool,
+                             _ body: @escaping (Int, ZipReader) throws -> T?) throws -> [T?] {
+        var results = [T?](repeating: nil, count: n)
+        let lock = NSLock()
+        var next = 0, finished = 0
+        var failure: Error?
+        func worker(_ reader: ZipReader, reports: Bool) {
+            while true {
+                lock.lock()
+                if failure != nil || next >= n { lock.unlock(); return }
+                let i = next; next += 1
+                lock.unlock()
+                do {
+                    let r = try body(i, reader)
+                    lock.lock(); results[i] = r; finished += 1; let k = finished; lock.unlock()
+                    if reports && !done(k) { lock.lock(); failure = failure ?? SignJob.cancelledError; lock.unlock(); return }
+                } catch {
+                    lock.lock(); failure = failure ?? error; lock.unlock()
+                    return
+                }
+            }
+        }
+        let helpers = n < 2 ? 0 : min(readers, n) - 1
+        let group = DispatchGroup()
+        for _ in 0..<helpers {
+            let r = try zip.clone()
+            DispatchQueue.global(qos: .userInitiated).async(group: group) { worker(r, reports: false) }
+        }
+        if n > 0 && !done(0) { lock.lock(); failure = SignJob.cancelledError; lock.unlock() }
+        worker(zip, reports: true)
+        group.wait()
+        if let f = failure { throw f }
+        return results
+    }
+
+    // R41: every file inflated and hashed (SHA-1 and SHA-256, for CodeResources) once, on `readers` threads, each
+    // with its own handle on the IPA; the biggest files first, so one big file doesn't run on alone at the end.
+    // Progress and stop() are asked on the calling thread only (its callers expect that thread).
+    private func readAll(_ zip: ZipReader, _ entries: [ZipEntry], total: UInt64,
+                         progress: ((String, Double) -> Void)?) throws -> [(ZipEntry, Read)] {
+        let work = entries.indices.sorted { entries[$0].size > entries[$1].size }
+        var results = [Read?](repeating: nil, count: entries.count)
+        let lock = NSLock()
+        var next = 0, doneBytes: UInt64 = 0
+        var failure: Error?
+        func fail(_ e: Error) { lock.lock(); failure = failure ?? e; lock.unlock() }
+        // The calling thread reports, a piece at a time, how far all the threads have got.
+        func report() -> Bool {
+            lock.lock(); let done = doneBytes; let failed = failure != nil; lock.unlock()
+            if failed { return false }
+            progress?("reading", Double(done) / Double(total))
+            if stop() { fail(SignJob.cancelledError); return false }
+            return true
+        }
+        func worker(_ reader: ZipReader, reports: Bool) {
+            while true {
+                lock.lock()
+                if failure != nil || next >= work.count { lock.unlock(); return }
+                let i = work[next]; next += 1
+                lock.unlock()
+                let e = entries[i]
+                do {
+                    var h = Hasher2()
+                    var head = [UInt8]()
+                    var sinceReport = 0
+                    try reader.read(e) { piece in
+                        if head.count < 4 { head += piece.prefix(4 - head.count) }
+                        h.update(piece)
+                        lock.lock(); doneBytes += UInt64(piece.count); lock.unlock()
+                        sinceReport += piece.count
+                        if reports && sinceReport >= 4 << 20 {
+                            sinceReport = 0
+                            if !report() { throw SignJob.cancelledError }
+                        }
+                    }
+                    let (s1, s256) = h.final()
+                    lock.lock(); results[i] = Read(sha1: s1, sha256: s256, macho: MachO.isMachO(head)); lock.unlock()
+                    if reports && !report() { return }
+                } catch {
+                    fail(error)
+                    return
+                }
+            }
+        }
+        let helpers = entries.count < 8 ? 0 : readers - 1
+        let group = DispatchGroup()
+        for _ in 0..<helpers {
+            let r = try zip.clone()
+            DispatchQueue.global(qos: .userInitiated).async(group: group) { worker(r, reports: false) }
+        }
+        worker(zip, reports: true)
+        while group.wait(timeout: .now() + 0.25) == .timedOut { _ = report() } // the helpers' last files
+        if let f = failure { throw f }
+        progress?("reading", 1)
+        return entries.indices.map { (entries[$0], results[$0]!) }
     }
 
     private func newPaths(_ files: [String: File], _ order: [String]) -> [String] {
@@ -277,13 +416,18 @@ final class IPASigner {
     private func mode(_ path: String, _ files: [String: File]) -> UInt32 {
         if case .entry(let e, _, _)? = files[path] { return e.unixMode & 0o170000 == 0 ? 0o100755 : e.unixMode }
         if case .data(_, let m)? = files[path] { return m }
+        if case .spilled(_, _, _, _, _, _, let m)? = files[path] { return m }
         return 0o100755
     }
 
     private func contents(_ path: String, _ files: [String: File], _ zip: ZipReader) throws -> Data {
         switch files[path] {
-        case .entry(let e, _, _)?: return try zip.data(e, limit: maxMachO)
+        // R41: room for the signature, so appending it doesn't move a big binary (cdSize is 32 bytes a 4 KB page)
+        case .entry(let e, _, _)?: return try zip.data(e, limit: maxMachO, spare: Int(min(e.size, maxMachO) / 64) + (64 << 10))
         case .data(let d, _)?: return d
+        case .spilled(let u, _, _, let packed, _, _, _)?:
+            guard packed == nil else { throw SignError("internal", "\(path) was signed twice") }
+            return try Data(contentsOf: u)
         default: throw SignError("bad_ipa", "\(path) is missing.")
         }
     }
@@ -303,6 +447,8 @@ final class IPASigner {
             switch files[path] {
             case .entry(_, let a, let b)?: h1 = a; h2 = b
             case .data(let d, _)?: h1 = sha1(d); h2 = sha256(d)
+            case .spilled(_, _, _, _, let a?, let b?, _)?: h1 = a; h2 = b
+            case .spilled(_, _, _, _, _, _, _)?: throw SignError("internal", "\(path) has no hashes")
             case .symlink(let target, _)?:
                 if !omit2 { f2[rel] = ["symlink": target] }
                 continue

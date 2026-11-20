@@ -42,7 +42,9 @@ enum MachO {
 
     // Signs a thin or fat Mach-O. A fat file keeps its 64-bit slices only (iFizBox's sideload build targets
     // iOS 15+, where 32-bit code can't run) and each is signed with the same parameters.
-    static func sign(_ file: Data, _ p: CodeSignParams, _ id: SigningIdentity?, time: Date = Date()) throws -> Data {
+    // R41: `file` is consumed, so a caller that passes its last copy (`consume`) isn't holding a second one while
+    // signThin changes it (a 300 MB binary was in memory twice).
+    static func sign(_ file: __owned Data, _ p: CodeSignParams, _ id: SigningIdentity?, time: Date = Date()) throws -> Data {
         let b = [UInt8](file.prefix(8))
         guard b.count >= 8 else { throw SignError("bad_macho", "\(p.identifier): not a Mach-O file") }
         let be = UInt32(b[0]) << 24 | UInt32(b[1]) << 16 | UInt32(b[2]) << 8 | UInt32(b[3])
@@ -76,11 +78,12 @@ enum MachO {
             }
             return out
         }
-        return try signThin(file, p, id, time: time)
+        return try signThin(consume file, p, id, time: time)
     }
 
-    static func signThin(_ input: Data, _ p: CodeSignParams, _ id: SigningIdentity?, time: Date) throws -> Data {
-        var file = input.startIndex == 0 ? input : Data([UInt8](input)) // zero-based
+    static func signThin(_ input: __owned Data, _ p: CodeSignParams, _ id: SigningIdentity?, time: Date) throws -> Data {
+        var file: Data
+        if input.startIndex == 0 { file = consume input } else { file = Data([UInt8](input)) } // zero-based
         guard file.count >= 32, file.le32(at: 0) == magic64 else {
             throw SignError("bad_macho", "\(p.identifier): only 64-bit Mach-O files can be signed")
         }
@@ -162,7 +165,7 @@ enum MachO {
         if filetype == 2 { execFlags |= 0x1 } // CS_EXECSEG_MAIN_BINARY
         if p.entitlements?["get-task-allow"].flatMap(plistBool) == true { execFlags |= 0x10 } // CS_EXECSEG_ALLOW_UNSIGNED
         let cdSize = 88 + p.identifier.utf8.count + 1 + (p.team.map { $0.utf8.count + 1 } ?? 0) + (nSpecial + nCode) * 32
-        let cmsReserve = id == nil ? 0 : try CMS.sign(cd: Data(count: cdSize), id: id!, time: time).count + 64
+        let cmsReserve = id == nil ? 0 : try CMS.reserve(id!, time: time)
         var blobs: [(UInt32, Int)] = [(0, cdSize), (2, requirements.count)]
         if let e = ents { blobs.append((5, e.count)) }
         if let d = entsDER { blobs.append((7, d.count)) }
@@ -195,10 +198,13 @@ enum MachO {
         cd.append(Data(p.identifier.utf8)); cd.append(0)
         if let t = p.team { cd.append(Data(t.utf8)); cd.append(0) }
         for slot in stride(from: nSpecial, through: 1, by: -1) { cd.append(special[slot] ?? Data(count: 32)) }
-        var i = 0
-        while i < codeLimit {
-            cd.append(sha256(file.subdata(in: i..<min(i + page, codeLimit))))
-            i += page
+        // R41: each page hashed where it lies (a copy of every page cost as much as the hashing on a big binary)
+        file.withUnsafeBytes { (raw: UnsafeRawBufferPointer) in
+            var i = 0
+            while i < codeLimit {
+                cd.append(sha256(UnsafeRawBufferPointer(rebasing: raw[i..<min(i + page, codeLimit)])))
+                i += page
+            }
         }
         precondition(cd.count == cdSize)
 
@@ -240,6 +246,25 @@ enum MachO {
 
 enum CMS {
     static let sha256OID = "2.16.840.1.101.3.4.2.1"
+
+    // The room a signature needs. Its size doesn't depend on the CodeDirectory (only its fixed-size digests go in),
+    // so it's measured once per certificate and signing time instead of signing every binary twice (R41: an RSA
+    // signature through the Keychain per binary); 64 bytes spare for ECDSA's few bytes of variation.
+    private static let reserveLock = NSLock()
+    private static var reserves = [Data: Int]()
+    static func reserve(_ id: SigningIdentity, time: Date) throws -> Int {
+        var key = id.certificate
+        withUnsafeBytes(of: time.timeIntervalSinceReferenceDate) { key.append(contentsOf: $0) }
+        reserveLock.lock()
+        if let n = reserves[key] { reserveLock.unlock(); return n }
+        reserveLock.unlock()
+        let n = try sign(cd: Data(count: 128), id: id, time: time).count + 64
+        reserveLock.lock()
+        if reserves.count > 16 { reserves.removeAll() } // one entry per signing run
+        reserves[key] = n
+        reserveLock.unlock()
+        return n
+    }
 
     // A detached CMS SignedData over the CodeDirectory, with the signed attributes Apple's codesign adds: content
     // type, signing time, message digest, and the CodeDirectory hashes (as a plist, 1.2.840.113635.100.9.1, and as

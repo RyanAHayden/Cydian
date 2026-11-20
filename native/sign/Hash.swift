@@ -18,14 +18,15 @@ struct Hasher2 {
 
 func sha1(_ d: Data) -> Data { var h = SHA1(); h.update(d); return h.final() }
 func sha256(_ d: Data) -> Data { var h = SHA256(); h.update(d); return h.final() }
+// R41: over bytes in place (a Mach-O's pages), with no Data made for each piece.
+func sha256(_ p: UnsafeRawBufferPointer) -> Data { var h = SHA256(); h.update(p); return h.final() }
 
 #if canImport(CommonCrypto)
 struct SHA1 {
     private var ctx = CC_SHA1_CTX()
     init() { CC_SHA1_Init(&ctx) }
-    mutating func update(_ d: Data) {
-        d.withUnsafeBytes { p in _ = CC_SHA1_Update(&ctx, p.baseAddress, CC_LONG(p.count)) }
-    }
+    mutating func update(_ d: Data) { d.withUnsafeBytes { update($0) } }
+    mutating func update(_ p: UnsafeRawBufferPointer) { _ = CC_SHA1_Update(&ctx, p.baseAddress, CC_LONG(p.count)) }
     mutating func final() -> Data {
         var out = [UInt8](repeating: 0, count: 20)
         CC_SHA1_Final(&out, &ctx)
@@ -36,9 +37,8 @@ struct SHA1 {
 struct SHA256 {
     private var ctx = CC_SHA256_CTX()
     init() { CC_SHA256_Init(&ctx) }
-    mutating func update(_ d: Data) {
-        d.withUnsafeBytes { p in _ = CC_SHA256_Update(&ctx, p.baseAddress, CC_LONG(p.count)) }
-    }
+    mutating func update(_ d: Data) { d.withUnsafeBytes { update($0) } }
+    mutating func update(_ p: UnsafeRawBufferPointer) { _ = CC_SHA256_Update(&ctx, p.baseAddress, CC_LONG(p.count)) }
     mutating func final() -> Data {
         var out = [UInt8](repeating: 0, count: 32)
         CC_SHA256_Final(&out, &ctx)
@@ -50,20 +50,19 @@ struct SHA256 {
 private struct Block64 {
     var buf = [UInt8]()
     var length: UInt64 = 0
-    mutating func feed(_ d: Data, _ compress: (UnsafePointer<UInt8>) -> Void) {
-        length &+= UInt64(d.count)
-        d.withUnsafeBytes { (raw: UnsafeRawBufferPointer) in
-            guard var p = raw.bindMemory(to: UInt8.self).baseAddress else { return }
-            var n = raw.count
-            if !buf.isEmpty {
-                let take = min(64 - buf.count, n)
-                buf.append(contentsOf: UnsafeBufferPointer(start: p, count: take))
-                p += take; n -= take
-                if buf.count == 64 { buf.withUnsafeBufferPointer { compress($0.baseAddress!) }; buf.removeAll(keepingCapacity: true) }
-            }
-            while n >= 64 { compress(p); p += 64; n -= 64 }
-            if n > 0 { buf.append(contentsOf: UnsafeBufferPointer(start: p, count: n)) }
+    mutating func feed(_ d: Data, _ compress: (UnsafePointer<UInt8>) -> Void) { d.withUnsafeBytes { feed($0, compress) } }
+    mutating func feed(_ raw: UnsafeRawBufferPointer, _ compress: (UnsafePointer<UInt8>) -> Void) {
+        length &+= UInt64(raw.count)
+        guard var p = raw.bindMemory(to: UInt8.self).baseAddress else { return }
+        var n = raw.count
+        if !buf.isEmpty {
+            let take = min(64 - buf.count, n)
+            buf.append(contentsOf: UnsafeBufferPointer(start: p, count: take))
+            p += take; n -= take
+            if buf.count == 64 { buf.withUnsafeBufferPointer { compress($0.baseAddress!) }; buf.removeAll(keepingCapacity: true) }
         }
+        while n >= 64 { compress(p); p += 64; n -= 64 }
+        if n > 0 { buf.append(contentsOf: UnsafeBufferPointer(start: p, count: n)) }
     }
     mutating func pad(_ compress: (UnsafePointer<UInt8>) -> Void) {
         let bits = length &* 8
@@ -111,6 +110,7 @@ struct SHA1 {
         h[0] &+= a; h[1] &+= bb; h[2] &+= c; h[3] &+= d; h[4] &+= e
     }
     mutating func update(_ d: Data) { b.feed(d) { SHA1.compress(&h, $0) } }
+    mutating func update(_ p: UnsafeRawBufferPointer) { b.feed(p) { SHA1.compress(&h, $0) } }
     mutating func final() -> Data { b.pad { SHA1.compress(&h, $0) }; return out(h) }
 }
 
@@ -148,6 +148,7 @@ struct SHA256 {
         h[0] &+= a; h[1] &+= bb; h[2] &+= c; h[3] &+= d; h[4] &+= e; h[5] &+= f; h[6] &+= g; h[7] &+= hh
     }
     mutating func update(_ d: Data) { b.feed(d) { SHA256.compress(&h, $0) } }
+    mutating func update(_ p: UnsafeRawBufferPointer) { b.feed(p) { SHA256.compress(&h, $0) } }
     mutating func final() -> Data { b.pad { SHA256.compress(&h, $0) }; return out(h) }
 }
 #endif

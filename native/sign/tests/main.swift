@@ -324,6 +324,108 @@ if let real = ProcessInfo.processInfo.environment["IFIZBOX_REAL_IPA"], FileManag
     }
 }
 
+// R41: big binaries (over a megabyte) are signed on several threads, kept in files until the IPA is written and
+// stored (level 0) or deflated in blocks; whatever the level or thread count, the IPA holds the same files.
+test("R41: big binaries, every level and thread count give the same signed files") {
+    let profile = try Profile(try fixture("profile.mobileprovision"))
+    let a = "Payload/Fixture.app/"
+    var first: [String: Data]? = nil
+    for (level, readers) in [(Int32(1), 4), (0, 1), (6, 2), (0, 4)] {
+        let signer = IPASigner(profile: profile, identity: identity)
+        signer.time = Date(timeIntervalSince1970: 1_795_000_000) // the same CMS bytes every run
+        signer.level = level
+        signer.readers = readers
+        let out = work.appendingPathComponent("big-\(level)-\(readers).ipa")
+        var last = [String: Double]()
+        var backwards = false
+        _ = try signer.sign(fixtures.appendingPathComponent("rich-big.ipa"), to: out) { phase, f in
+            if f < last[phase, default: 0] { backwards = true }
+            last[phase] = f
+        }
+        check(!backwards, "level \(level), \(readers) readers: a phase's progress went backwards")
+        check(last["reading"] == 1 && last["signing"] == 1, "level \(level): phases end at 1: \(last)")
+        let parts = work.appendingPathComponent(".big-\(level)-\(readers).ipa.parts")
+        check(!FileManager.default.fileExists(atPath: parts.path), "level \(level): the signed binaries' files are gone")
+        let r = try ZipReader(url: out)
+        for name in [a + "Fixture", a + "Frameworks/Kit.framework/Kit", a + "Frameworks/libloose.dylib"] {
+            let e = r.entries.first { $0.name == name }
+            check(e?.method == (level == 0 ? 0 : 8), "level \(level): \(name) method \(String(describing: e?.method))")
+            check(e.map { $0.size > 1 << 20 } == true, "\(name) is a big one")
+        }
+        let f = try entries(out) // every entry read back with its CRC checked
+        try verifySigned(f[a + "Fixture"]!, name: "big-\(level)", expectIdent: "dev.ifizbox.fixture", team: team,
+                         info: f[a + "Info.plist"], resources: f[a + "_CodeSignature/CodeResources"], ents: true)
+        try verifySigned(f[a + "Frameworks/libloose.dylib"]!, name: "big-loose-\(level)", expectIdent: "libloose", team: team,
+                         info: nil, resources: nil, ents: false)
+        let cr = try PropertyListSerialization.propertyList(from: f[a + "_CodeSignature/CodeResources"]!, format: nil) as! [String: Any]
+        let files2 = cr["files2"] as! [String: Any]
+        for rel in ["Frameworks/Kit.framework/Kit", "Frameworks/libloose.dylib"] {
+            let sealed = files2[rel] as? [String: Any]
+            check(sealed?["hash2"] as? Data == sha256(f[a + rel]!) && sealed?["hash"] as? Data == sha1(f[a + rel]!),
+                  "level \(level): \(rel) sealed with its signed hashes")
+        }
+        if let first = first {
+            // The rewritten Info.plist's key order isn't the same each time it's serialized (a Dictionary's), so it's
+            // compared as a plist, and the app's binary and seal (which hold its hash) were verified above.
+            let plist = { (d: Data?) in d.flatMap { try? PropertyListSerialization.propertyList(from: $0, format: nil) as? NSDictionary } }
+            check(plist(f[a + "Info.plist"]) == plist(first[a + "Info.plist"]), "level \(level): Info.plist")
+            let skip: Set<String> = [a + "Info.plist", a + "Fixture", a + "_CodeSignature/CodeResources"]
+            let differ = Set(f.keys).union(first.keys).subtracting(skip).filter { f[$0] != first[$0] }.sorted()
+            check(differ.isEmpty, "level \(level), \(readers) readers: not as the first run: \(differ)")
+        }
+        else { first = f }
+    }
+}
+
+test("R41: deflateBlocks joins into one stream; Deflater pieces; ZipWriter adds files stored or packed") {
+    var d = Data(count: 9 << 20 + 12345)
+    d.withUnsafeMutableBytes { p in for i in 0..<p.count { p[i] = UInt8(truncatingIfNeeded: (i * 7) ^ (i >> 9)) } }
+    for block in [1 << 20, 4 << 20, 16 << 20] {
+        let z = try deflateBlocks(d, level: 1, block: block)
+        let inf = try Inflater()
+        var back = Data()
+        try inf.feed(z) { back.append($0) }
+        check(inf.done && back == d, "block \(block): inflates to the input")
+    }
+    let z = try Deflater(level: 6)
+    var stream = Data()
+    for k in stride(from: 0, to: d.count, by: 3 << 20) {
+        try z.feed(d[k..<min(k + (3 << 20), d.count)], finish: false) { stream.append($0) }
+    }
+    try z.feed(Data(), finish: true) { stream.append($0) }
+    let inf = try Inflater()
+    var back = Data()
+    try inf.feed(stream) { back.append($0) }
+    check(back == d, "Deflater fed in pieces")
+    let emptyStream = try deflateData(Data(), level: 1)
+    check(emptyStream.count > 0, "an empty input still makes a stream")
+
+    let raw = work.appendingPathComponent("r41-raw.bin"), packed = work.appendingPathComponent("r41-packed.bin")
+    try d.write(to: raw)
+    try deflateBlocks(d, level: 1).write(to: packed)
+    let packedSize = UInt64(try Data(contentsOf: packed).count)
+    let zipURL = work.appendingPathComponent("r41-files.zip")
+    let w = try ZipWriter(url: zipURL)
+    try w.add("stored.bin", file: raw, size: UInt64(d.count), crc: crc32Of(d))
+    try w.add("packed.bin", file: packed, size: UInt64(d.count), crc: crc32Of(d), packed: packedSize)
+    let empty = work.appendingPathComponent("r41-empty.bin")
+    try Data().write(to: empty)
+    try w.add("empty.bin", file: empty, size: 0, crc: 0)
+    try w.add("small.txt", Data("hi".utf8), level: 0)
+    w.close()
+    let r = try ZipReader(url: zipURL)
+    for e in r.entries {
+        let got = try r.data(e)
+        check(got == (e.name == "small.txt" ? Data("hi".utf8) : e.name == "empty.bin" ? Data() : d), e.name)
+    }
+    check(r.entries.map(\.method) == [0, 8, 0, 0], "methods \(r.entries.map(\.method))")
+    let c = try r.clone()
+    let cloned = try c.data(c.entries[1])
+    check(cloned == d, "a clone reads on its own handle")
+    let (rc, _, err) = try run(["unzip", "-tq", zipURL.path])
+    check(rc == 0, "unzip -t: \(err)")
+}
+
 test("refusals") {
     let profile = try Profile(try fixture("profile.mobileprovision"))
     let signer = IPASigner(profile: profile, identity: identity)

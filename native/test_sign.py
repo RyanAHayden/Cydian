@@ -7,6 +7,7 @@ import hashlib
 import io
 import os
 import plistlib
+import random
 import shutil
 import struct
 import subprocess
@@ -52,6 +53,29 @@ def macho(filetype=2, encrypted=False):
     return bytes(b)
 
 
+def big_macho(filetype=2, pages=160, seed=1):
+    """R41: a Mach-O over a megabyte (160 16 KB pages of __TEXT, half random, half a pattern), so signing writes it
+    to a file of its own and deflates it in blocks."""
+    page = 0x4000
+    b = bytearray(T.macho())
+    struct.pack_into("<I", b, 12, filetype)
+    ncmds, size = struct.unpack_from("<II", b, 16)
+    off = 32
+    for _ in range(ncmds):  # grow __TEXT to `pages` pages and move __LINKEDIT after it
+        cmd, cmdsize = struct.unpack_from("<II", b, off)
+        if cmd == 0x19:
+            name = bytes(b[off + 8:off + 24]).rstrip(b"\0")
+            if name == b"__TEXT":  # vmsize, fileoff, filesize
+                struct.pack_into("<QQQ", b, off + 32, pages * page, 0, pages * page)
+            elif name == b"__LINKEDIT":  # vmaddr, vmsize, fileoff
+                struct.pack_into("<QQQ", b, off + 24, 0x100000000 + pages * page, page, pages * page)
+        off += cmdsize
+    rnd = random.Random(seed)
+    filler = bytes(rnd.getrandbits(8) for _ in range(pages * page // 2)) + b"\x1f\x20\x03\xd5" * (pages * page // 8)
+    out = bytearray(b[:page]) + bytearray(filler[page:pages * page])
+    return bytes(out + b[page:])
+
+
 def fat():
     thin = macho()
     arm7 = struct.pack("<IiiIIIII", 0xFEEDFACE, 12, 9, 2, 0, 0, 0, 0)
@@ -72,7 +96,7 @@ def info(bundle_id, exe, name="Fixture", **extra):
     return plistlib.dumps(d, fmt=plistlib.FMT_BINARY)
 
 
-def rich_ipa(main_binary=None):
+def rich_ipa(main_binary=None, kit=None, loose=None):
     """An app with a framework, a loose dylib, a share extension, localisations, a symlink and leftovers of an old
     signature."""
     buf = io.BytesIO()
@@ -96,8 +120,8 @@ def rich_ipa(main_binary=None):
         put(A + "_CodeSignature/CodeResources", b"old seal")
         put(A + "embedded.mobileprovision", b"old profile")
         put(A + "Frameworks/Kit.framework/Info.plist", info("dev.ifizbox.kit", "Kit", "Kit", CFBundlePackageType="FMWK"))
-        put(A + "Frameworks/Kit.framework/Kit", macho(6), 0o100755)
-        put(A + "Frameworks/libloose.dylib", macho(6), 0o100755)
+        put(A + "Frameworks/Kit.framework/Kit", kit or macho(6), 0o100755)
+        put(A + "Frameworks/libloose.dylib", loose or macho(6), 0o100755)
         put(A + "PlugIns/Share.appex/Info.plist", info("dev.ifizbox.fixture.share", "Share", "Share",
                                                        CFBundlePackageType="XPC!"))
         put(A + "PlugIns/Share.appex/Share", macho(), 0o100755)
@@ -203,6 +227,7 @@ class OnDeviceSigner(unittest.TestCase):
         w("profile-prefix.mobileprovision", T.profile(key, cert, app_id="com.me.*"))
         w("profile-expired.mobileprovision", T.profile(key, cert, days=-1))
         w("rich.ipa", rich_ipa())
+        w("rich-big.ipa", rich_ipa(big_macho(2), big_macho(6, seed=2), big_macho(6, pages=80, seed=3)))
         w("unsigned.macho", macho())
         w("fat.macho", fat())
         w("notanipa.ipa", small_zip({"hello.txt": "hi"}))

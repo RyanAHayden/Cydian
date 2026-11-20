@@ -12,6 +12,46 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 CC = shutil.which(os.environ.get("CC", "cc")) or shutil.which("clang") or shutil.which("gcc")
 FLAGS = ["-std=c11", "-Wall", "-Wextra", "-Werror", "-D_DEFAULT_SOURCE", "-O1"]
 
+# AddressSanitizer and UBSan on every host build of the helper and test_driver (the root helper parses what the app
+# sends it). A UB report aborts instead of printing and going on, so a test sees it as a failed run. Only where the
+# host compiler can build and run a sanitized program (the probe below); else SAN_SKIP says why.
+SAN = ["-fsanitize=address,undefined", "-fno-sanitize-recover=all", "-fno-omit-frame-pointer", "-g"]
+# Leak checking is off: the helper and drivers are short-lived and exit without freeing, which LSan would report.
+# abort_on_error makes an ASan report a signal death, never a normal-looking exit code.
+SAN_ENV = {"ASAN_OPTIONS": "detect_leaks=0:abort_on_error=1", "UBSAN_OPTIONS": "print_stacktrace=1"}
+
+
+def probe_sanitizers(cc):
+    """(flags, None) when cc builds and runs a sanitized program here, else ([], reason)."""
+    if not cc:
+        return [], "no C compiler on this machine"
+    tmp = tempfile.mkdtemp()
+    try:
+        src, exe = os.path.join(tmp, "p.c"), os.path.join(tmp, "p")
+        with open(src, "w") as f:
+            f.write("int main(void) { return 0; }\n")
+        env = dict(os.environ, TMPDIR=tmp, **SAN_ENV)
+        r = subprocess.run([cc, "-pipe", *SAN, "-o", exe, src], capture_output=True, text=True, env=env)
+        if r.returncode:
+            return [], f"{cc} can't build with {SAN[0]}: {r.stderr.strip()[:200]}"
+        r = subprocess.run([exe], capture_output=True, text=True, env=env, timeout=30)
+        if r.returncode:
+            return [], f"a sanitized program doesn't run here: {r.stderr.strip()[:200]}"
+        # GCC's sanitizer instrumentation makes -Wrestrict see an overlap in policy.c's snprintf from name_buf into
+        # item_buf (two separate arrays): a false positive the plain build doesn't give. Silence it where the
+        # compiler knows the option (clang doesn't, and fails -Werror on an unknown -Wno-).
+        quiet = ["-Wno-restrict"]
+        r = subprocess.run([cc, "-pipe", "-Werror", *SAN, *quiet, "-o", exe, src], capture_output=True, env=env)
+        return SAN + (quiet if r.returncode == 0 else []), None
+    finally:
+        shutil.rmtree(tmp, True)
+
+
+SAN_FLAGS, SAN_SKIP = probe_sanitizers(CC)
+if SAN_FLAGS:
+    # Every helper and driver these tests run inherits the environment.
+    os.environ.update(SAN_ENV)
+
 
 def build(out, sources, defs=()):
     # F59: main.c calls ipa.c's install-ipa, test_driver.c its checks.
@@ -20,7 +60,7 @@ def build(out, sources, defs=()):
     # F57: main.c calls paid.c's install-paid.
     if "main.c" in sources and "paid.c" not in sources:
         sources = [*sources, "paid.c"]
-    subprocess.run([CC, "-pipe", *FLAGS, *defs, "-o", out, *(os.path.join(HERE, s) for s in sources)], check=True,
+    subprocess.run([CC, "-pipe", *FLAGS, *SAN_FLAGS, *defs, "-o", out, *(os.path.join(HERE, s) for s in sources)], check=True,
                    capture_output=True, env=cc_env(os.path.dirname(out)))
 
 
@@ -29,6 +69,52 @@ def cc_env(tmp):
     # can fill up (EDQUOT once failed these builds). With -pipe the stages pass through pipes, and TMPDIR sends what
     # the compiler or linker still writes to the test's own directory (every output here lies in one).
     return dict(os.environ, TMPDIR=tmp)
+
+
+INJECTED = r"""
+#include <stdlib.h>
+#include <string.h>
+#include <limits.h>
+int main(int argc, char **argv) {
+    (void)argc;
+    if (!strcmp(argv[1], "heap")) {          /* one byte past a malloc'd buffer */
+        char *p = malloc(8);
+        volatile size_t n = 8;
+        p[n] = 1;
+        free(p);
+    } else if (!strcmp(argv[1], "stack")) {  /* one past a stack array */
+        char a[8];
+        volatile size_t n = 8;
+        a[n] = 1;
+        return a[0];
+    } else {                                 /* signed overflow */
+        volatile int i = INT_MAX;
+        volatile int j = i + 1;              /* stored, so -O1 can't fold the comparison away */
+        return j == 0;
+    }
+    return 0;
+}
+"""
+
+
+@unittest.skipUnless(SAN_FLAGS, SAN_SKIP or "")
+class Sanitizers(unittest.TestCase):
+    """The host builds run under ASan + UBSan: an overflow built by build() itself is caught, not silently run."""
+
+    def test_injected_overflow_caught(self):
+        tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp, True)
+        src, exe = os.path.join(tmp, "inject.c"), os.path.join(tmp, "inject")
+        with open(src, "w") as f:
+            f.write(INJECTED)
+        build(exe, [src])  # an absolute path: os.path.join keeps it
+        # A write past a buffer is ASan's (or UBSan's object-size check, which GCC runs first) report.
+        past = ("insufficient space", "out of bounds")
+        for kind, words in (("heap", ("heap-buffer-overflow", *past)), ("stack", ("stack-buffer-overflow", *past)),
+                            ("int", ("signed integer overflow",))):
+            r = subprocess.run([exe, kind], capture_output=True, text=True, timeout=30)
+            self.assertNotEqual(r.returncode, 0, kind)
+            self.assertTrue(any(w in r.stderr for w in words), f"{kind}: {r.stderr}")
 
 
 @unittest.skipUnless(CC, "no C compiler on this machine")

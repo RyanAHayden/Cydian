@@ -14,6 +14,48 @@ CC = shutil.which(os.environ.get("CC", "cc")) or shutil.which("clang") or shutil
 NOW = 1_800_000_000
 H = 3600
 
+# AddressSanitizer and UBSan on the daemon's host build, as native/helper/test_helper.py does for the root helper:
+# UB aborts, leak checking is off (the driver exits without freeing), an ASan report is a signal death.
+SAN = ["-fsanitize=address,undefined", "-fno-sanitize-recover=all", "-fno-omit-frame-pointer", "-g"]
+SAN_ENV = {"ASAN_OPTIONS": "detect_leaks=0:abort_on_error=1", "UBSAN_OPTIONS": "print_stacktrace=1"}
+
+
+def probe_sanitizers(cc):
+    """(flags, None) when cc builds and runs a sanitized program here, else ([], reason)."""
+    if not cc:
+        return [], "no C compiler on this machine"
+    tmp = tempfile.mkdtemp()
+    try:
+        src, exe = os.path.join(tmp, "p.c"), os.path.join(tmp, "p")
+        with open(src, "w") as f:
+            f.write("int main(void) { return 0; }\n")
+        env = dict(os.environ, TMPDIR=tmp, **SAN_ENV)
+        r = subprocess.run([cc, "-pipe", *SAN, "-o", exe, src], capture_output=True, text=True, env=env)
+        if r.returncode:
+            return [], f"{cc} can't build with {SAN[0]}: {r.stderr.strip()[:200]}"
+        r = subprocess.run([exe], capture_output=True, text=True, env=env, timeout=30)
+        if r.returncode:
+            return [], f"a sanitized program doesn't run here: {r.stderr.strip()[:200]}"
+        return SAN, None
+    finally:
+        shutil.rmtree(tmp, True)
+
+
+SAN_FLAGS, SAN_SKIP = probe_sanitizers(CC)
+if SAN_FLAGS:
+    os.environ.update(SAN_ENV)  # the driver inherits it
+
+INJECTED = r"""
+#include <stdlib.h>
+int main(void) {
+    char *p = malloc(8);
+    volatile size_t n = 8;
+    p[n] = 1;                   /* one byte past the buffer */
+    free(p);
+    return 0;
+}
+"""
+
 PLAN = """\
 Inst com.ex.tweak [1.0] (1.2 Example:1.0/stable [iphoneos-arm64])
 Inst libfoo [2:3.1-1] (2:3.2-1 Procursus:1.0/1900 [iphoneos-arm64])
@@ -31,7 +73,7 @@ class Base(unittest.TestCase):
         cls.addClassCleanup(shutil.rmtree, cls.tmp, True)  # also when the build below fails
         cls.driver = os.path.join(cls.tmp, "auto_driver")
         # -pipe and TMPDIR: cc's scratch files stay out of the shared /tmp, which other gates can fill (EDQUOT).
-        subprocess.run([CC, "-pipe", "-std=c11", "-Wall", "-Wextra", "-Werror", "-O1", "-o", cls.driver,
+        subprocess.run([CC, "-pipe", "-std=c11", "-Wall", "-Wextra", "-Werror", "-O1", *SAN_FLAGS, "-o", cls.driver,
                         os.path.join(HERE, "auto_driver.c"), os.path.join(HERE, "auto.c"),
                         os.path.join(HERE, "upgrades.c")], check=True, capture_output=True,
                        env=dict(os.environ, TMPDIR=cls.tmp))
@@ -48,6 +90,23 @@ class Base(unittest.TestCase):
         r = subprocess.run([self.driver, *map(str, args)], capture_output=True, text=True, timeout=30)
         self.assertEqual(r.returncode, 0, r.stderr)
         return r.stdout
+
+
+@unittest.skipUnless(SAN_FLAGS, SAN_SKIP or "")
+class Sanitizers(unittest.TestCase):
+    def test_injected_overflow_caught(self):
+        # Built with the same flags as the driver: the overflow is reported and the run fails.
+        tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp, True)
+        src, exe = os.path.join(tmp, "inject.c"), os.path.join(tmp, "inject")
+        with open(src, "w") as f:
+            f.write(INJECTED)
+        subprocess.run([CC, "-pipe", "-std=c11", "-Wall", "-Wextra", "-Werror", "-O1", *SAN_FLAGS, "-o", exe, src],
+                       check=True, capture_output=True, env=dict(os.environ, TMPDIR=tmp))
+        r = subprocess.run([exe], capture_output=True, text=True, timeout=30)
+        self.assertNotEqual(r.returncode, 0)
+        # ASan's report, or UBSan's object-size check where GCC runs that first.
+        self.assertTrue(any(w in r.stderr for w in ("heap-buffer-overflow", "insufficient space")), r.stderr)
 
 
 class Decisions(Base):

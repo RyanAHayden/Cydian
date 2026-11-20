@@ -27,7 +27,9 @@
 import { statusReady } from "../signing-client.js";
 import { normalizeServer } from "../core/signing.js";
 import { NAME, SIGN_HOST } from "../brand.js";
-import { freeRouteBlock } from "./free-apple-id.js";
+import { mod } from "../lazy.js";
+// F313: free-apple-id.js loads with Settings' pages (router.js lazyFor), the only place the walkthrough is drawn.
+const freeRouteBlock = (...args) => mod("freeAppleId").freeRouteBlock(...args);
 
 export const STEPS = [
   { id: "certificate", title: "Import Your Certificate" },

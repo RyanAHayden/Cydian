@@ -22,7 +22,12 @@ import { showAlert, alertOK } from "../nav/alert.js";
 import { showHUD } from "../nav/hud.js";
 import { parseProfile, checkP12Password, deviceSummary, deviceError, summary, profileKind, deviceCheck, deviceCheckText } from "../core/signing.js";
 import { sortCertFiles, resolvePassword } from "../core/certfiles.js";
-import { logsSection, logsPage, logsTitle, LOGS } from "./queue.js";
+import { mod, load } from "../lazy.js";
+// F313: the parts below load with Settings' pages (lazy.js; router.js lazyFor SETTINGS_PARTS), not at startup. They
+// are only drawn on those pages, so each call reaches its module through mod().
+const lazyFn = (name, fn) => (...args) => mod(name)[fn](...args);
+const logsSection = lazyFn("queue", "logsSection"), logsPage = lazyFn("queue", "logsPage"), logsTitle = lazyFn("queue", "logsTitle");
+const LOGS = "logs"; // queue.js LOGS (#/settings/logs), here so a Settings page's title needs no queue.js
 import { loadIdentity, saveIdentity, clearIdentity, getServer, setServer, serverStatus,
   localSigning, deviceStatus, importToDevice, removeFromDevice, statusReady, defaultServer,
   browserSigning, getBring, setBring, signAndInstall } from "../signing-client.js";
@@ -30,18 +35,19 @@ import { PASSWORD_EVENT } from "../signing-client.js";
 import { APP_IPA_URL, APP_NAME } from "../core/appoffer.js";
 import { drawWalkthrough, walkOpen, offerInstall, missingStep, siteReady, deviceRows } from "./signing.js";
 import { storedUdid, udidPending, startUdid, watchUdid, canFindUdid, udidFindRows } from "./signing.js";
-import { freeRouteBlock } from "./free-apple-id.js";
-import { accountGroup } from "./devaccount.js";
-import { openInAppSection } from "./importlink.js";
-import { accountSection, drawAccount, startAccountSync } from "./account.js";
-import { signingExtras } from "./signed-apps.js";
+const freeRouteBlock = lazyFn("freeAppleId", "freeRouteBlock");
+const accountGroup = lazyFn("devaccount", "accountGroup");
+const openInAppSection = lazyFn("importlink", "openInAppSection");
+const accountSection = lazyFn("account", "accountSection"), drawAccount = lazyFn("account", "drawAccount");
+const startAccountSync = () => load("account").then((m) => m.startAccountSync(), () => {}); // at launch, once account.js is in
+const signingExtras = lazyFn("signedApps", "signingExtras");
 import { syncReminder } from "../core/signing.js";
-import { websiteSection } from "./website-settings.js";
-import { pushActions } from "./push-settings.js";
+const websiteSection = lazyFn("websiteSettings", "websiteSection");
+const pushActions = lazyFn("pushSettings", "pushActions");
 import { whyAboutSection } from "./why.js"; // F306: Settings > About > Why <NAME>, in the installed apps
 import { pushRows } from "../core/push.js";
 import { versionLines } from "./version-foot.js";
-import { ipaSection } from "./ipa-install.js";
+const ipaSection = lazyFn("ipaInstall", "ipaSection");
 import { otherLinksOn, setOtherLinks } from "../core/otherlinks.js";
 import { NAME, GITHUB_REPO } from "../brand.js";
 import { profileNotes, keepOn, GUIDE_LINK } from "../core/keepid.js";

@@ -18,6 +18,7 @@ HOST_IDS = "*"   # bundle IDs /sign/host keeps: any app, whatever ID the user's 
 TTL = "600"              # seconds a hosted update (or a website-signed app) stays
 MAX_UPLOAD_MB = "512"    # largest IPA the website signs in the browser (/api/fetch?kind=ipa, /sign/upload); "0": none
 APNS_TEAM_ID = "S8NFX3A2LT"   # F280: the team whose APNs key pushes to com.ryha.ifizbox (src/push.js)
+APPLE_RELAY = "1"   # Free Apple ID route: the /apple/<host>/<path> relay (src/apple-relay.js; user 2026-11-20)
 
 # Wrangler makes this storage on the first deploy (or: `npx wrangler kv namespace create HOSTED`, and its id here).
 [[kv_namespaces]]

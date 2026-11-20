@@ -91,16 +91,23 @@ test("F134: the Signing page's groups, in order, for each build and state", asyn
   assert.deepEqual(signingLayout({ mode: "sideload", certificate: true, profile: true, options: true }),
     ["certificate", "profile", "account", "options", "server", "status", "help"]);
   // nothing yet: the certificate's Import row, the options, the server, then the walkthrough's link
-  assert.deepEqual(signingLayout({ mode: "sideload", options: true }), ["certificate", "options", "server", "status", "help"]);
+  assert.deepEqual(signingLayout({ mode: "sideload", options: true }), ["certificate", "account", "options", "server", "status", "help"]);
   // a file picked, one still missing: the Files group under the certificate
-  assert.deepEqual(signingLayout({ mode: "sideload", staged: true, options: true }), ["certificate", "files", "options", "server", "status", "help"]);
+  assert.deepEqual(signingLayout({ mode: "sideload", staged: true, options: true }), ["certificate", "files", "account", "options", "server", "status", "help"]);
   // the website: no options, server or Signed Apps; Install iFizBox App once the certificate works
   assert.deepEqual(signingLayout({ mode: "site", certificate: true, profile: true, ready: true }), ["certificate", "profile", "account", "app", "other", "help"]);
   // F254j: no certificate on the website: Use a Free Apple ID before the walkthrough's link; never in the app builds
-  assert.deepEqual(signingLayout({ mode: "site" }), ["certificate", "other", "free", "help"]);
+  assert.deepEqual(signingLayout({ mode: "site" }), ["certificate", "account", "other", "free", "help"]);
   assert.ok(signingLayout({ mode: "site", staged: true }).includes("free"));
   assert.ok(!signingLayout({ mode: "sideload" }).includes("free"));
   assert.ok(!signingLayout({ mode: "jailbreak" }).includes("free"));
+  // B118a: Apple Developer Account with or without a certificate, on sideload and the website; never jailbreak
+  for (const mode of ["sideload", "site"]) {
+    for (const certificate of [true, false]) {
+      assert.ok(signingLayout({ mode, certificate, profile: certificate, options: true, ready: certificate }).includes("account"), `${mode} ${certificate}`);
+    }
+  }
+  assert.ok(!signingLayout({ mode: "jailbreak", certificate: true }).includes("account"));
   // each layout is in SIGNING_GROUPS order with no group twice
   for (const l of [signingLayout({ mode: "sideload", certificate: true, staged: true, profile: true, options: true }), signingLayout({ mode: "site", staged: true })]) {
     assert.deepEqual(l, SIGNING_GROUPS.filter((g) => l.includes(g)));

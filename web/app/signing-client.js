@@ -34,6 +34,7 @@ import { NAME, GITHUB_REPO } from "./brand.js";
 import { storedRoute, decideRoute, ALERTS as ROUTE_ALERTS, routeParams, VPN_POLL, VPN_WAIT, VPN_CONNECTED, vpnReady } from "./core/installroute.js";
 import { SELF_RESTART } from "./core/apprun.js";
 import { INSECURE_IPA_ALERT, INSTALL_ANYWAY, isInsecure } from "./core/insecureipa.js";
+import { rememberSigned, malwareHashes } from "./core/malicious.js";
 
 // B104: a bridge call that downloads an IPA (signing.install, signing.prepare, signing.inspect, library.add), sent by
 // `send(extra)`. For an http link the shell tries the https twin first; when there is none it answers "insecure", and
@@ -52,6 +53,19 @@ export async function askInsecure(send, { alert = showAlert, url = null } = {}) 
     if (url) httpAllowed.add(url);
     return send({ insecure: true });
   }
+}
+
+// F292: the IPA's SHA-256, as a signer answered it (the shell's signing.install / signing.prepare, the website's
+// worker), kept for Report as Malicious under the app page's ID and version (`asked`: the caller's) and the IPA's own.
+// The signers refuse a hash from MALWARE_IPAS before signing (refuseSha256), with code "malware".
+export const KNOWN_MALWARE = "Known Malware";
+// { refuseSha256 } for a signer, only while MALWARE_IPAS lists a hash (a call stays as it was otherwise)
+export const refusing = () => { const h = malwareHashes(); return h.length ? { refuseSha256: h } : {}; };
+export function keepIpaHash(storage, result, asked = {}) {
+  if (!result?.sha256) return;
+  rememberSigned(storage, { sha256: result.sha256,
+    ids: [asked.bundleId, result.originalBundleId, result.originalId, result.bundleId],
+    versions: [asked.version, result.version] });
 }
 
 // F151: a job's error on the progress page (the HUD interface's fail, nav/progress.js) before its alert; a HUD
@@ -465,7 +479,7 @@ async function installOnDeviceOnce({ url, name = "", onInstalled = () => {}, par
   try {
     // manifestServer: the signing server hands iOS the manifest while iFizBox serves the IPA over plain HTTP at
     // 127.0.0.1 (nothing to set up on the phone; the server sees only the app's ID, version and name).
-    result = await untilCancel(h, askInsecure((extra) => bridge(native).call("signing.install", { ...withKeep(params ?? { url }), manifestServer: getServer(), ...(host ? { host: true } : {}), ...route, ...extra }, (ev) => {
+    result = await untilCancel(h, askInsecure((extra) => bridge(native).call("signing.install", { ...withKeep(params ?? { url }), manifestServer: getServer(), ...refusing(), ...(host ? { host: true } : {}), ...route, ...extra }, (ev) => {
       if (ev?.log) h.page?.raw?.(ev.log); // the shell's console lines (Sideload.swift install's log)
       // B111: This iPhone: the copy's and installd's own percents ({here}), not the overall "Installing on this iPhone"
       const here = route.route ? hereLabel(ev) : null;
@@ -486,10 +500,11 @@ async function installOnDeviceOnce({ url, name = "", onInstalled = () => {}, par
     if (e?.code === "cancelled") { h.hide(); return false; } // B104: Cancel on This Download Is Not Secure
     const why = deviceError(e, name);
     failed(h, why.message);
-    await alert({ title: why.title, message: why.message, buttons: ["OK"] });
+    await alert({ title: e?.code === "malware" ? KNOWN_MALWARE : why.title, message: why.message, buttons: ["OK"] });
     if (why.open === "signing") go(["signing"]);
     return false;
   }
+  keepIpaHash(storageOf(), result, { bundleId: params?.bundleId ?? null }); // F292
   if (h.cancelled) return false;
   if (route.route && !self && result?.bundleId !== IFIZBOX_ID) {
     // B111: This iPhone answers once installd has the app: no iOS prompt to follow, so Installed and Open <app>
@@ -665,11 +680,13 @@ export async function prepareOnDevice(job, { tag, signal = null, progress = () =
   const params = prepareParams(job);
   try {
     // B104: an http link with no https twin asks first (askInsecure); Cancel ends the row as its stop does
-    return await askInsecure((extra) => abortable(native, "signing.prepare", { ...params, ...extra }, (ev) => {
+    const r = await askInsecure((extra) => abortable(native, "signing.prepare", { ...params, ...refusing(), ...extra }, (ev) => {
       if (ev?.log) { log(ev.log); return; }
       // B152: the signer's own phase (reading, signing) goes along, so the run gives each its share of Signing
       if (ev?.phase) progress(ev.phase === "downloading" ? "downloading" : "signing", Number(ev.progress) || 0, ev.phase);
     }, { tag, signal }), { alert, url: params?.url ?? null });
+    keepIpaHash(storageOf(), r, { bundleId: job?.bundleId ?? (typeof job?.id === "string" && !job.id.startsWith("library:") ? job.id : null), version: job?.version ?? null }); // F292
+    return r;
   } catch (e) { throw rowError(e, job?.name || job?.id || ""); }
 }
 
@@ -1282,9 +1299,11 @@ export async function signInBrowser({ url, name = "", onInstalled = () => {}, br
     // F288: the tweaks kept for this app (screens/tweaks.js, Inject Tweaks on its IPA page), unpacked and prepared here
     const tweaks = !self && bundleId ? await guard((await import("./screens/tweaks.js")).preparedFor(bundleId)) : null;
     const signed = await guard(worker({ ipa: buffer(ipa), p12: buffer(id.p12), profile: buffer(made ?? id.profile), password: id.password ?? "", bring: carry,
-        appBundleId: bundleId || (isSelfIpa(url) ? IFIZBOX_ID : null), ...withKeep({}), ...(tweaks ? { tweaks } : {}) },
+        appBundleId: bundleId || (isSelfIpa(url) ? IFIZBOX_ID : null), ...withKeep({}), ...(tweaks ? { tweaks } : {}),
+        ...refusing() },
       { onProgress: (t) => h.set(t), ...(signal ? { signal } : {}) }));
     noteSigned(storage, ipaSize); // F261
+    keepIpaHash(storage, signed, { bundleId, version }); // F292: Report as Malicious sends it
     h.set("Uploading");
     const ipaBytes = signed.ipa instanceof Uint8Array ? signed.ipa : new Uint8Array(signed.ipa);
     // the early link takes this app only if it came out with the reserved bundle ID (iOS already has its manifest)
@@ -1322,7 +1341,7 @@ export async function signInBrowser({ url, name = "", onInstalled = () => {}, br
     const oom = ipaSize > 0 && isOutOfMemory(e?.message);
     if (oom) noteOutOfMemory(storage, ipaSize);
     const message = String(e?.message ?? e) + (oom ? `\n\n${memoryNote(memoryLimit(storage) ?? ipaSize)}` : "") + (opened ? `\n\n${iconLeftText(name)}` : "");
-    await alert({ title: name ? `Couldn't Install ${name}` : "Couldn't Install", message, buttons: ["OK"] });
+    await alert({ title: e?.code === "malware" ? KNOWN_MALWARE : name ? `Couldn't Install ${name}` : "Couldn't Install", message, buttons: ["OK"] });
     return false;
   }
 }

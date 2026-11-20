@@ -231,5 +231,271 @@ class Release(unittest.TestCase):
         self.assertIn("release: piracy list: Canister %s (%s), current" % (sha[:12], date), r.stdout)
 
 
+FAKE_GH = r"""#!/usr/bin/env bash
+# A stand-in for gh: answers from files in $FAKE_GH_DIR and logs every call (with the GH_TOKEN it saw).
+echo "GH_TOKEN=${GH_TOKEN:-} $*" >> "$FAKE_GH_DIR/log"
+case "$1 $2" in
+  "auth token")
+    [ "$3" = --user ] || [ "$3" = -u ] || { echo "fake gh: active account" ; exit 0; }
+    [ -f "$FAKE_GH_DIR/token-$4" ] || { echo "no account found for $4" >&2; exit 1; }
+    cat "$FAKE_GH_DIR/token-$4" ;;
+  "api user")
+    [ -f "$FAKE_GH_DIR/login-$GH_TOKEN" ] || { echo "HTTP 401: Bad credentials" >&2; exit 1; }
+    cat "$FAKE_GH_DIR/login-$GH_TOKEN" ;;
+  "release view")
+    [ -f "$FAKE_GH_DIR/view" ] || { echo "release not found" >&2; exit 1; }
+    cat "$FAKE_GH_DIR/view" ;;
+  *) echo "fake gh: unexpected $*" >&2; exit 9 ;;
+esac
+"""
+
+
+class Server:
+    """A local web server: `routes` maps a path to (status, headers, body), or to a function returning one."""
+
+    def __init__(self, routes):
+        import http.server
+        import threading
+        self.routes = routes
+        self.hits = {}
+        outer = self
+
+        class H(http.server.BaseHTTPRequestHandler):
+            def do_GET(self):
+                path = self.path.split("?")[0]
+                outer.hits[path] = outer.hits.get(path, 0) + 1
+                r = outer.routes.get(path, (404, {}, b"not found"))
+                if self.headers.get("User-Agent", "").startswith("Python-urllib"):
+                    r = (403, {}, b"forbidden")  # like Cloudflare in front of the real site
+                status, headers, body = r() if callable(r) else r
+                self.send_response(status)
+                for k, v in headers.items():
+                    self.send_header(k, v.replace("BASE", outer.base))
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+            def log_message(self, *a):
+                pass
+
+        self.httpd = http.server.ThreadingHTTPServer(("127.0.0.1", 0), H)
+        self.base = "http://127.0.0.1:%d" % self.httpd.server_address[1]
+        threading.Thread(target=self.httpd.serve_forever, daemon=True).start()
+
+    def close(self):
+        self.httpd.shutdown()
+        self.httpd.server_close()
+
+
+class Publish(unittest.TestCase):
+    """T33: the account a real run publishes as (a fake gh on PATH), the checks after publishing, and the live check of
+    https://<domain>/repo/ (a local web server). Nothing here touches GitHub or the network."""
+
+    OWNER = "RyanAHayden"
+    REPO = "RyanAHayden/iFizBox"
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.tmp)
+        self.fake = os.path.join(self.tmp, "gh")
+        bindir = os.path.join(self.tmp, "bin")
+        os.makedirs(self.fake)
+        os.makedirs(bindir)
+        gh = os.path.join(bindir, "gh")
+        with open(gh, "w") as f:
+            f.write(FAKE_GH)
+        os.chmod(gh, 0o755)
+        self.path = bindir + os.pathsep + os.environ.get("PATH", "")
+
+    def write(self, name, text):
+        with open(os.path.join(self.fake, name), "w") as f:
+            f.write(text)
+
+    def log(self):
+        try:
+            with open(os.path.join(self.fake, "log")) as f:
+                return f.read()
+        except FileNotFoundError:
+            return ""
+
+    def run_release(self, *args, env_extra=None, timeout=60):
+        env = {k: v for k, v in os.environ.items()
+               if k not in ("GH_TOKEN", "GITHUB_TOKEN", "GH_ENTERPRISE_TOKEN", "IFIZBOX_RELEASE_REPO")
+               and not k.startswith("IFIZBOX_LIVE_") and not k.startswith("IFIZBOX_RELEASE_")}
+        env.update({"PATH": self.path, "FAKE_GH_DIR": self.fake})
+        env.update(env_extra or {})
+        return subprocess.run([SCRIPT, *args], cwd=ROOT, env=env, capture_output=True, text=True, timeout=timeout)
+
+    def logged_in(self):
+        """gh knows the active pull-only account and the owner; the owner's token is the one that works."""
+        self.write("token-FIZL0", "tok-fizl0\n")
+        self.write("token-" + self.OWNER, "tok-owner\n")
+        self.write("login-tok-fizl0", "FIZL0\n")
+        self.write("login-tok-owner", self.OWNER + "\n")
+
+    # (1) the token pick
+
+    def test_token_from_owner_account(self):
+        self.logged_in()
+        r = self.run_release("--check-auth")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("publishing as %s (gh auth token --user %s)" % (self.OWNER, self.OWNER), r.stdout)
+        log = self.log()
+        self.assertIn("auth token --user %s\n" % self.OWNER, log)
+        self.assertIn("GH_TOKEN=tok-owner api user", log)  # gh's later calls run with the owner's token
+        self.assertNotIn("tok-fizl0", log)
+
+    def test_owner_not_logged_in(self):
+        self.write("token-FIZL0", "tok-fizl0\n")
+        r = self.run_release("--check-auth")
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("gh has no login for %s, who owns %s: run 'gh auth login'" % (self.OWNER, self.REPO), r.stderr)
+
+    def test_token_of_someone_else(self):
+        self.write("token-" + self.OWNER, "tok-fizl0\n")
+        self.write("login-tok-fizl0", "FIZL0\n")
+        r = self.run_release("--check-auth")
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("belongs to FIZL0", r.stderr)
+
+    def test_gh_token_from_environment_wins(self):
+        self.logged_in()
+        r = self.run_release("--check-auth", env_extra={"GH_TOKEN": "tok-env"})
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("GH_TOKEN from the environment", r.stdout)
+        self.assertNotIn("auth token", self.log())
+
+    def test_owner_follows_release_repo(self):
+        self.logged_in()
+        self.write("token-someone", "tok-someone\n")
+        self.write("login-tok-someone", "someone\n")
+        r = self.run_release("--check-auth", env_extra={"IFIZBOX_RELEASE_REPO": "someone/fork"})
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("auth token --user someone\n", self.log())
+
+    # (2) the release is really up
+
+    ASSETS = ["iFizBox.ipa", "iFizBox.deb", "com.ryha.ifizbox_9.8.7-1_iphoneos-arm64.deb", "Packages", "Packages.gz",
+              "Release", "source.json"]
+
+    def github(self, latest_tag):
+        """github.com's latest/download redirect to a tag's asset, and the asset itself."""
+        base = "/%s/releases" % self.REPO
+        s = Server({
+            base + "/latest/download/iFizBox.ipa":
+                (302, {"Location": "BASE%s/download/%s/iFizBox.ipa" % (base, latest_tag)}, b""),
+            base + "/download/%s/iFizBox.ipa" % latest_tag: (200, {}, b"PK\x03\x04ipa"),
+        })
+        self.addCleanup(s.close)
+        return s
+
+    def verify(self, server, timeout="0"):
+        return self.run_release("--verify-release", "9.8.7", env_extra={
+            "GH_TOKEN": "tok-env", "IFIZBOX_RELEASE_WEB": server.base,
+            "IFIZBOX_RELEASE_VERIFY_TIMEOUT": timeout, "IFIZBOX_RELEASE_VERIFY_INTERVAL": "0.2"})
+
+    def test_release_up(self):
+        self.write("view", "false\n" + "\n".join(self.ASSETS) + "\n")
+        s = self.github("v9.8.7")
+        r = self.verify(s)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("release view v9.8.7 --repo %s" % self.REPO, self.log())
+        self.assertIn("/releases/download/v9.8.7/iFizBox.ipa (200)", r.stdout)
+        self.assertIn("v9.8.7 is up on GitHub", r.stdout)
+        self.assertEqual(s.hits.get("/%s/releases/download/v9.8.7/iFizBox.ipa" % self.REPO), 1)
+
+    def test_release_lacks_asset(self):
+        self.write("view", "false\n" + "\n".join(a for a in self.ASSETS if a != "source.json") + "\n")
+        r = self.verify(self.github("v9.8.7"))
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("release v9.8.7 on %s lacks source.json" % self.REPO, r.stderr)
+
+    def test_latest_is_older_release(self):
+        self.write("view", "false\n" + "\n".join(self.ASSETS) + "\n")
+        r = self.verify(self.github("v9.8.6"), timeout="1")
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("doesn't resolve to v9.8.7's iFizBox.ipa: it answers 302 -> ", r.stderr)
+        self.assertIn("/download/v9.8.6/iFizBox.ipa", r.stderr)
+
+    def test_latest_asset_missing(self):
+        self.write("view", "false\n" + "\n".join(self.ASSETS) + "\n")
+        s = self.github("v9.8.7")
+        del s.routes["/%s/releases/download/v9.8.7/iFizBox.ipa" % self.REPO]
+        r = self.verify(s)
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("which answers 404", r.stderr)
+
+    def test_draft_not_checked_as_latest(self):
+        self.write("view", "true\n" + "\n".join(self.ASSETS) + "\n")
+        s = self.github("v9.8.6")
+        r = self.verify(s)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("is a draft", r.stdout)
+        self.assertEqual(s.hits, {})
+
+    # (2b) the site serves it
+
+    def site(self, versions, debs, up_after=0):
+        """https://<domain>/repo/: source.json and Packages; with up_after, they list 9.8.7 only from that many
+        requests of source.json on (a deploy landing while it polls)."""
+        def source():
+            vs = (["9.8.7"] if s.hits["/repo/source.json"] > up_after else []) + versions
+            return 200, {"Content-Type": "application/json"}, json.dumps({"apps": [
+                {"bundleIdentifier": "com.example.other", "versions": [{"version": "9.8.7"}]},
+                {"bundleIdentifier": "com.ryha.ifizbox", "versions": [{"version": v} for v in vs]}]}).encode()
+
+        def packages():
+            ds = (["9.8.7-12"] if s.hits["/repo/source.json"] > up_after else []) + debs
+            body = "Package: other.pkg\nVersion: 9.8.7\n\n" + "".join(
+                "Package: com.ryha.ifizbox\nVersion: %s\nArchitecture: iphoneos-arm64\n\n" % d for d in ds)
+            return 200, {}, body.encode()
+        s = Server({"/repo/source.json": source, "/repo/Packages": packages})
+        self.addCleanup(s.close)
+        return s
+
+    def live(self, server, timeout):
+        return self.run_release("--verify-live", "9.8.7", env_extra={
+            "IFIZBOX_LIVE_BASE": server.base, "IFIZBOX_LIVE_TIMEOUT": timeout, "IFIZBOX_LIVE_INTERVAL": "0.1"})
+
+    def test_live_up(self):
+        r = self.live(self.site(["9.8.6"], ["9.8.6-11"]), "5")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("/repo/source.json: versions 9.8.7 9.8.6", r.stdout)
+        self.assertIn("/repo/Packages: com.ryha.ifizbox 9.8.7-12 9.8.6-11", r.stdout)
+        self.assertIn("9.8.7 is up", r.stdout)
+        self.assertEqual(self.log(), "")  # no gh, no token needed
+
+    def test_live_waits_for_deploy(self):
+        s = self.site(["9.8.6"], ["9.8.6-11"], up_after=3)
+        r = self.live(s, "30")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("release: live: waiting: ", r.stderr)
+        self.assertIn("(no 9.8.7)", r.stderr)
+        self.assertGreaterEqual(s.hits["/repo/source.json"], 4)
+
+    def test_live_not_up_fails(self):
+        """Other packages and apps at 9.8.7 don't count: only iFizBox's own entries."""
+        r = self.live(self.site(["9.8.6"], ["9.8.6-11"], up_after=10 ** 6), "1")
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("/repo/source.json: versions 9.8.6 (no 9.8.7)", r.stderr)
+        self.assertIn("/repo/Packages: com.ryha.ifizbox 9.8.6-11 (no 9.8.7)", r.stderr)
+        self.assertIn("9.8.7 is NOT up after 1s", r.stderr)
+
+    def test_live_site_down_fails(self):
+        s = self.site([], [])
+        base = s.base
+        s.close()
+        r = self.run_release("--verify-live", "9.8.7", env_extra={
+            "IFIZBOX_LIVE_BASE": base, "IFIZBOX_LIVE_TIMEOUT": "0.5", "IFIZBOX_LIVE_INTERVAL": "0.1"})
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("URLError", r.stderr)
+        self.assertIn("NOT up", r.stderr)
+
+    def test_bad_version(self):
+        r = self.run_release("--verify-live", "1.2")
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("takes X.Y.Z", r.stderr)
+
+
 if __name__ == "__main__":
     unittest.main()

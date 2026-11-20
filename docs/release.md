@@ -86,7 +86,8 @@ One command does all of it: `tools/publish.sh X.Y.Z [--notes FILE] [--minimum X.
 clean and current and the version is new, commits and pushes `native/VERSION`, builds that exact commit in a clean
 temporary worktree, publishes it with `tools/release.sh` as the repo owner's GitHub account (whichever gh account
 is active), commits and pushes the updated `web/app/source.json`, and checks that `releases/latest/download/iFizBox.ipa`
-is the new version. Run it from an interactive shell (it needs `SWIFT_TOOLCHAIN` and `IOS_SDK`). `--dry-run` builds
+is the new version. It doesn't wait for the site: run `tools/release.sh --verify-live X.Y.Z` after it (step 6
+below). Run it from an interactive shell (it needs `SWIFT_TOOLCHAIN` and `IOS_SDK`). `--dry-run` builds
 and prints what would be published and changes nothing. There is no release on tag push in CI: the build needs the
 iOS SDK, which can't go on a hosted runner. The steps below are what it runs.
 
@@ -96,13 +97,33 @@ iOS SDK, which can't go on a hosted runner. The steps below are what it runs.
 3. Look at the plan first: `tools/release.sh --dry-run --notes notes.md`. That builds `native/` (it needs the
    toolchain from `docs/native.md`: `SWIFT_TOOLCHAIN`, `IOS_SDK`), runs mkdeb/mkipa's checks, and prints the tag,
    the asset names and the notes. It publishes nothing and makes no network calls.
-4. Publish: `tools/release.sh --notes notes.md`. It needs `gh`, logged in with push rights on the repo. It checks for
+4. Publish: `tools/release.sh --notes notes.md`. It needs `gh` with a login for the repo's owner (`RyanAHayden` for
+   `RyanAHayden/iFizBox`): when `GH_TOKEN` isn't set it takes the owner's token with
+   `gh auth token --user <owner>`, so it doesn't matter which gh account is active (an account with pull rights
+   only would get HTTP 404 from `gh release create`). If gh has no login for the owner it stops and says so:
+   `gh auth login` as the owner (gh keeps the other accounts), or set `GH_TOKEN`. `tools/release.sh --check-auth`
+   shows which account it would publish as. It checks for
    a clean tree, a HEAD that is on origin, and a tag that doesn't exist yet locally, on origin or as a release. Then it
    runs `gh release create` with the assets above. GitHub creates the tag at HEAD.
    Before building it refreshes `web/app/core/piracy-list.js` from Canister (`tools/sync-piracy-list.py`),
    warns when the committed copy is older than cnstr/manifests' newest piracy-list commit, and stops if the file
    changed: commit and push it, then run again (with `publish.sh`, run that again). A dry run stays offline and only
    names the copy's Canister commit; `--sync-piracy` makes it compare too, without writing the repo's copy.
+   After `gh release create` it checks that the release is really up and fails otherwise: `gh release view` lists
+   `iFizBox.ipa`, `iFizBox.deb`, `Packages`, `Packages.gz`, `Release` and `source.json`, and
+   `https://github.com/RyanAHayden/iFizBox/releases/latest/download/iFizBox.ipa` redirects to this tag's
+   `iFizBox.ipa`, which answers (retried for 2 minutes while GitHub catches up). A draft only gets the asset check,
+   because it is never "latest". `tools/release.sh --verify-release X.Y.Z` runs the same checks on their own, e.g.
+   after publishing a draft on the site.
+5. Commit `web/app/source.json` (the script rewrote it to name the new IPA) and push it to main.
+6. Verify it is live: `tools/release.sh --verify-live X.Y.Z`. Workers Builds deploys the site on push; this polls
+   `https://ifizbox.com/repo/source.json` and `https://ifizbox.com/repo/Packages` every 15 seconds until both list
+   X.Y.Z for iFizBox (other apps and packages don't count), and fails loudly after 15 minutes, printing what each
+   one says. If it fails, look at the Workers Builds deploy of the pushed commit.
+
+The order matters: release (step 4), commit `source.json` (5), push (5), verify live (6). Run before the push,
+`--verify-live` can only time out: `/repo/Packages` follows the release at once, but `/repo/source.json` is the
+deployed copy of `web/app/source.json`.
 
 Options:
 

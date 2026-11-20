@@ -7,7 +7,7 @@ server for two things, and this Worker is that server:
   iFizBox serves the signed app itself at `127.0.0.1`; the Worker hands iOS a manifest pointing there.
 - **iFizBox's own updates.** iOS closes iFizBox while it installs the new one, and iFizBox's local server closes with
   it, so the signed update waits here for 10 minutes (Cloudflare KV) and installs from here.
-- **Apps the website signed in the browser** (F93): the website signs with zsign as WebAssembly in your browser and
+- **Apps the website signed in the browser**: the website signs with zsign as WebAssembly in your browser and
   leaves the signed app here for the same 10 minutes, for iOS's install prompt.
 
 Beside those it stores only what you send it for other features: iFizBox Account's encrypted blobs (KV, ciphertext
@@ -115,5 +115,5 @@ Then put that `https://` address in **Settings > Installation & Signing > Signin
 
 `node test.mjs` checks them against an in-memory KV. ifizbox.com's own deploy: `npx wrangler deploy -c wrangler.ifizbox.toml`, run on release tags only by `tools/deploy.sh vX.Y.Z` (which `tools/publish.sh` runs after tagging; a push to main deploys nothing).
 
-The website's **Install** (no app to sign on) signs in the browser (F93: zsign as WebAssembly, `web/app/vendor/zsign`)
+The website's **Install** (no app to sign on) signs in the browser (zsign as WebAssembly, `web/app/vendor/zsign`)
 and uploads the signed IPA to `/sign/upload` (in parts, kept 10 minutes) for iOS's install prompt.

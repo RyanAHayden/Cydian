@@ -20,6 +20,14 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
         return true
     }
 
+    // F280: the APNs device token push.register waits for (Notifications.swift Push).
+    func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+        Push.received(deviceToken, nil)
+    }
+    func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
+        Push.received(nil, error)
+    }
+
     func application(_ application: UIApplication, configurationForConnecting session: UISceneSession,
                      options: UIScene.ConnectionOptions) -> UISceneConfiguration {
         let c = UISceneConfiguration(name: "Default", sessionRole: session.role)

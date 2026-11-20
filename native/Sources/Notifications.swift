@@ -64,6 +64,7 @@ final class Notifications: NSObject, UNUserNotificationCenterDelegate {
     }
 
     static func register(_ b: Bridge) {
+        Push.register(b) // F280: push.status, push.register, push.unregister (below)
         // What iOS allows iFizBox (Settings > Notifications > iFizBox, Background App Refresh) and when the background
         // check last ran: Settings shows it, so a badge that never comes has a reason on screen.
         b.on("app.notifyStatus") { c in
@@ -130,6 +131,100 @@ final class Notifications: NSObject, UNUserNotificationCenterDelegate {
                         DispatchQueue.main.async(execute: set)
                     }
                 }
+            }
+        }
+    }
+}
+
+// F280: push notifications (APNs), the sideload build. The page (web/app/core/push.js) sends the token this hands it
+// to the signing server (worker/src/push.js), which pushes update alerts; a tap's "url" route opens Changes through
+// userNotificationCenter(_:didReceive:) above. APNs delivers by topic = this copy's Info.plist bundle ID, whichever
+// team signed it, so the page checks the ID; and only when the embedded profile has aps-environment does iOS hand
+// out a token, its value (production / development) picking the APNs host.
+//
+//   push.status     {mode, bundleId, team, environment (aps-environment | null), authorization, registered,
+//                    profileExpires (ISO | null), version, ios}
+//   push.register   iOS's permission (asked once), then the device token -> {token (hex)}; errors "denied: ...",
+//                    "no_push: ..." (no aps-environment, or the jailbreak build), "apns: ..." (iOS's own error)
+//   push.unregister stops the token (the page has the server forget it first)
+// The token is never logged.
+enum Push {
+    private static var waiting: [Int: (String?, String?) -> Void] = [:] // main thread only
+    private static var next = 0
+
+    static var profile: Profile? {
+        guard let url = Bundle.main.url(forResource: "embedded", withExtension: "mobileprovision"),
+              let data = try? Data(contentsOf: url) else { return nil }
+        return try? Profile(data)
+    }
+
+    // From AppDelegate's didRegisterForRemoteNotificationsWithDeviceToken / didFailToRegister... (App.swift).
+    static func received(_ token: Data?, _ error: Error?) {
+        let hex = token.map { $0.map { String(format: "%02x", $0) }.joined() }
+        DispatchQueue.main.async {
+            let list = waiting.values
+            waiting = [:]
+            for done in list { done(hex, hex == nil ? (error?.localizedDescription ?? "no token") : nil) }
+        }
+    }
+
+    // Main thread. iOS answers through the app delegate, or not at all (no network to APNs): 30 s, then an error.
+    private static func requestToken(_ done: @escaping (String?, String?) -> Void) {
+        next += 1
+        let id = next
+        waiting[id] = done
+        UIApplication.shared.registerForRemoteNotifications()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 30) {
+            guard let d = waiting.removeValue(forKey: id) else { return }
+            d(nil, "iOS gave no push token within 30 seconds (is this iPhone online?)")
+        }
+    }
+
+    static func register(_ b: Bridge) {
+        b.on("push.status") { c in
+            UNUserNotificationCenter.current().getNotificationSettings { st in
+                DispatchQueue.main.async {
+                    let name: [UNAuthorizationStatus: String] = [.notDetermined: "notDetermined", .denied: "denied",
+                                                                 .authorized: "authorized", .provisional: "provisional"]
+                    let p = AppMode.current == .sideload ? profile : nil
+                    let info = Bundle.main.infoDictionary ?? [:]
+                    c.reply(["mode": AppMode.current.rawValue, "bundleId": Bundle.main.bundleIdentifier ?? "",
+                             "team": p?.team ?? "", "environment": (p?.pushEnvironment).map { $0 as Any } ?? NSNull(),
+                             "authorization": name[st.authorizationStatus] ?? "other",
+                             "registered": UIApplication.shared.isRegisteredForRemoteNotifications,
+                             "profileExpires": (p?.expires).map { ISO8601DateFormatter().string(from: $0) as Any } ?? NSNull(),
+                             "version": info["CFBundleShortVersionString"] ?? "", "ios": UIDevice.current.systemVersion], nil)
+                }
+            }
+        }
+        b.on("push.register") { c in
+            guard AppMode.current == .sideload else { return c.reply(nil, "no_push: the jailbreak build's alerts come from its daemon") }
+            guard profile?.pushEnvironment != nil else {
+                return c.reply(nil, "no_push: this copy's provisioning profile has no aps-environment")
+            }
+            let center = UNUserNotificationCenter.current()
+            let go = {
+                DispatchQueue.main.async {
+                    requestToken { token, error in
+                        if let token { c.reply(["token": token], nil) } else { c.reply(nil, "apns: \(error ?? "no token")") }
+                    }
+                }
+            }
+            center.getNotificationSettings { st in
+                switch st.authorizationStatus {
+                case .denied: c.reply(nil, "denied: notifications are off for this app in iOS Settings")
+                case .notDetermined:
+                    center.requestAuthorization(options: [.alert, .badge, .sound]) { ok, _ in
+                        if ok { go() } else { c.reply(nil, "denied: notifications were not allowed") }
+                    }
+                default: go()
+                }
+            }
+        }
+        b.on("push.unregister") { c in
+            DispatchQueue.main.async {
+                UIApplication.shared.unregisterForRemoteNotifications()
+                c.reply(nil, nil)
             }
         }
     }

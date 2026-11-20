@@ -17,6 +17,7 @@ routes = [
 HOST_IDS = "*"   # bundle IDs /sign/host keeps: any app, whatever ID the user's profile signs it under
 TTL = "600"              # seconds a hosted update (or a website-signed app) stays
 MAX_UPLOAD_MB = "512"    # largest IPA the website signs in the browser (/api/fetch?kind=ipa, /sign/upload); "0": none
+APNS_TEAM_ID = "S8NFX3A2LT"   # F280: the team whose APNs key pushes to com.ryha.ifizbox (src/push.js)
 
 # Wrangler makes this storage on the first deploy (or: `npx wrangler kv namespace create HOSTED`, and its id here).
 [[kv_namespaces]]
@@ -43,6 +44,16 @@ simple = { limit = 12, period = 60 }
 [[d1_databases]]
 binding = "REVIEWS"
 database_name = "ifizbox-reviews"
+
+# F280: push notifications (src/push.js, docs/push.md) in their own D1 database (made on the first deploy). Off until
+# a person adds the APNs Auth Key of team S8NFX3A2LT (developer.apple.com > Keys > + > Apple Push Notifications
+# service): `npx wrangler secret put APNS_KEY -c wrangler.ifizbox.toml` (the .p8's text) and APNS_KEY_ID.
+[[d1_databases]]
+binding = "PUSH"
+database_name = "ifizbox-push"
+
+[triggers]
+crons = ["*/30 * * * *"]
 
 # F182: review writes (posts, reports) per address across isolates; keep limit at REVIEW_WRITES.
 [[ratelimits]]

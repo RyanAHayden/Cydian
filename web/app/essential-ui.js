@@ -19,6 +19,7 @@ import { showBanner } from "./nav/banner.js";
 import { installQueue } from "./queue.js";
 import { appQueue } from "./app-queue.js";
 import { SELF_ID } from "./core/essential.js";
+import { renamedUpdateNotice } from "./core/push.js";
 
 const native = () => globalThis.ifizboxNative;
 const storage = () => { try { return globalThis.localStorage; } catch { return null; } };
@@ -64,6 +65,8 @@ export async function installSelfNow(row) {
   // The sideload app signs its own update on the phone and hosts it on the Signing Server (signing.install host:
   // true): straight to iOS's Install prompt, the key never leaves the phone. Without the bridge: installSelf.
   if (detectMode() === "sideload" && row?.ipa && globalThis.ifizboxNative?.call) {
+    // F280: a copy its signer renamed gets the update beside it (it keeps iFizBox's own ID now): said once
+    if (await renamedUpdateNotice({ alert: showAlert }) === "cancel") return "cancelled";
     const ok = await installOnDevice({ url: row.ipa, name: NAME, host: true });
     return ok ? "installing" : "failed";
   }

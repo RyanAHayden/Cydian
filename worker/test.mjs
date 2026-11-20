@@ -1220,3 +1220,4 @@ import { setup, normalCode, newCode, showCode, containerPath, SETUP_ALPHABET, PA
   assert.equal((await s("/sign/setup.sh", env, { method: "POST" })).status, 404);
   console.log("worker setup: ok");
 }
+await import("./test-push.mjs"); // F280

@@ -16,12 +16,12 @@ struct SignOptions {
 
     init() {}
 
-    // F237: whether this app keeps its ID. iFizBox's own IPA keeps it only when the running iFizBox has that ID too:
-    // an update to an iFizBox installed under the profile's ID must replace it, not install a second iFizBox.
+    // F237: whether this app keeps its ID. F280: iFizBox's own IPA too, whatever ID the running copy has: APNs
+    // delivers by the Info.plist ID, so only a copy that kept com.ryha.ifizbox gets push notifications. An update
+    // to a copy installed under the profile's ID then installs beside it (the page says so once, core/push.js
+    // renamedUpdateNotice). `running` stays for callers and tests that pass it.
     func keeps(_ appBundleID: String, running: String? = Bundle.main.bundleIdentifier) -> Bool {
-        guard keepBundleID else { return false }
-        if appBundleID == SignOptions.selfBundleID, let r = running, !r.isEmpty, r != appBundleID { return false }
-        return true
+        keepBundleID
     }
     static let selfBundleID = "com.ryha.ifizbox" // brand.env BRAND_BUNDLE_ID
 

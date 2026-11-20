@@ -90,8 +90,8 @@ test("F237: Keep Bundle IDs option, stored and the profile's IDs") {
     check(old == SignOptions(old).stored, "an old record equals its options written again")
     var o = SignOptions()
     check(SignOptions(o.stored).keepBundleID, "round trip keeps it")
-    // iFizBox's own IPA keeps its ID only when the running iFizBox has it
-    check(o.keeps("com.ryha.ifizbox", running: "com.ryha.ifizbox") && !o.keeps("com.ryha.ifizbox", running: "com.you.ifizbox"), "self")
+    // F280: iFizBox's own IPA keeps its ID whatever the running copy's (push goes by the Info.plist ID)
+    check(o.keeps("com.ryha.ifizbox", running: "com.ryha.ifizbox") && o.keeps("com.ryha.ifizbox", running: "com.you.ifizbox"), "self")
     check(o.keeps("com.ryha.ifizbox", running: nil) && o.keeps("com.google.ios.youtube", running: "com.you.ifizbox"), "others")
     o.keepBundleID = false
     check(!o.keeps("com.google.ios.youtube", running: nil), "off")

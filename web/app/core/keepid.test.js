@@ -163,12 +163,16 @@ test("website signing keeps the app's ID: no -b, entitlements with the profile's
   assert.equal(ents["get-task-allow"], false);
 });
 
-test("website signing the old way (keepBundleId false), and iFizBox's own IPA always the old way", async () => {
+test("website signing the old way (keepBundleId false); iFizBox's own IPA keeps its ID too (F280: push needs it)", async () => {
   let { create, seen } = fakeZsign("com.google.ios.youtube");
   let r = await runSignJob(create, job({ keepBundleId: false }));
   assert.equal(r.bundleId, "com.you.youtube");
   assert.equal(seen.args[seen.args.indexOf("-b") + 1], "com.you.youtube");
   ({ create, seen } = fakeZsign("com.ryha.ifizbox"));
   r = await runSignJob(create, job({}));
-  assert.equal(r.bundleId, "com.you.youtube", "an update must replace the iFizBox installed under the profile's ID");
+  assert.equal(r.bundleId, "com.ryha.ifizbox", "APNs delivers by the Info.plist ID");
+  assert.ok(!seen.args.includes("-b"), "Info.plist left as it is");
+  ({ create, seen } = fakeZsign("com.ryha.ifizbox"));
+  r = await runSignJob(create, job({ keepBundleId: false }));
+  assert.equal(r.bundleId, "com.you.youtube", "Keep Bundle IDs off: the old way, iFizBox too");
 });

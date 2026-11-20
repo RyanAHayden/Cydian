@@ -295,7 +295,10 @@ rest:
 - **Release**: `tools/setup/release.sh --probe` names what each build needs; `--dry-run` builds into
   `tools/setup/dist`; without it, it publishes them as the `setup` release's assets (a pre-release, so the app's
   self-update and the APT repo never see it). macOS is cross-built on Linux with `MACOS_SDK` (a MacOSX.sdk's
-  `usr/` and a few frameworks), clang, rustup's ld64.lld and llvm-lipo.
+  `usr/` and a few frameworks), clang, rustup's ld64.lld and llvm-lipo. `tools/setup/macos-sdk.sh` pulls that SDK
+  part out of Apple's Command Line Tools .dmg (or its .pkg, or an Xcode .xip), so no Mac is needed;
+  `tools/setup/llvm-mingw.sh` fetches the llvm-mingw that the Windows on ARM build needs. release.sh finds both in
+  their default folders.
 
 **Jailbreak build**: the root helper's `install-ipa` installs an IPA through `LSApplicationWorkspace
 installApplication:withOptions:error:`, as AppSync's `appinst` does (`native/helper/README.md`). It needs AppSync

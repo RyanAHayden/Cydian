@@ -20,7 +20,10 @@
 #                                                              aarch64-w64-mingw32-clang (llvm-mingw)
 #   macos          universal: aarch64- + x86_64-apple-darwin   clang, ld64.lld (rustup's), llvm-lipo, MACOS_SDK
 # MACOS_SDK: a MacOSX.sdk folder (usr/lib, usr/include and the CoreFoundation, Security, SystemConfiguration,
-# CoreServices and IOKit frameworks are enough; copy them off a Mac's /Library/Developer/CommandLineTools/SDKs).
+# CoreServices and IOKit frameworks are enough): tools/setup/macos-sdk.sh pulls them out of a Command Line Tools
+# .dmg/.pkg or an Xcode .xip. Unset, ~/.local/share/ifizbox/MacOSX.sdk (its default DEST) when it's there.
+# LLVM_MINGW: an llvm-mingw folder, its bin/ added to the end of PATH (tools/setup/llvm-mingw.sh fetches one);
+# unset, ~/.local/share/ifizbox/llvm-mingw. (Both ~/.local/share are ${XDG_DATA_HOME:-~/.local/share}.)
 # Each needs its Rust target (rustup target add …). The first build fetches crates and idevice (network).
 #   IFIZBOX_RELEASE_REPO  owner/name to publish on (default native/brand.env BRAND_GITHUB_REPO)
 set -euo pipefail
@@ -35,7 +38,7 @@ while [ $# -gt 0 ]; do
     --dry-run) mode=dry ;;
     --out) out=${2:?--out needs a directory}; shift ;;
     --allow-missing) allow_missing=1 ;;
-    -h|--help) sed -n '2,29p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '2,28p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "setup release: unknown argument $1 (see --help)" >&2; exit 2 ;;
   esac
   shift
@@ -48,6 +51,11 @@ targetdir="$here/cli/target"
 sysroot=$(rustc --print sysroot 2>/dev/null || true)
 lld64=${LD64_LLD:-$sysroot/lib/rustlib/x86_64-unknown-linux-gnu/bin/gcc-ld/ld64.lld}
 [ -x "$lld64" ] || lld64=$(command -v ld64.lld || true)
+data=${XDG_DATA_HOME:-$HOME/.local/share}/ifizbox
+if [ -z "${MACOS_SDK:-}" ] && [ -d "$data/MacOSX.sdk/usr/lib" ]; then MACOS_SDK=$data/MacOSX.sdk; fi
+llvm_mingw=${LLVM_MINGW:-$data/llvm-mingw}
+# at the end, so its clang never stands in for the system's in the other builds
+if [ -x "$llvm_mingw/bin/aarch64-w64-mingw32-clang" ]; then PATH=$PATH:$llvm_mingw/bin; fi
 have_target() { rustup target list --installed 2>/dev/null | grep -qx "$1"; }
 
 # why NAME can't be built here, or nothing
@@ -58,14 +66,14 @@ missing() {
     linux-x86_64) have_target x86_64-unknown-linux-musl || m+=("rustup target x86_64-unknown-linux-musl"); command -v clang >/dev/null || m+=(clang) ;;
     linux-arm64) have_target aarch64-unknown-linux-musl || m+=("rustup target aarch64-unknown-linux-musl"); command -v clang >/dev/null || m+=(clang) ;;
     windows-x64) have_target x86_64-pc-windows-gnu || m+=("rustup target x86_64-pc-windows-gnu"); command -v x86_64-w64-mingw32-gcc >/dev/null || m+=("x86_64-w64-mingw32-gcc (mingw-w64)") ;;
-    windows-arm64) have_target aarch64-pc-windows-gnullvm || m+=("rustup target aarch64-pc-windows-gnullvm"); command -v aarch64-w64-mingw32-clang >/dev/null || m+=("aarch64-w64-mingw32-clang (llvm-mingw)") ;;
+    windows-arm64) have_target aarch64-pc-windows-gnullvm || m+=("rustup target aarch64-pc-windows-gnullvm"); command -v aarch64-w64-mingw32-clang >/dev/null || m+=("aarch64-w64-mingw32-clang (llvm-mingw: tools/setup/llvm-mingw.sh, or LLVM_MINGW)") ;;
     macos)
       have_target aarch64-apple-darwin || m+=("rustup target aarch64-apple-darwin")
       have_target x86_64-apple-darwin || m+=("rustup target x86_64-apple-darwin")
       command -v clang >/dev/null || m+=(clang)
       command -v llvm-lipo >/dev/null || m+=(llvm-lipo)
       [ -n "$lld64" ] || m+=("ld64.lld (rustup's, or LD64_LLD)")
-      [ -n "${MACOS_SDK:-}" ] && [ -d "${MACOS_SDK:-}/usr/lib" ] || m+=("MACOS_SDK (a MacOSX.sdk folder)") ;;
+      [ -n "${MACOS_SDK:-}" ] && [ -d "${MACOS_SDK:-}/usr/lib" ] || m+=("MACOS_SDK (a MacOSX.sdk folder: tools/setup/macos-sdk.sh)") ;;
   esac
   [ ${#m[@]} -eq 0 ] || { local IFS=,; echo "${m[*]}"; }
 }

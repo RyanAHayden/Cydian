@@ -16,6 +16,11 @@ body {
   -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
 }
 button { font: inherit; color: inherit; margin: 0; }
+/* B168: text fields take back what the body turns off, so holding one gives iOS's Select / Paste callout (in the
+   app's WKWebView too): sign-in, password and key fields, alerts' fields, search. */
+input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]), textarea {
+  -webkit-user-select: text; user-select: text; -webkit-touch-callout: default;
+}
 /* No focus ring: a tapped or clicked button kept a blue outline, which iOS 6 never draws (user 2026-11-18). */
 :focus, :focus-visible { outline: none; }
 /* B24: holding a link (every package row is an <a>) or an image starts WebKit's drag, which lifted a black box with

@@ -52,7 +52,8 @@ export function showAlert({ title = "", message = "", input = null, buttons = ["
           let text = null;
           if (native?.call) try { text = String((await native.call("clipboard.read", {})) ?? ""); } catch { /* old shell */ }
           if (text == null) try { text = await navigator.clipboard.readText(); } catch { return; }
-          const v = input.paste(text);
+          // B168: `paste: true` (Sign In With Key) pastes the text as it is, trimmed; it used to throw here.
+          const v = typeof input.paste === "function" ? input.paste(text) : String(text ?? "").trim();
           if (v) { field.value = v; field.focus({ preventScroll: true }); }
         });
         row.append(field, paste);

@@ -3,8 +3,9 @@
 // (ifizbox.appearance) picks the tone, ifizbox.lightTheme and ifizbox.darkTheme the theme in each. Same rule as
 // core/settings.js themeState(); screens/settings.js applyTheme() takes over once the app runs.
 (function () {
-  var a = null, l = null, d = null;
+  var a = null, l = null, d = null, s = null;
   try {
+    s = localStorage.getItem("ifizbox.style"); // F201: the era, iOS 6 unless iOS 7 is chosen
     a = localStorage.getItem("ifizbox.appearance");
     l = localStorage.getItem("ifizbox.lightTheme");
     d = localStorage.getItem("ifizbox.darkTheme");
@@ -13,19 +14,23 @@
   var dark = a === "dark" || (a !== "light" && !!window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches);
   // A reload on Theme > Light or Theme > Dark shows that list's preview (screens/settings.js previewOf).
   var m = /^#\/(?:home\/)?settings\/(?:(?:theme|display)\/)?(lightTheme|darkTheme)\/?$/.exec((window.location && window.location.hash) || "");
-  if (m) dark = m[1] === "darkTheme";
+  // F201: iOS 7 has its own two themes (core/settings.js STYLE_PALETTES) and no theme lists to preview.
+  var ios7 = s === "ios7";
+  if (m && !ios7) dark = m[1] === "darkTheme";
   var root = document.documentElement;
+  root.setAttribute("data-style", ios7 ? "ios7" : "ios6");
   root.setAttribute("data-theme", dark ? "dark" : "light");
   // Each tone's themes, in core/settings.js's order, and the default (its `default`: Gunmetal, Classic): a new theme
   // adds its name here, beside its ios6.css or palettes.css block (F200), and its top-bar colour below.
   var darks = ["oled", "gunmetal", "midnight", "linen", "nord", "dracula", "leather", "felt", "wood"],
     lights = ["classic", "sepia", "solarized", "legalpad", "metal"];
-  var palette = dark ? (darks.indexOf(d) >= 0 ? d : "gunmetal") : (lights.indexOf(l) >= 0 ? l : "classic");
+  var palette = ios7 ? (dark ? "oled" : "white")
+    : dark ? (darks.indexOf(d) >= 0 ? d : "gunmetal") : (lights.indexOf(l) >= 0 ? l : "classic");
   root.setAttribute("data-palette", palette);
   // The browser's top bar too (screens/settings.js THEME_COLORS): index.html's meta says light until now.
   var color = { classic: "#4f698b", oled: "#000", gunmetal: "#5f656f", midnight: "#0a1424", linen: "#000",
     nord: "#2e3440", dracula: "#21222c", sepia: "#7a5c36", solarized: "#2a74a8",
-    leather: "#4a2e1a", felt: "#6a4220", wood: "#42270f", legalpad: "#5a3218", metal: "#9aa0a9" }[palette];
+    leather: "#4a2e1a", felt: "#6a4220", wood: "#42270f", legalpad: "#5a3218", metal: "#9aa0a9", white: "#f7f7f7" }[palette];
   var metas = document.querySelectorAll('meta[name="theme-color"]:not([media])');
   for (var i = 0; i < metas.length; i++) metas[i].setAttribute("content", color);
 })();

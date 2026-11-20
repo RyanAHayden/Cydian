@@ -61,6 +61,7 @@ export const SECTIONS = [
   { id: "device", page: "general" },
   { id: "compat", page: "general" },
   { id: "sources", page: "general" },
+  { id: "style", page: "theme", title: "Style" }, // F201: iOS 6 (the default) or iOS 7, html[data-style]
   { id: "appearance", page: "theme", title: "Mode" }, // F199: Theme's Mode, a segmented Automatic / Light / Dark
   { id: "themes", page: "theme", title: "Themes" }, // F199: Light and Dark, each pushing its checklist of themes
   { id: "updates", page: "updates" },
@@ -91,6 +92,15 @@ export const RETIRED_DAEMON_KEYS = ["checkUpdates", "cellular"];
 // footer, for a list); `with` names the row whose group it joins (sections()).
 export const SETTINGS = [
   {
+    // F201: the iOS era the whole app is drawn in, put on <html data-style> (theme-boot.js before first paint,
+    // screens/settings.js applyTheme after). iOS 6 is the base look (ios6.css); iOS 7 is ios7.css over it, with its
+    // own two themes (STYLE_PALETTES), so the Themes rows (`style: "ios6"`) hide while it is on.
+    key: "style", section: "style", kind: "choice", feature: "appearance", modes: ALL, default: "ios6",
+    label: "Style",
+    options: [{ value: "ios6", label: "iOS 6" }, { value: "ios7", label: "iOS 7" }],
+    footer: "iOS 7 has two themes of its own: White, and OLED Black in Dark mode.",
+  },
+  {
     // F199: Theme's Mode, drawn as an iOS 6 segmented control. Kept under its old key (ifizbox.appearance) so a
     // stored choice, the transfer to the app (TRAVELS) and the shell's app.theme read the same value.
     key: "appearance", section: "appearance", kind: "segmented", feature: "appearance", modes: ALL, default: "auto",
@@ -102,7 +112,7 @@ export const SETTINGS = [
     // F199: the theme Light mode paints (one today: the kit's own). `swatch`: the theme list's little tile (bar
     // colour over ground colour), from ios6.css's palette blocks. Stored at ifizbox.lightTheme.
     key: "lightTheme", section: "themes", kind: "list", feature: "appearance", modes: ALL, default: "classic",
-    label: "Light", tone: "light",
+    label: "Light", tone: "light", style: "ios6", // F201: iOS 6's themes; iOS 7 has its own (STYLE_PALETTES)
     // F200: Sepia and Solarized Light (palettes.css).
     options: [{ value: "classic", label: "Classic", swatch: ["#6f88a8", "#c5ccd4"] },
       { value: "sepia", label: "Sepia", swatch: ["#a5865a", "#ebdfc5"] },
@@ -115,7 +125,7 @@ export const SETTINGS = [
   {
     // F198/F199: the dark palette, stored at ifizbox.darkTheme (DARK_THEME_KEY, which theme-boot.js reads raw).
     key: "darkTheme", section: "themes", kind: "list", feature: "appearance", modes: ALL, default: "gunmetal",
-    label: "Dark", tone: "dark",
+    label: "Dark", tone: "dark", style: "ios6", // F201
     options: [{ value: "oled", label: "OLED Black", swatch: ["#000", "#0e0e0f"] },
       { value: "gunmetal", label: "Gunmetal", swatch: ["#5f656f", "#3b3f46"] },
       // F200: palettes.css.
@@ -336,7 +346,7 @@ export function addRecent(list, query, max = RECENT_MAX) {
 // F75: the settings that move with the user from the website to the app (Open in iFizBox App, core/transfer.js):
 // appearance, device, the compat options; Ignored Upgrades (holds) and the Signing Server travel beside them. The
 // app takes only those it shows itself (settings.isShown).
-export const TRAVELS = ["appearance", "lightTheme", "darkTheme", "device", "worksOnMyPhone", "compatMarks", "iosVersion"];
+export const TRAVELS = ["style", "appearance", "lightTheme", "darkTheme", "device", "worksOnMyPhone", "compatMarks", "iosVersion"];
 export const DAEMON_KEYS = ["autoInstall", "autoInstallIdle", "respring", "keepVersions"];
 // F282: "ignoredVersions" (Ignore This Version) goes as its { id: version } object, so the daemon's count and
 // automatic installs skip that version too.
@@ -801,7 +811,8 @@ export function createSettings({ storage = globalThis.localStorage, mode = "site
     const out = [];
     for (const s of SECTIONS) {
       const groups = [];
-      for (const d of SETTINGS.filter((x) => x.section === s.id && shown(x))) {
+      // F201: a row with `style` shows only in that style (the Themes rows: iOS 6's themes only)
+      for (const d of SETTINGS.filter((x) => x.section === s.id && shown(x) && (!x.style || get("style") === x.style))) {
         const hint = hintOf(d);
         const host = d.with ? groups.find((g) => g.settings.some((x) => x.key === d.with)) : null;
         const last = groups[groups.length - 1];
@@ -882,10 +893,22 @@ export function paletteFor(theme, darkTheme, lightTheme) {
 // F199: everything Theme's page decides, in one call (theme-boot.js keeps the same rule before first paint): Mode
 // picks the tone (Automatic: the system's), and the tone's chosen theme is the palette. `preview` ("light" or
 // "dark") is the tone of the theme list on screen: the page shows that list's theme while it is open.
-export function themeState({ appearance, lightTheme, darkTheme, preview = null }, systemDark) {
-  const theme = preview === "light" || preview === "dark" ? preview : themeFor(appearance, systemDark);
-  return { theme, palette: paletteFor(theme, darkTheme, lightTheme) };
+// F201: `style` is the era (<html data-style>): iOS 6's themes are the lightTheme and darkTheme picks; another era has
+// its own pair (STYLE_PALETTES) and no picks, so neither the picks nor a preview change it.
+export function themeState({ style = "ios6", appearance, lightTheme, darkTheme, preview = null }, systemDark) {
+  const era = STYLES.includes(style) ? style : STYLE_DEFAULT;
+  const own = STYLE_PALETTES[era];
+  const theme = !own && (preview === "light" || preview === "dark") ? preview : themeFor(appearance, systemDark);
+  return { theme, palette: own ? own[theme] : paletteFor(theme, darkTheme, lightTheme), style: era };
 }
+
+// F201: the eras Theme > Style offers (the style setting's options), iOS 6 first and the default. An era that is not
+// iOS 6 paints only its own two themes, one per tone: iOS 7's White (no palette block: ios6.css's light tokens, then
+// ios7.css's) and OLED Black (ios6.css's dark block, then ios7.css's). theme-boot.js keeps the same table.
+export const STYLES = byKey.get("style").options.map((o) => o.value);
+export const STYLE_DEFAULT = byKey.get("style").default;
+export const STYLE_KEY = "ifizbox.style";
+export const STYLE_PALETTES = { ios7: { light: "white", dark: "oled" } };
 
 // F323: the app icon a tone ("light" or "dark") gets: with Match Theme on, that tone's theme's icon; off, the tone's
 // pick (lightIcon, darkIcon), its theme's own while that is "theme". `get` reads a setting (settings.get).

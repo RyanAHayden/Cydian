@@ -20,15 +20,15 @@ test("paletteFor: classic in light; Gunmetal in dark unless another is chosen (F
   assert.equal(paletteFor("dark", null), "gunmetal");
   assert.equal(paletteFor("dark", "oled"), "oled");
   assert.equal(paletteFor("dark", "neon"), "gunmetal");
-  assert.deepEqual(Object.keys(THEME_COLORS).sort(), [...LIGHT_PALETTES, ...DARK_PALETTES].sort()); // F200: one per theme
+  assert.deepEqual(Object.keys(THEME_COLORS).sort(), [...LIGHT_PALETTES, ...DARK_PALETTES, "white"].sort()); // F200: one per theme; F201: iOS 7's White
   assert.deepEqual([THEME_COLORS.classic, THEME_COLORS.oled, THEME_COLORS.gunmetal], ["#4f698b", "#000", "#5f656f"]);
 });
 
 // theme-boot.js in a sandbox: what it puts on <html> before first paint for a stored Appearance and dark theme.
-function boot({ appearance = null, lightTheme = null, darkTheme = null, systemDark = false, hash = "" } = {}) {
+function boot({ appearance = null, lightTheme = null, darkTheme = null, systemDark = false, hash = "", style = null, withStyle = false } = {}) {
   const attrs = {};
   const meta = { attrs: { content: "#4f698b" }, setAttribute(k, v) { this.attrs[k] = v; } };
-  const store = { "ifizbox.appearance": appearance, "ifizbox.lightTheme": lightTheme, "ifizbox.darkTheme": darkTheme };
+  const store = { "ifizbox.appearance": appearance, "ifizbox.lightTheme": lightTheme, "ifizbox.darkTheme": darkTheme, "ifizbox.style": style };
   const ctx = {
     location: { hash },
     localStorage: { getItem: (k) => store[k] ?? null },
@@ -40,7 +40,8 @@ function boot({ appearance = null, lightTheme = null, darkTheme = null, systemDa
   };
   ctx.window = ctx;
   runInNewContext(read("theme-boot.js"), ctx);
-  return { theme: attrs["data-theme"], palette: attrs["data-palette"], color: meta.attrs.content };
+  const out = { theme: attrs["data-theme"], palette: attrs["data-palette"], color: meta.attrs.content };
+  return withStyle ? { ...out, style: attrs["data-style"] } : out;
 }
 
 test("theme-boot.js agrees with themeFor and paletteFor for every Appearance, dark theme and system", () => {
@@ -115,11 +116,41 @@ test("F199: themeState, theme-boot.js and the store agree for every Mode, theme 
       const known = (list, v) => (v && v !== "neon" ? v : list);
       const want = { theme: tone, palette: tone === "dark" ? known("gunmetal", darkTheme) : known("classic", lightTheme) };
       const what = JSON.stringify({ appearance, lightTheme, darkTheme, systemDark, preview });
-      assert.deepEqual(got, want, what);
+      assert.deepEqual(got, { ...want, style: "ios6" }, what);
       assert.deepEqual(boot({ appearance, lightTheme, darkTheme, systemDark, hash }), { ...want, color: THEME_COLORS[want.palette] }, what);
     }
   }
   assert.deepEqual(LIGHT_PALETTES, ["classic", "sepia", "solarized", "legalpad", "metal"]);
+});
+
+// F201: iOS 7 has its own two themes, White and OLED Black: the theme picks and the lists' previews don't change it,
+// and theme-boot.js agrees with themeState for every stored Style, Mode, system and preview.
+test("F201: iOS 7's White and OLED Black, the same in themeState and theme-boot.js", () => {
+  const previews = [[null, ""], ["light", "#/home/settings/theme/lightTheme"], ["dark", "#/home/settings/theme/darkTheme"]];
+  for (const style of [null, "ios6", "ios7", "ios99"]) for (const appearance of [null, "auto", "light", "dark"])
+    for (const systemDark of [false, true]) for (const [preview, hash] of previews) {
+      const store = createSettings({ storage: mem({ "ifizbox.style": style, "ifizbox.appearance": appearance, "ifizbox.darkTheme": "nord", "ifizbox.lightTheme": "sepia" }) });
+      const got = themeState({ style: store.get("style"), appearance: store.get("appearance"), lightTheme: "sepia", darkTheme: "nord", preview }, systemDark);
+      const what = JSON.stringify({ style, appearance, systemDark, preview });
+      if (style === "ios7") {
+        const tone = appearance === "dark" || (appearance !== "light" && systemDark) ? "dark" : "light";
+        assert.deepEqual(got, { theme: tone, palette: tone === "dark" ? "oled" : "white", style: "ios7" }, what);
+      } else assert.equal(got.style, "ios6", what);
+      assert.deepEqual(boot({ style, appearance, lightTheme: "sepia", darkTheme: "nord", systemDark, hash, withStyle: true }),
+        { theme: got.theme, palette: got.palette, color: THEME_COLORS[got.palette], style: got.style }, what);
+    }
+  assert.equal(themeState({ style: "bogus", appearance: "light" }, false).style, "ios6");
+});
+
+// F201: ios7.css is linked after palettes.css (its tone blocks outrank the palette blocks they tie with) and before
+// wide.css, and every rule in it is scoped to html[data-style="ios7"], so iOS 6 never sees it.
+test("F201: ios7.css is linked after palettes.css and only styles html[data-style=ios7]", () => {
+  const links = [...read("index.html").matchAll(/<link rel="stylesheet" href="([^"]+)"/g)].map((m) => m[1]);
+  assert.ok(links.indexOf("ios7.css") > links.indexOf("palettes.css"));
+  const css = read("ios7.css").replace(/\/\*[\s\S]*?\*\//g, "");
+  const sels = [...css.matchAll(/([^{}]+)\{/g)].map((m) => m[1].trim());
+  assert.ok(sels.length > 20);
+  for (const sel of sels) for (const one of sel.split(/,(?![^(]*\))/)) assert.match(one.trim(), /^html\[data-style="ios7"\]/, one);
 });
 
 // F325: the textured themes (Leather, Felt, Wood; Legal Pad, Brushed Metal): a texture drawn in CSS where Linen's
@@ -180,7 +211,8 @@ test("every dark rule paints with tokens: no fixed colours but black and the kit
     const rules = css.replace(/\/\*[\s\S]*?\*\//g, "").split("}").map((r) => r.trim()).filter((r) => /data-theme="dark"/.test(r.split("{")[0]));
     for (const rule of rules) {
       const [sel, body = ""] = rule.split("{");
-      if (/^html\[data-theme="dark"\](\[data-palette="\w+"\])?$/.test(sel.trim())) continue; // the palettes themselves
+      // the palettes themselves, and an era's dark tone (F201: ios7.css's OLED Black block)
+      if (/^html(\[data-style="ios\d+"\])?\[data-theme="dark"\](\[data-palette="\w+"\])?$/.test(sel.trim())) continue;
       if (/\.action-sheet|\.action-button/.test(sel)) continue; // UIAlertSheetBlack*: the kit's own black sheet
       if (/\.scope-filter\.done/.test(sel)) continue; // shared with light: the nav bar's blue Done
       if (/^html\[data-theme="dark"\] \.dm-shot$/.test(sel.trim())) continue; // F254i: a picture of iOS's own dark Settings

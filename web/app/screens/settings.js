@@ -1305,7 +1305,9 @@ export function signingLayout({ mode, certificate = false, staged = false, profi
     // the sideload Keychain's with no picks left (its caller clears the picks after an import)
     files: staged && !(site && ready),
     profile,
-    account: certificate && (mode === "sideload" || site), // own profiles with an App Store Connect key (devaccount.js): needs the .p12
+    // own profiles with an App Store Connect key (devaccount.js), shown with or without a certificate: hiding it after
+    // Remove Certificate made the API key look deleted (only Remove API Key deletes it)
+    account: mode === "sideload" || site,
     options,
     server: mode === "sideload",
     status: mode === "sideload",

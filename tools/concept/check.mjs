@@ -110,6 +110,40 @@ async function tap(css) {
   for (const type of ["mousePressed", "mouseReleased"]) await send("Input.dispatchMouseEvent", { type, x: at.x, y: at.y, button: "left", clickCount: 1 });
   return at.text;
 }
+// B210: Home > a page pushed on it (Why <NAME> while its tile shows, else a link in Home's list) > the Home tab: Home
+// still draws every row and group it drew before (the Why tile may go: F306 hides it once the page was opened), each
+// one on the page with a height, and what's on screen at a row's centre is that row (nothing blank over it).
+const HOME_ROWS = `const home = d.querySelector(".page.is-top .home"); if (!home) return null;
+  const sc = home.closest(".page-body"), box = sc.getBoundingClientRect();
+  return [...home.children].filter((c) => !c.hidden && !c.matches(".why") && c.getClientRects().length && c.textContent.trim())
+    .map((c) => { const r = c.getBoundingClientRect(), y = r.top + Math.min(r.height / 2, 10);
+      const onScreen = r.top >= box.top && y < box.bottom - 60; // above the tab bar
+      const hit = onScreen ? d.elementFromPoint(r.left + r.width / 2, y) : null;
+      const cs = w.getComputedStyle(c), seen = cs.visibility !== "hidden" && Number(cs.opacity) > 0; // below the screen too
+      return { cls: String(c.className).split(" ").slice(0, 3).join("."), h: Math.round(r.height), onScreen, painted: seen && (!onScreen || c.contains(hit)) }; });`;
+async function homeRetap(name) {
+  const HOME_TAB = 'a.tab[data-tab="home"]';
+  await tap(HOME_TAB);
+  await sleep(1200);
+  await inApp(`const b = d.querySelector(".page.is-top .home")?.closest(".page-body"); if (b) b.scrollTop = 0;`);
+  await sleep(300);
+  const before = await inApp(HOME_ROWS);
+  if (!check(Array.isArray(before) && before.length > 3, `${name}: Home draws its rows (${before?.length ?? "no Home"})`)) return;
+  const pushed = await tap(".page.is-top .home .why:not([hidden]) a") ?? await tap(".page.is-top .home .home-links a.cell-inner");
+  await sleep(1200);
+  const away = await inApp("return w.location.hash");
+  check(pushed && away.startsWith("#/home/"), `${name}: Home pushed "${pushed}" (${away})`);
+  await tap(HOME_TAB);
+  await sleep(1200);
+  const after = await inApp(HOME_ROWS);
+  const lost = (before ?? []).filter((b) => !after?.some((a) => a.cls === b.cls)).map((b) => b.cls);
+  const flat = (after ?? []).filter((a) => !a.h).map((a) => a.cls);
+  const blank = (after ?? []).filter((a) => !a.painted).map((a) => a.cls);
+  check(Array.isArray(after) && after.length === before.length && !lost.length && !flat.length && !blank.length,
+    `${name}: Home tab from "${pushed}" draws all ${before.length} rows again (${after?.length ?? "no Home"}` +
+    (lost.length ? `; missing ${lost.join(", ")}` : "") + (flat.length ? `; no height ${flat.join(", ")}` : "") +
+    (blank.length ? `; covered ${blank.join(", ")}` : "") + ")");
+}
 async function set(control, value) {
   await ev(`(() => { const s = document.getElementById(${JSON.stringify(control)}); s.value = ${JSON.stringify(value)}; s.dispatchEvent(new Event("change")); })()`);
 }
@@ -256,6 +290,7 @@ for (const mode of MODES) {
         const after = await inApp("return w.location.hash");
         check(tabs > 0 && which && after !== before, `${name}: tapping "${which}" in the tab bar went ${before} -> ${after}`);
       }
+      await homeRetap(name);
       if (DRAG !== "none") { await fingerChecks(name); await rowChecks(name); }
       await liveResize(device);
       if (PROBE) console.log(`     probe: ${JSON.stringify(await inApp(PROBE))}`);

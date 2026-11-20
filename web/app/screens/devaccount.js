@@ -15,7 +15,7 @@ import { grouped } from "../nav/ui.js";
 import { showAlert, alertOK } from "../nav/alert.js";
 import { NAME, DOMAIN } from "../brand.js";
 import { sortKeyFiles, issuerFromText, UUID_RE } from "../core/certfiles.js";
-import { makeJwt, httpTransport, ensureProfile, appIdPrefix, profileRows, profileSerials, findCertificate, ensureDevice,
+import { makeJwt, httpTransport, ensureProfile, appIdPrefix, appIdFor, profileRows, profileSerials, findCertificate, ensureDevice,
   makeOwnSigning, profileForP12, profileForAnyP12, LIMIT_TEXT, REVOKE_WARNING } from "../core/asc.js";
 import { parseProfile, fromBase64, toBase64, normalUdid } from "../core/signing.js";
 import { showHUD } from "../nav/hud.js";
@@ -229,14 +229,23 @@ export async function pickRevoke(certs, { alert = showAlert } = {}) {
   return sure?.index === 1 ? c.id : null;
 }
 
+// B121: the website's certificate serial, read from the .p12 itself (signing-client.js identityCert, kept with the
+// identity), else every certificate its profile lists (one of them is the .p12's; F276's profile from a key lists all).
+export async function siteSerials(id, { save, cert } = {}) {
+  const read = cert ?? (await import("../signing-client.js")).identityCert;
+  const c = await Promise.resolve(read(id, save ? { save } : {})).catch(() => null);
+  if (c?.serial) return [c.serial];
+  return id?.profile ? profileSerials(id.profile) : [];
+}
+
 // The serials this app signs with now (the picker marks that certificate "in use").
-async function currentSerials(n, load) {
+async function currentSerials(n, load, save) {
   if (n?.call) {
     const st = await n.call("signing.status", {}).catch(() => null);
     return st?.identity?.serial ? [st.identity.serial] : [];
   }
   const id = await load().catch(() => null);
-  return id?.profile ? profileSerials(id.profile) : [];
+  return siteSerials(id, { save });
 }
 const identityApi = async () => { const m = await import("../signing-client.js"); return { load: m.loadIdentity, save: m.saveIdentity }; };
 const message = (e) => String(e?.message ?? e).replace(/^\w+: /, "");
@@ -262,7 +271,7 @@ export async function makeCertificateFlow(native, { request, alert = showAlert, 
     const go = await alert({ title: `${MAKE_CERT_BUTTON}?`, message: makeCertText(app), buttons: ["Cancel", "Make"], cancel: 0 });
     if (go?.index !== 1) return false;
   }
-  const ownSerials = await currentSerials(n, load);
+  const ownSerials = await currentSerials(n, load, save);
   let made = null;
   let revokeId = null;
   for (let round = 0; !made && round < 4; round++) {
@@ -324,10 +333,11 @@ export async function hasCertificate(native, { load } = {}) {
   } catch { return true; }
 }
 
-// F276: a key user picked a .p12 and no .mobileprovision: the profile for the app's own App ID comes from the key,
-// listing every distribution certificate in the account (the .p12's serial can't be read before it's opened).
+// F276: a key user picked a .p12 and no .mobileprovision: the profile for the app's own App ID comes from the key.
+// B121: for the .p12's own certificate when its serial can be read here (identityCert); else listing every
+// distribution certificate in the account.
 // Saves it with the staged identity; resolves true when it did. Quiet (false) without a key or when nothing is missing.
-export async function profileFromKey(native, { request, identity, alert = showAlert, hud = showHUD, info = keyInfo } = {}) {
+export async function profileFromKey(native, { request, identity, alert = showAlert, hud = showHUD, info = keyInfo, cert = undefined } = {}) {
   const n = nativeOf(native);
   const { load, save } = identity ?? (await identityApi());
   const id = await load().catch(() => null);
@@ -335,7 +345,12 @@ export async function profileFromKey(native, { request, identity, alert = showAl
   if (!(await info(native))) return false;
   const hide = hud("Making Profile");
   try {
-    const r = await profileForAnyP12({ request: request ?? (n?.call ? nativeRequest(n) : siteRequest()), udid: null, deviceName: "iPhone", cache: {} });
+    const req = request ?? (n?.call ? nativeRequest(n) : siteRequest());
+    const read = cert ?? (await import("../signing-client.js")).identityCert;
+    const own = await Promise.resolve(read(id, { save })).catch(() => null);
+    const r = own?.serial && own.team
+      ? await profileForP12({ request: req, serials: [own.serial], team: own.team, udid: null, deviceName: "iPhone", cache: {} })
+      : await profileForAnyP12({ request: req, udid: null, deviceName: "iPhone", cache: {} });
     await save({ profile: fromBase64(r.entry.content), profileName: PROFILE_FILE });
     return true;
   } catch (e) {
@@ -365,7 +380,7 @@ async function checkAccount(native, redraw = () => {}) {
       if (!udid) udid = storedUdid()?.udid ?? null; // F277: a website visit made from the app, kept by an older shell
     } else {
       const id = await (await import("../signing-client.js")).loadIdentity();
-      serials = id?.profile ? profileSerials(id.profile) : [];
+      serials = await siteSerials(id);
       udid = storedUdid()?.udid ?? null;
     }
     if (serials.length) {
@@ -428,7 +443,20 @@ export function accountGroup({ native, redraw = () => {} } = {}) {
 }
 
 // ---- the website's sign-time step ----
-export async function autoProfileSite({ ipa, id, bundleId = null, keep = true, log = () => {} }) {
+// B121: a cached per-app profile that doesn't list the .p12's own certificate (made before its serial was read, for
+// whichever certificate the imported profile listed first) is forgotten, so ensureProfile makes it again.
+export function dropOtherCertProfile(cache, identifier, serials) {
+  const e = cache?.[identifier];
+  if (!e?.content || serials?.length !== 1) return false;
+  let listed;
+  try { listed = profileSerials(fromBase64(e.content)); } catch { return false; }
+  const norm = (s) => String(s).toUpperCase().replace(/^0+/, "");
+  if (!listed.length || listed.map(norm).includes(norm(serials[0]))) return false;
+  delete cache[identifier];
+  return true;
+}
+
+export async function autoProfileSite({ ipa, id, bundleId = null, keep = true, log = () => {}, cert = undefined }) {
   const k = siteKey();
   if (!k || !keep || !id?.profile) return null;
   let own = bundleId;
@@ -437,8 +465,11 @@ export async function autoProfileSite({ ipa, id, bundleId = null, keep = true, l
   }
   const base = parseProfile(id.profile);
   const c = readJson(CACHE) ?? {};
-  const r = await ensureProfile({ request: siteRequest(k), bundleId: own, prefix: appIdPrefix(base.appId, base.teamId),
-    udid: storedUdid()?.udid ?? null, deviceName: "iPhone", serials: profileSerials(id.profile), cache: c });
+  const prefix = appIdPrefix(base.appId, base.teamId);
+  const serials = await siteSerials(id, { cert });
+  dropOtherCertProfile(c, appIdFor(own, prefix), serials);
+  const r = await ensureProfile({ request: siteRequest(k), bundleId: own, prefix,
+    udid: storedUdid()?.udid ?? null, deviceName: "iPhone", serials, cache: c });
   writeJson(CACHE, c);
   log(r.made ? `Profile ${r.appId}: made by ${NAME} (${r.reason})${r.deviceMade ? ", this iPhone added to the account" : ""}` : `Profile ${r.appId}: made by ${NAME}, reused`);
   return fromBase64(r.entry.content);

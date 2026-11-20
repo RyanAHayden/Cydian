@@ -7,7 +7,7 @@ import { readFileSync } from "node:fs";
 const strip = (f) => readFileSync(new URL(f, import.meta.url), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
 const rulesOf = (src) => [...src.matchAll(/([^{}]+)\{([^}]*)\}/g)].map(([, sel, decl]) => ({ sel: sel.trim(), decl }));
 const pkg = rulesOf(strip("./packages.css"));
-const ios6 = rulesOf(strip("./ios6.css"));
+const ios6 = rulesOf(strip("./style.css") + strip("./ios6.css")); // C45: the reload bar's layout is style.css's
 const bottomOf = (decl) => /(?:^|;)\s*bottom\s*:\s*([^;]+)/.exec(decl)?.[1].trim();
 
 test("B51: idle, the index ends 6 pt above the tab bar", () => {

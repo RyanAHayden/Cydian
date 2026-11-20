@@ -1,4 +1,4 @@
-// B4: short pages rubber-band through a zero-width float in .page-body (ios6.css), never by stretching a child.
+// B4: short pages rubber-band through a zero-width float in .page-body (style.css), never by stretching a child.
 // dca99b5's `.page-body > :first-child { min-height: calc(100% + 1px) }` stretched the first group of every page
 // that appends several groups straight into .page-body (Settings root, the package page), pushing the rest down.
 import { test } from "node:test";
@@ -6,8 +6,11 @@ import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
 
 const css = readFileSync(new URL("./ios6.css", import.meta.url), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
-const rules = [...css.matchAll(/([^{}]+)\{([^}]*)\}/g)].map(([, sel, decl]) => ({ sel: sel.trim(), decl }));
 const base = readFileSync(new URL("./style.css", import.meta.url), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+// C45: the shared chrome is style.css (its layout, "Era hooks" on) and ios6.css (its look), loaded in that order; the
+// layout tests below read the two as one sheet, layout first.
+const chrome = base + "\n" + css;
+const rules = [...chrome.matchAll(/([^{}]+)\{([^}]*)\}/g)].map(([, sel, decl]) => ({ sel: sel.trim(), decl }));
 const zOf = (src, sel) => Number(new RegExp(`(^|\\n)${sel.replace(/\./g, "\\.")}\\s*\\{[^}]*z-index:\\s*(\\d+)`).exec(src)?.[2]);
 
 test("no rule sizes a page's children to the scroller's height", () => {
@@ -42,7 +45,7 @@ test("the banner sits under the nav bar, below it in z-order, without the safe-a
   assert.ok(b, ".banner missing");
   assert.match(b.decl, /top\s*:\s*var\(--nav-h\)/);
   assert.doesNotMatch(b.decl, /safe-area-inset-top/);
-  const z = zOf(css, ".banner");
+  const z = zOf(chrome, ".banner");
   assert.ok(z < zOf(base, ".navbar"), "below the nav bar");
   assert.ok(z > zOf(base, "#screens"), "over the page");
   const t = rules.find((x) => x.sel === ".banner-timer");
@@ -69,7 +72,7 @@ test("B40: the reload bar sits whole right above the tab bar, and the last row c
   assert.match(tab, /bottom\s*:\s*0/);
   assert.match(tab, /height\s*:\s*var\(--tab-h\)/, "the tab bar is exactly --tab-h tall");
   assert.match(base, /--tab-h\s*:\s*calc\(49px \+ var\(--safe-bottom\)\)/);
-  const z = zOf(css, ".reload-bar");
+  const z = zOf(chrome, ".reload-bar");
   assert.ok(z > zOf(base, "#screens"), "over the page, not behind it");
   assert.ok(z < zOf(base, ".tabbar"), "under the tab bar, so it slides out from behind it");
   const room = rules.find((x) => /^html\.has-reload :is\([^)]*\.page-body[^)]*\)::after$/.test(x.sel));
@@ -83,7 +86,7 @@ test("B40: the reload bar sits whole right above the tab bar, and the last row c
 // under the sheets' and the dark action sheets' scrim, so it shows again when the sheet closes.
 test("B154: modal sheets cover the reload bar", () => {
   const pk = readFileSync(new URL("./packages.css", import.meta.url), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
-  const z = zOf(css, ".reload-bar");
+  const z = zOf(chrome, ".reload-bar");
   assert.ok(z < zOf(pk, ".sheet"), "under the modal sheets");
   assert.ok(z < zOf(pk, ".action-scrim"), "under the action sheets");
   for (const r of rules.filter((x) => /reload-bar/.test(x.sel) && x.sel !== ".reload-bar")) {
@@ -224,5 +227,49 @@ test("C44: an era stylesheet sets no layout", () => {
   const dir = new URL("./", import.meta.url);
   for (const f of readdirSync(dir).filter((x) => /^ios\d+\.css$/.test(x) && x !== "ios6.css")) {
     assert.deepEqual(layoutIn(readFileSync(new URL(f, dir), "utf8")), [], `${f}: layout belongs in style.css; move it through a hook`);
+  }
+});
+
+// C45: the rest of ios6.css (switch, plain tables and section header, button pair, HUD, menu callout, queue hint,
+// signing rows, banner, share sheet, reload bar, segmented control, undo bar, pull to refresh, placeholders, locked
+// tab, and the odds and ends) went the same way: ios6.css is all look now and its layout is style.css's, in the order
+// it had, after style.css's own rules (journal/2026-11-20-c45-ios6-era-readiness/cascade.py proves the order).
+test("C45: ios6.css sets no layout at all, and every rule in it but the token blocks sits in a look-only stretch", () => {
+  assert.deepEqual(layoutIn(raw), [], "move it to style.css (Era hooks), after the rules there, keeping its order");
+  assert.doesNotMatch(css, /@keyframes|@media/, "motion and reduced motion are layout: style.css's");
+  const tokensOnly = (sel, props) => props.every((p) => p.startsWith("--") || p === "color-scheme");
+  for (const { sel, props } of cssRules(outside)) {
+    if (sel === "body") continue; // the page's own text colour and ground
+    assert.ok(/^(:root|html)(\[[^\]]*\])*$/.test(sel) && tokensOnly(sel, props), `${sel} sits outside the look-only stretches`);
+  }
+});
+
+test("C45: ios6.css's decorations come from tokens: no gradient, image or emboss written into a rule", () => {
+  // Custom properties hold the values; a rule reads them. Hairlines built from a colour token (inset 0 1px 0
+  // var(--divider-hi)) are allowed; literal gradients, url() art and text embosses are not, so an era swaps values
+  // instead of undoing them. The one url() left is the Share button's glyph, an icon (C51's icon map, not a decoration).
+  const ICON = new Set([".bar-button.share-button::before"]);
+  const bad = [];
+  for (const m of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    const sel = m[1].trim().replace(/\s+/g, " ");
+    for (const d of m[2].split(/;(?![^(]*\))/).map((x) => x.trim()).filter(Boolean)) {
+      const [p, ...v] = d.split(":");
+      const val = v.join(":").trim();
+      if (p.trim().startsWith("--")) continue;
+      if (/gradient\(/.test(val) || (/url\(/.test(val) && !ICON.has(sel))) bad.push(`${sel}: ${p.trim()}`);
+      if (/^(text-shadow|filter|border-image(-source)?)$/.test(p.trim()) && !/^(var\(|none$|brightness\()/.test(val) && !ICON.has(sel)) bad.push(`${sel}: ${p.trim()}`);
+    }
+  }
+  assert.deepEqual(bad, []);
+});
+
+test("C45: style.css holds the moved layout and the new hooks drive it", () => {
+  for (const [sel, hook] of [[".section-header", "--section-head-h"], [".cell-inner.pair-button", "--pair-h"], [".store-segmented", "--seg-h"],
+    [".hud", "--hud-w"], [".menu-items", "--callout-h"], [".queue-hint-text", "--callout-h"], [".banner", "--banner-pad"],
+    [".plain .cell-inner", "--plain-cell-pad-y"]]) {
+    assert.ok(new RegExp(`(^|\\n)${sel.replace(/\./g, "\\.")}\\s*\\{[^}]*var\\(${hook}\\)`).test(base), `${sel} uses ${hook}`);
+  }
+  for (const k of ["@keyframes hud-spin", "@keyframes ph-pulse", ".page-body::before", ".switch {", ".sw-knob {", ".reload-bar {", ".undo-bar {", ".pull-refresh {", ".share-sheet {"]) {
+    assert.ok(base.includes(k), `${k} in style.css`);
   }
 });

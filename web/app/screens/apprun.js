@@ -39,7 +39,7 @@ import { fitFileNames } from "../core/midtrunc.js";
 import { appRows, createAppRun, rowStatus, summaryLine, runStatus, runPercent, ended, isSelf, DIDNT_DOWNLOAD, barOf } from "../core/apprun.js";
 import { recordWhen } from "../core/apprun.js"; // B136
 import { apps as appStore, undoRecord } from "../core/installed.js"; // B170
-import { SELF_UPDATE_LINES, SELF_UPDATE_FAILED, HERE_CLOSING_LINE } from "../signing-client.js";
+import { SELF_UPDATE_LINES, SELF_UPDATE_FAILED, HERE_CLOSING_LINE } from "../signing/selfupdate.js";
 
 // The phone's side of a run, from signing-client.js (prepareOnDevice, openPrepared, discardPrepared). Each attempt of a
 // row gets its own tag, so signing.cancel {tag} stops that try only.

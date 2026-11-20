@@ -29,7 +29,7 @@ import { createWishlist } from "../core/wishlist.js";
 import { versionLines, applyVersionLines } from "../core/appupdates.js"; // F281
 import { apps, recordInstall, removeInstall } from "../core/installed.js";
 import { getBackend } from "../backend.js";
-import { loadIdentity, saveIdentity } from "../signing-client.js";
+import { loadIdentity, saveIdentity } from "../signing/identity.js";
 import { settings, createSwitch } from "./settings.js";
 import { NAME, DOMAIN } from "../brand.js";
 import { rowIcon } from "../icons/rowicons.js";

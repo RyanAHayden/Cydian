@@ -64,8 +64,9 @@ test("openAt: Install's redirect opens just the missing step", () => {
 });
 
 test("nothing on the page or in the code still talks about trusting iFizBox's certificate", async () => {
-  const { readFile } = await import("node:fs/promises");
-  for (const f of ["./signing.js", "./settings.js", "../signing-client.js", "../core/signing.js", "../signing.css"]) {
+  const { readFile, readdir } = await import("node:fs/promises");
+  const parts = (await readdir(new URL("../signing/", import.meta.url))).filter((f) => f.endsWith(".js")).map((f) => `../signing/${f}`);
+  for (const f of ["./signing.js", "./settings.js", "../signing-client.js", ...parts, "../core/signing.js", "../signing.css"]) {
     const text = await readFile(new URL(f, import.meta.url), "utf8");
     const hit = text.match(/Certificate Trust Settings|Local Install|signing\.(trust|resetTrust|testServer)|Test Install Server|setUpTrust|mobileconfig|localInstallSection/);
     assert.equal(hit?.[0] ?? null, null, f);

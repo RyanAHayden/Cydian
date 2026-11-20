@@ -50,11 +50,15 @@ import { barButton } from "../nav/ui.js";
 import { longPress, showMenu, copyText } from "../nav/menu.js";
 import { fitFileNames, isFileName } from "../core/midtrunc.js";
 import { readIpaFile } from "../core/ipainfo.js";
-import { localSigning, libraryCall, installFromLibrary, signAndInstall, openSigning, handOffIpa } from "../signing-client.js";
+import { localSigning } from "../signing/common.js";
+import { libraryCall, installFromLibrary } from "../signing/library.js";
+import { signAndInstall } from "../signing/install.js";
+import { openSigning } from "../signing/device.js";
+import { handOffIpa } from "../signing/toobig.js";
 import { siteCertificateAlert } from "./altstore.js";
 import { NAME } from "../brand.js";
 import { signingPage } from "../core/signingpage.js"; // C15: Installation & Signing in the sideload build
-import { serverReachable } from "../signing-client.js";
+import { serverReachable } from "../signing/library.js";
 import { libraryJob } from "../core/appqueue.js";
 import { queueApp } from "./queue.js";
 import { storedKeep, originalState, originalNote, OLD_WAY_ALERT, OLD_WAY_TEXT } from "../core/keepid.js";

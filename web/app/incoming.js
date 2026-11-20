@@ -243,7 +243,7 @@ export async function defaultInstall({ jailbreak = null, ipaInstall = null, reme
     const keep = remember ?? screen.rememberIpa;
     return ({ url, name }) => openIt({ url, name, onInstalled: (r) => keep(r, name || ipaName(url)) });
   }
-  return (await import("./signing-client.js")).signAndInstall;
+  return (await import("./signing/install.js")).signAndInstall;
 }
 
 // F89: ifizbox://install?url=<https IPA>[&name=…] -> { url, name }, or null (no http(s) URL in it).

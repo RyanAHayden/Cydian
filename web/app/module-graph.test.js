@@ -12,7 +12,8 @@ import { lazyFor, LAZY_TABS, SETTINGS_PARTS, BROWSE_PARTS, TAB_TITLES, TABS, set
 
 const root = dirname(fileURLToPath(import.meta.url));
 // The bound F313 set (169 modules, 2.74 MB before; 104 after). Raise it only with a reason in the commit.
-const MAX_MODULES = 110;
+// C28 split signing-client.js into signing/ (14 files for 1, the same code): 119, so 124.
+const MAX_MODULES = 124;
 
 // Static imports only: `import x from "…"`, `import "…"`, `export … from "…"` at the start of a line (multi-line
 // lists included). import() calls are not matched.

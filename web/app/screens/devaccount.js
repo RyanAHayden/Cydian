@@ -233,7 +233,7 @@ export async function pickRevoke(certs, { alert = showAlert } = {}) {
 // B121: the website's certificate serial, read from the .p12 itself (signing-client.js identityCert, kept with the
 // identity), else every certificate its profile lists (one of them is the .p12's; F276's profile from a key lists all).
 export async function siteSerials(id, { save, cert } = {}) {
-  const read = cert ?? (await import("../signing-client.js")).identityCert;
+  const read = cert ?? (await import("../signing/password.js")).identityCert;
   const c = await Promise.resolve(read(id, save ? { save } : {})).catch(() => null);
   if (c?.serial) return [c.serial];
   return id?.profile ? profileSerials(id.profile) : [];
@@ -248,7 +248,7 @@ async function currentSerials(n, load, save) {
   const id = await load().catch(() => null);
   return siteSerials(id, { save });
 }
-const identityApi = async () => { const m = await import("../signing-client.js"); return { load: m.loadIdentity, save: m.saveIdentity }; };
+const identityApi = async () => { const m = await import("../signing/identity.js"); return { load: m.loadIdentity, save: m.saveIdentity }; };
 const message = (e) => String(e?.message ?? e).replace(/^\w+: /, "");
 
 // Puts a made (or picked) .p12 and its profile (base64 or bytes) where signing finds it.
@@ -347,7 +347,7 @@ export async function profileFromKey(native, { request, identity, alert = showAl
   const hide = hud("Making Profile");
   try {
     const req = request ?? (n?.call ? nativeRequest(n) : siteRequest());
-    const read = cert ?? (await import("../signing-client.js")).identityCert;
+    const read = cert ?? (await import("../signing/password.js")).identityCert;
     const own = await Promise.resolve(read(id, { save })).catch(() => null);
     const r = own?.serial && own.team
       ? await profileForP12({ request: req, serials: [own.serial], team: own.team, udid: null, deviceName: "iPhone", cache: {} })
@@ -380,7 +380,7 @@ async function checkAccount(native, redraw = () => {}) {
       if (!udid) udid = (await n.call("asc.udid", {}).catch(() => null))?.udid ?? null;
       if (!udid) udid = storedUdid()?.udid ?? null; // F277: a website visit made from the app, kept by an older shell
     } else {
-      const id = await (await import("../signing-client.js")).loadIdentity();
+      const id = await (await import("../signing/identity.js")).loadIdentity();
       serials = await siteSerials(id);
       udid = storedUdid()?.udid ?? null;
     }

@@ -28,10 +28,12 @@ import { mod, load } from "../lazy.js";
 const lazyFn = (name, fn) => (...args) => mod(name)[fn](...args);
 const logsSection = lazyFn("queue", "logsSection"), logsPage = lazyFn("queue", "logsPage"), logsTitle = lazyFn("queue", "logsTitle");
 const LOGS = "logs"; // queue.js LOGS (#/settings/logs), here so a Settings page's title needs no queue.js
-import { loadIdentity, saveIdentity, clearIdentity, getServer, setServer, serverStatus,
-  localSigning, deviceStatus, importToDevice, removeFromDevice, statusReady, defaultServer,
-  browserSigning, getBring, setBring, signAndInstall } from "../signing-client.js";
-import { PASSWORD_EVENT } from "../signing-client.js";
+import { loadIdentity, saveIdentity, clearIdentity, getServer, setServer, serverStatus, defaultServer, getBring,
+  setBring } from "../signing/identity.js";
+import { localSigning, browserSigning } from "../signing/common.js";
+import { deviceStatus, importToDevice, removeFromDevice, statusReady } from "../signing/device.js";
+import { signAndInstall } from "../signing/install.js";
+import { PASSWORD_EVENT } from "../signing/password.js";
 import { APP_IPA_URL, APP_NAME } from "../core/appoffer.js";
 import { drawWalkthrough, walkOpen, offerInstall, missingStep, siteReady, deviceRows } from "./signing.js";
 import { storedUdid, udidPending, startUdid, watchUdid, canFindUdid, udidFindRows } from "./signing.js";

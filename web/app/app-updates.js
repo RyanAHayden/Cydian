@@ -125,7 +125,7 @@ function sendWatch() {
   lastSent = json;
   Promise.resolve().then(() => native.call("updates.watch", watch)).catch(() => { lastSent = null; });
   // F280: the push server (the signing server) follows the same list (core/push.js; does nothing while Push is off)
-  import("./signing-client.js").then((s) => syncPush({ native, watch, server: s.getServer() })).catch(() => {});
+  import("./signing/identity.js").then((s) => syncPush({ native, watch, server: s.getServer() })).catch(() => {});
 }
 // The switch flipped: send the last list again, with or without iFizBox.
 export const selfAlertsChanged = () => sendWatch();

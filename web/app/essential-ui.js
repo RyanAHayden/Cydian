@@ -13,7 +13,7 @@ import { checkForUpdates, fetchRelease, newerRelease, unfinishedSelfUpdate, clea
 import { getBackend } from "./backend.js";
 import { detectMode } from "./core/settings.js";
 import { showAlert } from "./nav/alert.js";
-import { installOnDevice } from "./signing-client.js";
+import { installOnDevice } from "./signing/route.js";
 import { NAME } from "./brand.js";
 import { showBanner } from "./nav/banner.js";
 import { installQueue } from "./queue.js";

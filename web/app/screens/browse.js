@@ -40,7 +40,8 @@ import { reviewsTab } from "./reviews.js";
 import { reviewsApi, reviewsBase, mergeReviews } from "../core/reviews.js";
 import { showActionSheet } from "../nav/actionsheet.js";
 import { showAlert } from "../nav/alert.js"; // B71a
-import { signAndInstall, localSigning } from "../signing-client.js";
+import { signAndInstall } from "../signing/install.js";
+import { localSigning } from "../signing/common.js";
 import { installOptions } from "../core/altstore.js";
 import { ipaInstallAvailable } from "../ipa-install.js";
 import { IPA_FOOTER } from "../core/ipainstall.js";

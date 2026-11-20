@@ -21,8 +21,9 @@ import { showAlert } from "./nav/alert.js";
 import { liveHUD } from "./nav/hud.js";
 import { grouped, el, row } from "./nav/ui.js";
 import { format, settingsRoute } from "./router.js";
-import { installOnDevice, openSigning } from "./signing-client.js";
-import { askInsecure } from "./signing-client.js"; // B104
+import { installOnDevice } from "./signing/route.js";
+import { openSigning } from "./signing/device.js";
+import { askInsecure } from "./signing/common.js"; // B104
 import { createSwitch } from "./screens/settings.js";
 import { phaseLabel, deviceError, inspectGroups, installParams, installedId, signsAsFor, isCgBI, fromBase64, notLandedText, SENT_TO_IOS } from "./core/signing.js";
 import { NAME } from "./brand.js";
@@ -84,7 +85,7 @@ export async function inspectAndInstall({ url, name = "", onInstalled = () => {}
 // The Custom Install row's tap: the Signing walkthrough first when something is missing (F75), else the sheet. With
 // `opts.queue` (F84, the app page) the sheet's Install queues the app with its options instead of signing now.
 export async function customInstall(opts, { check = null, inspect = inspectAndInstall, toQueue = inspectToQueue } = {}) {
-  const missing = check ? await check() : await (await import("./signing-client.js")).firstInstallCheck();
+  const missing = check ? await check() : await (await import("./signing/device.js")).firstInstallCheck();
   if (missing) return false;
   return opts?.queue ? toQueue(opts) : inspect(opts);
 }

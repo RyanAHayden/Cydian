@@ -415,7 +415,7 @@ export async function addDebTo(bundleId, st, data, { store = tweakStore } = {}) 
 export async function signableApps({ library = null, records = null } = {}) {
   const out = new Map();
   try {
-    const list = library ? await library() : (await (await import("../signing-client.js")).libraryCall("list"))?.ipas ?? [];
+    const list = library ? await library() : (await (await import("../signing/library.js")).libraryCall("list"))?.ipas ?? [];
     for (const e of list) if (e?.bundleId && !out.has(e.bundleId)) out.set(e.bundleId, { bundleId: e.bundleId, name: e.options?.name || e.name || e.bundleId, from: "My IPAs" });
   } catch { /* no library (the website): the signed apps only */ }
   try {

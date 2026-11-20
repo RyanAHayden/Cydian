@@ -4,7 +4,7 @@
 // when the user opened Signing themselves.
 import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { rememberInstall, pendingInstall, forgetInstall, offerInstall, routeLeftSigning, siteReady } from "./signing.js";
 import { installApp } from "./home.js";
 import { APP_IPA_URL, APP_NAME } from "../core/appoffer.js";
@@ -140,7 +140,8 @@ test("every Signing page offers it as it draws (app and website, page and walkth
     const body = settings.slice(settings.indexOf(`async function ${fn}(`)).split(/\n}\n/)[0];
     assert.match(body, /offerInstall\(/, fn);
   }
-  const client = readFileSync(new URL("../signing-client.js", import.meta.url), "utf8");
+  const dir = new URL("../signing/", import.meta.url);
+  const client = readdirSync(dir).filter((f) => f.endsWith(".js")).map((f) => readFileSync(new URL(f, dir), "utf8")).join("\n");
   assert.equal((client.match(/rememberInstall\(/g) ?? []).length, 3,
     "the app's first Install, My IPAs' Install (B39) and the website's No Certificate");
 });

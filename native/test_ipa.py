@@ -87,11 +87,20 @@ class Ipa(unittest.TestCase):
         self.assertEqual(first, open(self.ipa, "rb").read())
 
     def test_launch_screen_checked(self):
-        """B180: the IPA has the launch storyboard and its images too."""
-        os.remove(os.path.join(self.app, "LaunchStripes@2x.png"))
-        self.assertIn("launch image LaunchStripes@2x.png missing", self.problems())
-        shutil.rmtree(os.path.join(self.app, "LaunchScreen.storyboardc"))
-        self.assertTrue(any("LaunchScreen.storyboardc missing" in p for p in self.problems()))
+        """B203: the IPA's splash is the neutral UILaunchScreen (no storyboard: its bars would show Classic whatever
+        the theme), and it carries every theme's set for the in-app cover."""
+        self.assertEqual([p for p in self.problems() if "aunch" in p], [])
+        with open(os.path.join(self.app, "Info.plist"), "rb") as f:
+            info = plistlib.load(f)
+        self.assertEqual(info.get("UILaunchScreen"), {})
+        self.assertNotIn("UILaunchStoryboardName", info)
+        self.assertNotIn("IFIZBOX_REMOVE_KEYS", info)
+        os.remove(os.path.join(self.app, "LaunchThemes", "gunmetal", "LaunchStripes@2x.png"))
+        self.assertIn("launch theme gunmetal: image LaunchStripes@2x.png missing", self.problems())
+        info["UILaunchStoryboardName"] = "LaunchScreen"
+        with open(os.path.join(self.app, "Info.plist"), "wb") as f:
+            plistlib.dump(info, f)
+        self.assertTrue(any("UILaunchStoryboardName" in p for p in self.problems()))
 
     def test_helper_flagged(self):
         self.write("ifizbox-helper", b"x", 0o755)

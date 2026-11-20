@@ -157,6 +157,9 @@ bundle() {
   # the loose PNGs it names (launch/make.py).
   cp -R launch/LaunchScreen.storyboardc "$app/"
   cp launch/Launch*@2x.png launch/Launch*@3x.png "$app/"
+  # B203: every theme's set (launch/make.py): the in-app cover's, and what the helper's launch-theme copies over the
+  # files above. The IPA's own splash is neutral (Info-sideload.plist UILaunchScreen), its storyboard unused.
+  rm -rf "$app/LaunchThemes" && cp -R launch/themes "$app/LaunchThemes"
   cp bridge.js "$app/bridge.js"
   # Apple's WWDR intermediates and roots, public certificates the on-device signer puts in each CMS (I6).
   mkdir -p "$app/certs" && cp sign/certs/*.cer "$app/certs/"

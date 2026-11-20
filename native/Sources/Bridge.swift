@@ -220,6 +220,7 @@ enum Theme {
         if let web = window.rootViewController?.view as? WKWebView { Launch.paint(web, ground) }
         UserDefaults.standard.set(["style": style, "darkPalette": darkPalette, "lightPalette": lightPalette],
                                   forKey: savedKey)
+        Splash.follow(dark: theme == "dark", palette: darkPalette, lightPalette: lightPalette) // B203: the next splash
         window.rootViewController?.setNeedsStatusBarAppearanceUpdate()
     }
 }

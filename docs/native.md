@@ -277,7 +277,8 @@ folder in the Files app. Paste the table here when it exists.
 What opening the app shows before the page draws: the page's first frame without its text. That is `index.html`'s
 `#boot` under the app's bars (`web/app/ios6.css` with `data-shell="app"`): the nav bar's gloss runs up through the
 status-bar strip, the pinstripes fill the middle, and the tab bar's black runs down over the home indicator. It has
-no title, tab icons or Loading. Both builds use it.
+no title, tab icons or Loading, and it is in the current theme ("Every theme's frame" below). The jailbreak
+build's splash and both builds' cover use it; the sideload IPA's own splash is neutral.
 
 **Why a storyboard.** Keeping a launch screen at all matters: without `UILaunchStoryboardName` or `UILaunchScreen`
 iOS runs the app letterboxed at an old screen size. Info.plist's `UILaunchScreen` dictionary can't draw these strips.
@@ -323,11 +324,35 @@ stripes are one point tall. `test_native.py` keeps the images' total far under t
 - The shell keeps the last `app.theme` (`{style, darkPalette}`, UserDefaults `ifizbox.shellTheme`). When that
   was dark (Dark, or Automatic on a dark iPhone), the window and web view start on the palette's ground (black for
   OLED Black, the dark pinstripes for Gunmetal) instead of the light pinstripes. `Theme.apply` repaints them on every
-  change. The launch screen and the cover are still light, so a dark run fades from them to the dark page.
+  change.
 
-**Checked by the builds:** `mkdeb.py check` and `mkipa.py check` (through `native/launch_check.py`) refuse a bundle
+**Every theme's frame** (`native/Sources/Launch.swift`, `Splash`). The splash never shows another theme:
+
+- `launch/make.py`'s `THEMES` draws each Settings palette's bars and ground as the CSS does
+  (`native/test_launch_grounds.py` reads them back out of `ios6.css` and `palettes.css`) and writes
+  `launch/themes/<key>/`: that theme's images and a copy of `LaunchScreen.storyboardc` whose colour views are the
+  theme's. The colours are rewritten in the compiled view nib in place (its `UIColor` values; no Mac needed).
+  Classic's set is the top-level files byte for byte. `build.sh` copies `themes/` into both bundles as
+  `LaunchThemes/`. Adding a palette means a row in `THEMES` and `launch_check.THEME_KEYS`, then rerun make.py.
+- **Jailbreak build:** iOS draws the splash from the bundle's own launch files at every launch (the iPhone 7 keeps
+  no SplashBoard snapshot for an app in the jailbreak's `/Applications`; swapping one PNG or one nib colour showed on
+  the next launch). On every `app.theme`, `Splash.follow` compares the bundle's files with the theme's and, when they
+  differ, runs `ifizbox-helper launch-theme <key>` (`native/helper/launch.h`), which copies the theme's 12 PNGs and
+  view nib over the bundle's own (temp file + rename each). A .deb upgrade puts Classic's back; the page's first
+  `app.theme` puts the theme's back. It also drops this app's own SplashBoard snapshots, if iOS keeps any.
+- **Sideload IPA:** the signed bundle can't change, so its splash is neutral: `Info-sideload.plist` sets an empty
+  `UILaunchScreen` (iOS's own background, white or black with the iPhone's appearance, no bars) and drops
+  `UILaunchStoryboardName` (`mkipa.py`'s `IFIZBOX_REMOVE_KEYS`).
+- **Both:** the cover is the theme's frame, `LaunchThemes/<key>/` loaded as a bundle of its own
+  (`Splash.cover`); with that set missing, Classic falls back to the bundle's own storyboard and any other theme
+  gets no cover (the window's ground), never another theme's bars.
+- Automatic follows the page's resolved theme at the last change: an iPhone that switched appearance while the app
+  wasn't running opens once on the other tone's frame in the jailbreak build.
+
+**Checked by the builds:** `mkdeb.py check` and `mkipa.py check` (through `native/launch_check.py`) refuse a .deb
 whose Info.plist doesn't name the `LaunchScreen` storyboard or still has `UILaunchScreen`, or that lacks the
-compiled `LaunchScreen.storyboardc` or any image it names at @2x or @3x.
+compiled `LaunchScreen.storyboardc` or any image it names at @2x or @3x; an IPA that names the storyboard or lacks
+the empty `UILaunchScreen`; and either one missing a theme's set under `LaunchThemes/`.
 
 **Checking it without a phone.** `journal/2026-11-20-b180-launch-strips/sim/` has a Simulator harness for the Mac.
 It holds iOS's splash up, then shows `#boot` in a WKWebView set up like the app's, and screenshots both, plus the

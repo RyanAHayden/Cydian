@@ -3,6 +3,11 @@
 <!-- Keys the sideload IPA adds to Info.plist (docs/sideload.md, "What I2 needs"). mkipa.py merges them in. -->
 <plist version="1.0">
 <dict>
+	<!-- B203: a neutral splash (iOS's own background, white or black with the iPhone's appearance, no bars): the
+	     signed bundle can't follow the theme, and the storyboard's bars would show Classic whatever the theme.
+	     mkipa.py drops the keys listed in IFIZBOX_REMOVE_KEYS from Info.plist. -->
+	<key>UILaunchScreen</key><dict/>
+	<key>IFIZBOX_REMOVE_KEYS</key><array><string>UILaunchStoryboardName</string></array>
 	<key>UIBackgroundModes</key><array><string>audio</string><string>fetch</string></array>
 	<!-- I3: the background update check (BackgroundCheck.swift), a BGAppRefreshTask. -->
 	<key>BGTaskSchedulerPermittedIdentifiers</key><array><string>com.ryha.ifizbox.updates</string></array>

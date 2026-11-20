@@ -54,6 +54,8 @@ const listeners = new Set();
 export const onSourcesChanged = (f) => { listeners.add(f); return () => listeners.delete(f); };
 // B75: the add paths pass their ctx, so the Sources tab can load what was added under the reload bar (screens/sources.js).
 const changed = (ctx) => { for (const f of listeners) f(ctx); };
+// B141: the same for adds made outside this screen (the website's Open in App import, screens/importlink.js).
+export const sourcesChanged = (ctx) => changed(ctx);
 
 let pending = null; // the import under review: [entry with status and `pick`]
 

@@ -115,7 +115,16 @@ settings.onChange((key) => { if (key === "device" && state.body?.isConnected) dr
 // F45: an add, delete or reorder in Manage reloads the list, so it is right when the user goes back.
 // B75: and a source just added starts loading at once, under the reload bar (`ctx` from Manage's Add paths), even
 // when the Sources list was never drawn, so Search finds its packages without a visit here.
-manage.onSourcesChanged((ctx) => { if (state.body) load(ctx ?? state.ctx); else loadNew(ctx); });
+// B141: and a source that came in already read (Add's IPA record, the website's Open in App import) goes into the
+// catalog at once (feedCatalog: ctx.loadData), so Search finds its apps without a Refresh.
+manage.onSourcesChanged((ctx) => {
+  if (state.body) load(ctx ?? state.ctx); else loadNew(ctx);
+  feedCatalog(ctx ?? state.ctx);
+});
+
+// B141: the app's ctx, for loads started where no screen hands one (the website's import at first launch): the
+// reload bar, the badge and catalog loads. A screen's own ctx, once given, stays.
+export function useContext(ctx) { state.ctx ??= ctx; }
 
 export function render(el, route, ctx) {
   if (manage.isManage(route)) {
@@ -149,8 +158,8 @@ async function load(ctx) {
 // B75: `fresh` reads the list first (a source just added, Search), inside the busy section so two callers never
 // start two runs; a call while another run is busy marks `again` and gets that run's promise (null for a Refresh).
 // Resolves to the refreshed records, or null when nothing needed loading.
-function firstLoad(ctx, { fresh = false, backend = getBackend() } = {}) {
-  if (state.busy) { state.again = true; return state.current ?? Promise.resolve(null); }
+function firstLoad(ctx, { fresh = false, backend = getBackend(), retry = null } = {}) {
+  if (state.busy) { state.again = true; if (retry) state.againRetry = retry; return state.current ?? Promise.resolve(null); }
   state.busy = true;
   let run = null;
   const job = (async () => {
@@ -160,6 +169,7 @@ function firstLoad(ctx, { fresh = false, backend = getBackend() } = {}) {
       // F150: the reload bar instead of a HUD, so the list stays usable while the new sources load.
       done = await loadNeverLoaded(backend, state.sources, settings.deviceType(), {
         tried: state.tried,
+        retry, // B141: Search's per-visit second try of failed sources
         // the bar ends in the finally below; begin hands back a no-op `end` (B75: none made end() throw, so the
         // list was never read again after a first load)
         begin: (keys) => { run = startRun(ctx, [...(keys ?? [])]); return () => {}; },
@@ -177,6 +187,7 @@ function firstLoad(ctx, { fresh = false, backend = getBackend() } = {}) {
       state.busy = false;
       state.current = null;
       runAgain(ctx, run?.cancelled);
+      settle();
     }
     return done;
   })();
@@ -190,9 +201,21 @@ function firstLoad(ctx, { fresh = false, backend = getBackend() } = {}) {
 // loading now: firstLoad's one run under the reload bar, with the words, rows, badge and Cancel of Refresh, whichever
 // tab is open. Search calls it on opening and as a query is typed; Manage's adds through onSourcesChanged. Each
 // source is tried once per session (state.tried, shared by every caller). `backend` is for the tests.
-export function loadNew(ctx = state.ctx, { backend } = {}) {
+// B141: `retry` (a Set Search keeps per visit, core/sources.js loadNeverLoaded) also loads failed or empty sources
+// once more.
+export function loadNew(ctx = state.ctx, { backend, retry } = {}) {
   if (ctx) state.ctx = ctx;
-  return firstLoad(ctx ?? state.ctx, { fresh: true, ...(backend ? { backend } : {}) });
+  return firstLoad(ctx ?? state.ctx, { fresh: true, ...(backend ? { backend } : {}), ...(retry ? { retry } : {}) });
+}
+
+// B141: a run (Refresh at launch, a first load, a row's retry) is under way: Search says sources are still loading
+// instead of No Results. onSettled(f) is told each time one ends with no other started; returns unsubscribe.
+export const isLoading = () => state.busy;
+const settledListeners = new Set();
+export function onSettled(f) { settledListeners.add(f); return () => settledListeners.delete(f); }
+function settle() {
+  if (state.busy) return;
+  for (const f of [...settledListeners]) { try { f(); } catch { /* one listener's error stops no other */ } }
 }
 
 // Called with no arguments each time a landed source's packages are in the catalog (after ctx.loadData), for a
@@ -208,8 +231,10 @@ function fireLanded() {
 function runAgain(ctx, cancelled = false) {
   if (!state.again) return;
   state.again = false;
+  const retry = state.againRetry;
+  state.againRetry = null;
   if (cancelled) return;
-  loadNew(ctx ?? state.ctx);
+  loadNew(ctx ?? state.ctx, retry ? { retry } : {});
 }
 
 // Loading marks: the rows of `keys` spin and the Sources tab's badge spins until each answers (onEach), as
@@ -347,6 +372,7 @@ export async function retrySource(ctx, key) {
     state.running = false;
     state.busy = false;
     runAgain(ctx); // B75
+    settle();
     state.rows?.finish();
     announce();
     ctx?.setBadge?.("sources", tabBadge(state.rows?.counts(), false));
@@ -378,6 +404,7 @@ export async function refreshInBackground(ctx) {
     if (!run?.cancelled) { clearLoading(ctx); run?.end(); }
     state.busy = false;
     runAgain(ctx, run?.cancelled); // B75
+    settle();
   }
 }
 
@@ -661,5 +688,6 @@ async function refresh(ctx) {
     if (!run?.cancelled) { clearLoading(ctx); run?.end(); }
     state.busy = false;
     runAgain(ctx, run?.cancelled); // B75
+    settle();
   }
 }

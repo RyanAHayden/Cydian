@@ -457,6 +457,7 @@ if (addFrom) requestAnimationFrame(() => addSource(ctx, addFrom));
 // The website instead refreshes each launch once browsing is unlocked (F250), whatever the setting says: one path each
 // (websign-gate.js launchRefresh).
 const refreshSetting = () => settingsScreen.settings.isShown("refreshOnLaunch") && settingsScreen.settings.get("refreshOnLaunch");
+SCREENS.sources.useContext?.(ctx); // B141: loads started outside a screen (the website's import) get the reload bar
 const refreshAtOpen = () => launchRefresh({ mode: detectMode(), settingOn: refreshSetting,
   background: () => SCREENS.sources.refreshInBackground?.(ctx) });
 refreshAtOpen();

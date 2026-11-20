@@ -558,14 +558,26 @@ export function firstLoadFilter(type) {
   return (s) => isAltKey(s?.key) && neverLoaded(s) && shown(s);
 }
 
+// B141: the AltStore sources worth one more try when Search finds nothing: never loaded, last fetch failed, or no
+// apps (count null or 0). One only its own app can read (`unsupported`, an encrypted GBox source) never answers.
+export function retryFilter(type) {
+  const shown = sourceFilter(type) ?? (() => true);
+  return (s) => isAltKey(s?.key) && !s.unsupported && shown(s) && (neverLoaded(s) || Boolean(s.error) || !s.count);
+}
+
 // F43: refreshes the never-loaded sources in `list` (firstLoadFilter), once each per `tried` (a Set of keys the
 // caller keeps, so a source whose fetch throws isn't asked again on every visit). `begin()` runs before the fetch
 // and returns what ends it (the screen's HUD). Resolves to the refreshed records, or null when nothing needed it.
-export async function loadNeverLoaded(backend, list, type, { tried = new Set(), begin = () => () => {}, onEach, onRow } = {}) {
+// B141: `retry` (a Set of keys the caller keeps per visit, Search's) also takes the sources retryFilter keeps that
+// aren't in it yet: one whose first fetch failed (first launch, the network still coming up) loads again once per
+// Search visit instead of never.
+export async function loadNeverLoaded(backend, list, type, { tried = new Set(), retry = null, begin = () => () => {}, onEach, onRow } = {}) {
   const want = firstLoadFilter(type);
-  const keys = new Set((Array.isArray(list) ? list : []).filter((s) => want(s) && !tried.has(s.key)).map((s) => s.key));
+  const again = retry ? retryFilter(type) : null;
+  const keys = new Set((Array.isArray(list) ? list : [])
+    .filter((s) => (want(s) && !tried.has(s.key)) || (again?.(s) && !retry.has(s.key))).map((s) => s.key));
   if (!keys.size) return null;
-  for (const k of keys) tried.add(k);
+  for (const k of keys) { tried.add(k); retry?.add(k); }
   const end = begin(keys);
   try {
     return await backend.refreshSources(onEach, { filter: (s) => keys.has(s?.key), ...(onRow ? { onRow } : {}) });

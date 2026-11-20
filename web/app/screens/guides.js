@@ -332,20 +332,30 @@ const opens = (id, lite) => guideIds(lite).includes(id) || Boolean(GUIDES[id]?.l
 // Hoc profile whose explicit App ID has Push keeps its own ID and gets its own notifications. The push goes to the
 // Info.plist bundle ID, so the signing team doesn't matter, and one such App ID covers every app.
 export const KEEP_INTRO = "A signed app keeps its own bundle ID, so it replaces the original and gets its own "
-  + "server's notifications: they go to the ID in the app, whoever signed it. Your profile only needs Push, which "
-  + "Apple gives to an explicit App ID (not a wildcard like com.you.*) in an Ad Hoc profile; a development profile "
-  + "gets test pushes only. One such App ID covers every app. You need a paid Apple Developer account and its Apple "
+  + "server's notifications: they go to the ID in the app, whoever signed it. Your profile needs Push, App Groups "
+  + "and two notification capabilities, which Apple gives to an explicit App ID (not a wildcard like com.you.*) in an "
+  + "Ad Hoc profile; a development profile gets test pushes only. One such App ID covers every app. You need a paid Apple Developer account and its Apple "
   + "Distribution certificate, or a signing service's .p12 and Push profile (then skip to Import It). With Keep Bundle "
   + "IDs off, an app becomes a renamed copy and gets no notifications.";
 export const DEVELOPER_URL = "https://developer.apple.com/account/resources/identifiers/list";
 STEPS[KEEP_GUIDE] = [
+  // D15: docs/developer-account.md step 3, confirmed with Unbound (2026-11-20): an app that hands notifications to an
+  // extension gets none with Push alone; it needs groups assigned and both notification capabilities.
   { title: "Make an App ID with Push", text: "On developer.apple.com, Certificates, IDs & Profiles > Identifiers > +: "
     + "App IDs, App. Choose Explicit and type an ID of your own, such as com.yourname.apps. Tick Push Notifications, "
-    + "then Register. This one App ID is enough for every app's notifications. An App ID per app only keeps apps' "
+    + "App Groups, Communication Notifications and Time Sensitive Notifications (Associated Domains is worth ticking "
+    + "too), then Continue, Register. For a signing service's coverage, also tick App Attest, Fonts, Extended Virtual "
+    + "Addressing, Increased Memory Limit, Increased Debugging Memory Limit and, on the App Services tab, WeatherKit. "
+    + "This one App ID is enough for every app's notifications. An App ID per app only keeps apps' "
     + "keychains and App Groups apart, so their sign-ins don't mix. With an API key (Settings > Signing > Apple "
-    + `Developer Account), ${NAME} makes that per-app App ID and its Ad Hoc profile itself, for every app it signs.`,
+    + `Developer Account), ${NAME} makes that per-app App ID and its Ad Hoc profile itself, for every app it signs, `
+    + "but Apple's API can't make groups or turn on the two notification capabilities: tick those on the website.",
     rows: [{ label: "Identifiers", subtitle: "developer.apple.com", chevron: true,
       onClick: () => globalThis.open?.(DEVELOPER_URL, "_blank", "noopener") }] },
+  { title: "Give It App Groups", text: "Ticking App Groups isn't enough: with no groups assigned, the profile's group "
+    + "list is empty, and an app that hands notifications to an extension (a modded Discord, for one) gets none. "
+    + "Identifiers > +: App Groups, a description and an ID such as group.com.yourname.apps.1. Make five (.1 to .5). "
+    + "Then open the App ID > App Groups > Configure, select them all and Save." },
   { title: "Register Your iPhones", text: "Devices > +: a name and the iPhone's UDID. A Mac's Finder shows it: click "
     + "the line under the iPhone's name. Settings > Signing says whether this iPhone is in your profile." },
   { title: "Make an Ad Hoc Profile", text: "Profiles > +: Ad Hoc. Pick the App ID, your Apple Distribution "
@@ -354,6 +364,9 @@ STEPS[KEEP_GUIDE] = [
     rows: [{ label: "Settings > Signing", href: format(settingsRoute(["signing"])) }] },
   { title: "Install the App", text: "Keep Bundle IDs on (Settings > Signing, or Custom Install per app). If the App "
     + "Store copy is on the iPhone, delete it first: iOS won't put a signed app over it, and its data goes with it." },
+  { title: "When the App ID Changes", text: "Any change to the App ID's capabilities or groups makes every profile "
+    + "made from it invalid. Make the Ad Hoc profile again, import the new one into Settings > Signing (the old one "
+    + "stays in use until you do) and re-sign the apps with it." },
 ];
 export const keepGuideHref = (fmt = format) => fmt({ tab: "home", path: ["guides", KEEP_GUIDE] });
 

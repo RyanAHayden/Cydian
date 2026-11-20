@@ -6,6 +6,7 @@
 //   app icon, "Open <NAME> on Your iPhone" and why it can't install here (this Mac / this PC / Android phones)
 //   Scan With Your iPhone   a QR code of https://<DOMAIN> (core/qr.js), then the address with Copy Link
 //   On Your iPhone          Safari > Share > Add to Home Screen > open it
+//   Why <NAME>?             gone for this visit, onto the Why page (screens/why.js, F303)
 //   Look Around Anyway      gone for good (core/platform.js DISMISS_KEY), into the normal site (wide.css)
 //   What Is <NAME>?         gone for this visit, onto the FAQ (screens/guides.js)
 //
@@ -17,6 +18,7 @@ import { qrSvg } from "../core/qr.js";
 import { notIphoneText, dismissNotIphone } from "../core/platform.js";
 import { format } from "../router.js";
 import { NAME, DOMAIN } from "../brand.js";
+import { WHY_ROUTE } from "./why.js";
 
 export const SITE_URL = `https://${DOMAIN}`;
 export const FAQ_ROUTE = { tab: "home", path: ["guides", "faq"] };
@@ -105,12 +107,15 @@ export function showNotIphone(kind, { win = globalThis, copy = copyText, parent 
   anyway.classList.add("notiphone-anyway");
   const what = rowButton(`What Is ${NAME}?`, leave(format(FAQ_ROUTE)));
   what.classList.add("notiphone-what");
+  // F303: Why <NAME>, what it does that others don't (screens/why.js), the first way into the site
+  const whyApp = rowButton(`Why ${NAME}?`, leave(format(WHY_ROUTE)));
+  whyApp.classList.add("notiphone-whyapp");
 
   body.append(
     hero,
     group("Scan With Your iPhone", table(qr, addr)),
     group("On Your iPhone", table(...steps)),
-    group(null, table(anyway, what)),
+    group(null, table(whyApp, anyway, what)),
   );
   page.append(bar, body);
   parent.append(page);

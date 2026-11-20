@@ -25,15 +25,18 @@ class Mode(unittest.TestCase):
         if not cc:
             raise unittest.SkipTest("no C compiler")
         cls.tmp = tempfile.mkdtemp()
+        cls.addClassCleanup(shutil.rmtree, cls.tmp, True)  # also when the build below fails
         drv = os.path.join(cls.tmp, "driver.c")
         with open(drv, "w") as f:
             f.write(DRIVER)
         cls.exe = os.path.join(cls.tmp, "mode")
-        subprocess.run([cc, "-Wall", "-Werror", "-o", cls.exe, drv, os.path.join(HERE, "Sources/mode.c")], check=True)
-
-    @classmethod
-    def tearDownClass(cls):
-        shutil.rmtree(cls.tmp)
+        # The compiler keeps its own scratch files in $TMPDIR, else /tmp, which the other gates on this machine share
+        # and can fill up (a gate once failed here on "error closing /tmp/cc*.s: Disk quota exceeded" while
+        # tempfile had fallen back to /var/tmp). -pipe passes the stages through pipes, and TMPDIR sends whatever
+        # the compiler or linker still writes to this test's own directory, which mkdtemp just proved writable.
+        env = dict(os.environ, TMPDIR=cls.tmp)
+        subprocess.run([cc, "-pipe", "-Wall", "-Werror", "-o", cls.exe, drv, os.path.join(HERE, "Sources/mode.c")],
+                       check=True, env=env)
 
     def mode(self, *path):
         out = subprocess.run([self.exe, *path], check=True, capture_output=True, text=True).stdout.strip()

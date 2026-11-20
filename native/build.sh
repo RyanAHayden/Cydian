@@ -153,6 +153,9 @@ bundle() {
     for x in @2x @3x; do cp "icon/${icon/60x60/${pt}x${pt}}$x.png" "$app/AppIcon${pt}x${pt}$x.png"; done
   done
   cp "icon/$car" "$app/Assets.car"
+  # F323: every app icon at 180 px as this build's Home Screen shows it (Lite's sashed), for the page: Home's header
+  # and Theme > App Icon's thumbnails (Bridge.swift AppScheme serves them as appicon/<icon>.png).
+  rm -rf "$app/AppIconThumbs" && python3 icon/alternates.py thumbs "$app/AppIconThumbs" ${overlay:+--lite}
   # B180: the launch screen, Info.plist's UILaunchStoryboardName (compiled on a Mac by launch/storyboard.sh), and
   # the loose PNGs it names (launch/make.py).
   # B203: the .deb's only: the IPA's splash is the neutral UILaunchScreen (Info-sideload.plist).

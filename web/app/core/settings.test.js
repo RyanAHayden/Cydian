@@ -30,7 +30,7 @@ test("defaults with nothing stored", () => {
 
 // F128: the settings audit. What's left, and the ones that went (docs/settings.md).
 test("F128: exactly these settings remain, and the retired ones are gone", () => {
-  assert.deepEqual(SETTINGS.map((d) => d.key), ["appearance", "lightTheme", "darkTheme", "device", "arch", "worksOnMyPhone", "compatMarks",
+  assert.deepEqual(SETTINGS.map((d) => d.key), ["appearance", "lightTheme", "darkTheme", "iconMatch", "lightIcon", "darkIcon", "device", "arch", "worksOnMyPhone", "compatMarks",
     "iosVersion", "refreshOnLaunch", "returnHome", "holds", "selfUpdateAlerts", "upgradeNotifications", "autoInstall", "autoInstallIdle", "respring",
     "keepVersions", "showExpiry", "resignReminder", "keepBundleId", "showExpiryWarning", "expiryWarning", "installRoute"]);
   assert.deepEqual(RETIRED, ["sideloader", "checkUpdates", "cellular", "notifications", "badge", "allowZoom"]);
@@ -43,7 +43,8 @@ test("F128: exactly these settings remain, and the retired ones are gone", () =>
   // every section is on a page, every setting in a section
   for (const sec of SECTIONS) assert.ok(PAGES.some((p) => p.id === sec.page), sec.id);
   // (F285: "alerts", selfUpdateAlerts, is drawn by screens/settings.js notifySection among iOS's rows, not as a section)
-  for (const d of SETTINGS) if (d.modes.length && d.section !== "alerts") assert.ok(SECTIONS.some((x) => x.id === d.section), d.key);
+  // (F323: "appicon", Theme > App Icon, is drawn by screens/settings.js appIconGroups, not as a section)
+  for (const d of SETTINGS) if (d.modes.length && d.section !== "alerts" && d.section !== "appicon") assert.ok(SECTIONS.some((x) => x.id === d.section), d.key);
 });
 
 test("F128: the migration drops the retired settings' stored values and keeps everything else", () => {
@@ -257,16 +258,16 @@ test("rows each mode shows once every feature exists", () => {
   assert.deepEqual(show("site"),
     ["appearance", "lightTheme", "darkTheme", "device", "worksOnMyPhone", "compatMarks", "iosVersion", "returnHome", "holds", "keepBundleId"]);
   assert.deepEqual(show("jailbreak"),
-    ["appearance", "lightTheme", "darkTheme", "worksOnMyPhone", "compatMarks", "refreshOnLaunch", "returnHome", "holds",
+    ["appearance", "lightTheme", "darkTheme", "iconMatch", "lightIcon", "darkIcon", "worksOnMyPhone", "compatMarks", "refreshOnLaunch", "returnHome", "holds",
       "upgradeNotifications", "autoInstall", "autoInstallIdle", "respring", "keepVersions"]);
   assert.deepEqual(show("sideload"),
-    ["appearance", "lightTheme", "darkTheme", "worksOnMyPhone", "compatMarks", "refreshOnLaunch", "returnHome", "holds", "selfUpdateAlerts", "showExpiry", "resignReminder", "keepBundleId",
+    ["appearance", "lightTheme", "darkTheme", "iconMatch", "lightIcon", "darkIcon", "worksOnMyPhone", "compatMarks", "refreshOnLaunch", "returnHome", "holds", "selfUpdateAlerts", "showExpiry", "resignReminder", "keepBundleId",
       "showExpiryWarning", "expiryWarning", "installRoute"]);
 });
 
 test("rows wait for their feature: today Appearance, the sources settings, Works on My Phone, Ignored Upgrades and Automatic Installs", () => {
   const s = createSettings({ storage: memStorage(), mode: "jailbreak" });
-  assert.deepEqual(keysOf(s), ["appearance", "lightTheme", "darkTheme", "worksOnMyPhone", "compatMarks", "refreshOnLaunch", "returnHome", "holds", "upgradeNotifications",
+  assert.deepEqual(keysOf(s), ["appearance", "lightTheme", "darkTheme", "iconMatch", "lightIcon", "darkIcon", "worksOnMyPhone", "compatMarks", "refreshOnLaunch", "returnHome", "holds", "upgradeNotifications",
     "autoInstall", "autoInstallIdle", "respring", "keepVersions"]);
   assert.equal(s.isShown("autoInstall"), true);
   assert.equal(createSettings({ storage: memStorage(), mode: "jailbreak", features: new Set(["appearance"]) }).isShown("autoInstall"), false);

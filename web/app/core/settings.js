@@ -40,7 +40,7 @@ export const MODES = ["site", "jailbreak", "sideload"];
 // "upgrade-notifications": Upgrade Notifications, N5's daemon's "n Upgrades" in the jailbreak app (F65).
 // "auto-install", "rollback": N7's Automatic Installs rows, which F70 hands to the daemon (daemonPrefs below).
 export const FEATURES = new Set(["appearance", "sources", "holds", "compat", "device", "resign", "upgrade-notifications",
-  "auto-install", "rollback", "keep-id", "expiry-warning", "install-route", "self-alerts"]); // "keep-id": Keep Bundle IDs (F237); "expiry-warning": F244; "self-alerts": F285
+  "auto-install", "rollback", "keep-id", "expiry-warning", "install-route", "self-alerts", "app-icon"]); // "keep-id": Keep Bundle IDs (F237); "expiry-warning": F244; "self-alerts": F285; "app-icon": F323
 
 const BOTH = ["jailbreak", "sideload"];
 const ALL = ["site", ...BOTH];
@@ -128,6 +128,26 @@ export const SETTINGS = [
       { value: "felt", label: "Felt", swatch: ["#6a4220", "#2c6834"] },
       { value: "wood", label: "Wood", swatch: ["#4e2f15", "#66401f"] }],
     footer: "The theme in Dark mode, and in Automatic while the iPhone is dark.",
+  },
+  {
+    // F323: the Home Screen icon follows the themes: in Light the light theme's icon, on a dark Home Screen the dark
+    // theme's (native/Sources/AppIcon.swift). The apps only: the website's apple-touch-icon can't switch. Drawn by
+    // screens/settings.js appIconGroups (Theme > App Icon), so its section is no SECTIONS group. Off, Light and Dark
+    // below pick each mode's icon. The sideload build's switch shows iOS's alert (the jailbreak app's goes quietly).
+    key: "iconMatch", section: "appicon", kind: "toggle", feature: "app-icon", modes: BOTH, default: true,
+    label: "Match Theme", options: onOff,
+    footer: (mode) => "The icon changes with your theme." + (mode === "sideload" ? " iOS shows an alert each time." : ""),
+  },
+  {
+    // F323: Light's and Dark's icon while Match Theme is off: "theme" (the theme's own, where they start) or an icon
+    // of APP_ICONS. Each pushes theme/<key>, a grid of icons (screens/settings.js iconPage).
+    key: "lightIcon", section: "appicon", kind: "icon", feature: "app-icon", modes: BOTH, default: "theme",
+    label: "Light", iconTone: "light", options: [{ value: "theme", label: "Theme" }],
+    footer: (mode) => "Pick an icon for each mode." + (mode === "sideload" ? " iOS shows an alert when it changes." : ""),
+  },
+  {
+    key: "darkIcon", section: "appicon", kind: "icon", feature: "app-icon", modes: BOTH, default: "theme",
+    label: "Dark", iconTone: "dark", options: [{ value: "theme", label: "Theme" }],
   },
   {
     // F37: what kind of iPhone this is. The site only: the jailbreak app takes it from the bridge (deviceType) and
@@ -326,6 +346,15 @@ const byKey = new Map(SETTINGS.map((d) => [d.key, d]));
 // The architecture list in core/apt.js is the source of truth; the options above must cover it.
 for (const a of ARCHES) if (!byKey.get("arch").options.some((o) => o.value === a)) throw new Error(`arch ${a} has no option`);
 for (const a of ARCHES) if (!byKey.get("device").options.some((o) => o.value === a)) throw new Error(`arch ${a} has no device type`);
+
+// F323: the app icons: every theme's (native/icon/themes/<theme>/, the light themes first, as the shell's sets are
+// named) and Clear (native/icon/clear/). Light's and Dark's icon picks take any of them, or "theme".
+export const APP_ICONS = [
+  ...byKey.get("lightTheme").options.map((o) => ({ value: o.value, label: o.label, tone: "light" })),
+  ...byKey.get("darkTheme").options.map((o) => ({ value: o.value, label: o.label, tone: "dark" })),
+  { value: "clear", label: "Clear", tone: null },
+];
+for (const k of ["lightIcon", "darkIcon"]) byKey.get(k).options.push(...APP_ICONS.map(({ value, label }) => ({ value, label })));
 
 // F37: the device types. "none" is an iPhone without a jailbreak; the others are the APT architecture it installs.
 export const NOT_JAILBROKEN = "none";
@@ -856,4 +885,37 @@ export function paletteFor(theme, darkTheme, lightTheme) {
 export function themeState({ appearance, lightTheme, darkTheme, preview = null }, systemDark) {
   const theme = preview === "light" || preview === "dark" ? preview : themeFor(appearance, systemDark);
   return { theme, palette: paletteFor(theme, darkTheme, lightTheme) };
+}
+
+// F323: the app icon a tone ("light" or "dark") gets: with Match Theme on, that tone's theme's icon; off, the tone's
+// pick (lightIcon, darkIcon), its theme's own while that is "theme". `get` reads a setting (settings.get).
+export function iconFor(tone, get) {
+  const own = paletteFor(tone, get("darkTheme"), get("lightTheme"));
+  if (get("iconMatch") !== false) return own;
+  const pick = get(tone === "dark" ? "darkIcon" : "lightIcon");
+  return APP_ICONS.some((i) => i.value === pick) ? pick : own;
+}
+
+// F323: what the shell's app.icon takes: the icon for a light and for a dark Home Screen, and the one of the tone on
+// screen now (iOS 15-17 show only that one; native/Sources/AppIcon.swift picks the set).
+export function iconState(get, onScreen) {
+  return { light: iconFor("light", get), dark: iconFor("dark", get), onScreen: iconFor(onScreen === "dark" ? "dark" : "light", get) };
+}
+
+// F323: Theme > App Icon > Light / Dark's grid: "Themes", that tone's themes; "Special", Clear and the other tone's
+// themes (any icon works in either mode). Each group's cells are APP_ICONS entries.
+// `clear`: whether Clear is offered (clearOffered: not below iOS 18, user 2026-11-20).
+export function iconGroups(tone, { clear = true } = {}) {
+  const t = tone === "dark" ? "dark" : "light";
+  return [
+    { header: "Themes", icons: APP_ICONS.filter((i) => i.tone === t) },
+    { header: "Special", icons: [...(clear ? [APP_ICONS.find((i) => i.value === "clear")] : []), ...APP_ICONS.filter((i) => i.tone && i.tone !== t)] },
+  ];
+}
+
+// F323 (user 2026-11-20): Clear, like iOS's own clear and tinted icons, is for iOS 18 and later; phones below that
+// (the iPhone 7 on iOS 15) aren't offered it. `ios`: "15.8.8"; unknown (null) offers it.
+export function clearOffered(ios) {
+  const major = parseInt(String(ios ?? ""), 10);
+  return !Number.isFinite(major) || major >= 18;
 }

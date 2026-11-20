@@ -64,6 +64,47 @@ def facets(data):
     return [k.decode("utf-8", "replace") for k, _ in Bom(data).tree("FACETKEYS")]
 
 
+# F323: CoreUI's rendition key attributes this reader needs (the KEYFORMAT block lists which a key holds, in order).
+ATTR_APPEARANCE, ATTR_SCALE, ATTR_IDENTIFIER = 7, 12, 17
+
+
+def icon_sets(data):
+    """Each asset's image renditions, by asset name: {"AppIcon": [{file, width, height, scale, appearance}]}, where
+    appearance is APPEARANCEKEYS' name for it ("UIAppearanceAny", "UIAppearanceDark"). A rendition belongs to the
+    asset whose FACETKEYS identifier (attribute 17) its key carries."""
+    bom = Bom(data)
+    kf = bom.block(bom.vars["KEYFORMAT"])
+    if kf[:4] != b"tmfk":
+        raise ValueError("no key format")
+    n = struct.unpack_from("<I", kf, 8)[0]
+    attrs = [struct.unpack_from("<I", kf, 12 + 4 * i)[0] for i in range(n)]
+    looks = {0: "UIAppearanceAny"}
+    if "APPEARANCEKEYS" in bom.vars:
+        looks.update({struct.unpack_from("<H", v, 0)[0]: k.decode("utf-8", "replace")
+                      for k, v in bom.tree("APPEARANCEKEYS")})
+    ids = {}
+    for k, v in bom.tree("FACETKEYS"):
+        count = struct.unpack_from("<H", v, 4)[0]
+        pairs = dict(struct.unpack_from("<HH", v, 6 + 4 * i) for i in range(count))
+        if ATTR_IDENTIFIER in pairs:
+            ids[pairs[ATTR_IDENTIFIER]] = k.decode("utf-8", "replace")
+    out = {name: [] for name in ids.values()}
+    for key, value in bom.tree("RENDITIONS"):
+        if value[:4] != b"ISTC":
+            continue
+        _, _, width, height, scale = struct.unpack_from("<5I", value, 4)
+        if not width:
+            continue  # a set's own header rendition, no pixels
+        k = dict(zip(attrs, struct.unpack_from("<%dH" % len(attrs), key, 0)))
+        name = ids.get(k.get(ATTR_IDENTIFIER))
+        if name is None:
+            continue
+        out[name].append({"file": value[40:168].split(b"\0", 1)[0].decode("utf-8", "replace"), "width": width,
+                          "height": height, "scale": scale // 100,
+                          "appearance": looks.get(k.get(ATTR_APPEARANCE, 0), "?")})
+    return out
+
+
 # B179: the app icon at every iPhone size iOS asks for: point size -> scales (notifications 20pt, Settings 29pt,
 # Spotlight 40pt, the home screen 60pt), and the App Store's 1024 px marketing icon.
 ICON_SIZES = {20: (2, 3), 29: (2, 3), 40: (2, 3), 60: (2, 3)}
@@ -101,6 +142,11 @@ def icon_problems(info, files, app, lite):
         return problems + ["Assets.car unreadable: %s" % e]
     if "AppIcon" not in names:
         problems.append("Assets.car has no AppIcon (has %s)" % ", ".join(names))
+    # F323: setAlternateIconName finds nothing for a name Info.plist lists and the catalog lacks
+    alternates = info.get("CFBundleIcons", {}).get("CFBundleAlternateIcons", {})
+    missing = sorted(n for n, d in alternates.items() if d.get("CFBundleIconName", n) not in names)
+    if missing:
+        problems.append("Assets.car lacks alternate icons Info.plist lists: %s" % ", ".join(missing[:5]))
     prefix = "AppIconLite" if lite else "AppIcon"
     icons = [r for r in rends if r["file"].startswith("AppIcon") and r["width"]]
     for r in icons:

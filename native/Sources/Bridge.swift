@@ -70,6 +70,7 @@ final class Bridge: NSObject, WKScriptMessageHandlerWithReply {
         AccountKey.register(self) // F97: account.key.*, the iFizBox Account key in the Keychain (Account.swift)
         ASC.register(self) // asc.*: the App Store Connect key and the profiles iFizBox makes with it (ASC.swift)
         KeepAwake.register(self) // F287: app.keepAwake, the screen stays on while work runs (KeepAwake.swift)
+        AppIcon.register(self) // F323: app.icon, the Home Screen icon follows the theme (AppIcon.swift)
     }
 
     func on(_ method: String, _ h: @escaping Handler) { methods[method] = h }
@@ -129,12 +130,15 @@ final class AppScheme: NSObject, WKURLSchemeHandler {
     static let scheme = "ifizbox"
     static func url(_ page: String) -> URL { URL(string: "\(scheme)://app/\(page)")! }
     private let root = Bundle.main.resourceURL!.appendingPathComponent("web").standardizedFileURL
+    static let thumbs = Bundle.main.resourceURL!.appendingPathComponent("AppIconThumbs").standardizedFileURL
 
     func webView(_ webView: WKWebView, start task: WKURLSchemeTask) {
         guard let url = task.request.url else { return task.didFailWithError(URLError(.badURL)) }
         let path = url.path.isEmpty || url.path == "/" ? "index.html" : String(url.path.dropFirst())
-        let file = root.appendingPathComponent(path).standardizedFileURL
-        let inside = file.path.hasPrefix(root.path + "/")
+        // F323: appicon/<icon>.png is the app icon as this build's Home Screen shows it (build.sh's AppIconThumbs)
+        let base = path.hasPrefix("appicon/") ? AppScheme.thumbs : root
+        let file = base.appendingPathComponent(path.hasPrefix("appicon/") ? String(path.dropFirst(8)) : path).standardizedFileURL
+        let inside = file.path.hasPrefix(base.path + "/")
         let data = inside ? try? Data(contentsOf: file) : nil
         let headers = ["Content-Type": AppScheme.mime(file.pathExtension), "Content-Length": "\(data?.count ?? 0)",
                        "Cache-Control": "no-cache"]

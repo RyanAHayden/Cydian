@@ -67,6 +67,8 @@ import { signedAppRows } from "../core/signing.js";
 import { onPageShow, patchDetails, cellsOf } from "../nav/pagestate.js";
 import { refreshInstallation } from "./installroute.js";
 import { loadStyle, EASE, DURATION } from "../nav/motion.js";
+import { APP_ICONS, iconGroups } from "../core/settings.js";
+import { nativeIcons, iconSrc, iconOf, iconImage, refreshIcons, tellIcon, clearHere, readIcons } from "../appicon.js";
 
 // F284: Installation & Signing's own sub-pages under signing/ (the main page's Signing rows), sideload build only.
 // How Signing Works stays signing/help.
@@ -127,6 +129,7 @@ export function nav(route) {
   if (first === INSTALLATION && INSTALLATION_TITLES[second]) return { title: INSTALLATION_TITLES[second] };
   const key = second ?? first;
   if (key && TITLES[key]) return { title: TITLES[key] };
+  if (defOf(key)?.kind === "icon") return { title: `${defOf(key).label} Icon` }; // F323: Theme > App Icon's grids
   if (key && settings.pageOf(key)) return { title: settings.pageOf(key).title };
   if (key && defOf(key)) return { title: defOf(key).label };
   return { title: "Settings" };
@@ -172,6 +175,7 @@ function draw({ el, route }) {
   else if (opensMerged([first, second], merged())) drawSigning(el); // F271: Installation & Signing
   else if (opensSigningSub([first, second], merged())) drawSigningSub(el, second); // F284
   else if (first === INSTALLATION && settings.isShown("installRoute")) drawInstallation(el, second, { store: settings, server: () => serverSections(el, { footer: true }) }); // sideload
+  else if (second && defOf(second)?.kind === "icon") el.replaceChildren(iconPage(second)); // F323
   else if (second) el.replaceChildren(listPage(second));
   else if (first === "signing") drawSigning(el);
   else if (first && settings.pageOf(first)) el.replaceChildren(groupPage(first));
@@ -198,6 +202,7 @@ function groupPage(id) {
   if (id === "general") frag.append(blockedSection()); // F226: Blocked packages and authors, every mode
   if (id === "general") frag.append(sideloadingSection()); // F83, sideload build
   if (id === "general") frag.append(websiteSection()); // F145: Lock Home, Install on the Website; website only
+  if (id === "theme") frag.append(appIconGroups()); // F323: App Icon, the apps only
   // F285: the sideload build's Update Alerts and Checking for Updates, above Ignored Upgrades
   if (id === "updates" && detectMode() === "sideload") frag.prepend(notifySection());
   return frag;
@@ -341,7 +346,7 @@ function listPage(key) {
   if (d.tone) {
     const list = frag.firstElementChild;
     const space = Object.assign(document.createElement("div"), { className: "theme-preview-space" });
-    const box = themePreview();
+    const box = themePreview(d.tone);
     frag.append(space, box);
     splitPane(box, space, list);
   }
@@ -521,8 +526,9 @@ export function pick(d, value, store = settings) {
 
 // Theme > Light / Dark: a sample of the app's controls in the theme showing, pinned over the page's bottom half
 // (settings.css .theme-preview). Inert: nothing in it does anything.
-function themePreview() {
+function themePreview(tone) {
   const make = (tag, cls, text) => Object.assign(document.createElement(tag), { className: cls, textContent: text ?? "" });
+  loadStyle("appicon.css");
   // F215: the pane holds the divider (a grip to drag) and the sample, which scrolls on its own under it.
   const pane = make("div", "theme-preview");
   const grip = make("div", "theme-preview-grip");
@@ -533,6 +539,17 @@ function themePreview() {
   box.setAttribute("aria-hidden", "true");
   const bar = make("div", "navbar theme-preview-bar");
   bar.append(make("span", "bar-button back", "Back"), make("span", "nav-title", "Preview"), make("span", "bar-button", "Edit"));
+  // F323: in the apps, a small Home header, its icon the one this theme (or Theme > App Icon's pick) gives the app.
+  // The website's preview stays as it was (its icon never changes).
+  const home = document.createDocumentFragment();
+  if (nativeIcons()) {
+    const head = make("div", "theme-preview-home");
+    const icon = make("img", "theme-preview-icon");
+    icon.alt = "";
+    iconImage(icon, tone);
+    head.append(icon, make("span", "theme-preview-home-title", `Welcome to ${NAME}`));
+    home.append(head);
+  }
   const search = make("div", "search-bar");
   const field = make("label", "search-field");
   field.append(Object.assign(document.createElement("input"), { type: "search", placeholder: "Search" }));
@@ -551,8 +568,97 @@ function themePreview() {
   const sw = groups.querySelectorAll(".cell-inner")[2];
   sw.append(createSwitch({ label: "Switch", checked: true }));
   sw.classList.add("has-switch");
-  box.append(bar, search, seg, buttons, groups);
+  box.append(bar, home, search, seg, buttons, groups);
   return pane;
+}
+
+// ---- F323: Theme > App Icon ----------------------------------------------------------------------------------
+// The apps only (nativeIcons: the website's icon can't switch). One group with the Match Theme switch (on by default,
+// its footer says the icon follows the theme); off, a second group slides in under it with Light and Dark, each
+// with its icon's thumbnail, pushing theme/lightIcon or theme/darkIcon (iconPage). They start on the themes' own
+// icons, so turning the switch off changes nothing until one is picked. A pick applies to its mode only.
+const iconLabel = (name) => APP_ICONS.find((i) => i.value === name)?.label ?? name;
+const iconThumb = (name) => ({ icon: { cls: "app-icon-thumb", src: iconSrc(name) } });
+
+// The groups' data, pure for the tests: [switch group, picks group].
+export function appIconLayout(store = settings) {
+  const pick = (key) => {
+    const d = defOf(key);
+    const name = iconOf(d.iconTone, readIcons((k) => store.get(k)));
+    return { key, label: d.label, detail: iconLabel(name), icon: name, href: format(settingsRoute(["theme", key])) };
+  };
+  return [
+    { header: "App Icon", id: "appicon", rows: [{ key: "iconMatch", label: defOf("iconMatch").label }], footer: store.footerOf("iconMatch") },
+    { id: "appicon-picks", rows: [pick("lightIcon"), pick("darkIcon")], footer: store.footerOf("lightIcon"), hidden: store.get("iconMatch") !== false },
+  ];
+}
+
+function appIconGroups() {
+  if (!nativeIcons()) return document.createDocumentFragment();
+  loadStyle("appicon.css");
+  const [sw, picks] = appIconLayout();
+  const frag = grouped([
+    { header: sw.header, rows: sw.rows.map((r) => ({ label: r.label })), footer: sw.footer },
+    { rows: picks.rows.map((r) => ({ label: r.label, detail: r.detail, href: r.href, ...iconThumb(r.icon),
+      live: () => iconLabel(iconOf(defOf(r.key).iconTone)) })), footer: picks.footer },
+  ]);
+  const [group, pickGroup] = frag.querySelectorAll(".group");
+  group.dataset.key = "appicon";
+  pickGroup.dataset.key = "appicon-picks";
+  const cell = group.querySelector(".cell-inner");
+  cell.append(makeSwitch(defOf("iconMatch")));
+  cell.classList.add("has-switch");
+  const foot = group.querySelector(".group-footer");
+  // The switch doesn't redraw the page (it keeps its slide): the groups follow it, and nav/slide.js slides what
+  // moves (the picks group fades in, everything under it slides down).
+  const follow = () => {
+    const on = settings.get("iconMatch") !== false;
+    pickGroup.hidden = on;
+    if (foot) foot.hidden = !on;
+  };
+  follow();
+  const off = settings.onChange((key) => {
+    if (key !== "iconMatch") return;
+    if (!pickGroup.isConnected) { off(); return; }
+    follow();
+  });
+  return frag;
+}
+
+// Theme > App Icon > Light / Dark: a grid of icons in groups (core/settings.js iconGroups: this mode's themes, then
+// Clear and the other mode's; Clear only from iOS 18 on), the icon this mode has now checked. A tap picks it for this mode (the shell switches
+// at once: applyTheme's tellIcon) and the page redraws with the check on it.
+function iconPage(key) {
+  const d = defOf(key);
+  if (!d || !settings.isShown(key)) return grouped([{ footer: "This setting is not available here." }]);
+  loadStyle("appicon.css");
+  const now = iconOf(d.iconTone);
+  const frag = document.createDocumentFragment();
+  for (const g of iconGroups(d.iconTone, { clear: clearHere() })) { // no Clear below iOS 18
+    const group = document.createElement("div");
+    group.className = "group";
+    const head = Object.assign(document.createElement("h2"), { className: "group-header", textContent: g.header });
+    const table = document.createElement("div");
+    table.className = "table grouped icon-table";
+    const grid = document.createElement("div");
+    grid.className = "icon-grid";
+    grid.setAttribute("role", "radiogroup");
+    grid.setAttribute("aria-label", g.header);
+    for (const i of g.icons) {
+      const b = Object.assign(document.createElement("button"), { type: "button", className: "icon-cell" });
+      b.setAttribute("role", "radio");
+      b.setAttribute("aria-checked", String(i.value === now));
+      b.dataset.icon = i.value;
+      const img = Object.assign(document.createElement("img"), { src: iconSrc(i.value), alt: "" });
+      b.append(img, Object.assign(document.createElement("span"), { className: "icon-cell-label", textContent: i.label }));
+      b.addEventListener("click", () => { if (settings.get(key) !== i.value) settings.set(key, i.value); });
+      grid.append(b);
+    }
+    table.append(grid);
+    group.append(head, table);
+    frag.append(group);
+  }
+  return frag;
 }
 
 function holdsPage() {
@@ -673,6 +779,10 @@ export function applyTheme(doc = document, win = window) {
   }
   // A preview pins the shell to the tone on screen (its status bar and keyboard follow the page) until it ends.
   tellShell(preview ? theme : appearance, theme, win, darkPalette, paletteFor("light", darkPalette, lightTheme));
+  // F323: the Home Screen icon follows, once the theme lists are left (a tap through them would switch it each time,
+  // with iOS's alert in the sideload build); the icons the page shows follow at once.
+  if (!preview) tellIcon(theme);
+  refreshIcons(doc);
 }
 
 // The jailbreak/sideload shell (F23): native parts the page can't style (keyboard, <select> pickers, alerts,
@@ -717,6 +827,7 @@ export function init() {
   window.addEventListener?.("hashchange", () => applyTheme()); // F199: a theme list's preview starts and ends
   settings.onChange((key) => {
     if (key === "appearance" || key === "lightTheme" || key === "darkTheme") applyTheme();
+    if (key === "iconMatch" || key === "lightIcon" || key === "darkIcon") applyTheme(); // F323
     if (key === "resignReminder") remindNow();
   });
   // F260: the signer confirmed the website's password in the background: repaint the Password rows (no redraw: one

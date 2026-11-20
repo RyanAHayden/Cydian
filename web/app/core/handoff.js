@@ -24,7 +24,7 @@ const CYDIA_SHARE = "https://cydia.saurik.com/api/share#?source=";
 
 // F50: alt: records keep their detected format (F16a, core/sources/detect.js FORMATS); one from before F16a has none
 // and is AltStore.
-const IPA_FORMATS = ["altstore", "esign", "scarlet", "gbox"];
+const IPA_FORMATS = ["altstore", "esign", "scarlet", "gbox", "github"]; // github: F304
 export const isIpaFormat = (format) => IPA_FORMATS.includes(format);
 export function formatOf(source) {
   if (!(source?.kind === "altstore" || isAltKey(source?.key))) return "apt";
@@ -107,8 +107,11 @@ function ipaLinks(source) {
   return keep(managers.map((m) => ({ app: m.app, url: m.source(url) })));
 }
 
+// F304: a GitHub repo read through its releases (core/github.js) is a source only this app reads: no other app's link.
+const githubOnly = (source) => Boolean(source?.github) || source?.format === "github";
+
 export function sourceLinks(source) {
-  if (!source) return [];
+  if (!source || githubOnly(source)) return [];
   if (isIpaFormat(formatOf(source))) return ipaLinks(source);
   if (!isHttp(source.uri)) return [];
   return keep(APT_MANAGERS.map((m) => ({ app: m.app, url: m.source(source) })));
@@ -123,7 +126,7 @@ export function sourceLinks(source) {
 //   Irisin  IrisinLink.swift: irisin://package/<identity>
 // An AltStore app has no per-app link in those apps: its row adds the app's source.
 export function packageLinks(id, source) {
-  if (!id || !source) return [];
+  if (!id || !source || githubOnly(source)) return [];
   if (isIpaFormat(formatOf(source))) return sourceLinks(source);
   if (!isHttp(source.uri)) return [];
   const flat = isFlat(source.dist);
@@ -145,6 +148,7 @@ export function siteOrigin(location) {
 }
 
 export function addLink(source, origin = PUBLIC_SITE) {
+  if (githubOnly(source)) return githubAddLink(source, origin);
   const alt = isIpaFormat(formatOf(source));
   const url = alt ? altUrl(source) : source?.uri;
   if (!isHttp(url)) return null;
@@ -154,6 +158,12 @@ export function addLink(source, origin = PUBLIC_SITE) {
     for (const c of source.components ?? []) q += `&component=${enc(c)}`;
   }
   return `${String(origin).replace(/\/+$/, "")}/add?${q}`;
+}
+
+// F304: a GitHub source is shared as its repo's page, which Add Source reads again (core/github.js githubRepoPage).
+function githubAddLink(source, origin) {
+  const m = /^https:\/\/(?:github\.com|api\.github\.com\/repos)\/([^/]+)\/([^/?#]+)/i.exec(String(source?.uri ?? ""));
+  return m ? `${String(origin).replace(/\/+$/, "")}/add?url=${enc(`https://github.com/${m[1]}/${m[2]}`)}` : null;
 }
 
 // /add's query string -> what Add Source should hold, or null when there is no http(s) url in it.

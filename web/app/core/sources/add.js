@@ -8,6 +8,8 @@
 //     { format, kind: "ipa", source, parsed: null, reason }    a format we know but can't read (an encrypted GBox
 //                                                              source): saved with `unsupported`, so the source page
 //                                                              still shows its "Open in" row (F8)
+//     { format: "github", kind: "github", repo, source, app }  F304: a GitHub repo's page (core/github.js detectGithub):
+//                                                              its releases as a Tweak Source and/or an app source
 //   or throws SourceError: invalid_url, verification (backend failure, with its `code`), or not_source
 //   (SourceFormatError, with a message that says what the page was).
 //
@@ -20,6 +22,7 @@ import { altKey } from "../altstore.js";
 import { DEFAULT_ARCH, repoLayout, parseRelease } from "../apt.js";
 import { detect, unwrapLink, SourceFormatError, FORMATS } from "./detect.js";
 import { parseIpaSource } from "./ipa.js";
+import { githubRepoPage, githubAccountPage, detectGithub, ACCOUNT_MESSAGE } from "../github.js"; // F304
 
 export const DEFAULT_DISTS = ["stable"];
 
@@ -63,6 +66,11 @@ export async function detectSource(backend, input, { arch = DEFAULT_ARCH, count,
   if (!link) throw new SourceError("invalid_url");
   const url = link.url;
   const opts = { arch, ...(count ? { count } : {}) };
+  // F304: a GitHub repo's page is read through its releases (core/github.js), never as a web page.
+  const gh = githubRepoPage(url);
+  if (gh) return detectGithub(backend, gh, opts);
+  const account = githubAccountPage(url);
+  if (account) throw new SourceFormatError(ACCOUNT_MESSAGE(account), "github_account");
   let body = null;
   try {
     body = await bodyOf(backend, url);

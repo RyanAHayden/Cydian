@@ -206,7 +206,9 @@ export function tweaksGroup({ bundleId = "", store = tweakStore, alert = showAle
 export const INFO_KEY = "ifizbox.tweakInfo";
 const INFO_MAX = 400;
 const debKey = (st) => `${st?.package ?? ""}@${st?.version ?? ""}`;
-const debName = (st) => `${st.package}_${st.version ?? "0"}.deb`;
+// F304: a GitHub release's tweak may be a bare .dylib (core/github.js X-GitHub-Asset): kept and injected as it is.
+export const isDylibTweak = (st) => String(st?.["x-github-asset"] ?? "").trim().toLowerCase() === "dylib";
+const debName = (st) => `${st.package}_${st.version ?? "0"}.${isDylibTweak(st) ? "dylib" : "deb"}`;
 const debs = new Map(); // debKey -> Uint8Array, this session only (a few at most)
 
 function infoStore(storage = globalThis.localStorage) {
@@ -250,7 +252,9 @@ export async function tweakInfo(st, { fetchDeb = defaultFetchDeb, storage } = {}
   const hit = store.get(debKey(st));
   if (hit) return hit;
   let info;
-  try { info = inspectTweakDeb(await tweakDeb(st, { fetchDeb })); } catch (e) {
+  // F304: a bare .dylib has no filter .plist to say which app it is for: it loads into whichever app it is put in.
+  if (isDylibTweak(st)) info = { ok: true, why: null, bundles: [], anyApp: true };
+  else try { info = inspectTweakDeb(await tweakDeb(st, { fetchDeb })); } catch (e) {
     if (e instanceof UnpackError) info = { ok: false, why: String(e.message), bundles: [], anyApp: false };
     else throw e; // a failed download is asked again next time
   }

@@ -58,6 +58,7 @@ import { appleRelay, isApplePath } from "./apple-relay.js";
 import { setup, isSetupPath } from "./setup.js";
 import { push, isPushPath, scheduled as pushScheduled } from "./push.js";
 import { NAME, GITHUB_REPO, DOMAIN } from "../../web/app/brand.js";
+import { githubApi, githubApiTarget } from "./github.js"; // F304
 
 const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type" };
@@ -273,6 +274,7 @@ async function apiFetch(u, maxBytes = MAX_UPLOAD, token = null, env = {}, range 
     if (!r.ok) return fetchErr("upstream", `upstream answered HTTP ${r.status}`, r.status >= 400 && r.status < 600 ? r.status : 502);
     return new Response(r.body, { headers: { ...SAFE, "Content-Type": r.headers.get("content-type") ?? "application/octet-stream", "X-Source-URL": encodeURI(target.href) } });
   }
+  if (!kind && githubApiTarget(target)) return githubApi(target, env); // F304: a GitHub repo as a source
   try {
     if (kind === "packages") {
       const dir = target.href.endsWith("/") ? target.href : target.href + "/";

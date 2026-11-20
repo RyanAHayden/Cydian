@@ -221,7 +221,7 @@ export function createNativeBackend({ native = globalThis.ifizboxNative, sourceO
   const aptCalls = sideload
     ? sourceCalls(backend, { indexedDB: sourceOptions.indexedDB, name: sourceOptions.tweakName ?? "ifizbox-tweak-sources",
       tweakDefaults: sourceOptions.injectDefaults ?? (() => loadInjectSources({ remote: (url) => backend.text(url) })),
-      count: async (text) => countInjectable(text), arch: "iphoneos-arm" })
+      count: async (text) => countInjectable(text), arch: "iphoneos-arm", github: true }) // github: F304
     : nativeSourceCalls(backend, call, sourceOptions);
   const sources = withAltSources(aptCalls, backend, opts);
   if (cf) {

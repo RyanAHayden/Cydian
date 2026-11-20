@@ -12,6 +12,7 @@ import { DOMAIN } from "../brand.js";
 import { repoLayout, parseRelease, parseControl, matchesArch, DEFAULT_ARCH } from "./apt.js";
 import { isAltKey, neverLoaded } from "./altstore.js";
 import { releaseTime, fingerprint, healthFields, withTimeout, pool, REFRESH_TIMEOUT, REFRESH_CONCURRENCY } from "./health.js";
+import { githubApiRepo, isGithubSource, refreshGithubSource } from "./github.js"; // F304
 
 // F72: iFizBox's own repo names the oldest iFizBox that may run without upgrading first (core/essential.js).
 const MIN_FIELD = "x-ifizbox-minimum-version";
@@ -189,6 +190,8 @@ export function githubRepo(url) {
     if (!user || !repo || !name.test(user) || (host !== "raw.githubusercontent.com" && GH_RESERVED.has(user.toLowerCase()))) return null;
     return { user, repo: repo.replace(/\.git$/, "") };
   }
+  // F304: a GitHub repo's releases as an app source keep the API URL (api.github.com/repos/<user>/<repo>/releases).
+  if (host === "api.github.com") return githubApiRepo(u.href);
   const io = /^([a-z0-9][a-z0-9-]{0,38})\.github\.io$/.exec(host);
   if (io) {
     // A first segment that is the file itself (fizl0.github.io/source.json) is no repo.
@@ -219,6 +222,7 @@ export function githubAvatarUrl(source) {
 export function sourceIcons(source) {
   const avatar = githubAvatarUrl(source);
   if (isAltKey(source?.key)) return source.iconURL ? [source.iconURL] : avatar ? [avatar] : [];
+  if (isGithubSource(source)) return avatar ? [avatar] : []; // F304: no CydiaIcon.png on a repo's page
   return [...sourceIconUrls(source), ...(avatar ? [avatar] : [])];
 }
 
@@ -390,6 +394,7 @@ export function releaseDepiction(source, id) {
 // stands and no Packages is fetched: an unchanged repo costs one request. `releaseDate` (its Date:) and
 // `releaseHash` are saved for the health line (core/health.js) and the next refresh.
 export async function refreshSource(backend, source, { arch = DEFAULT_ARCH, count = countInline } = {}) {
+  if (isGithubSource(source)) return refreshGithubSource(backend, source, { count }); // F304: its releases, no Release
   const layout = repoLayout(source, arch);
   const out = { updated: Date.now(), error: null };
   try {
@@ -514,6 +519,15 @@ export function sourceCalls(backend, opts = {}) {
       const cur = await db.get(s.key);
       return db.put(cur ? { ...cur, ...s } : s);
     },
+    // F304: `opts.github` (the sideload app's Tweak Sources): a GitHub repo read through its releases (core/github.js
+    // githubTweakRecord, from withAltSources' Add) is saved as it comes; refreshSource reads it the same way.
+    ...(opts.github ? {
+      async addGithub(rec) {
+        const db = await store();
+        const cur = await db.get(rec.key);
+        return db.put(cur ? { ...cur, ...rec } : rec);
+      },
+    } : {}),
     removeSource: async (key) => (await store()).remove(key),
     // Refreshes every source (all at once), saving each as it lands; onEach(source) sees the updated record.
     // `filter` (F41, sourceFilter): only the sources it keeps are fetched.

@@ -14,6 +14,7 @@
 // keeps the same row and Changes sees a version bump, not a new app.
 import { parseAltSource, appStanza, str, httpUrl } from "../altstore.js";
 import { NAME } from "../../brand.js";
+import { githubToAlt } from "../github.js"; // F304
 
 const isObj = (v) => Boolean(v && typeof v === "object" && !Array.isArray(v));
 
@@ -172,6 +173,11 @@ function gboxToAlt(json) {
 // ---- shared --------------------------------------------------------------------------------------------------
 
 export function toAltSource(format, json) {
+  // F304: a GitHub repo's releases (the API's list) as one app, each release's .ipa a version (core/github.js).
+  if (format === "github") {
+    if (!Array.isArray(json)) throw new Error("GitHub's answer is not a list of releases.");
+    return githubToAlt(json);
+  }
   if (!isObj(json)) throw new Error("The source is not a JSON object.");
   switch (format) {
     case "altstore": return json;

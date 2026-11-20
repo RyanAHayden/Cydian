@@ -4,6 +4,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import Foundation
 
+#if !canImport(ObjectiveC)
+// Linux (native/test_sign.py) has no autorelease pools: the body just runs.
+@inline(__always) func autoreleasepool<T>(invoking body: () throws -> T) rethrows -> T { try body() }
+#endif
+
 struct ZipError: Error, CustomStringConvertible {
     let description: String
     init(_ s: String) { description = s }
@@ -29,9 +34,20 @@ struct ZipEntry {
 
 final class ZipReader {
     let entries: [ZipEntry]
+    let url: URL
     private let fh: FileHandle
 
+    // R41: another reader of the same file with its own file handle (the entries aren't read again), so threads can
+    // read entries side by side.
+    func clone() throws -> ZipReader { try ZipReader(url: url, entries: entries) }
+    private init(url: URL, entries: [ZipEntry]) throws {
+        self.url = url
+        self.entries = entries
+        fh = try FileHandle(forReadingFrom: url)
+    }
+
     init(url: URL) throws {
+        self.url = url
         fh = try FileHandle(forReadingFrom: url)
         let end = fh.seekToEndOfFile()
         let tailLen = min(end, 65_557)
@@ -92,7 +108,7 @@ final class ZipReader {
 
     private func dataOffset(_ e: ZipEntry) throws -> UInt64 {
         fh.seek(toFileOffset: e.localOffset)
-        let h = [UInt8](fh.readData(ofLength: 30))
+        let h = autoreleasepool { [UInt8](fh.readData(ofLength: 30)) }
         guard h.count == 30, le32(h, 0) == 0x04034b50 else { throw ZipError("bad local header for \(e.name)") }
         return e.localOffset + 30 + UInt64(le16(h, 26)) + UInt64(le16(h, 28))
     }
@@ -104,9 +120,13 @@ final class ZipReader {
         fh.seek(toFileOffset: off)
         while left > 0 {
             let n = Int(min(left, 1 << 20))
-            let d = fh.readData(ofLength: n)
-            guard d.count == n else { throw ZipError("\(e.name) is cut short") }
-            try chunk(d)
+            // R41: FileHandle's reads are autoreleased, and the signer runs as one long block that never drains a
+            // pool: every piece of the IPA read stayed in memory until it ended (iOS killed it on a big app).
+            try autoreleasepool {
+                let d = fh.readData(ofLength: n)
+                guard d.count == n else { throw ZipError("\(e.name) is cut short") }
+                try chunk(d)
+            }
             left -= UInt64(n)
         }
     }
@@ -136,8 +156,9 @@ final class ZipReader {
         guard total == e.size, UInt32(truncatingIfNeeded: crc) == e.crc else { throw ZipError("\(e.name) is damaged (CRC)") }
     }
 
-    func data(_ e: ZipEntry, limit: UInt64 = 1 << 31) throws -> Data {
-        var d = Data(capacity: Int(min(e.size, limit)))
+    // `spare`: room kept past the contents (a Mach-O's signature is appended to it without moving it).
+    func data(_ e: ZipEntry, limit: UInt64 = 1 << 31, spare: Int = 0) throws -> Data {
+        var d = Data(capacity: Int(min(e.size, limit)) + spare)
         try read(e, limit: limit) { d.append($0) }
         return d
     }
@@ -153,17 +174,19 @@ final class Inflater {
     }
     deinit { inflateEnd(&s) }
 
+    private var buf = [UInt8](repeating: 0, count: 1 << 18)
+
     func feed(_ input: Data, _ out: (Data) throws -> Void) throws {
-        var buf = [UInt8](repeating: 0, count: 1 << 18)
-        var inBytes = [UInt8](input)
-        let total = inBytes.count
+        let total = input.count
         var consumed = 0
-        while !done {
-            var produced = 0
-            var rc: Int32 = Z_OK
-            inBytes.withUnsafeMutableBufferPointer { ib in
+        // R41: zlib reads the input where it lies (it was copied into an array first, a megabyte at a time)
+        try input.withUnsafeBytes { (ib: UnsafeRawBufferPointer) in
+            let base = ib.bindMemory(to: Bytef.self).baseAddress.map { UnsafeMutablePointer(mutating: $0) }
+            while !done {
+                var produced = 0
+                var rc: Int32 = Z_OK
                 buf.withUnsafeMutableBufferPointer { ob in
-                    s.next_in = ib.baseAddress.map { $0 + consumed }
+                    s.next_in = base.map { $0 + consumed }
                     s.avail_in = uInt(total - consumed)
                     s.next_out = ob.baseAddress
                     s.avail_out = uInt(ob.count)
@@ -171,37 +194,80 @@ final class Inflater {
                     consumed = total - Int(s.avail_in)
                     produced = ob.count - Int(s.avail_out)
                 }
+                if produced > 0 { try out(Data(buf[0..<produced])) }
+                if rc == Z_STREAM_END { done = true; break }
+                guard rc == Z_OK || rc == Z_BUF_ERROR else { throw ZipError("bad deflate data") }
+                if consumed == total && produced < buf.count { break }
             }
-            if produced > 0 { try out(Data(buf[0..<produced])) }
-            if rc == Z_STREAM_END { done = true; break }
-            guard rc == Z_OK || rc == Z_BUF_ERROR else { throw ZipError("bad deflate data") }
-            if consumed == total && produced < buf.count { break }
         }
     }
 }
 
 func deflateData(_ input: Data, level: Int32 = 6) throws -> Data {
-    var s = z_stream()
-    guard deflateInit2_(&s, level, Z_DEFLATED, -15, 8, Z_DEFAULT_STRATEGY, zlibVersion(),
-                        Int32(MemoryLayout<z_stream>.size)) == Z_OK else { throw ZipError("zlib deflateInit failed") }
-    defer { deflateEnd(&s) }
+    let d = try Deflater(level: level)
     var out = Data()
-    var inBytes = [UInt8](input)
-    var buf = [UInt8](repeating: 0, count: 1 << 18)
-    var rc: Int32 = Z_OK
-    inBytes.withUnsafeMutableBufferPointer { ib in
-        s.next_in = ib.baseAddress
-        s.avail_in = uInt(ib.count)
-        repeat {
-            buf.withUnsafeMutableBufferPointer { ob in
-                s.next_out = ob.baseAddress
-                s.avail_out = uInt(ob.count)
-                rc = deflate(&s, Z_FINISH)
-                out.append(ob.baseAddress!, count: ob.count - Int(s.avail_out))
-            }
-        } while rc == Z_OK
+    try d.feed(input, finish: true) { out.append($0) }
+    return out
+}
+
+// Raw deflate, piece by piece (R41: a signed binary is deflated from its file as it's written, never whole in memory).
+final class Deflater {
+    private var s = z_stream()
+    private var buf = [UInt8](repeating: 0, count: 1 << 18)
+    init(level: Int32) throws {
+        guard deflateInit2_(&s, level, Z_DEFLATED, -15, 8, Z_DEFAULT_STRATEGY, zlibVersion(),
+                            Int32(MemoryLayout<z_stream>.size)) == Z_OK else { throw ZipError("zlib deflateInit failed") }
     }
-    guard rc == Z_STREAM_END else { throw ZipError("deflate failed") }
+    deinit { deflateEnd(&s) }
+
+    // `finish` on the last piece (it may be empty) ends the stream; `flush` (Z_FULL_FLUSH) ends a piece on a byte
+    // boundary with no state carried over, so independently deflated pieces join into one stream (deflateBlocks).
+    func feed(_ input: Data, finish: Bool, flush: Int32 = Z_NO_FLUSH, _ out: (Data) throws -> Void) throws {
+        let mode = finish ? Z_FINISH : flush
+        try input.withUnsafeBytes { (ib: UnsafeRawBufferPointer) in
+            s.next_in = ib.bindMemory(to: Bytef.self).baseAddress.map { UnsafeMutablePointer(mutating: $0) }
+            s.avail_in = uInt(ib.count)
+            var rc: Int32 = Z_OK
+            repeat {
+                var produced = 0
+                buf.withUnsafeMutableBufferPointer { ob in
+                    s.next_out = ob.baseAddress
+                    s.avail_out = uInt(ob.count)
+                    rc = deflate(&s, mode)
+                    produced = ob.count - Int(s.avail_out)
+                }
+                if produced > 0 { try out(Data(buf[0..<produced])) }
+                if finish ? rc == Z_STREAM_END : s.avail_in == 0 && produced < buf.count { break }
+            } while rc == Z_OK || rc == Z_BUF_ERROR
+            guard finish ? rc == Z_STREAM_END : rc == Z_OK || rc == Z_BUF_ERROR else { throw ZipError("deflate failed") }
+            s.next_in = nil
+        }
+    }
+}
+
+// R41: deflates `input` as one raw deflate stream made of `block`-sized pieces deflated side by side (as pigz does):
+// each but the last ends with a full flush, so they join with no dictionary carried across. On the iPhone 7's two
+// cores a big signed binary deflates in half the time, a few bytes a block bigger than one stream.
+func deflateBlocks(_ input: Data, level: Int32, block: Int = 4 << 20) throws -> Data {
+    let n = max(1, (input.count + block - 1) / block)
+    if n == 1 { return try deflateData(input, level: level) }
+    var parts = [Data?](repeating: nil, count: n)
+    var failure: Error?
+    let lock = NSLock()
+    DispatchQueue.concurrentPerform(iterations: n) { i in
+        let lo = input.startIndex + i * block, hi = min(lo + block, input.endIndex)
+        do {
+            let z = try Deflater(level: level)
+            var out = Data()
+            try z.feed(input[lo..<hi], finish: i == n - 1, flush: Z_FULL_FLUSH) { out.append($0) }
+            lock.lock(); parts[i] = out; lock.unlock()
+        } catch {
+            lock.lock(); failure = failure ?? error; lock.unlock()
+        }
+    }
+    if let f = failure { throw f }
+    var out = Data(capacity: parts.reduce(0) { $0 + ($1?.count ?? 0) })
+    for p in parts { out.append(p!) }
     return out
 }
 
@@ -248,15 +314,41 @@ final class ZipWriter {
         central.append(c)
     }
 
-    func add(_ name: String, _ data: Data, mode: UInt32 = 0o100644, time: UInt16 = 0, date: UInt16 = 0x5B71) throws {
+    // `level` 0 stores it as it is (R41), 1-9 deflates it.
+    func add(_ name: String, _ data: Data, mode: UInt32 = 0o100644, time: UInt16 = 0, date: UInt16 = 0x5B71, level: Int32 = 6) throws {
         let isDir = name.hasSuffix("/")
-        let packed = isDir || data.isEmpty ? Data() : try deflateData(data)
-        let method: UInt16 = isDir || data.isEmpty ? 0 : 8
+        let stored = isDir || data.isEmpty || level == 0
+        let packed = stored ? Data() : try deflateData(data, level: level)
+        let method: UInt16 = stored ? 0 : 8
         let c = Central(name: Data(name.utf8), method: method, flags: 0x0800, time: time, date: date,
                         crc: crc32Of(data), csize: UInt64(method == 0 ? data.count : packed.count),
                         usize: UInt64(data.count), offset: offset, attr: mode << 16)
         local(c)
         write(method == 0 ? data : packed)
+        central.append(c)
+    }
+
+    // R41: a file's contents (`size` bytes, CRC `crc`), read from disk a piece at a time: stored as they are, or,
+    // with `packed` (its size), the file holds them deflated already (deflateBlocks) and is copied as it is.
+    func add(_ name: String, file: URL, size: UInt64, crc: UInt32, packed: UInt64? = nil, mode: UInt32 = 0o100755,
+             time: UInt16 = 0, date: UInt16 = 0x5B71) throws {
+        let csize = packed ?? size
+        guard size < 0xFFFF_FFFF, csize < 0xFFFF_FFFF else { throw ZipError("\(name) is too big") }
+        let src = try FileHandle(forReadingFrom: file)
+        defer { src.closeFile() }
+        let c = Central(name: Data(name.utf8), method: packed == nil ? 0 : 8, flags: 0x0800, time: time, date: date,
+                        crc: crc, csize: csize, usize: size, offset: offset, attr: mode << 16)
+        local(c)
+        var left = csize
+        while left > 0 {
+            try autoreleasepool { // as ZipReader.raw
+                let n = Int(min(left, 1 << 20))
+                let d = src.readData(ofLength: n)
+                guard d.count == n else { throw ZipError("\(name) is cut short") }
+                write(d)
+                left -= UInt64(n)
+            }
+        }
         central.append(c)
     }
 

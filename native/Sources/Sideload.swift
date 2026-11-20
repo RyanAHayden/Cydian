@@ -412,6 +412,7 @@ enum Sideload {
             signer.options = options
             if let job = job { signer.stop = { job.cancelled } }
             if let log = log { let nslog = signer.log; signer.log = { nslog($0); log($0) } }
+            if servers.host != nil { signer.level = 6 } // R41: uploaded to the server (25 MB cap): small beats fast
             app = try signer.sign(input, to: output) { emit($0, $1) }
             log?("Signed \(app.name) \(app.version) as \(app.bundleID), \(Sideload.size(output))")
             try job?.check()

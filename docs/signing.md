@@ -424,6 +424,13 @@ cross-compiled into the app; this way neither. It writes what Apple's `codesign`
 - zip to zip: the IPA is read once to hash every file and is never unpacked to disk; untouched entries are copied
   still compressed, only signed binaries, changed Info.plists and the new files are deflated. ZIP64 is read and
   written.
+- speed and memory on a big app: the reading pass and a bundle's loose binaries run on all cores (`readers`), each
+  thread with its own handle on the IPA. A signed binary over 1 MB waits in a file next to the output until the IPA
+  is written, so only the binaries being signed are in memory. Changed files are deflated at level 1 (`level`), in
+  4 MB blocks deflated side by side (one valid stream, as pigz does); level 6 only when the IPA is uploaded to the
+  server, whose 25 MB cap matters more than the time. Level 6 ran at 12 MB/s on the iPhone 7 and was most of a big
+  app's signing time. FileHandle reads sit in an autorelease pool each: the signer runs as one long block, and
+  without that every piece read stayed in memory until it ended. `native/sign/bench/` times it on a real IPA.
 
 Plus the arm64e fix-up and the user's edits (below). No dylib injection.
 

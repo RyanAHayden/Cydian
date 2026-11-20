@@ -59,12 +59,13 @@ export function showActionSheet({ title = "", buttons = [], cancel = "Cancel", d
       // B202: the answer and the sheet's removal never hang on the slide-out. A throw in it (C26's undefined `ease`
       // until B201) left the sheet drawn with dead buttons and the caller never answered: View Repo froze the app.
       resolve(index);
-      const end = () => scrim.remove();
+      let timer = 0;
+      const end = () => { clearTimeout(timer); scrim.remove(); };
       try {
         dim.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 250, easing: "ease-in", fill: "forwards" });
         const a = sheet.animate([{ transform: "none" }, { transform: "translateY(100%)" }], { duration: 250, easing: EASE, fill: "forwards" });
+        timer = setTimeout(end, 250 + 300); // an animation iOS drops (the app went to the background) still ends
         a.finished.then(end, end);
-        setTimeout(end, 250 + 300); // an animation iOS drops (the app went to the background) still ends
       } catch {
         end();
       }

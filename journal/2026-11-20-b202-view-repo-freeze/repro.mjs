@@ -6,8 +6,11 @@
 //
 //   node journal/2026-11-20-b202-view-repo-freeze/repro.mjs [web/app dir] [--shots DIR]
 //   env: TOUCH=1 CDP touch taps instead of mouse; REAL=1 ask the real api.canister.me (through the script's own
-//        /proxy); Q=<query> ROW=<text of the row to tap>; WAITCOUNT=1 time the Tweaks count and log long tasks.
-// Below the swapped part, the smoke test's own run (push/pop/swipe/sheet) is unreachable leftover.
+//        /proxy); Q=<query> ROW=<text of the row to tap>; WAITCOUNT=1 time the Tweaks count and log long tasks;
+//        LOGAPI=1 log the site's unanswered /api calls and what Canister's search gave.
+// --site: the website with Device Jailbroken and Works on My Phone off (the fixture's Keycap row is for another
+// architecture). It has no View Repo from Search, so it checks that the Other Sources row's alert opens, goes and
+// opens again.
 import { spawn } from "node:child_process";
 import { createServer } from "node:http";
 import { readFile, writeFile, mkdtemp, mkdir, rm } from "node:fs/promises";
@@ -40,7 +43,11 @@ const server = createServer(async (req, res) => {
     catch (e) { res.writeHead(200).end(JSON.stringify({ status: 599, body: "", headers: {} })); }
     return;
   }
-  if (url.pathname.startsWith("/api/")) { res.writeHead(404).end(); return; } // the site's Worker isn't here
+  // The site's proxy, for Canister's package search only (from the fixture); everything else isn't here.
+  if (url.pathname === "/api/fetch" && /package\/search/.test(url.searchParams.get("url") ?? "")) {
+    res.writeHead(200, { "Content-Type": "application/json" }).end(JSON.stringify(FIX)); return;
+  }
+  if (url.pathname.startsWith("/api/")) { if (process.env.LOGAPI) console.log("404", req.url.slice(0, 160)); res.writeHead(404).end(); return; }
   const path = normalize(join(ROOT, url.pathname === "/" ? "index.html" : decodeURIComponent(url.pathname)));
   if (!path.startsWith(ROOT)) { res.writeHead(403).end(); return; }
   let body;
@@ -130,7 +137,7 @@ await send("Runtime.enable");
 await send("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 2, mobile: true });
 if (process.env.TOUCH) await send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 5 });
 await send("Emulation.setUserAgentOverride", { userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Mobile/15E148 Safari/604.1", platform: "iPhone" });
-await send("Page.addScriptToEvaluateOnNewDocument", { source: RECORDER + (SITE ? `try { localStorage.setItem("ifizbox.firstVisit", "later"); } catch {}` : BRIDGE) });
+await send("Page.addScriptToEvaluateOnNewDocument", { source: RECORDER + (SITE ? `try { localStorage.setItem("ifizbox.firstVisit", "later"); localStorage.setItem("ifizbox.device", "iphoneos-arm64"); localStorage.setItem("ifizbox.worksOnMyPhone", "false"); } catch {}` : BRIDGE) });
 await send("Page.navigate", { url: base + "#/home" });
 
 const until = async (expr, ms = 5000) => { const end = Date.now() + ms; while (Date.now() < end) { if (await ev(expr)) return true; await sleep(100); } return false; };
@@ -189,6 +196,27 @@ try {
   await until("document.querySelector('.page.is-top input[type=search]')", 5000);
   await settle();
   await ev(`(() => { const i = document.querySelector('.page.is-top input[type=search]'); i.focus(); i.value = ${JSON.stringify(process.env.Q ?? "dislike")}; i.dispatchEvent(new Event('input', { bubbles: true })); })()`);
+  if (SITE) {
+    // The website (Device: Jailbroken) has no View Repo from Search (offerTweak is the sideload app's): its Other
+    // Sources row opens an alert (extras.js offer: Add Source & Install). Check that it answers and goes.
+    check(await until("document.querySelector('.discovery .cell')", 8000), "Search shows Other Sources");
+    if (process.env.LOGAPI) console.log("ask:", await ev(`import("./screens/extras.js").then((m) => m.canisterApi().search("dislike")).then((j) => "rows " + j?.data?.length, (e) => "error " + e.message)`));
+    if (process.env.LOGAPI) console.log("rows:", await ev(`Promise.all([import("./core/canister.js"), import("./backend.js"), import("./screens/extras.js")]).then(async ([c, b, x]) => { const have = await b.getBackend().sources(); const j = await x.canisterApi().search("dislike"); return JSON.stringify(c.mapResults(j, { have, arch: b.getArch() }).map((r) => [r.name, r.repo.name, r.repo.added, r.archOk])); }, (e) => "error " + e.message)`));
+    if (process.env.LOGAPI) console.log("group:", await ev(`import("./screens/extras.js").then(async (m) => { const g = m.discoveryGroup(null, { wait: 0 }); await g.search("dislike"); return g.el.textContent.slice(0, 200); }, (e) => "error " + e.message)`));
+    if (process.env.LOGAPI) console.log("discovery:", await ev("[...document.querySelectorAll('.discovery')].map((d) => d.outerHTML.slice(0, 300)).join(' | ')"));
+    await shot("2-search");
+    check(await tap(".discovery .cell-inner", process.env.ROW ?? ""), "tap the package");
+    check(await until("document.querySelector('.alert-scrim')", 3000), "the alert opens");
+    await sleep(500);
+    await shot("3-alert");
+    check(await tap(".alert-button", "Cancel"), "tap Cancel");
+    check(await until("!document.querySelector('.alert-scrim')", 3000), "the alert goes");
+    check(await tap(".discovery .cell-inner", process.env.ROW ?? ""), "the row still answers");
+    check(await until("document.querySelector('.alert-scrim')", 3000), "the alert opens again");
+    await shot("4-again");
+    check(pageErrors.length === 0, `no page errors${pageErrors.length ? ": " + pageErrors.join(" | ").slice(0, 600) : ""}`);
+    throw null; // done: the shared ending below
+  }
   check(await until("document.querySelector('.discovery-tweak')", 8000), "Search shows Other Sources · Canister");
   await shot("2-search");
   console.log("rows:", await ev("[...document.querySelectorAll('.discovery-tweak')].map(e => e.textContent).join(' | ')"));
@@ -222,75 +250,9 @@ try {
   console.log("calls", (await Promise.race([ev("JSON.stringify(window.__calls.slice(-20))"), sleep(3000)])));
   console.log("errors", pageErrors);
   console.log("top", await Promise.race([ev("document.querySelector('.page.is-top')?.textContent.slice(0,300)"), sleep(3000)]));
-  ws.close(); await cleanup(); process.exit(failures.length ? 1 : 0);
-
-  // 1. push
-  const settingsRow = ["a, .cell, li, button", "Settings"];
-  await resetMoves();
-  check(await tap(...settingsRow), "Home shows a Settings row");
-  await until("location.hash.includes('settings')", 3000);
-  await settle();
-  check((await hash()).includes("settings"), `push to Settings (route ${await hash()})`);
-  check(await moved() > 0, "the push slid");
-  await shot("2-settings");
-  const settingsHash = await hash();
-
-  const pushOne = async () => { // Settings' first row that opens a page
-    await resetMoves();
-    const ok = await tap(".page.is-top a.cell[href*='settings/'], .page.is-top .cell.chevron, .page.is-top a[href*='settings/']");
-    await until(`location.hash !== ${JSON.stringify(settingsHash)}`, 3000);
-    await settle();
-    return ok && (await hash()) !== settingsHash;
-  };
-  check(await pushOne(), `push a Settings page (route ${await hash()})`);
-  check(await moved() > 0, "that push slid");
-  await shot("3-pushed");
-
-  // 2. pop with Back
-  await resetMoves();
-  check(await tap(".nav-item.is-top .back, .navbar .back"), "the nav bar shows Back");
-  await until(`location.hash === ${JSON.stringify(settingsHash)}`, 3000);
-  await settle();
-  check((await hash()) === settingsHash, `Back pops (route ${await hash()})`);
-  check(await moved() > 0, "the pop slid");
-
-  // 3. swipe back (the app only: the website leaves Back to the browser's own gesture)
-  if (!SITE) {
-    check(await pushOne(), "push again");
-    await resetMoves();
-    await swipeBack();
-    await until(`location.hash === ${JSON.stringify(settingsHash)}`, 3000);
-    await settle();
-    if (!check((await hash()) === settingsHash, `swipe back pops (route ${await hash()})`)) {
-      console.log(`  at the edge: ${await ev("(() => { const e = document.elementFromPoint(4, 420); return e ? e.tagName + '.' + e.className : 'nothing'; })()")}`);
-    }
-    check(await moved() > 0, "the swipe dragged the page");
-    await shot("4-swiped");
-  }
-
-  // 4. a sheet
-  const before = await ev("document.querySelectorAll('.sheet').length");
-  await ev(`import("./nav/sheet.js").then(({ showSheet }) => { const b = document.createElement("div"); b.className = "smoke-body"; b.textContent = "smoke"; window.__smokeClose = showSheet({ title: "Smoke", body: b }); })`);
-  await sleep(100);
-  await settle();
-  check(await ev("document.querySelectorAll('.sheet').length") > before, "a sheet opens");
-  await shot("5-sheet");
-  check(await tap(".sheet .sheet-right button, .sheet .sheet-right a, .sheet .sheet-right *", "Done"), "the sheet shows Done");
-  await until(`document.querySelectorAll('.sheet').length === ${before}`, 3000);
-  check(await ev("document.querySelectorAll('.sheet').length") === before, "Done closes the sheet");
-  await settle();
-
-  // the verdict
-  const anims = await ev("window.__smoke.anims");
-  const bad = anims.filter((a) => a.props.some(isLayoutProperty));
-  console.log(`${anims.length} animations recorded`);
-  if (KEEP) for (const a of anims) console.log(`  ${a.kind} ${a.target} [${a.props.join(", ")}] ${a.extra ?? ""}`);
-  for (const a of bad) console.log(`  layout: ${a.kind} on ${a.target}: ${a.props.filter(isLayoutProperty).join(", ")}`);
-  check(anims.length > 0, "animations were seen at all (the recorder works)");
-  check(bad.length === 0, "no layout property animated (transform and opacity only)");
   check(pageErrors.length === 0, `no page errors${pageErrors.length ? ": " + pageErrors.join(" | ").slice(0, 600) : ""}`);
 } catch (e) {
-  failures.push(String(e?.stack ?? e));
+  if (e !== null) failures.push(String(e?.stack ?? e));
   console.error(e);
 }
 ws.close();

@@ -25,6 +25,12 @@ headless Chromium: Search "dislike", tap the Keycap's Repo tweak under Other Sou
   real api.canister.me (`REAL=1 Q=youtube`, tapping the ZodTTD archive, whose package list is 15 MB): no hang. The
   Tweaks count took 17 s to download, with two long tasks (66 and 98 ms) on desktop Chromium.
 
+- Site (`--site`: Device Jailbroken, Works on My Phone off, Canister answered at `/api/fetch` from the fixture): the
+  website has no View Repo from Search. offerTweak runs only in the sideload app, and the site's Other Sources row
+  opens an alert (extras.js `offer`) instead. That alert opens, Cancel takes it away and it opens again, on both
+  trees. So the freeze never reached the site's Search. It did reach the site's own action sheets (Modify and so
+  on) between C26 and B201.
+
 ## Fix
 
 - nav/actionsheet.js `close()`: answer first, then run the slide-out inside a try. A throw removes the sheet
@@ -47,6 +53,13 @@ fallback), the selection ghost (F163 `lastPress`: the sheet's buttons aren't PRE
 slide.js's ResizeObserver, FocusKeyboard.swift and the native `net.fetch` path (async, replies on main), and the
 size of Canister's package lists (BigBoss 8.9 MB, ZodTTD 15.7 MB: parse and filter cost under 0.2 s on desktop).
 None of these froze anything.
+
+## Spec review
+
+The review asked for the site run, which was missing (now done, above). It flagged the leftover smoke-test code in
+repro.mjs (removed) and the fallback timer, which was never cleared (it now clears on removal). It also called the
+close() hardening and the action sheet tests beyond the task. I kept both: the identifier was already fixed, so
+they are this task's fix, and they keep the same freeze from coming back.
 
 ## Not verified
 

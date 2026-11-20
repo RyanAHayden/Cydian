@@ -31,6 +31,7 @@
 //     .away()     B76: iFizBox went to the background while a row was with iOS: that row is handed off to iOS
 //     .confirm(id) B76: iOS has an app whose row ended "Sent to iOS" (apps.isInstalled on the way back): Installed
 //     .reprompt(id) B85: the "Tap Install on the iOS prompt" row's tap: reprompt(row), logged -> a promise for true | false
+//     .notTaken(id, why) B123: an ended run's "Sent to iOS" row that iOS never took turns Failed (why) -> true | false
 //     .rows / .running / .stopping / .current (the row with iOS)
 //
 // B76: a stock phone can't watch iOS's install once iFizBox is in the background, so installed: false after a handoff
@@ -328,6 +329,15 @@ export function createAppRun({ rows, sign, install, discard = () => {}, reprompt
       set(r, retryPatch(r));
       if (running) { pump(); return endPromise; }
       return start();
+    },
+    // B123: iFizBox's own row was sent to iOS but iOS never took it (signing.selfUpdate notStarted / stalled): the
+    // ended run's row turns Failed with `why`, so its tap and Retry All sign and send it again
+    notTaken(id, why) {
+      const r = rows.find((x) => x.id === id);
+      if (!r || running || r.state !== "installed" || !r.unsure) return false;
+      set(r, { state: "failed", unsure: false, dismissed: false, error: why, phase: null, fraction: 0 });
+      log(r, "error", `${label(r)}: ${why}`);
+      return true;
     },
     retryAll() {
       const again = rows.filter((r) => ["failed", "cancelled"].includes(r.state));

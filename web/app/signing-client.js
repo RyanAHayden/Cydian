@@ -26,7 +26,8 @@ import { addSiteUrl, markFresh, MYIPAS } from "./core/myipas.js";
 import { showActionSheet } from "./nav/actionsheet.js";
 import { storedKeep, withKeep, originalState, originalNote } from "./core/keepid.js";
 import { detectMode } from "./core/settings.js";
-import { progressHUD, lockSelfUpdate, unlockSelfUpdate, TRY_AGAIN_LABEL } from "./nav/progress.js";
+import { progressHUD, lockSelfUpdate, unlockSelfUpdate, TRY_AGAIN_LABEL, WAITING_LABEL, CLOSING_LABEL, CLOSE_GRACE,
+  CLOSE_BY_HAND, RESTART_BY_HAND, RETURN_LABEL } from "./nav/progress.js";
 import { recordSelfUpdate } from "./core/selfupdate.js";
 import { showAlert } from "./nav/alert.js";
 import { NAME, GITHUB_REPO } from "./brand.js";
@@ -486,6 +487,16 @@ async function installOnDeviceOnce({ url, name = "", onInstalled = () => {}, par
     finishHere(h, result, { native, name, later });
     return true;
   }
+  if (route.route) {
+    // B123: This iPhone, iFizBox itself: installd ends iFizBox while it installs over it, so an answer means it
+    // didn't. The new version is in place: say to close it by hand (no locked "Closing" that never closes)
+    onInstalled(result);
+    if (typeof h.finish === "function") {
+      h.page?.step?.(RESTART_BY_HAND);
+      h.finish({ label: RETURN_LABEL, status: "Installed" });
+    } else later(() => (h.done ? h.done("Done") : h.hide()), 1200);
+    return true;
+  }
   h.set("Installing");
   onInstalled(result);
   // iFizBox itself (host): iOS's Install prompt is up, and iFizBox closes once it's answered so the install finishes
@@ -504,8 +515,9 @@ async function installOnDeviceOnce({ url, name = "", onInstalled = () => {}, par
   // never took it. The version is kept so the next launch can tell it didn't land.
   if (host || isSelfIpa(url) || result?.bundleId === IFIZBOX_ID) {
     if (host) recordSelfUpdate(storageOf(), result?.version);
-    lockSelfUpdate(h, { later });
-    if (host) followSelfUpdate(h, { native, retry: () => installOnDevice({ url, name, onInstalled, params, after, host }, { native, hud, alert, go, later, follow }) });
+    // B123: hosted, "Waiting for iOS" until the shell says it is closing
+    lockSelfUpdate(h, { later, ...(host ? { label: WAITING_LABEL } : {}) });
+    if (host) followSelfUpdate(h, { native, waiting: true, later, retry: () => installOnDevice({ url, name, onInstalled, params, after, host }, { native, hud, alert, go, later, follow }) });
     return true;
   }
   // iOS asks "Install …?" over the app: the progress page ends on Done (signed and handed to iOS), Return under it.
@@ -528,15 +540,40 @@ export const SELF_UPDATE_FAILED = {
   notStarted: `The update didn't start: iOS didn't download the new ${NAME}. If Install was pressed, try again.`,
   stalled: `The update didn't finish: iOS stopped downloading the new ${NAME}.`,
 };
-export async function followSelfUpdate(h, { native, retry = null } = {}) {
+// B123: `waiting` (the page was locked on WAITING_LABEL): finished or guessed turn it to CLOSING_LABEL, and if iFizBox
+// is still here CLOSE_GRACE later, or the shell can't be followed (older shell, none running), the page unlocks with
+// CLOSE_BY_HAND. Without it, B83's behaviour (the caller's CLOSING_LABEL lock stays).
+export async function followSelfUpdate(h, { native, retry = null, waiting = false, later = setTimeout } = {}) {
+  let closing = false;
+  const byHand = () => {
+    if (h?.page?.closed || typeof h?.finish !== "function") return;
+    h.page?.error?.(CLOSE_BY_HAND);
+    h.finish({ label: RETURN_LABEL, status: "Done" });
+  };
+  const close = () => {
+    if (closing || !waiting || typeof h?.finish !== "function") return;
+    closing = true;
+    h.finish({ label: CLOSING_LABEL, status: "Done", locked: true });
+    later(byHand, CLOSE_GRACE);
+  };
   let last = null;
-  const say = (s) => { if (s && s !== last && SELF_UPDATE_LINES[s]) { last = s; h?.page?.step?.(SELF_UPDATE_LINES[s]); } };
-  let r;
-  try { r = await bridge(native).call("signing.selfUpdate", {}, (ev) => say(ev?.state)); } catch { return null; }
-  const s = r?.state ?? null;
+  const say = (s) => {
+    if (s === "finished" || s === "guessed") close();
+    if (s && s !== last && SELF_UPDATE_LINES[s]) { last = s; h?.page?.step?.(SELF_UPDATE_LINES[s]); }
+  };
+  const s = await watchSelfUpdate(say, native);
   say(s);
   if (SELF_UPDATE_FAILED[s]) unlockSelfUpdate(h, { message: SELF_UPDATE_FAILED[s], retry });
+  else if (waiting && !s) byHand();
   return s;
+}
+
+// B123: signing.selfUpdate's states as they come (onState(state)) -> the last one, or null (an older shell without the
+// call, or no self-update running)
+export async function watchSelfUpdate(onState = () => {}, native) {
+  let r;
+  try { r = await bridge(native).call("signing.selfUpdate", {}, (ev) => { if (ev?.state) onState(ev.state); }); } catch { return null; }
+  return r?.state ?? null;
 }
 
 // ---- F235: the IPA queue's run, sign ahead and install one at a time (core/apprun.js, screens/apprun.js) --------

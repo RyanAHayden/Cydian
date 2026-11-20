@@ -75,6 +75,15 @@ const MAX_LINES = 1500; // lines kept on screen while it follows; the callers' l
 export const LOCK_LIMIT = 120_000;
 // B49: the finish button while iFizBox's own update is with iOS (disabled; iOS closes iFizBox to finish it).
 export const CLOSING_LABEL = `Closing ${NAME}`;
+// B123: the locked finish button while iOS hasn't got the whole new IPA yet (iOS's prompt up, or its download going):
+// CLOSING_LABEL only once the shell says it is closing (signing.selfUpdate finished or guessed).
+export const WAITING_LABEL = "Waiting for iOS";
+// B123: how long after "Closing" the page waits for iFizBox to be gone before it says to close it by hand (the
+// shell exits 3 s after finished, 8 s after guessed).
+export const CLOSE_GRACE = 20_000;
+// B123: the honest end where iFizBox can't (or didn't) close by itself.
+export const CLOSE_BY_HAND = `${NAME} didn't close by itself: close it from the app switcher so iOS can install the new version, then open the new ${NAME}.`;
+export const RESTART_BY_HAND = `The new ${NAME} is installed. Close ${NAME} from the app switcher and open it again to use it.`;
 
 export function openProgress({ title = "Running", onCancel = null } = {}) {
   const sheet = el("div", "sheet console progress-page");
@@ -395,10 +404,11 @@ const lockedPages = new WeakMap();
 // iOS's prompt is answered). The page ends on "Closing iFizBox", greyed, with Close greyed too: a Close tap there had
 // lost the update (user 2026-11-18, 0.9.6 to 0.9.7). A HUD without finish (tests, an older caller) ends on Done after
 // 1.2 s as before. -> true when it locked.
-export function lockSelfUpdate(h, { later = setTimeout } = {}) {
+// B123: `label` WAITING_LABEL while the shell still waits for iOS (followSelfUpdate turns it to CLOSING_LABEL).
+export function lockSelfUpdate(h, { later = setTimeout, label = CLOSING_LABEL } = {}) {
   if (typeof h?.finish === "function") {
     h.set?.("Done");
-    h.finish({ label: CLOSING_LABEL, status: "Done", locked: true });
+    h.finish({ label, status: "Done", locked: true });
     return true;
   }
   later(() => (h?.done ? h.done("Done") : h?.hide?.()), 1200);

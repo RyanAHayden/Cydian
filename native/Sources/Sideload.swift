@@ -1163,6 +1163,9 @@ enum CloseForUpdate {
     }
     static var token: NSObjectProtocol?
     private static var resignToken: NSObjectProtocol?
+    private static var backgroundToken: NSObjectProtocol? // B123
+    // B123: how long iOS's prompt has to make iFizBox resign active before the wait starts without it
+    static let promptGrace: TimeInterval = 5
     private(set) static var state: State?
     private static var sinks = [(State?) -> Bool]() // signing.selfUpdate watches; false: done with it
     private static var run = 0 // each afterPrompt bumps it: an older run's polls stop
@@ -1175,19 +1178,29 @@ enum CloseForUpdate {
         set(.prompt)
         var resigned = false
         let nc = NotificationCenter.default
-        resignToken.map(nc.removeObserver)
-        resignToken = nc.addObserver(forName: UIApplication.willResignActiveNotification, object: nil, queue: .main) { _ in resigned = true }
-        token.map(nc.removeObserver)
-        token = nc.addObserver(forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main) { _ in
-            guard resigned else { return } // the prompt hasn't shown yet
+        // B123: the wait starts once the prompt is answered (active again after resigning), or when iFizBox goes to
+        // the background (Install, then Home: KeepAlive keeps the polls going), or when iOS's prompt never made
+        // iFizBox resign active within `promptGrace` (it was left in .prompt for ever, the page locked, nothing closing)
+        let begin = {
+            guard mine == run, state == .prompt else { return }
             token.map(nc.removeObserver); token = nil
             resignToken.map(nc.removeObserver); resignToken = nil
-            guard mine == run else { return }
+            backgroundToken.map(nc.removeObserver); backgroundToken = nil
             guard let status = status else { return guess() }
             KeepAlive.shared.begin()
             set(.waiting)
             poll(status, run: mine, since: Date(), misses: 0)
         }
+        resignToken.map(nc.removeObserver)
+        resignToken = nc.addObserver(forName: UIApplication.willResignActiveNotification, object: nil, queue: .main) { _ in resigned = true }
+        token.map(nc.removeObserver)
+        token = nc.addObserver(forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main) { _ in
+            guard resigned else { return } // the prompt hasn't shown yet
+            begin()
+        }
+        backgroundToken.map(nc.removeObserver)
+        backgroundToken = nc.addObserver(forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main) { _ in begin() }
+        DispatchQueue.main.asyncAfter(deadline: .now() + promptGrace) { if !resigned { begin() } }
     }
 
     // signing.selfUpdate: `sink` gets the state now (nil: no self-update running) and each change after; it answers

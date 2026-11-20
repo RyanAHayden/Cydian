@@ -18,17 +18,21 @@
 //   Top right, as F234's: the red Cancel while it runs (every app not finished is abandoned; then the app Confirm
 //     again with what finished cleared and the footer "Stopped. N installed and cleared from the queue."), Retry All
 //     after failures (Close at the top left), Done when clean.
-//   The bottom: the status and the bar while it runs, then Return to iFizBox; "Closing iFizBox" (locked, B49) when
-//     iFizBox's own IPA went to iOS, which closes iFizBox to install it.
+//   The bottom: the status and the bar while it runs, then Return to iFizBox. When iFizBox's own IPA went to iOS
+//     (B123, followSelf): locked on "Waiting for iOS" while the shell waits for iOS to download it, "Closing iFizBox"
+//     once the shell closes, Try Again (the row Failed) when iOS never took it, and an honest "close it from the app
+//     switcher" with Return wherever iFizBox didn't close by itself.
 //
 // What iOS took leaves the queue (and is recorded for Installed) as it goes; failed and cancelled apps stay queued.
 // An app handed to iOS while iFizBox was in the background ends "Sent to iOS", and turns Installed once iOS says it has
 // it when iFizBox is back in front (followHandoff, B76).
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { el, barButton } from "../nav/ui.js";
-import { openProgress, openOn, RETURN_LABEL, CLOSING_LABEL } from "../nav/progress.js";
+import { openProgress, openOn, RETURN_LABEL, CLOSING_LABEL, WAITING_LABEL, TRY_AGAIN_LABEL, CLOSE_GRACE, CLOSE_BY_HAND,
+  RESTART_BY_HAND } from "../nav/progress.js";
 import { fitFileNames } from "../core/midtrunc.js";
-import { appRows, createAppRun, rowStatus, summaryLine, runStatus, runPercent, ended, isSelf } from "../core/apprun.js";
+import { appRows, createAppRun, rowStatus, summaryLine, runStatus, runPercent, ended, isSelf, DIDNT_DOWNLOAD } from "../core/apprun.js";
+import { SELF_UPDATE_LINES, SELF_UPDATE_FAILED } from "../signing-client.js";
 
 // The phone's side of a run, from signing-client.js (prepareOnDevice, openPrepared, discardPrepared). Each attempt of a
 // row gets its own tag, so signing.cancel {tag} stops that try only.
@@ -44,6 +48,8 @@ export function phoneLanes(sc, { native } = {}) {
       return sc.openPrepared(r, { tag, signal, progress, log, host: isSelf(r), native, ...(again ? { again: true } : {}) });
     },
     discard: (r) => sc.discardPrepared(r.token, native),
+    // B123: iFizBox's own update once its IPA is with iOS (signing.selfUpdate): onState(state) -> the last state | null
+    selfUpdate: (onState) => (sc.watchSelfUpdate ? sc.watchSelfUpdate(onState, native) : Promise.resolve(null)),
     // B85: the "Tap Install on the iOS prompt" row's tap: iOS's prompt for that app again
     reprompt: (r) => sc.repromptPrepared?.(r, native) ?? false,
     // B111: a This iPhone install's Open <app> (iOS has it the moment the row ends)
@@ -275,11 +281,69 @@ export async function runAppRun(jobs, deps) {
     // B49: iFizBox's own IPA is with iOS, which closes iFizBox to install it: nothing to tap
     const fin = sentSelf ? null : deps.finish?.(result); // B71a: the jailbreak run's (AppSync Unified's respring)
     const opener = sentSelf || fin ? null : openRow(rows, lanes); // B111: one app installed on This iPhone
-    if (sentSelf) page.finish({ label: CLOSING_LABEL, status: text, locked: true });
+    if (sentSelf) followSelf(text);
     else if (fin) page.finish({ label: fin.label, status: text, action: fin.action ?? (() => false) });
     else if (opener) page.finish({ label: RETURN_LABEL, status: text, action: () => false, also: opener });
     else page.finish({ label: RETURN_LABEL, status: text, action: () => false });
     return result;
+  }
+
+  // B123: iFizBox's own IPA went to iOS. Hosted (iOS's prompt): the page locks on "Waiting for iOS" and follows the
+  // shell's signing.selfUpdate (native CloseForUpdate), a line a step; "Closing iFizBox" only once the shell says it
+  // closes (finished, or an older server's guess), and if iFizBox is still here CLOSE_GRACE later, or the shell can't
+  // be followed, the page says to close it from the app switcher. notStarted / stalled: iOS never took it, so the row
+  // turns Failed, back in the queue, with Try Again. This iPhone: installd ends iFizBox while it installs over it, so
+  // the run ending at all means it didn't: the new version is in place, close it by hand.
+  let following = null; // the self row being followed (one follow per send)
+  let selfEnd = null; // the follow's latest finish, drawn again when another row's retry ends
+  const later = deps.later ?? ((f, ms) => { const t = setTimeout(f, ms); t?.unref?.(); return t; }); // node: don't hold tests
+  const selfFinish = (o) => { selfEnd = o; page.finish(o); };
+  function followSelf(text) {
+    const self = rows.find((r) => isSelf(r) && r.state === "installed");
+    if (!self) return page.finish({ label: RETURN_LABEL, status: text, action: () => false });
+    if (following === self && selfEnd) return page.finish({ ...selfEnd, status: text });
+    following = self;
+    if (self.here) {
+      line("step", RESTART_BY_HAND, self.id);
+      return selfFinish({ label: RETURN_LABEL, status: text, action: () => false });
+    }
+    selfFinish({ label: WAITING_LABEL, status: text, locked: true });
+    const watch = deps.selfUpdate ?? lanes.selfUpdate;
+    let closing = false;
+    let last = null;
+    const live = () => following === self && !page.closed;
+    const byHand = () => {
+      if (!live()) return;
+      line("error", CLOSE_BY_HAND, self.id);
+      selfFinish({ label: RETURN_LABEL, status: text, action: () => false });
+    };
+    const onState = (s) => {
+      if (!live()) return;
+      if (s && s !== last && SELF_UPDATE_LINES[s]) { last = s; line("step", SELF_UPDATE_LINES[s], self.id); }
+      if ((s === "finished" || s === "guessed") && !closing) {
+        closing = true;
+        selfFinish({ label: CLOSING_LABEL, status: text, locked: true });
+        later(byHand, CLOSE_GRACE);
+      }
+    };
+    const over = (s) => {
+      onState(s);
+      if (!live() || closing) return;
+      if (!SELF_UPDATE_FAILED[s]) return byHand(); // an older shell, or none running: nothing will close it
+      line("error", SELF_UPDATE_FAILED[s], self.id);
+      if (!run.notTaken(self.id, s === "stalled" ? "iOS stopped downloading it" : DIDNT_DOWNLOAD)) return byHand();
+      following = null;
+      selfEnd = null;
+      sentSelf = false;
+      cleared.delete(self.id);
+      if (!queue.get?.(self.id)) queue.add?.(self.job, { quiet: true });
+      const now = summaryLine(rows);
+      summary.textContent = now;
+      page.bar({ left: closeB, right: retryAll });
+      page.finish({ label: TRY_AGAIN_LABEL, status: now, title: "Not Updated", action: () => { retry(self.id); return true; } });
+    };
+    if (typeof watch !== "function") return onState("guessed"); // no shell to follow: Closing, then by hand if it didn't
+    Promise.resolve().then(() => watch(onState)).then(over, () => over(null));
   }
 
   // every row starts drawn

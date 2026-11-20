@@ -13,10 +13,12 @@ import { grouped, el } from "../nav/ui.js";
 import { format } from "../router.js";
 import { catalog } from "../catalog.js";
 import { haptic } from "../nav/haptic.js";
-import { ROULETTE_TYPES, ROULETTE_VIBES, ROULETTE_PRICES, spinPick, choosePick, dayKey, dayBefore } from "../core/catalog.js";
+import { ROULETTE_TYPES, ROULETTE_VIBES, ROULETTE_PRICES, spinPick, choosePick } from "../core/catalog.js";
 import { wishlist, iconBox, rememberNames, token, storeLabel } from "./browse.js";
+// The streak and Browse's row live in roulette-row.js, which browse.js imports (C38: no browse <-> roulette cycle).
+import { readSpins, saveSpins, recordSpin, currentStreak } from "./roulette-row.js";
+export { ROULETTE_KEY, readSpins, saveSpins, recordSpin, currentStreak, ROULETTE_SUBTITLE, rouletteTitle, rouletteRow } from "./roulette-row.js";
 
-export const ROULETTE_KEY = "ifizbox.roulette";
 const ROW = 40;        // a wheel row's height (px)
 const CENTER = 80;     // the band's top inside a wheel: the third of five rows
 const COPIES = 14;     // each wheel's list repeated, so a spin of several turns never runs off the end
@@ -24,52 +26,8 @@ const TURNS = [3, 4, 5]; // whole turns per wheel: the right one stops last
 const SECONDS = [1.6, 1.9, 2.2];
 const MID = 7;         // a dragged wheel starts from this copy, so a drag either way and a spin after stay inside the reel
 
-// ---- the streak (pure) -------------------------------------------------------------------------------------
-
-// { last: "2026-11-18" | null, streak, best, spins } from storage; a fresh record when there is none or it's broken.
-export function readSpins(storage = globalThis.localStorage) {
-  const empty = { last: null, streak: 0, best: 0, spins: 0 };
-  try {
-    const v = JSON.parse(storage?.getItem(ROULETTE_KEY) ?? "null");
-    if (!v || typeof v !== "object") return empty;
-    const n = (x) => (Number.isFinite(x) && x > 0 ? Math.floor(x) : 0);
-    return { last: /^\d{4}-\d{2}-\d{2}$/.test(v.last) ? v.last : null, streak: n(v.streak), best: n(v.best), spins: n(v.spins) };
-  } catch {
-    return empty;
-  }
-}
-
-export function saveSpins(state, storage = globalThis.localStorage) {
-  try { storage?.setItem(ROULETTE_KEY, JSON.stringify(state)); } catch { /* private mode or full: this session only */ }
-  return state;
-}
-
-// A spin on `today`: the first one of a day adds a day to the streak when yesterday had one, else starts it at 1;
-// more spins the same day only count as spins.
-export function recordSpin(state, today = dayKey()) {
-  const s = { last: null, streak: 0, best: 0, spins: 0, ...state };
-  const streak = s.last === today ? s.streak : s.last === dayBefore(today) ? s.streak + 1 : 1;
-  return { last: today, streak, best: Math.max(s.best, streak), spins: s.spins + 1 };
-}
-
-// The streak as it stands on `today`: kept while the last spin was today or yesterday (today's spin can still
-// carry it on), 0 once a day was missed.
-export function currentStreak(state, today = dayKey()) {
-  if (!state?.last) return 0;
-  return state.last === today || state.last === dayBefore(today) ? state.streak : 0;
-}
-
-export const ROULETTE_SUBTITLE = "Spin for something new";
 // F317: the intro in two short sentences (AGENTS.md, Hints); the wheels show their own type and price.
 export const ROULETTE_INTRO = "Each spin lands on a real free package from your sources. Spin once a day and your streak grows.";
-export const rouletteTitle = (jailbroken = true) => (jailbroken ? "Tweak Roulette" : "App Roulette");
-
-// Browse's row for it (nav/ui.js grouped section): the subtitle and, once there is one, the day streak.
-export function rouletteRow({ jailbroken = true, streak = 0, href = format({ tab: "home", path: ["browse", "roulette"] }) } = {}) {
-  return { rows: [{ label: rouletteTitle(jailbroken), subtitle: ROULETTE_SUBTITLE + (streak > 0 ? ` · ${streak}-day streak` : ""),
-    href, icon: { src: "icons/roulette.svg" }, cls: "browse-icon-row" }] };
-}
-
 // Where a wheel at absolute row `pos` lands for `target` (an index in its list of `len`): `turns` whole turns on.
 export function nextPos(pos, len, target, turns) {
   return pos - (pos % len) + len * turns + target;

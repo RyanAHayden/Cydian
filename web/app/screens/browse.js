@@ -53,7 +53,7 @@ import { ignoreVersionLabel, versionToStore, IGNORE_VERSION } from "../core/appu
 import { openInGroup, setSourceShare, shareHeadButton } from "./handoff.js";
 import { healthOf } from "../core/health.js";
 import { sourceErrorGroup } from "./sourceerror.js"; // B177
-import { addSource } from "./manage.js";
+import { load as loadLazy } from "../lazy.js"; // C38: Add Source from manage.js, loaded on the tap (manage.js imports browse.js)
 import { featuredStrip, paymentGroup, paidStateOf, soldByVendor } from "./extras.js";
 import { installQueue } from "../queue.js";
 import { queuedFor, MODE_LABEL } from "../core/queue.js";
@@ -63,7 +63,7 @@ import { createWishlist, wishLabel, wishRows, WISH_EMPTY } from "../core/wishlis
 import { filterRows } from "../core/changes.js";
 import { sizeText as formatSize } from "../core/appqueue.js";
 import { dailyPick, browseKind, collectionsFor, dayKey } from "../core/catalog.js";
-import { readSpins, currentStreak, rouletteRow } from "./roulette.js";
+import { readSpins, currentStreak, rouletteRow } from "./roulette-row.js"; // C38: not roulette.js, which imports browse.js
 import { NAME } from "../brand.js";
 import { PACKAGE } from "../brand.js"; // B71: iFizBox's own row never queues its Remove
 import { appJob } from "../core/appqueue.js"; // B71
@@ -1738,7 +1738,7 @@ function depActionRow(p, route, ctx) {
   if (!a) return p.id && p.id !== "firmware" && p.kind !== "missing" ? { label: p.id, href: deeper(route, token("package", p.id)) } : null;
   switch (a.kind) {
     case "open": return { label: a.label, href: deeper(route, token("package", a.id)) };
-    case "add-source": return { label: a.label, subtitle: a.url, chevron: true, onClick: () => addSource(ctx, { url: a.url }) };
+    case "add-source": return { label: a.label, subtitle: a.url, chevron: true, onClick: () => loadLazy("manage").then((m) => m.addSource(ctx, { url: a.url })) };
     case "settings": return getBackend().kind === "http" ? { label: a.label, href: format(settingsRoute(["iosVersion"])) } : null;
     case "remove": {
       const q = queueOf();

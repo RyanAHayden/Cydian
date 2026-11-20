@@ -25,6 +25,7 @@ NAME = r"[a-z][A-Za-z0-9]*(?:\.[A-Za-z][A-Za-z0-9]*)+"
 # A call's function name and opening, past at most one plain first argument (native?.call?.( included).
 ARG = r"(?:([\w$]+)\s*(?:\?\.)?\s*)?\(\s*(?:[\w$.?]+\s*,\s*)?"
 CALL = re.compile(ARG + r'(["\'`])(' + NAME + r")\2|\bmethod\s*:\s*([\"'])(" + NAME + r")\4")
+FILE = re.compile(r"\.(?:css|js|mjs|json|html|png|svg|jpg|plist|ipa|deb)$")
 TEMPLATE = re.compile(ARG + r"`([a-z][A-Za-z0-9]*)\.\$\{")
 
 # Template prefix -> (files, regex): the method names come from group 1 of every match in those files.
@@ -90,6 +91,8 @@ def js_calls(files=None, namespaces=None):
         src = strip_comments(read(p))
         for m in CALL.finditer(src):
             name = m.group(3) or m.group(5)
+            if FILE.search(name):  # loadStyle("signing.css"): a file, not a call
+                continue
             if m.group(5) or m.group(1) == "call" or name.split(".")[0] in namespaces:
                 calls.setdefault(name, []).append(f"{p}:{line_of(src, m.start())}")
         for m in TEMPLATE.finditer(src):

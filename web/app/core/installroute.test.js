@@ -43,7 +43,15 @@ test("the This iPhone option names the VPN apps from one list: LocalDevVPN and T
   const d = SETTINGS.find((x) => x.key === "installRoute");
   assert.equal(d.default, "server");
   assert.deepEqual(d.modes, ["sideload"]);
-  assert.match(IPHONE_INTRO, /^Installs straight onto this iPhone: no server, and .+ can update itself\.$/);
+  assert.match(IPHONE_INTRO, /^Installs straight onto this iPhone: no server, no install popup, and .+ can update itself\.$/);
+});
+
+test("the This iPhone subtitle lists the no-popup benefit, each line short enough for a 375pt-wide row", () => {
+  const lines = ROUTE_OPTIONS.find((x) => x.value === "iphone").subtitle.split("\n");
+  assert.equal(lines[1], "No server, no install popup");
+  // A grouped row on a 375pt phone leaves about 250pt beside the check mark; 13px Helvetica averages about 7pt a
+  // character, so 30 characters a line stays on one line.
+  for (const o of ROUTE_OPTIONS) for (const l of o.subtitle.split("\n")) assert.ok(l.length <= 30, l);
 });
 
 test("This iPhone's page: the VPN first, then pairing by itself; Paired and older iOS as before", () => {

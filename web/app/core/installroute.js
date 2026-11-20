@@ -16,11 +16,12 @@ export const vpnList = (vpns = VPNS) => vpns.length < 2 ? vpns.join("") : `${vpn
 // Subtitles: one short point per line (the rows wrap them, settings.css .route-row).
 export const ROUTE_OPTIONS = [
   { value: "server", label: "Signing Server", subtitle: `Default\nUses ${DOMAIN}` },
-  { value: "iphone", label: "This iPhone", subtitle: `${vpnList()}\nNo server\nUpdates itself` },
+  { value: "iphone", label: "This iPhone", subtitle: `${vpnList()}\nNo server, no install popup\nUpdates itself` },
 ];
 
-// This iPhone's page says what it gives in one sentence under its title.
-export const IPHONE_INTRO = `Installs straight onto this iPhone: no server, and ${NAME} can update itself.`;
+// This iPhone's page says what it gives in one sentence under its title. Installs through installation_proxy never
+// show iOS's install prompt, so that is one of the points.
+export const IPHONE_INTRO = `Installs straight onto this iPhone: no server, no install popup, and ${NAME} can update itself.`;
 
 export function storedRoute(storage = globalThis.localStorage) {
   try { return storage?.getItem(STORAGE_KEY) === "iphone" ? "iphone" : "server"; } catch { return "server"; }

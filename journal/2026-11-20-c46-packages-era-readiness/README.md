@@ -50,7 +50,8 @@ sheet and sheets behind tokens, with no visible change.
   a scratch copy of `web/app` with main's packages.css vs this branch, 6 palettes x 11 routes + 2 site shots = 68,
   compared with `journal/2026-11-20-c44-era-readiness/diff.py`: **same**, 0 px and 0 computed-style differences in
   every shot. (A first base run used the sheet route without `sheet-scroll page-body`, which put the header under
-  the nav bar; both sides were rerun with the fixed route.)
+  the nav bar; both sides were rerun with the fixed route.) The two dark scope tokens were renamed after this run
+  (same values, same rules); cascade.py was rerun on the final file and still matches.
 - `tools/check.sh`: run by `run done`, which refuses to tick unless it passes.
 
 ## Notes
@@ -73,7 +74,9 @@ sheet and sheets behind tokens, with no visible change.
 ## Spec review
 
 Fresh subagent, diff + brief only. Fixed: the dark scope bar's literal `#000` selected edge and divider now read
-`--dk-scope-seg-selected-edge` / `--dk-scope-seg-divider`; screenshots were still running at review time and are
+`--scope-seg-dark-selected-edge` / `--scope-seg-dark-divider` (first named `--dk-…`, which theme-palette.test.js
+refuses: every `--dk-*` token a dark rule reads must come from the palettes; black is the same in all of them);
+screenshots were still running at review time and are
 recorded above. Not changed: the three test edits (needed: they read one rule for both halves); the dark action
 sheet tokens (dark rules read `--dk-*` tokens, as docs/eras.md asks); `.store-btn` (Browse's price button, not the
 store header); palettes.css's own search bar / store header rules (docs/eras.md's known palette limit, outside this

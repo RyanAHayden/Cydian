@@ -31,7 +31,8 @@
   --scope-seg-selected: linear-gradient(#97a9c1, #41618e);
   --scope-seg-selected-edge: #3e4e64; --scope-seg-selected-edge-top: #343a42; --scope-seg-selected-edge-bottom: #38547b;
   --scope-seg-selected-divider: #43597b;
-  --dk-scope-seg-selected-edge: #000; --dk-scope-seg-divider: #000; /* dark: the rest is ios6.css's --dk-btn* */
+  /* dark: black in every palette, so not a palette (--dk-*) token; the rest is ios6.css's --dk-btn* */
+  --scope-seg-dark-selected-edge: #000; --scope-seg-dark-divider: #000;
   /* Filter: a blue Done while its panel is open (the nav bar's Done colours), and the panel's pinstripes */
   --scope-done: linear-gradient(#79a1f3, #3b71e1 49%, #215fdd 51%, #2361dd);
   --scope-done-pressed: linear-gradient(#5f86d6, #2a5bc0 49%, #164bb8 51%, #184db9);
@@ -343,7 +344,7 @@ html[data-theme="dark"] .scope-segment, html[data-theme="dark"] .scope-filter {
 }
 html[data-theme="dark"] .scope-segment.selected, html[data-theme="dark"] .scope-segment:active,
 html[data-theme="dark"] .scope-filter.selected, html[data-theme="dark"] .scope-filter:active {
-  border-color: var(--dk-scope-seg-selected-edge); background: var(--dk-btn-pressed); background-origin: border-box;
+  border-color: var(--scope-seg-dark-selected-edge); background: var(--dk-btn-pressed); background-origin: border-box;
 }
 html[data-theme="dark"] .scope-segments, html[data-theme="dark"] .scope-filter { box-shadow: 0 1px 0 var(--dk-ctl-hi); }
 .filter-sheet .filter-clear .cell-label { color: var(--detail); }
@@ -377,7 +378,7 @@ html[data-compat-marks="off"] .compat-mark { display: none; }
 /* An exact match that can't work (Search, F35): the name in red, the reason under it. */
 .pkg-name.incompatible { color: #c0392b; }
 html[data-theme="dark"] .pkg-name.incompatible { color: var(--dk-bad); }
-html[data-theme="dark"] .scope-segment + .scope-segment, html[data-theme="dark"] .scope-segment.selected + .scope-segment { border-left-color: var(--dk-scope-seg-divider); }
+html[data-theme="dark"] .scope-segment + .scope-segment, html[data-theme="dark"] .scope-segment.selected + .scope-segment { border-left-color: var(--scope-seg-dark-divider); }
 /* ==== } look-only ==== */
 
 /* Search's Filter panel (screens/search.js): drops down from under the scope bar over the results only, between the

@@ -19,8 +19,8 @@ iFizBox: a package manager with the iOS 6 Cydia look, for modern iPhones. Three 
 
 Shortcuts recipes live in `docs/shortcuts.md`.
 
-- Gate: `tools/check.sh` (every `test_*.py`). It must pass before `done`. Add the `native/` builds (jailbreak and
-  sideload) to it once they exist.
+- Gate: `tools/check.sh` (the `native/` builds, jailbreak and sideload, then every `test_*.py`). It must pass
+  before `done`.
 - Python: stdlib only (`bz2`, `lzma`, `gzip`, `email`-style parsing); the gate needs no pip packages. Local
   reference tools (`tools/themecmp.py`, `tools/kitmatch.py`) may use Pillow/numpy. Ask in the journal before
   adding a dependency.
@@ -55,8 +55,12 @@ Shortcuts recipes live in `docs/shortcuts.md`.
   `ref/` (gitignored). Use them as a reference and redraw in CSS/SVG. Don't name the product or pages "Cydia".
   `ref/` exists only in the main checkout. In a worktree, link it first:
   `ln -s "$(git rev-parse --path-format=absolute --git-common-dir)/../ref" ref`.
-- The server fetches URLs visitors type in. Every fetch goes through the SSRF guard (F3): no private, loopback or
-  link-local addresses, size and time caps.
+- The server fetches URLs visitors type in (`/api/fetch`, `/api/ipainfo`, App Store lookups). On ifizbox.com,
+  Cloudflare's own fetch is what keeps them off private and loopback addresses; on the self-hosted Node server
+  (`worker/node.mjs`) `worker/src/ssrf-node.js` resolves every host and redirect hop, refuses private, loopback,
+  link-local, CGNAT, ULA and multicast addresses and connects to the address it checked. Both runtimes refuse
+  literal private hosts and `localhost` up front (`worker/src/ssrf.js`). Caps: 30 s for the answer's headers,
+  plain `/api/fetch` bodies 64 MB / 120 s, IPAs `MAX_UPLOAD_MB`. A new outgoing fetch uses `env.FETCH` when given.
 - The iPhone 4S (iOS 6, jailbroken) is a reference device only: `ssh 4s` (see R1). It shows how iOS 6 and Cydia look
   and behave. It will never run iFizBox (the app or the site), so never test, benchmark or time iFizBox on it.
   Only touch it when your task says so.

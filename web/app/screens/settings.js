@@ -38,6 +38,7 @@ import { signingExtras } from "./signed-apps.js";
 import { syncReminder } from "../core/signing.js";
 import { websiteSection } from "./website-settings.js";
 import { pushActions } from "./push-settings.js";
+import { whyAboutSection } from "./why.js"; // F306: Settings > About > Why <NAME>, in the installed apps
 import { pushRows } from "../core/push.js";
 import { versionLines } from "./version-foot.js";
 import { ipaSection } from "./ipa-install.js";
@@ -177,8 +178,9 @@ function rootPage() {
   // F271: in the sideload build Installation lives on the Signing row's page (Installation & Signing)
   const pageRows = settings.pages().filter((p) => p.id !== "signing" && !(p.id === INSTALLATION && merged()))
     .map((p) => ({ label: p.title, href: format(settingsRoute([p.id])), ...(PAGE_ICONS[p.id] ? { icon: rowIcon(PAGE_ICONS[p.id]) } : {}) }));
+  const whyAbout = whyAboutSection(detectMode()); // F306: installed apps only (the website has Home's tile)
   frag.append(accountSection(), grouped([{ rows: pageRows }]), signingSection(), openInAppSection(), ipaSection(),
-    logsSection(detectMode()), ...versionLines());
+    logsSection(detectMode()), ...(whyAbout ? [grouped([whyAbout])] : []), ...versionLines());
   return frag;
 }
 

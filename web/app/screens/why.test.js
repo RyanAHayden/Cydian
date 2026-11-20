@@ -6,7 +6,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { NAME } from "../brand.js";
-import { WHY_POINTS, WHY_ROUTE, whyHref, nav, whySections, endGroup, showsWhyTile, shotSrc, ensureWhyStyle, WHY_TILE } from "./why.js";
+import { WHY_POINTS, WHY_ROUTE, whyHref, nav, whySections, endGroup, showsWhyTile, shotSrc, ensureWhyStyle, WHY_TILE,
+  WHY_OPENED_KEY, whyOpened, markWhyOpened, whyAboutSection } from "./why.js";
 
 const read = (f) => readFileSync(new URL(f, import.meta.url), "utf8");
 
@@ -23,12 +24,14 @@ function jpegSize(buf) {
   return null;
 }
 
-test("the page leads with APT tweaks injected into sideloaded apps, then the brief's points in order", () => {
+test("the page leads with the two builds, then APT tweaks injected into sideloaded apps, then the rest in order", () => {
   assert.deepEqual(WHY_POINTS.map((p) => p.id),
-    ["tweaks", "builds", "look", "signing", "freeid", "routes", "sources", "safety", "resign", "reviews"]);
-  const lead = WHY_POINTS[0];
-  assert.match(lead.lines.join(" "), /APT repos/);
-  assert.match(lead.lines.join(" "), /ElleKit/);
+    ["builds", "tweaks", "look", "signing", "freeid", "routes", "sources", "safety", "resign", "reviews"]);
+  assert.equal(WHY_POINTS[0].title, "One App, Jailbroken or Not");
+  assert.equal(WHY_POINTS[1].title, "Tweaks in Sideloaded Apps");
+  const tweaks = WHY_POINTS[1];
+  assert.match(tweaks.lines.join(" "), /APT repos/);
+  assert.match(tweaks.lines.join(" "), /ElleKit/);
   assert.match(WHY_POINTS.find((p) => p.id === "routes").lines.join(" "), /Tailscale/);
   assert.match(WHY_POINTS.find((p) => p.id === "routes").lines.join(" "), /LocalDevVPN/);
   assert.match(WHY_POINTS.find((p) => p.id === "sources").lines.join(" "), /AltStore.*APT/);
@@ -44,7 +47,8 @@ test("short lines: every row reads in one breath", () => {
 test("every screenshot is a real file at the size the page reserves for it", () => {
   const shots = WHY_POINTS.filter((p) => p.shot);
   assert.ok(shots.length >= 5);
-  assert.equal(WHY_POINTS[0].shot, "tweaks");
+  assert.equal(WHY_POINTS[0].shot, "builds");
+  assert.equal(WHY_POINTS[1].shot, "tweaks");
   for (const p of shots) {
     const buf = readFileSync(new URL(`../${shotSrc(p.shot)}`, import.meta.url));
     assert.deepEqual(jpegSize(buf), p.size, p.shot);
@@ -63,11 +67,13 @@ test("the name comes from brand.js, never spelled in why.js", () => {
 test("route, tile visibility and what to do next per build", () => {
   assert.deepEqual(WHY_ROUTE, { tab: "home", path: ["why"] });
   assert.equal(whyHref(), "#/home/why");
+  // F306: the website always; the installed apps until opened
   assert.equal(showsWhyTile("site", true), true);
   assert.equal(showsWhyTile("site", false), true);
   assert.equal(showsWhyTile("sideload", false), true);
   assert.equal(showsWhyTile("sideload", true), false);
-  assert.equal(showsWhyTile("jailbreak", false), false);
+  assert.equal(showsWhyTile("jailbreak", false), true);
+  assert.equal(showsWhyTile("jailbreak", true), false);
   let installed = 0;
   const site = endGroup("site", () => { installed++; });
   site.rows[0].onClick();
@@ -78,6 +84,52 @@ test("route, tile visibility and what to do next per build", () => {
   assert.equal(whySections({ mode: "jailbreak" }).length, WHY_POINTS.length);
   assert.equal(whySections({ mode: "site", install: () => {} }).length, WHY_POINTS.length + 1);
   assert.ok(whySections()[0].lead);
+  assert.equal(whySections()[0].point.id, "builds"); // the lead styling follows the first group
+  assert.ok(!whySections()[1].lead);
+});
+
+// A Storage-like map, and a page body that takes what render() appends.
+const memStore = () => { const m = new Map(); return { getItem: (k) => m.get(k) ?? null, setItem: (k, v) => m.set(k, String(v)), m }; };
+function fakeEl(tag) {
+  const e = { tagName: tag, children: [], classList: { add() {} }, append(...k) { e.children.push(...k); },
+    querySelector: () => ({ append() {} }), set textContent(t) { e.text = t; }, set className(c) { e.cls = c; } };
+  return e;
+}
+
+test("F306: installed apps show the tile until the page is opened, then Settings > About has the row", async () => {
+  // opening the page in an installed app stores ifizbox.whyOpened; on the website it doesn't
+  const prevDoc = globalThis.document;
+  globalThis.document = { head: null, createElement: fakeEl, createDocumentFragment: () => fakeEl("#frag"),
+    createTextNode: (t) => ({ text: t }), getElementById: () => null };
+  try {
+    const { render } = await import("./why.js");
+    for (const mode of ["sideload", "jailbreak"]) {
+      const store = memStore();
+      assert.equal(whyOpened(store), false);
+      assert.equal(showsWhyTile(mode, whyOpened(store)), true, `${mode}: first time`);
+      render(fakeEl("div"), { mode, storage: store });
+      assert.equal(store.m.get(WHY_OPENED_KEY), "1");
+      assert.equal(showsWhyTile(mode, whyOpened(store)), false, `${mode}: after opening`);
+      const about = whyAboutSection(mode);
+      assert.equal(about.header, "About");
+      assert.equal(about.rows[0].label, WHY_TILE.label);
+      assert.equal(about.rows[0].href, "#/home/why");
+    }
+    const site = memStore();
+    render(fakeEl("div"), { mode: "site", storage: site });
+    assert.equal(site.m.size, 0);
+    assert.equal(showsWhyTile("site", true), true);
+    assert.equal(whyAboutSection("site"), null);
+  } finally {
+    globalThis.document = prevDoc;
+  }
+  assert.equal(WHY_OPENED_KEY, "ifizbox.whyOpened");
+  // storage that throws (private mode) keeps the tile
+  assert.equal(whyOpened({ getItem() { throw new Error("blocked"); } }), false);
+  markWhyOpened({ setItem() { throw new Error("blocked"); } });
+  // Settings' root draws it, ahead of the version line; Home re-checks it on Back
+  assert.match(read("./settings.js"), /whyAboutSection\(detectMode\(\)\)[\s\S]*grouped\(\[whyAbout\]\)[\s\S]*versionLines\(\)/);
+  assert.match(read("./home.js"), /drawThemes\(\); \/\/ F306: Back from Why/);
 });
 
 test("its styles go in once and use the theme's tokens, no literal text colours", () => {
@@ -95,7 +147,7 @@ test("Home links it high and keeps it open while locked; the Not-an-iPhone page 
   assert.match(home, /OPEN_WHILE_LOCKED = new Set\(\[[^\]]*"why"/);
   assert.match(home, /case "why": return why\.nav\(\)/);
   assert.match(home, /case "why": why\.render\(/);
-  assert.match(home, /whyRow\.hidden = !why\.showsWhyTile\(settings\.mode, setUp\)/);
+  assert.match(home, /whyRow\.hidden = !why\.showsWhyTile\(settings\.mode, why\.whyOpened\(\)\)/);
   // right under the welcome and hint, above GitHub | Discord
   assert.match(home, /hintBox,\n\s+whyRow,\n\s+tileRow\("pair",/);
   const not = read("./notiphone.js");

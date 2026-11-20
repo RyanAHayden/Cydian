@@ -28,6 +28,7 @@ import { matchRecommendedApps } from "../core/recommended.js";
 import { showAlert } from "../nav/alert.js";
 import { searchBar, pinned } from "../nav/searchbar.js";
 import { detectMode } from "../core/settings.js";
+import { onPageShow } from "../nav/pagestate.js"; // B172
 
 export const title = "Search";
 
@@ -220,7 +221,11 @@ export function render(body, route, ctx) {
   // Other Sources and Recommended Sources aren't asked again.
   async function run({ again = false } = {}) {
     const q = input.value.trim();
-    state.query = input.value;
+    // B172: only a run the user started here sets the session's query: a source landing re-runs every copy still
+    // drawn (again), and a copy left behind would put its old text back.
+    if (!again) state.query = input.value;
+    const copy = copies.get(body); // what this copy last asked
+    if (copy && !again) copy.asked = askedKey();
     const seq = ++state.seq;
     if (!again) {
       // One character searches here; Canister needs two (core/canister.js askable()).
@@ -258,7 +263,28 @@ export function render(body, route, ctx) {
     recs.search(q, { again: true });
   }, () => body.isConnected);
   run();
+  copies.set(body, { input, bar, drawScope, run, asked: askedKey() });
 }
+
+// B172: Search's root page can be on screen twice, its own tab and pushed on Home (Find Extensions for Applications:
+// router.js rootOn). Each copy has its own field and list (render's closures); the query and filters are the
+// session's (state) and rootInput is the copy drawn last. A copy that comes back to the top (a tab switch, Back)
+// becomes reselect()'s field, and takes the query and filters the other copy left and searches again. -> true when it
+// searched again.
+const copies = new WeakMap(); // a root copy's body -> { input, bar, drawScope, run, asked }
+const askedKey = () => JSON.stringify([state.query, state.filters]);
+export function showCopy(body) {
+  const copy = body && copies.get(body);
+  if (!copy) return false;
+  rootInput = copy.input;
+  if (copy.asked === askedKey() && copy.input.value === state.query) return false;
+  copy.bar.set(state.query);
+  copy.drawScope();
+  copy.run();
+  copy.asked = askedKey();
+  return true;
+}
+onPageShow((route) => route.tab === "search" && !route.path.length, (_route, el) => showCopy(el));
 
 // ---- apps in recommended sources not added yet ---------------------------------------------------------------
 // Under the local results: apps whose source Recommended lists (core/recommended.js) but the user hasn't added.

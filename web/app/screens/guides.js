@@ -13,7 +13,7 @@
 // (Files, AirDrop, LocalSend; From a Computer per system, F176). Nothing jailbreak-only is named there (guides.test.js).
 // Cydia's Storage Information and Developers Only are left out: there's no storage page to show.
 import { el, grouped, row, segmented } from "../nav/ui.js";
-import { format, settingsRoute } from "../router.js";
+import { format, settingsRoute, rootOn } from "../router.js";
 import { NAME } from "../brand.js";
 import { GUIDE_ID as KEEP_GUIDE } from "../core/keepid.js";
 import { UDID_HOW } from "../core/signing.js";
@@ -30,8 +30,10 @@ const packageHref = (id) => format({ tab: "search", path: [`package:${id}`] });
 export const LINKS = {
   device: { label: "Settings > Device", href: () => format(settingsRoute(["device"])) },
   signing: { label: "Settings > Signing", href: () => format(settingsRoute(["signing"])) },
-  refresh: { label: "Refresh Sources", href: () => format({ tab: "sources" }) },
-  installed: { label: "Installed", href: () => format({ tab: "installed" }) },
+  // B172: from a page (`on`, the route the row sits on) these push that tab's root above it (router.js rootOn), so
+  // it slides in and Back returns; without one, a plain link to the tab.
+  refresh: { label: "Refresh Sources", href: (on) => format(on ? rootOn("sources", on) : { tab: "sources" }) },
+  installed: { label: "Installed", href: (on) => format(on ? rootOn("installed", on) : { tab: "installed" }) },
   ipas: { label: "Install IPAs", href: () => format({ tab: "installed", path: ["myipas"] }) },
   add: { label: "Add a Source", href: () => format({ tab: "sources", path: ["manage", "sources"] }) },
   more: { label: "Recommended Sources", href: () => format({ tab: "sources", path: ["manage", "recommended"] }) },
@@ -40,7 +42,7 @@ export const LINKS = {
   password: { label: "Root Password How-To", href: () => format({ tab: "home", path: ["guides", "password"] }) },
 };
 // C15: labels and texts name the signing page the build's way (Installation & Signing in the sideload build)
-export const linkRow = (id, mode) => ({ label: pageName(LINKS[id].label, mode), href: LINKS[id].href() });
+export const linkRow = (id, mode, on) => ({ label: pageName(LINKS[id].label, mode), href: LINKS[id].href(on) });
 
 // ---- FAQ ----------------------------------------------------------------------------------------------------
 // Each answer: { q, a } (one paragraph) or { q, steps: [...] }, `next`: LINKS ids, `group`, and where it shows:
@@ -436,7 +438,7 @@ export function render(body, route, opts = {}) {
   const p = guidePage(route.path, lite);
   const page = el("div", "guide");
   if (p.page === "list") page.append(grouped([{ rows: guideRows(format, lite) }]));
-  else if (p.page === "answer") page.append(answerView(p.answer));
+  else if (p.page === "answer") page.append(answerView(p.answer, route));
   else if (p.id === "faq") page.append(grouped(faqSections(lite)));
   else if (p.id === "copying") page.append(lite ? grouped(noJailbreakSections()) : copyingView(opts.segment ?? 0));
   else if (p.id === "openssh") page.append(stepsView("openssh", opts));
@@ -447,7 +449,7 @@ export function render(body, route, opts = {}) {
   return page;
 }
 
-function answerView(f) {
+function answerView(f, route = null) {
   const frag = document.createDocumentFragment();
   const g = el("div", "group");
   g.append(el("h1", "guide-q", f.q));
@@ -469,7 +471,7 @@ function answerView(f) {
   }
   g.append(ul);
   frag.append(g);
-  if (f.next?.length) frag.append(grouped([{ header: "Next", rows: f.next.map((id) => linkRow(id)) }]));
+  if (f.next?.length) frag.append(grouped([{ header: "Next", rows: f.next.map((id) => linkRow(id, undefined, route)) }]));
   return frag;
 }
 

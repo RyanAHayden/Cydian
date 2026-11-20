@@ -35,6 +35,7 @@ import { failedBanner, FAILED_BANNER_MS } from "../core/aptupdate.js";
 import { refreshRows, tabBadge, coalesce, ROW } from "../core/refreshrows.js";
 import { labelSource, toggleTrust, trustMenuLabel } from "./safety.js"; // F291
 import { findMoreOn, findMoreRow, labelCanister } from "./findmore.js"; // F305
+import { onPageShow } from "../nav/pagestate.js"; // B172
 
 export const title = "Sources";
 
@@ -155,6 +156,19 @@ export function render(el, route, ctx) {
   draw();
   load(ctx);
 }
+
+// B172: Sources' root page can be on screen twice, its own tab and pushed on Home (Home's Loading Sources / Sources
+// Failed tile, Help's and the guides' Refresh Sources: router.js rootOn), and the state above (body, search box, list
+// box) follows the copy drawn last. A copy that comes back to the top while the other one holds it takes it back and
+// is drawn again (draw() moves the search box into it), so its rows keep up. -> true when it redrew.
+export function redrawCopy(el, route, ctx) {
+  if (!el || el === state.body) return false;
+  state.body = el;
+  if (ctx) state.ctx = ctx;
+  draw();
+  return true;
+}
+onPageShow((route) => route.tab === "sources" && !route.path.length, (route, el) => redrawCopy(el, route));
 
 async function load(ctx) {
   if (ctx) state.ctx = ctx;
@@ -311,7 +325,8 @@ function feedCatalog(ctx) {
 
 // ---- F233: the rows' states and the retry --------------------------------------------------------------------
 
-const rowOf = (key) => document.querySelector(`.source-row[data-key="${CSS.escape(String(key))}"]`);
+const rowOf = (key) => (state.body ?? document).querySelector( // B172: the copy on screen, not one left behind
+`.source-row[data-key="${CSS.escape(String(key))}"]`);
 function paintKey(key) { const li = key == null ? null : rowOf(key); if (li) paintRow(li); }
 function paintAll() { for (const li of document.querySelectorAll(".source-row")) paintRow(li); }
 

@@ -146,6 +146,16 @@ export function libraryJob(entry, { installed = false } = {}) {
   };
 }
 
+// B136: the installed version an app row goes by: Installed's record (`rec`, core/installed.js; "" when its version
+// is unknown), unless the phone's own app list says the app isn't there (`onPhone`: apps.isInstalled's answer for its
+// bundle ID, false). A record left by an install iOS never finished then doesn't block the row's Install swipe.
+// true, null or undefined (iOS can't be asked) keep the record; iFizBox's own record (`self`) always stands.
+export function installedOnPhone(rec, onPhone) {
+  if (!rec) return null;
+  if (onPhone === false && !rec.self) return null;
+  return rec.version || "";
+}
+
 // Confirm's Modifications and Statistics, from the queue alone: every app and what it needs, under its mode.
 export function appPlan(jobs = []) {
   const out = { installs: [], reinstalls: [], upgrades: [], downgrades: [], removes: [], resigns: [], essential: [], download: null };

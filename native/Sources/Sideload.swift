@@ -593,7 +593,10 @@ enum Sideload {
             fallback.finish() // B89
             InstallPrompt.end(bid, link: iosLink)
             job?.end()
-            if !ok { serverLog("iOS didn't fetch the whole IPA within 15 minutes; it is no longer served"); server.remove(ipaPath) }
+            if !ok {
+                serverLog("iOS didn't fetch the whole IPA within 15 minutes; it is no longer served"); server.remove(ipaPath)
+                SignBridge.queue.async { forgetUnlessInstalled(bid) { InstallLog.say(bid, $0) } } // B136
+            }
             // B29: served: the route stays for the grace too. iOS's installer may ask again for parts, and
             // a route removed the moment one request reached the last byte answered those with 404.
             SignBridge.queue.asyncAfter(deadline: .now() + servedGrace) {
@@ -629,6 +632,7 @@ enum Sideload {
             SignBridge.queue.async {
                 try? FileManager.default.removeItem(at: output)
                 KeepAlive.shared.end()
+                forgetUnlessInstalled(bid, log: log) // B136
             }
             served?(false)
         }
@@ -949,6 +953,20 @@ enum Sideload {
     static func records() -> [SignedRecord] { (try? Data(contentsOf: recordsURL)).map(SignedRecords.decode) ?? [] }
     static func saveRecords(_ list: [SignedRecord]) {
         try? SignedRecords.encode(list).write(to: recordsURL, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+    }
+
+    // B136: the record is written when iOS is handed the link (serveChecked), before iOS installs anything. An install
+    // iOS never took (it never fetched the IPA: B128's ECONNREFUSED; or the user cancelled) takes it back out, so
+    // iFizBox doesn't go on thinking the app is installed; unless iOS has the app anyway (an earlier install: its
+    // record stands) or can't be asked (nil). Runs on SignBridge.queue.
+    static func forgetUnlessInstalled(_ bid: String, log: ((String) -> Void)? = nil) {
+        guard Workspace.isInstalled(bid) == false else { return }
+        let list = records()
+        let kept = list.filter { $0.bundleID != bid }
+        guard kept.count != list.count else { return }
+        saveRecords(kept)
+        reschedule()
+        log?("iOS doesn't have \(bid): it is no longer listed as signed")
     }
 
     static func installedJSON() -> [String: Any] {

@@ -32,6 +32,7 @@ import { openProgress, openOn, RETURN_LABEL, CLOSING_LABEL, WAITING_LABEL, TRY_A
   RESTART_BY_HAND } from "../nav/progress.js";
 import { fitFileNames } from "../core/midtrunc.js";
 import { appRows, createAppRun, rowStatus, summaryLine, runStatus, runPercent, ended, isSelf, DIDNT_DOWNLOAD } from "../core/apprun.js";
+import { recordWhen } from "../core/apprun.js"; // B136
 import { SELF_UPDATE_LINES, SELF_UPDATE_FAILED } from "../signing-client.js";
 
 // The phone's side of a run, from signing-client.js (prepareOnDevice, openPrepared, discardPrepared). Each attempt of a
@@ -109,7 +110,9 @@ export function helperLanes({ backend, install, needs, native } = {}) {
 // B76: iFizBox leaving the screen while an app is with iOS hands that app to iOS (run.away(): a false from the watch
 // then reads "Sent to iOS", not Failed), and coming back asks iOS which "Sent to iOS" rows it has (run.confirm: Installed).
 // Also asked when such a row ends while iFizBox is in front. -> { check, stop }
-export function followHandoff(run, rows, { isInstalled, doc = globalThis.document } = {}) {
+// B136: `answered(row, onPhone)` hears iOS's answer for each row asked (true, false, or null when iOS gave none), so
+// the run records an app only once iOS has it (core/apprun.js recordWhen).
+export function followHandoff(run, rows, { isInstalled, doc = globalThis.document, answered = () => {} } = {}) {
   const hidden = () => doc?.visibilityState === "hidden";
   let asking = false;
   const check = async () => {
@@ -120,7 +123,11 @@ export function followHandoff(run, rows, { isInstalled, doc = globalThis.documen
     let answer = {};
     try { answer = (await isInstalled(sent.map((r) => r.bundleId))) ?? {}; } catch { /* unknown: they stay sent */ }
     asking = false;
-    for (const r of sent) if (answer[r.bundleId] === true) run.confirm(r.id);
+    for (const r of sent) {
+      const v = answer[r.bundleId];
+      if (v === true) run.confirm(r.id);
+      try { answered(r, typeof v === "boolean" ? v : null); } catch { /* the page's bug isn't the check's */ }
+    }
   };
   const onVisibility = () => { if (hidden()) run.away(); else check(); };
   doc?.addEventListener?.("visibilitychange", onVisibility);
@@ -192,6 +199,15 @@ export async function runAppRun(jobs, deps) {
 
   // ---- the run ----
   const cleared = new Set();
+  // B136: Installed's record of an app is written once iOS confirmed it (recordWhen), not when a row ends "Sent to
+  // iOS": an install iOS never fetched (B128) left the app recorded, and its Search row's swipe did nothing.
+  const recorded = new Set();
+  const recordIf = (r, onPhone) => {
+    // no isInstalled at all (helperLanes, tests): iOS can't be asked, the row counts as sent (null)
+    if (recorded.has(r.id) || recordWhen(r, onPhone === undefined && !isInstalled ? null : onPhone) !== "now") return;
+    recorded.add(r.id);
+    Promise.resolve().then(() => record(r.job)).catch(() => {}); // no store: Installed won't list it
+  };
   let sentSelf = false;
   const run = createAppRun({
     rows,
@@ -207,15 +223,16 @@ export async function runAppRun(jobs, deps) {
         cleared.add(r.id);
         if (isSelf(r)) sentSelf = true;
         queue.clear(r.id);
-        Promise.resolve().then(() => record(r.job)).catch(() => {}); // no store: Installed won't list it
         if (r.unsure) Promise.resolve().then(() => handoff?.check()); // B76: iOS may have it already
       }
+      recordIf(r); // B136: only once iOS has it (a confirm comes back here with unsure off)
       tick();
     },
     onLog: ({ id, kind, text }) => line(kind, text, id),
   });
   const isInstalled = deps.isInstalled ?? lanes.isInstalled;
-  const handoff = followHandoff(run, rows, { isInstalled, ...(deps.doc ? { doc: deps.doc } : {}) });
+  const handoff = followHandoff(run, rows, { isInstalled, answered: (r, onPhone) => recordIf(r, onPhone),
+    ...(deps.doc ? { doc: deps.doc } : {}) });
   page.onClose?.(() => handoff.stop());
   let tickQueued = false;
   const tick = () => {

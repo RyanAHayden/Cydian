@@ -900,25 +900,27 @@ export const ELLEKIT_FOOTER = `Added to a signed app when a tweak you inject nee
 export const CANISTER_FOOTER = "Other Sources in Search, Find More Sources, the piracy list and the Known Safe label come from canister.me.";
 export function softwareSections() {
   const open = (url) => () => window.open(url, "_blank", "noopener");
-  const row = (label, subtitle, url) => ({ label, subtitle, chevron: true, cls: "thanks-row",
-    icon: { text: label.charAt(0).toUpperCase(), color: "#7a8a99" }, onClick: open(url) });
+  // B205: every row shows its project's picture (a GitHub avatar or the project's own logo), the letter only if it fails
+  const gh = (owner) => `https://github.com/${owner}.png?size=128`;
+  const row = (label, subtitle, url, src, cls) => ({ label, subtitle, chevron: true, cls: "thanks-row",
+    icon: { text: label.charAt(0).toUpperCase(), color: "#7a8a99", src, cls }, onClick: open(url) });
   return [
     // ElleKit (vendor/ellekit): bundled for tweak injection, with its BSD-3-Clause licence
     // literal labels: native/test_notices.py reads `label: "X"` rows and ["X", "subtitle", url] entries
     { header: "Software", rows: [{ label: "ElleKit", subtitle: "Évelyne Bélanger\nTweak injection, BSD-3-Clause", chevron: true, cls: "thanks-row",
-      icon: { text: "E", color: "#7a8a99" }, onClick: open("https://github.com/tealbathingsuit/ellekit") }],
+      icon: { text: "E", color: "#7a8a99", src: gh("tealbathingsuit") }, onClick: open("https://github.com/tealbathingsuit/ellekit") }],
       footer: ELLEKIT_FOOTER },
     // F305: Canister's package search and repo index (Search's Other Sources, Find More Sources, the piracy list)
     { rows: [{ label: "Canister", subtitle: "Aarnav Tale\nPackage search and repo index", chevron: true, cls: "thanks-row", // F317: one class (ui.js classList.add): two threw and broke Credits
-      icon: { text: "C", color: "#7a8a99" }, onClick: open("https://canister.me/") }],
+      icon: { text: "C", color: "#7a8a99", src: "https://canister.me/favicon.png" }, onClick: open("https://canister.me/") }],
       footer: CANISTER_FOOTER },
     // Third-party notices: no hint, so one group (a footer-less row per group would only add gaps)
-    { rows: [["zsign", "zhlynn\nApp signing, MIT", "https://github.com/zhlynn/zsign"],
-      ["OpenSSL", "The OpenSSL Project\nzsign's cryptography, Apache-2.0", "https://www.openssl.org/"],
-      ["zlib", "Jean-loup Gailly and Mark Adler\nzsign's compression, zlib licence", "https://zlib.net/"],
-      ["idevice", "Jackson Coxson\nInstalling on this iPhone, MIT", "https://github.com/jkcoxson/idevice"],
-      ["Tailscale", "Tailscale Inc\nInstalling over a tailnet, BSD-3-Clause", "https://github.com/tailscale/tailscale"],
-    ].map(([label, subtitle, url]) => row(label, subtitle, url)) },
+    { rows: [["zsign", "zhlynn\nApp signing, MIT", "https://github.com/zhlynn/zsign", gh("zhlynn")],
+      ["OpenSSL", "The OpenSSL Project\nzsign's cryptography, Apache-2.0", "https://www.openssl.org/", gh("openssl")],
+      ["zlib", "Jean-loup Gailly and Mark Adler\nzsign's compression, zlib licence", "https://zlib.net/", "https://zlib.net/images/zlib3d-b1.png", "thanks-logo"],
+      ["idevice", "Jackson Coxson\nInstalling on this iPhone, MIT", "https://github.com/jkcoxson/idevice", gh("jkcoxson")],
+      ["Tailscale", "Tailscale Inc\nInstalling over a tailnet, BSD-3-Clause", "https://github.com/tailscale/tailscale", gh("tailscale")],
+    ].map(([label, subtitle, url, src, cls]) => row(label, subtitle, url, src, cls)) },
   ];
 }
 

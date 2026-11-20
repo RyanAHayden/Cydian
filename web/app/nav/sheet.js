@@ -1,49 +1,82 @@
 // A modal sheet, as iOS 6 presents one (presentModalViewController): it slides up over everything with its own
 // blue nav bar, a title and a Done button, and slides back down on Done or Escape. Transform only.
-// Styles: packages.css (.sheet).
+// Styles: packages.css (.sheet). The one sheet scaffold: the Confirm sheets (screens/queue.js modal), Write a Review
+// (screens/reviews.js), the progress page (nav/progress.js) and the Install sheet (signing-sheet.js) are built on it.
 //
 //   const close = showSheet({ title: "Depiction", body: element, onClose });
-export function showSheet({ title = "", body, onClose = () => {} } = {}) {
-  const sheet = document.createElement("div");
-  sheet.className = "sheet";
+//   close()                      slides it down, removes it, runs onClose; a promise that settles once it is gone
+//                                (the same promise on every later call)
+//   close.sheet / .h1 / .left / .right / .content   its nodes (.content is the .sheet-body the body goes in)
+//   close.setTitle(t)            the title and the dialog's label
+//   close.closed()               true once close() ran
+//
+// Options beyond title/body/onClose:
+//   left                         a node (or array) at the left of the bar (empty by default)
+//   right                        a node (or array) at the right in place of Done; null for nothing there
+//   cls                          more classes on the .sheet ("confirm-sheet", "console progress-page")
+//   bodyCls                      more classes on the .sheet-body
+//   escape                       false: Escape does nothing (sheets whose close has more to do than slide down)
+export function showSheet({ title = "", body = null, onClose = () => {}, left = null, right, cls = "", bodyCls = "", escape = true } = {}) {
+  const doc = globalThis.document;
+  const make = (tag, className, text) => {
+    const n = doc.createElement(tag);
+    if (className) n.className = className;
+    if (text != null) n.textContent = text;
+    return n;
+  };
+  const put = (box, nodes) => { for (const n of [nodes].flat()) if (n) box.append(n); };
+
+  const sheet = make("div", `sheet ${cls}`.trim());
   sheet.setAttribute("role", "dialog");
   sheet.setAttribute("aria-modal", "true");
   sheet.setAttribute("aria-label", title);
 
-  const bar = document.createElement("header");
-  bar.className = "navbar sheet-bar";
-  const h1 = Object.assign(document.createElement("h1"), { className: "nav-title", textContent: title });
-  const done = Object.assign(document.createElement("button"), { type: "button", className: "bar-button done", textContent: "Done" });
-  const spacer = document.createElement("div");
-  const right = document.createElement("div");
-  right.className = "sheet-right";
-  right.append(done);
-  const row = document.createElement("div");
-  row.className = "sheet-bar-row";
-  row.append(spacer, h1, right);
+  const bar = make("header", "navbar sheet-bar");
+  const h1 = make("h1", "nav-title", title);
+  const l = make("div", "sheet-left");
+  const r = make("div", "sheet-right");
+  let done = null;
+  if (right === undefined) {
+    done = make("button", "bar-button done", "Done");
+    done.type = "button";
+    r.append(done);
+  } else put(r, right);
+  put(l, left);
+  const row = make("div", "sheet-bar-row");
+  row.append(l, h1, r);
   bar.append(row);
 
-  const content = document.createElement("div");
-  content.className = "sheet-body";
-  if (body) content.append(body);
+  const content = make("div", `sheet-body ${bodyCls}`.trim());
+  put(content, body);
   sheet.append(bar, content);
-  document.body.append(sheet);
+  doc.body.append(sheet);
 
   const ease = "cubic-bezier(.25,.1,.25,1)";
-  sheet.animate([{ transform: "translateY(100%)" }, { transform: "none" }], { duration: 350, easing: ease });
+  sheet.animate?.([{ transform: "translateY(100%)" }, { transform: "none" }], { duration: 350, easing: ease });
 
-  let closed = false;
-  function close() {
-    if (closed) return;
-    closed = true;
-    document.removeEventListener("keydown", onKey);
-    const a = sheet.animate([{ transform: "none" }, { transform: "translateY(100%)" }], { duration: 300, easing: ease, fill: "forwards" });
-    const end = () => { sheet.remove(); onClose(); };
-    a.finished.then(end, end);
-  }
+  let gone = null;
   const onKey = (e) => { if (e.key === "Escape") close(); };
-  document.addEventListener("keydown", onKey);
-  done.addEventListener("click", close);
-  done.focus({ preventScroll: true });
-  return close;
+  function close() {
+    if (gone) return gone;
+    doc.removeEventListener?.("keydown", onKey);
+    gone = new Promise((resolve) => {
+      const end = () => {
+        sheet.remove();
+        try { onClose(); } finally { resolve(); }
+      };
+      const a = sheet.animate?.([{ transform: "none" }, { transform: "translateY(100%)" }], { duration: 300, easing: ease, fill: "forwards" });
+      if (a?.finished) a.finished.then(end, end); else end();
+    });
+    return gone;
+  }
+  if (escape) doc.addEventListener?.("keydown", onKey);
+  if (done) {
+    done.addEventListener("click", () => close());
+    done.focus?.({ preventScroll: true });
+  }
+  return Object.assign(close, {
+    sheet, h1, left: l, right: r, content,
+    setTitle(t) { h1.textContent = t; sheet.setAttribute("aria-label", t); },
+    closed: () => gone !== null,
+  });
 }

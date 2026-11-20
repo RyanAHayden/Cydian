@@ -416,6 +416,128 @@ enum IDevice {
         }
     }
 
+    // ---- B220: which port RemotePairing listens on
+    //
+    // remotepairingd's port isn't fixed: 49152 is the first port of iOS's dynamic range, which it gets when it starts
+    // early, and a restart (the phone's or the service's) can leave it elsewhere. Every connect to 49152 was then
+    // refused while the app said the pairing was fine. The service is advertised over mDNS (_remotepairing._tcp), as
+    // idevice's own pair_rsd_ios finds it. The port that worked last is tried first, then 49152, then every advertised
+    // port; a probe on 10.7.0.1 (or the phone's Tailscale address) picks the one this phone answers on (another
+    // device's advertised port is refused here, so it costs a millisecond). Every port refused means nothing serves
+    // RemotePairing for this pairing any more (the phone dropped it): code "refused", and the page pairs again.
+
+    static let remotePairingService = "_remotepairing._tcp"
+    // The port that answered last, for this run of the app only (nothing of the route is kept outside the Keychain).
+    private static let portLock = NSLock()
+    private static var lastPort: UInt16?
+    static var lastRemotePairingPort: UInt16? {
+        get { portLock.lock(); defer { portLock.unlock() }; return lastPort }
+        set { portLock.lock(); lastPort = newValue; portLock.unlock() }
+    }
+
+    /// The ports to try, in order, before the advertised ones: the last good one, then 49152.
+    static func knownRemotePairingPorts() -> [UInt16] {
+        var out: [UInt16] = []
+        for p in [lastRemotePairingPort, remotePairingPort].compactMap({ $0 }) where !out.contains(p) { out.append(p) }
+        return out
+    }
+
+    /// The port this phone answers RemotePairing on, by `probe` (a TCP connect over the route in use). Throws
+    /// "refused" when every candidate refused; otherwise the first port that didn't answer (a refused one can't be
+    /// it), and the connect says what's wrong (the VPN off, a tailnet rule). Blocking.
+    static func findRemotePairingPort(probe: (UInt16) -> VPNCheck.Probe) throws -> UInt16 {
+        var tried: [UInt16] = [], refused: [UInt16] = [], silent: [UInt16] = []
+        func attempt(_ ports: [UInt16]) -> UInt16? {
+            for p in ports where !tried.contains(p) {
+                tried.append(p)
+                switch probe(p) {
+                case .connected: return p
+                case .refused: refused.append(p)
+                case .silent: silent.append(p)
+                }
+            }
+            return nil
+        }
+        let known = knownRemotePairingPorts()
+        var found = attempt(known)
+        if found == nil {
+            let advertised = advertisedRemotePairingPorts()
+            ilog("RemotePairing: \(known.map(String.init).joined(separator: ", ")) didn't answer; advertised: \(advertised.isEmpty ? "none" : advertised.map(String.init).joined(separator: ", "))")
+            found = attempt(advertised)
+        }
+        if let p = found {
+            if p != lastRemotePairingPort { lastRemotePairingPort = p; ilog("RemotePairing is on port \(p)") }
+            return p
+        }
+        // A port that didn't answer may still be the one (a slow route); one that refused isn't
+        if let p = silent.first { return p }
+        throw Failure(code: "refused", text: "this iPhone refused RemotePairing on port \(refused.map(String.init).joined(separator: ", ")): it no longer has this pairing. Pair again")
+    }
+
+    private final class BrowseBox {
+        let lock = NSLock()
+        var ports: [UInt16] = []
+        var refs: [DNSServiceRef] = [] // the resolves under way, freed with the browse
+        var error: DNSServiceErrorType = 0
+        let queue = DispatchQueue(label: "ifizbox.idevice.browse") // every callback runs here
+    }
+
+    private static let resolvedReply: DNSServiceResolveReply = { _, _, _, err, _, _, port, _, _, c in
+        guard err == kDNSServiceErr_NoError, let c = c else { return }
+        let b = Unmanaged<BrowseBox>.fromOpaque(c).takeUnretainedValue()
+        let p = UInt16(bigEndian: port)
+        b.lock.lock(); if p > 0, !b.ports.contains(p) { b.ports.append(p) }; b.lock.unlock()
+    }
+
+    /// The ports _remotepairing._tcp is advertised on (this phone's own service among them), gathered for `wait`
+    /// seconds. Needs Local Network access and the type in Info-sideload.plist's NSBonjourServices; [] without them.
+    static func advertisedRemotePairingPorts(wait: TimeInterval = 2) -> [UInt16] {
+        let box = BrowseBox()
+        let ctx = Unmanaged.passRetained(box)
+        defer { ctx.release() }
+        let q = box.queue
+        var browse: DNSServiceRef?
+        let found: DNSServiceBrowseReply = { _, flags, iface, err, name, type, domain, c in
+            guard let c = c else { return }
+            let b = Unmanaged<BrowseBox>.fromOpaque(c).takeUnretainedValue()
+            guard err == kDNSServiceErr_NoError else { b.error = err; return }
+            guard flags & DNSServiceFlags(kDNSServiceFlagsAdd) != 0, let name = name, let type = type, let domain = domain else { return }
+            var r: DNSServiceRef?
+            guard DNSServiceResolve(&r, 0, iface, name, type, domain, IDevice.resolvedReply, c) == kDNSServiceErr_NoError, let ref = r else { return }
+            DNSServiceSetDispatchQueue(ref, b.queue)
+            b.refs.append(ref)
+        }
+        let st = DNSServiceBrowse(&browse, 0, 0, remotePairingService, nil, found, ctx.toOpaque())
+        guard st == kDNSServiceErr_NoError, let br = browse else {
+            ilog("RemotePairing browse failed: \(st)")
+            return []
+        }
+        DNSServiceSetDispatchQueue(br, q)
+        Thread.sleep(forTimeInterval: wait)
+        q.sync { // on its queue: no callback runs after this
+            for r in box.refs { DNSServiceRefDeallocate(r) }
+            box.refs = []
+            DNSServiceRefDeallocate(br)
+        }
+        if box.error != 0 { ilog("RemotePairing browse: error \(box.error)") }
+        box.lock.lock(); defer { box.lock.unlock() }
+        return box.ports
+    }
+
+    /// B220: a failed RemotePairing connect, by what it means for the page: "refused" (nothing listens: the pairing
+    /// is gone from the phone) and "pairing_rejected" (the phone answered but turned the pairing down) both mean
+    /// pair again; anything else stays connect_failed (the VPN, the network).
+    static func connectFailure(_ e: Failure) -> Failure {
+        let t = e.text
+        if t.contains("RemotePairing(") || t.contains("PairVerifyFailed") || t.contains("Pairing rejected") {
+            return Failure(code: "pairing_rejected", text: "this iPhone didn't accept the pairing (\(t)). Pair again")
+        }
+        if t.localizedCaseInsensitiveContains("connection refused") {
+            return Failure(code: "refused", text: "this iPhone refused the connection (\(t)): it no longer has this pairing. Pair again")
+        }
+        return e
+    }
+
     // ---- Connecting
 
     static func sockaddr4(_ port: UInt16, host: String = address) -> sockaddr_in {
@@ -468,7 +590,24 @@ enum IDevice {
             switch kind {
             case .remotePairing:
                 ilog("addresses: \(interfaceAddresses())")
-                let (host, port) = try endpoint(remotePairingPort)
+                let first = try endpoint(remotePairingPort)
+                let host = first.0
+                var port = first.1
+                // B220: the port it listens on now, by a probe over the same route (Tailscale's node is up by now)
+                watch.begin("finding RemotePairing's port through \(via)", Limit.tunnel)
+                let tailnet = viaTailscale
+                let w = watch
+                let rpPort = try IDevice.findRemotePairingPort { p in
+                    w.alive("probing port \(p)") // each probe gets the step's whole limit
+                    return tailnet ? Tailscale.probe(p) : VPNCheck.probe(p)
+                }
+                if rpPort != remotePairingPort {
+                    if tailnet {
+                        let local = Tailscale.mapPort(rpPort)
+                        guard local != rpPort else { throw Failure(code: "connect_failed", text: "Tailscale: couldn't open the local relay") }
+                        port = local
+                    } else { port = rpPort }
+                }
                 watch.begin("connecting to iOS at \(host):\(port) through \(via) (RemotePairing tunnel, RSD)", Limit.tunnel)
                 var rp: OpaquePointer?
                 try data.withUnsafeBytes { try check(rp_pairing_file_from_bytes($0.baseAddress?.assumingMemoryBound(to: UInt8.self), UInt(data.count), &rp), "bad_pairing") }
@@ -480,7 +619,7 @@ enum IDevice {
                         tunnel_create_rppairing($0, socklen_t(MemoryLayout<sockaddr_in>.size), Brand.name, rp, nil, nil, &adapter, &handshake)
                     }
                 }
-                try check(err, "connect_failed")
+                do { try check(err, "connect_failed") } catch let e as Failure { throw IDevice.connectFailure(e) }
                 guard adapter != nil, handshake != nil else { throw Failure(code: "connect_failed", text: "idevice made no tunnel") }
                 watch.setCloser(adapter_clone(adapter))
                 ilog("tunnel and RSD up in \(String(format: "%.2f", Date().timeIntervalSince(t0))) s: \(rsdSummary())")

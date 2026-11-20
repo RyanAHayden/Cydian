@@ -18,12 +18,18 @@ so nothing reaches the Signing Server, there's no install sheet to keep alive, a
 
 ## Routes
 
-- **iOS 17.4+ / iOS 27**: RemotePairing on 10.7.0.1:49152, an RPPairing tunnel and RSD
+- **iOS 17.4+ / iOS 27**: RemotePairing on 10.7.0.1 (port below), an RPPairing tunnel and RSD
   (`tunnel_create_rppairing`, `afc_client_connect_rsd`, `installation_proxy_connect_rsd`). The pairing is made on
   the phone on iOS 27 (Developer Mode > Pair with <app>, a 6-digit code; the app is idevice's pairable host).
   Lockdown's 62078 is refused over loopback on iOS 27.
 - **Older iOS**: TCP lockdown on 10.7.0.1:62078 with a pairing record made on a computer (`idevice_pair`,
   jitterbugpair) and imported; a heartbeat runs while connected.
+
+RemotePairing's port isn't fixed: 49152 is the first of iOS's dynamic ports, which remotepairingd usually gets, but
+after a restart it can listen elsewhere. A connect probes the port that answered last in this run, then 49152, then
+every port `_remotepairing._tcp` is advertised on over mDNS (listed in `NSBonjourServices`), over the route in use
+(10.7.0.1, or the phone's Tailscale address). When every port refuses, nothing serves this pairing any more: the
+connect fails with `refused` (a turned-down pairing with `pairing_rejected`), and the page pairs again.
 
 Pair-setup isn't allowed over loopback, Wi-Fi or Tailscale (`allowsPairSetup` false), so a connection only ever
 verifies an existing pairing. LocalDevVPN must be on while installing; iOS lets no app switch another app's VPN.

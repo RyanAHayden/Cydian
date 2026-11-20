@@ -148,6 +148,19 @@ enum Tailscale {
         return p > 0 ? UInt16(p) : port
     }
 
+    /// B220: a TCP connect to `port` on this phone's own Tailscale address through the running node (beginInstall or
+    /// test started it), for IDevice.findRemotePairingPort. Blocking.
+    static func probe(_ port: UInt16, host: String? = nil) -> VPNCheck.Probe {
+        lock.lock(); let h = host ?? relayHost; lock.unlock()
+        guard let h = h else { return .silent }
+        let c = strdup(h); defer { free(c) }
+        switch TSProbe(c, Int32(port), 3000) {
+        case 1: return .connected
+        case 0: return .refused
+        default: return .silent
+        }
+    }
+
     static func endInstall() {
         tunnel_set_port_map(nil)
         lock.lock(); relayHost = nil; lock.unlock()
@@ -265,11 +278,18 @@ enum TailscaleBridge {
         let st = Tailscale.start()
         if let e = st["error"] as? String, !e.isEmpty { return ["ok": false, "code": "not_running", "detail": e] }
         if st["state"] as? String == "Running" { Tailscale.remember(st) }
+        // B220: the port RemotePairing listens on now (it isn't always 49152); every advertised port refused means
+        // this phone no longer serves the pairing: the page says to pair again.
+        let port: UInt16
+        do { port = try IDevice.findRemotePairingPort { Tailscale.probe($0, host: own) } } catch let e as IDevice.Failure where e.code == "refused" {
+            Tailscale.log("test \(own): \(e.text)")
+            return ["ok": false, "code": "refused", "detail": e.text, "address": own, "name": st["name"] ?? NSNull()]
+        }
         let h = strdup(own); defer { free(h) }
-        var r = Tailscale.json(TSTest(h, Int32(IDevice.remotePairingPort)))
+        var r = Tailscale.json(TSTest(h, Int32(port)))
         r["address"] = own
         r["name"] = st["name"] ?? NSNull()
-        Tailscale.log("test \(own):\(IDevice.remotePairingPort): \(r)")
+        Tailscale.log("test \(own):\(port): \(r)")
         return r
     }
 }

@@ -7,7 +7,7 @@ own addresses are reset by iOS; a connection that arrives over the Tailscale app
 
 | File | What it does |
 | --- | --- |
-| `tsnet.go` | the c-archive: start the node (login URL, approval, status), a 127.0.0.1 relay per remote port dialed through the tailnet, RemotePairing's handshake as a test, logout, stop; logs to os_log (`ifizbox.tailscale`, `tsnet`) |
+| `tsnet.go` | the c-archive: start the node (login URL, approval, status), a 127.0.0.1 relay per remote port dialed through the tailnet, RemotePairing's handshake as a test, a port probe (`TSProbe`: connected, refused or no answer), logout, stop; logs to os_log (`ifizbox.tailscale`, `tsnet`) |
 | `go.mod`, `go.sum` | the pinned tailscale.com version and every module's checksum |
 | `pin.env` | the Go toolchain version and its sha256 |
 | `build.sh` | downloads that Go once (checked), builds `libtsnet.a` for arm64 iOS 15, cached per user in `~/.cache/ifizbox/tailscale` |
@@ -18,8 +18,9 @@ own addresses are reset by iOS; a connection that arrives over the Tailscale app
 ## How an install connects
 
 `IDevice.Session` asks `Tailscale.useForInstall()` (Connect With: Tailscale, or Automatic with the Tailscale VPN
-on, and the app signed in). Then it starts the node, opens a relay for 49152 and hands idevice
-`127.0.0.1:<relay>` instead of LocalDevVPN's `10.7.0.1:49152`. RemotePairing's tunnel runs on a second port the
+on, and the app signed in). Then it starts the node, finds the port RemotePairing listens on (`TSProbe` through the
+tailnet: 49152 or the advertised one, `../idevice/README.md`), opens a relay for it and hands idevice
+`127.0.0.1:<relay>` instead of LocalDevVPN's `10.7.0.1:<port>`. RemotePairing's tunnel runs on a second port the
 phone picks (createListener): idevice asks `tunnel_set_port_map` (our patch,
 `../idevice/patches/0002-tunnel-port-map.patch`) and gets a relay for that port too. Everything after (RSD, AFC,
 installation_proxy) runs inside that tunnel. The node stops when the session ends.

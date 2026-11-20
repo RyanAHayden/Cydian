@@ -330,6 +330,38 @@ func TSTest(host *C.char, port C.int) *C.char {
 	return cjson(res)
 }
 
+// TSProbe dials host:port through the tailnet and hangs up (B220: which port this phone's RemotePairing service is
+// on). 1: it connected; 0: the phone refused it (nothing listens there); -1: no answer or another error; -2: the
+// node isn't running.
+//
+//export TSProbe
+func TSProbe(host *C.char, port C.int, ms C.int) C.int {
+	mu.Lock()
+	s := srv
+	mu.Unlock()
+	if s == nil {
+		return -2
+	}
+	h := C.GoString(host)
+	target := net.JoinHostPort(h, fmt.Sprint(int(port)))
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(int(ms))*time.Millisecond+10*time.Second)
+	defer cancel()
+	waitPeer(ctx, h) // as for a relay: dialing before the phone's node is known goes through iOS, which resets it
+	dctx, dcancel := context.WithTimeout(ctx, time.Duration(int(ms))*time.Millisecond)
+	defer dcancel()
+	c, err := s.Dial(dctx, "tcp", target)
+	if err == nil {
+		c.Close()
+		logf("probe %s: connected", target)
+		return 1
+	}
+	logf("probe %s: %v", target, err)
+	if strings.Contains(err.Error(), "refused") {
+		return 0
+	}
+	return -1
+}
+
 // TSStop closes the relays and the node.
 //
 //export TSStop

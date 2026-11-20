@@ -1,0 +1,11 @@
+[
+  { "nav": "#/", "ms": 4000 },
+  { "eval": "(async()=>{const m=await import('/signing-sheet.js'); const native={call:async(meth)=>meth==='signing.inspect'?{app:{name:'Delta',version:'1.6',bundleId:'com.rileytestut.Delta'},permissions:[],entitlements:{},extensions:[]}:null}; window.__r=m.inspectAndInstall({url:'https://example.com/Delta.ipa',name:'Delta'},{native}); return 'opened'})()" },
+  { "wait": 1500 },
+  { "eval": "(()=>{const s=document.querySelector('.sheet'); const b=[...s.querySelectorAll('button')].filter(x=>x.textContent==='Cancel').map(x=>x.className); return JSON.stringify(b)})()" },
+  { "shot": "sheet" },
+  { "click": ".ss-bar-cancel" },
+  { "wait": 800 },
+  { "eval": "String(document.querySelectorAll('.sheet').length)" },
+  { "shot": "closed" }
+]

@@ -52,7 +52,8 @@ def stops(*pairs):
 
 
 # Each theme's empty frame (B203). Keys are Settings' palette values (web/app/core/settings.js): the light palettes
-# (classic, sepia, solarized) and the dark ones (oled, gunmetal, midnight, linen, nord, dracula).
+# (classic, sepia, solarized, legalpad, metal) and the dark ones (oled, gunmetal, midnight, linen, nord, dracula,
+# leather, felt, wood).
 #   pins:       the ground's --pin-dark, --pin-light (Linen: its weave's base twice, a stripe can't draw the weave)
 #   nav_line:   the nav bar's bottom edge; nav_hi: its 1 pt top highlight (rrggbb, alpha)
 #   nav_gloss:  the bar's 44 pt gloss; nav_shadow: the alpha its 2.5 pt shadow starts at (OLED Black has none)
@@ -88,6 +89,20 @@ THEMES = {
                     nav_gloss=stops((0, "4f5268"), (0.5, "383b4c"), (0.51, "2c2e3b"), (1, "21222c")),
                     nav_shadow=0.4, tab_line=("15161c", 1), tab_gloss=stops((0, "383b4c"), (1, "21222c")),
                     tab_base="21222c"),
+    # F325's textured themes: the bar's gloss flattened over its texture's colour, no texture or stitching drawn
+    "leather": dict(pins=("382617", "3b2819"), nav_line="1c1007", nav_hi=("ffebc8", 0.3),
+                    nav_gloss=stops((0, "8f633f"), (0.5, "5e3d24"), (0.51, "553620"), (1, "4a2e1a")),
+                    nav_shadow=0.5, **CLASSIC_TAB),
+    "felt": dict(pins=("2a6432", "2c6834"), nav_line="1e0f04", nav_hi=("ffebc8", 0.3),
+                 nav_gloss=stops((0, "926e4f"), (0.5, "7f5531"), (0.51, "704825"), (1, "58381d")),
+                 nav_shadow=0.45, **CLASSIC_TAB),
+    "wood": dict(pins=("633e21", "66401f"), nav_line="1a0c03", nav_hi=("ffe6be", 0.25),
+                 nav_gloss=stops((0, "634831"), (0.5, "52331a"), (0.51, "462a13"), (1, "331f0e")),
+                 nav_shadow=0.5, **CLASSIC_TAB),
+    "legalpad": dict(pins=("f3e397", "f9eba0"), nav_line="2a1608", nav_hi=("b07a4c", 1),
+                     nav_gloss=stops((0, "8a5530"), (1, "5a3218")), nav_shadow=0.18, **CLASSIC_TAB),
+    "metal": dict(pins=("c6cbd2", "cbd0d6"), nav_line="6d737c", nav_hi=("ffffff", 1),
+                  nav_gloss=stops((0, "eef0f3"), (1, "b9bec6")), nav_shadow=0.18, **CLASSIC_TAB),
 }
 
 

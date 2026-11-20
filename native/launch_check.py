@@ -17,7 +17,8 @@ IMAGES = ("LaunchStripes", "LaunchNavTop", "LaunchNavBottom", "LaunchTabGloss", 
 VIEW_NIB = "Lvc-00-000-view-Lrt-00-000.nib"  # the storyboard's root view, the nib make.py recolours per theme
 THEMES = "LaunchThemes/"
 # Every theme Settings offers (web/app/core/settings.js; native/test_launch_grounds.py keeps this in step).
-THEME_KEYS = ("classic", "sepia", "solarized", "oled", "gunmetal", "midnight", "linen", "nord", "dracula")
+THEME_KEYS = ("classic", "sepia", "solarized", "oled", "gunmetal", "midnight", "linen", "nord", "dracula",
+              "leather", "felt", "wood", "legalpad", "metal")
 
 
 def storyboard_problems(files, base, what):

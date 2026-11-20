@@ -123,6 +123,30 @@ def inner(layer):
     return re.match(r"linear-gradient\((.*)\)", layer.split(") ")[0] + ")").group(1)
 
 
+TEXTURED = ("leather", "felt", "wood", "legalpad", "metal")
+
+
+def textured_nav(n):
+    """A textured bar's (line, highlight, gloss): the 44 pt gloss flattened over the colour under it (the base
+    layer's first colour), its bottom line the gloss's last 1 pt or a 1 pt layer of its own."""
+    hi = next(x for x in n if "safe-area-inset-top" in x)
+    hi = re.match(r"linear-gradient\((rgba\([^)]*\)|#[0-9a-f]+)", hi).group(1)
+    glo = next(x for x in n if x.startswith("linear-gradient") and "100% 44px" in x)
+    args = re.match(r"linear-gradient\((.*)\) bottom /", glo).group(1)
+    if "calc(100% - 1px)" in args:
+        line = re.findall(r"(#[0-9a-f]+) calc\(100% - 1px\)", args)[-1]
+        args = args.split(" calc(")[0]
+    else:
+        line = inner(next(x for x in n if "bottom / 100% 1px" in x)).split(",")[0]
+    under = make.hexrgb(hex6(re.search(r"#[0-9a-f]{3,6}", n[-1]).group(0)))
+    flat = []
+    for p in re.split(r",(?![^(]*\))", args):
+        m = re.fullmatch(r"(.*?)(\s+[\d.]+%)?", p.strip())
+        c, a = colour(m.group(1))
+        flat.append("#%02x%02x%02x%s" % (make.mix(under, make.hexrgb(c), a) + (m.group(2) or "",)))
+    return line, hi, gradient(", ".join(flat))
+
+
 class LaunchThemes(unittest.TestCase):
     def setUp(self):
         self.ios6 = read("web", "app", "ios6.css")
@@ -147,7 +171,7 @@ class LaunchThemes(unittest.TestCase):
             root = self.block(self.ios6, ":root")
             pins = (hex6(self.var(root, "pin-dark")), hex6(self.var(root, "pin-light")))
             nav, tab, shadow = light_nav, light_tab, 0.18
-        elif key in ("sepia", "solarized"):
+        elif key in ("sepia", "solarized", "legalpad", "metal"):
             b = self.block(self.pal, 'html[data-theme="light"][data-palette="%s"]' % key)
             pins = (hex6(self.var(b, "pin-dark")), hex6(self.var(b, "pin-light")))
             nav, tab, shadow = self.var(b, "lt-nav-bar"), light_tab, 0.18
@@ -161,10 +185,13 @@ class LaunchThemes(unittest.TestCase):
             sh = self.var(b, "dk-nav-shadow")
             shadow = 0 if sh == "none" else float(re.search(r"rgba\(0,\s*0,\s*0,\s*([\d.]+)\)", sh).group(1))
         n = layers(nav)
-        line = inner(n[0]).split(",")[0]
-        hi = re.match(r"linear-gradient\((rgba\([^)]*\)|#[0-9a-f]+)", n[1]).group(1)
-        out = dict(pins=pins, nav_line=hex6(line), nav_hi=colour(hi), nav_gloss=gradient(inner(n[2])),
-                   nav_shadow=shadow)
+        if key in TEXTURED:  # F325's textured bars: the storyboard draws no texture or stitching
+            line, hi, glo = textured_nav(n)
+        else:
+            line = inner(n[0]).split(",")[0]
+            hi = re.match(r"linear-gradient\((rgba\([^)]*\)|#[0-9a-f]+)", n[1]).group(1)
+            glo = gradient(inner(n[2]))
+        out = dict(pins=pins, nav_line=hex6(line), nav_hi=colour(hi), nav_gloss=glo, nav_shadow=shadow)
         t = layers(tab)
         if "rgba(0,0,0,.7)" in t[0].replace(" ", ""):  # the light theme's tab bar, as the storyboard draws it
             out.update(tab_line=colour(re.match(r"linear-gradient\((rgba\([^)]*\))", t[1]).group(1)),

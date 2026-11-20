@@ -31,7 +31,7 @@ import { leaveQuestion, LEAVE } from "../core/installroute.js";
 import { tailscaleVPNOn, installStatus, CHECKING, STATUS_ACTIONS } from "../core/installroute.js";
 import { NAME } from "../brand.js";
 import { showHUD } from "../nav/hud.js";
-import { EASE, DURATION } from "../nav/motion.js";
+import { slideChange } from "../nav/slide.js";
 
 export const PAGE = "installation";
 // F300: Installation & Signing's main page links to Install Apps With (`with`: the choice and the chosen route's
@@ -307,7 +307,7 @@ let connectPick = null; // B167: the Connect With pick just made, until idevice.
 // F301: a repaint of a page's groups changes only what changed, in place: a group whose rows are the same keeps its
 // element and only the rows whose content changed are swapped (a detail, a spinner, a checkmark), a footer's text is
 // set on the footer that's there, and only groups that come, go or change their rows are rebuilt. Moves slide
-// (slideLayout). Rows kept from an earlier draw call the latest draw's handlers (each tap goes through a holder).
+// (nav/slide.js's watcher, measured right around the change by slideChange). Rows kept from an earlier draw call the latest draw's handlers (each tap goes through a holder).
 // `build(sections)` makes the groups' DOM (grouped() and what the page adds to it).
 const sigOf = (r) => JSON.stringify(r, (k, v) => (typeof v === "function" ? "ƒ" : v));
 export function patchGroups(box, sections, build) {
@@ -328,7 +328,7 @@ export function patchGroups(box, sections, build) {
     const ul = [...g.children].find((c) => c.classList?.contains("table"));
     [...(ul?.children ?? [])].forEach((li, j) => { li.__sig = sigOf(s.rows[j]); li.__h = holders[i][j]; });
   });
-  slideLayout(box, () => {
+  slideChange(box, () => {
     const old = [...box.children];
     const used = new Set();
     const next = fresh.map((g) => {
@@ -357,48 +357,6 @@ export function patchGroups(box, sections, build) {
     });
     if (next.length !== old.length || next.some((g, i) => g !== old[i])) box.replaceChildren(...next);
   });
-}
-
-// F300: a repaint of a page's groups slides: a group that stays starts where it was and slides to its new place, a
-// group that comes in fades in from a little above, and what's under the box slides as slideBelow does (FLIP, by
-// transform and opacity only). Groups are matched by their header, or their first row's label.
-export function slideLayout(box, change) {
-  if (!box?.isConnected || !box.getBoundingClientRect) return slideBelow(box, change);
-  const keys = () => {
-    const seen = new Map();
-    return [...box.children].map((g) => {
-      const k = g.querySelector?.(".group-header")?.textContent || g.querySelector?.(".cell-label")?.textContent || g.className || "";
-      const n = (seen.get(k) ?? 0) + 1;
-      seen.set(k, n);
-      return [`${k}#${n}`, g];
-    });
-  };
-  const before = new Map(keys().map(([k, g]) => [k, g.getBoundingClientRect().top]));
-  slideBelow(box, change);
-  if (!before.size) return;
-  const ease = { duration: DURATION, easing: EASE };
-  for (const [k, g] of keys()) {
-    if (!g.animate) continue;
-    if (!before.has(k)) { g.animate([{ opacity: 0, transform: "translateY(-12px)" }, { opacity: 1, transform: "none" }], ease); continue; }
-    const d = before.get(k) - g.getBoundingClientRect().top;
-    if (Math.abs(d) >= 0.5) g.animate([{ transform: `translateY(${d}px)` }, { transform: "none" }], ease);
-  }
-}
-
-// B167: a repaint that makes the box taller or shorter (Checking… giving way to Tailscale's three signed-in rows, a
-// footer's new length) doesn't make what's under it jump: everything below starts where it was and slides to its
-// new place (FLIP, by transform only, as nav/ui.js collapse).
-export function slideBelow(box, change) {
-  const before = box.isConnected && box.getBoundingClientRect ? box.getBoundingClientRect().height : null;
-  change();
-  if (before == null) return;
-  const d = before - box.getBoundingClientRect().height;
-  if (Math.abs(d) < 0.5) return;
-  for (let n = box; n && !n.classList?.contains("page-body"); n = n.parentElement) {
-    for (let s = n.nextElementSibling; s; s = s.nextElementSibling) {
-      s.animate?.([{ transform: `translateY(${d}px)` }, { transform: "none" }], { duration: DURATION, easing: EASE });
-    }
-  }
 }
 
 // grouped() with the footers of groups marked `warn` in red (ios6.css .sign-warning, as Settings > Signing's).

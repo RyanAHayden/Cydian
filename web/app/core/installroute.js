@@ -347,9 +347,12 @@ export function verifyFailure(err) {
 // Leave stops the step (index 1).
 export const LEAVE = 1;
 export function leaveQuestion(step) {
-  if (step !== "pairing" && step !== "checking") return null;
-  const message = step === "pairing"
-    ? "Leaving stops pairing. It starts again when you come back to This iPhone."
-    : "Leaving stops checking this iPhone. It checks again when you come back.";
+  const messages = {
+    pairing: "Leaving stops pairing. It starts again when you come back to This iPhone.",
+    checking: "Leaving stops checking this iPhone. It checks again when you come back.",
+    signingIn: "Leaving stops signing in to Tailscale. Tap Sign In again when you come back to This iPhone.", // B143
+  };
+  const message = messages[step];
+  if (!message) return null;
   return { title: "Stop Setting Up?", message, buttons: ["Cancel", "Leave"], cancel: 0 };
 }

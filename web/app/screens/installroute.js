@@ -83,6 +83,7 @@ export function vpnDetail(st) {
 
 // Tailscale's sign-in while it runs: the step line ("Log in on the page"), or null.
 let signingIn = null;
+let signInVisit = null; // B143: the pair page's visit that started it (leaving that page stops it), null from the main page
 
 // The main page's groups (pure, for tests): the choice and, with This iPhone chosen, its state, Connect With and
 // Tailscale. `st.tailscale` is tailscale.status's answer (idevice.status carries it).
@@ -211,9 +212,10 @@ function warnFooters(sections) {
   return frag;
 }
 
-async function tailscaleSignIn(native, alert, redraw, done = `${NAME} is on your tailnet. Tap Test Connection to check it reaches this iPhone.`) {
+async function tailscaleSignIn(native, alert, redraw, done = `${NAME} is on your tailnet. Tap Test Connection to check it reaches this iPhone.`, from = null) {
   if (signingIn) return;
   signingIn = "Starting…";
+  signInVisit = from;
   redraw();
   try {
     await call(native, "tailscale.signIn", {}, (ev) => {
@@ -223,10 +225,12 @@ async function tailscaleSignIn(native, alert, redraw, done = `${NAME} is on your
       redraw();
     });
     signingIn = null;
+    signInVisit = null;
     redraw();
     await alert({ title: "Signed In", message: done, buttons: ["OK"] });
   } catch (e) {
     signingIn = null;
+    signInVisit = null;
     redraw();
     if (!/^cancel+ed/.test(e?.message || "") && e?.code !== "canceled") alert({ title: "Couldn't Sign In", message: e?.message || "No answer.", buttons: ["OK"] });
   }
@@ -507,20 +511,26 @@ export function leave() { // also for tests: ends a visit (its VPN poll) without
   if (visit?.poll) clearInterval(visit.poll);
   visit = null;
   if (was && pairing && shown) call(shown.native, "idevice.pairCancel").catch(() => {}); // once, not again on the hashchange after Leave
+  if (was && signingIn && signInVisit === was && shown) { // B143: the sign-in this page started (an older shell has no such call)
+    signInVisit = null;
+    call(shown.native, "tailscale.signInCancel").catch(() => {});
+  }
 }
 
 // B134: leaving the page while a step runs asks first (core leaveQuestion): "pairing" while idevice.pair waits (the
 // code coming or being typed), "checking" while the page's spinner waits on idevice.status; null otherwise (paired,
-// waiting for the VPN to come on, Try Again: nothing runs that leaving would stop). Tailscale's sign-in isn't asked:
-// its Safari sheet covers the app while it runs, and the bridge has no call to stop it.
+// waiting for the VPN to come on, Try Again: nothing runs that leaving would stop). B143: "signingIn" while a Tailscale
+// sign-in this visit started runs (Starting…, Waiting for approval; its login page covers the app in between), and Leave
+// stops it with tailscale.signInCancel.
 export function pendingStep(onPage = onPairPage()) {
   if (!visit || !onPage) return null;
   if (pairing) return "pairing";
+  if (signingIn && signInVisit === visit) return "signingIn";
   return visit.checking ? "checking" : null;
 }
 
 // Asks "Stop Setting Up?"; true when the step is gone (it ended while asking, or Leave: the visit ends and the pairing
-// is cancelled, as a plain leave() does). The page itself is left by the caller.
+// or Tailscale sign-in is cancelled, as a plain leave() does). The page itself is left by the caller.
 let asking = null;
 export function askLeave(alert = showAlert, onPage) {
   const q = leaveQuestion(pendingStep(onPage));
@@ -645,7 +655,7 @@ async function drawPair(box, { store, native, alert, redraw }) {
     vpn,
     busy: signingIn,
     choose: async (value) => { await busy("Switching", () => call(native, "tailscale.setConnect", { value }).catch(() => {})); recheck(); },
-    signIn: async () => { await useTailscale(); tailscaleSignIn(native, alert, redraw, `${NAME} is on your tailnet. Turn on the Tailscale app's VPN to pair.`); },
+    signIn: async () => { await useTailscale(); tailscaleSignIn(native, alert, () => { if (visit === v) redraw(); }, `${NAME} is on your tailnet. Turn on the Tailscale app's VPN to pair.`, v); }, // B143: once left, an ending sign-in mustn't draw the page (a new visit and its poll)
     openTailscale: async () => { await useTailscale(); openApp(native, alert, TAILSCALE_URL, "Tailscale"); },
     install: () => openApp(native, alert, LOCALDEVVPN_STORE, "App Store"),
   });

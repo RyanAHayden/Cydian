@@ -17,6 +17,7 @@
 // One bar at a time: showing another takes the first away at once. `doc` and `clock` are for the tests.
 
 import { STEP_TEXT } from "../core/reloadsteps.js";
+import { EASE, DURATION } from "./motion.js";
 
 export const PHASES = Object.freeze(Object.values(STEP_TEXT));
 export const MIN_STEP_MS = 600;
@@ -105,7 +106,7 @@ export function showReloadBar(text = "", { onCancel = null, doc = globalThis.doc
   });
   handle.set(text);
   doc.body.append(bar);
-  bar.animate?.([{ transform: "translateY(100%)" }, { transform: "none" }], { duration: 300, easing: "cubic-bezier(.25,.1,.25,1)" });
+  bar.animate?.([{ transform: "translateY(100%)" }, { transform: "none" }], { duration: DURATION, easing: EASE });
   root?.classList?.add("has-reload");
   current = handle;
   return handle;

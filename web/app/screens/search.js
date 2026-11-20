@@ -29,6 +29,7 @@ import { showAlert } from "../nav/alert.js";
 import { searchBar, pinned } from "../nav/searchbar.js";
 import { detectMode } from "../core/settings.js";
 import { onPageShow } from "../nav/pagestate.js"; // B172
+import { EASE } from "../nav/motion.js";
 
 export const title = "Search";
 
@@ -343,7 +344,7 @@ async function openFilters(scope, changed, redraw) {
   wrap.style.top = Math.round(scope.getBoundingClientRect().bottom) + "px";
   wrap.append(box);
   document.body.append(wrap);
-  const ease = "cubic-bezier(.25,.1,.25,1)";
+  const ease = EASE;
   box.animate([{ transform: "translateY(-100%)" }, { transform: "none" }], { duration: 280, easing: ease });
   const onRoute = () => { if (!/^#\/search\/?$/.test(location.hash)) close(); };
   addEventListener("hashchange", onRoute);

@@ -19,8 +19,8 @@
 // Not slid: virtualised lists (.vlist: rows are recycled while scrolling), the install console (.progress-body),
 // anything absolutely placed, inline, or animated by its own code, and anything marked data-noslide.
 
-export const DURATION = 300;                       // ms: .preview-slot's .3s
-export const EASE = "cubic-bezier(.25,.1,.25,1)";  // and its curve (CSS `ease`, iOS 6's default)
+export { DURATION, EASE } from "./motion.js";      // .preview-slot's .3s and its curve (CSS `ease`, iOS 6's default)
+import { DURATION, EASE } from "./motion.js";
 const ROOT = ".page-body, .sheet-body, .sheet-scroll, .search-results, .alert-scrim";
 const NOT_ROOT = ".progress-body";
 const SKIP = ".vlist, .progress-body, .pull-clip, .scroll-indicator, [data-noslide], [data-slide-ghost]";

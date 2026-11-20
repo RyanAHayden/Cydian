@@ -8,6 +8,8 @@
 //   // destructive: one index or a list of them (red buttons)
 //
 // All text goes in through textContent.
+import { EASE, DURATION } from "./motion.js";
+
 export function showActionSheet({ title = "", buttons = [], cancel = "Cancel", destructive = -1 } = {}) {
   return new Promise((resolve) => {
     const scrim = document.createElement("div");
@@ -44,9 +46,8 @@ export function showActionSheet({ title = "", buttons = [], cancel = "Cancel", d
 
     const onKey = (e) => { if (e.key === "Escape") { e.preventDefault(); close(-1); } };
     document.addEventListener("keydown", onKey);
-    const ease = "cubic-bezier(.25,.1,.25,1)";
-    dim.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 300, easing: "ease-out" });
-    sheet.animate([{ transform: "translateY(100%)" }, { transform: "none" }], { duration: 300, easing: ease });
+    dim.animate([{ opacity: 0 }, { opacity: 1 }], { duration: DURATION, easing: "ease-out" });
+    sheet.animate([{ transform: "translateY(100%)" }, { transform: "none" }], { duration: DURATION, easing: EASE });
     (cancelButton || sheet.querySelector(".action-button"))?.focus({ preventScroll: true });
 
     let done = false;

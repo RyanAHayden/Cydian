@@ -13,16 +13,9 @@ import { certificateWarnings, revocationLabel, resignLabel, signedAppRows, devic
 import { resignJob } from "../core/appqueue.js";
 import { signedAppsNamed } from "../core/installed.js"; // B150
 import { getServer, chooseRoute } from "../signing-client.js";
+import { loadStyle } from "../nav/motion.js";
 
-let styled = false;
-function style() {
-  if (styled || typeof document === "undefined") return;
-  styled = true;
-  const link = document.createElement("link");
-  link.rel = "stylesheet";
-  link.href = new URL("../signsheet.css", import.meta.url).href;
-  document.head.append(link);
-}
+function style() { loadStyle("signsheet.css"); }
 
 const day = (iso) => { const d = new Date(iso ?? ""); return Number.isNaN(d.getTime()) ? null : d.toLocaleDateString(); };
 

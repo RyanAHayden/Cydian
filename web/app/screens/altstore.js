@@ -55,6 +55,7 @@ import { APP_MODE_LABEL } from "../core/appqueue.js"; // F242a
 import { installedOnPhone } from "../core/appqueue.js"; // B136
 import { whereFromGroup, reportBanner, reports, reportMalicious } from "./safety.js"; // F291
 import { addTweaksGroup, installTweaksChoice } from "./tweaks.js"; // F302a
+import { EASE, DURATION } from "../nav/motion.js";
 
 function img(url, cls) {
   const src = mediaUrl(url);
@@ -1140,7 +1141,7 @@ export function zoomShots(list, index = 0) {
     { transform: `translate(${from.left + from.width / 2 - (to.left + to.width / 2)}px, ${from.top + from.height / 2 - (to.top + to.height / 2)}px) scale(${from.width / to.width})` },
     { transform: "none" }] : [{ transform: "scale(.9)" }, { transform: "none" }];
   const img = track.children[index]?.firstElementChild;
-  const ease = { duration: 300, easing: "cubic-bezier(.25,.1,.25,1)" };
+  const ease = { duration: DURATION, easing: EASE };
   layer.animate?.([{ opacity: 0 }, { opacity: 1 }], ease);
   img?.animate?.(grow, ease);
   const close = () => {

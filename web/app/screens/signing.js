@@ -28,6 +28,7 @@ import { statusReady } from "../signing-client.js";
 import { normalizeServer } from "../core/signing.js";
 import { NAME, SIGN_HOST } from "../brand.js";
 import { freeRouteBlock } from "./free-apple-id.js";
+import { loadStyle } from "../nav/motion.js";
 
 export const STEPS = [
   { id: "certificate", title: "Import Your Certificate" },
@@ -127,15 +128,7 @@ const h = (tag, cls, text) => {
 };
 
 // The stylesheet, once, from this module's own folder (no build step: the page links it when first drawn).
-let styled = false;
-function style() {
-  if (styled || typeof document === "undefined") return;
-  styled = true;
-  const link = h("link");
-  link.rel = "stylesheet";
-  link.href = new URL("../signing.css", import.meta.url).href;
-  document.head.append(link);
-}
+function style() { loadStyle("signing.css"); }
 style();
 
 // F78: the certificate step's picture is the user's own screenshot of the iOS Files picker with the three files

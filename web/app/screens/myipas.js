@@ -58,6 +58,7 @@ import { serverReachable } from "../signing-client.js";
 import { libraryJob } from "../core/appqueue.js";
 import { queueApp } from "./queue.js";
 import { storedKeep, originalState, originalNote, OLD_WAY_ALERT, OLD_WAY_TEXT } from "../core/keepid.js";
+import { loadStyle } from "../nav/motion.js";
 
 export { MYIPAS };
 
@@ -153,17 +154,7 @@ export function render(body, route, ctx) {
   body.append(note("Nothing here."));
 }
 
-let styled = false;
-function style() {
-  if (styled || typeof document === "undefined") return;
-  styled = true;
-  for (const f of ["../myipas.css", "../signsheet.css"]) {
-    const link = document.createElement("link");
-    link.rel = "stylesheet";
-    link.href = new URL(f, import.meta.url).href;
-    document.head.append(link);
-  }
-}
+function style() { loadStyle("myipas.css"); loadStyle("signsheet.css"); }
 
 const go = (path) => { location.hash = format({ tab: "installed", path }).replace(/^#/, ""); };
 const ipaPath = (file) => [MYIPAS, ipaToken(file)];

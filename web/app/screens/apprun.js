@@ -39,7 +39,7 @@ import { fitFileNames } from "../core/midtrunc.js";
 import { appRows, createAppRun, rowStatus, summaryLine, runStatus, runPercent, ended, isSelf, DIDNT_DOWNLOAD, barOf } from "../core/apprun.js";
 import { recordWhen } from "../core/apprun.js"; // B136
 import { apps as appStore, undoRecord } from "../core/installed.js"; // B170
-import { SELF_UPDATE_LINES, SELF_UPDATE_FAILED, HERE_CLOSING_LINE } from "../signing/selfupdate.js";
+import { SELF_UPDATE_LINES, SELF_UPDATE_FAILED, HERE_CLOSING_LINE, DOWNLOAD_HINT, DOWNLOAD_BY_HAND } from "../signing/selfupdate.js";
 
 // The phone's side of a run, from signing-client.js (prepareOnDevice, openPrepared, discardPrepared). Each attempt of a
 // row gets its own tag, so signing.cancel {tag} stops that try only.
@@ -424,9 +424,18 @@ export async function runAppRun(jobs, deps) {
       line("error", CLOSE_BY_HAND, self.id);
       selfFinish({ label: RETURN_LABEL, status: text, action: () => false });
     };
+    let hinted = false;
+    // B208: iOS is downloading it and the shell hasn't closed DOWNLOAD_HINT later: how to close it by hand, unlocked
+    // (Return), still following (a later finished/guessed locks on Closing again)
+    const hint = () => {
+      if (!live() || closing) return;
+      line("step", DOWNLOAD_BY_HAND, self.id);
+      selfFinish({ label: RETURN_LABEL, status: text, action: () => false });
+    };
     const onState = (s) => {
       if (!live()) return;
       if (s && s !== last && SELF_UPDATE_LINES[s]) { last = s; line("step", SELF_UPDATE_LINES[s], self.id); }
+      if (s === "downloading" && !hinted) { hinted = true; later(hint, DOWNLOAD_HINT); }
       if ((s === "finished" || s === "guessed") && !closing) {
         closing = true;
         selfFinish({ label: CLOSING_LABEL, status: text, locked: true });

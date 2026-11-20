@@ -4,7 +4,9 @@
 // newer version than remembered, beyond the ones already counted or notified, posts "n Updates" (a tap opens
 // Changes) and sets the icon badge (B47: Changes' last count plus updates it didn't count, UpdateCheck.badge). The rules are native/sign/Updates.swift (tested on Linux, native/test_updates.py).
 //
-//   updates.watch {apps: [{id, name, version, source}], known: ["<id> <version>"]} -> {scheduled: Bool}
+//   updates.watch {apps: [{id, name, version, source}], known: ["<id> <version>"], counted?: ["<id> <version>"]}
+//                 -> {scheduled: Bool}
+//   (`counted`, B207: the keys of Changes' counted rows, sent when `known` also holds ignored versions; else `known`)
 //
 // iOS decides when the task runs (how often the app is used, battery, Low Power Mode): earliestBeginDate is only
 // "not before". It never runs in the jailbreak build (N5's daemon checks apt there), and only registers where the
@@ -54,10 +56,11 @@ enum BackgroundCheck {
             guard AppMode.current == .sideload else { return Apt.reply(c, ["scheduled": false], nil) }
             let apps = UpdateCheck.watched(c.params["apps"])
             let page = Set((c.params["known"] as? [Any] ?? []).compactMap { $0 as? String })
+            let counted = UpdateCheck.pageKeys(known: page, counted: c.params["counted"]) // B207
             queue.async {
                 let known = UpdateCheck.mergeKnown(old: loadKnown(), oldWatch: loadWatch(), page: page, newWatch: apps)
                 save(apps, known: known)
-                UserDefaults.standard.set(page.sorted(), forKey: pageKeysKey)
+                UserDefaults.standard.set(counted.sorted(), forKey: pageKeysKey)
                 // B34: iFizBox itself counts too, or a phone following only iFizBox never gets asked and its own
                 // update can neither badge the icon nor notify from here.
                 if !apps.isEmpty { askOnce() }
@@ -182,15 +185,18 @@ enum BackgroundCheck {
                     // B47: the icon badge is Changes' count: what it counted when last open, plus updates for apps it
                     // didn't count (before, found.count alone, which disagreed with Changes' rows).
                     let pageKeys = Set(UserDefaults.standard.stringArray(forKey: BackgroundCheck.pageKeysKey) ?? [])
-                    let badge = UpdateCheck.badge(found, pageCount: UserDefaults.standard.integer(forKey: BackgroundCheck.pageCountKey),
-                                                  pageKeys: pageKeys)
+                    let known = BackgroundCheck.loadKnown()
+                    let fresh = UpdateCheck.fresh(found, known: known)
+                    // B207: a notice's badge never under the updates it tells of (UpdateCheck.noticeBadge)
+                    let badge = UpdateCheck.noticeBadge(found, fresh: fresh,
+                                                        pageCount: UserDefaults.standard.integer(forKey: BackgroundCheck.pageCountKey),
+                                                        pageKeys: pageKeys)
                     UserDefaults.standard.set(found.map(\.key), forKey: BackgroundCheck.foundKey) // B124
                     UNUserNotificationCenter.current().getNotificationSettings { st in
                         guard st.badgeSetting == .enabled else { return }
                         Notifications.setIcon(badge) // B158: one setter, in order
                     }
-                    let known = BackgroundCheck.loadKnown()
-                    guard !UpdateCheck.fresh(found, known: known).isEmpty else { return finish(true) }
+                    guard !fresh.isEmpty else { return finish(true) }
                     post(found, badge: badge) { posted in
                         BackgroundCheck.queue.async { [self] in
                             // Only what reached the user counts as told: without permission, the next run tries again.

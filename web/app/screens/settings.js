@@ -1567,7 +1567,9 @@ function showSigningPage(el, layout, parts) {
 // when the background check last ran. A "no" given once can only be changed in iOS Settings: the row opens it.
 // F285, F311: iOS 6 Settings style, what you get first, how it's checked after; each footer explains only its own
 // group (AGENTS.md, Hints):
-//   Update Alerts          Notifications (iOS), Icon Badge (iOS), <NAME> Updates (selfUpdateAlerts)
+//   Update Alerts          Notifications (iOS), Icon Badge (iOS), <NAME> Updates (selfUpdateAlerts); with Icon Badge
+//                          off in iOS: Notifications, Icon Badge, Turn On in Settings, the footer says it's off,
+//                          and <NAME> Updates in a group of its own under it
 //   Checking for Updates   Push, Last Push; Push's footer (core/push.js pushRows: what it does, or what's wrong)
 //   (no header)            Background Check, Background App Refresh and Notifications (iOS, each only when off),
 //                          Last Check, Turn On in Settings (only when one is off); the footer says what's off, else
@@ -1580,11 +1582,21 @@ export function notifyRows(st, now = Date.now(), { push = null, selfAlerts = tru
   if (!g) return null;
   const row = (label) => g.rows.find((r) => r.label === label);
   const self = SETTINGS.find((d) => d.key === "selfUpdateAlerts");
-  const alerts = { header: "Update Alerts", rows: [row("Notifications"), row("Icon Badge"),
-    { label: self.label, detail: selfAlerts ? "On" : "Off", on: selfAlerts, toggle: "self" }], footer: self.footer };
-  const check = { rows: g.rows.filter((r) => r.check).map(({ check: _, ...r }) => r), footer: g.footer };
-  if (!push) return [alerts, { header: "Checking for Updates", ...check }];
-  return [alerts, { header: "Checking for Updates", rows: [{ ...push.rows[0], toggle: "push" }, ...push.rows.slice(1)],
+  const selfRow = { label: self.label, detail: selfAlerts ? "On" : "Off", on: selfAlerts, toggle: "self" };
+  // B207: Icon Badge off in iOS (once iOS has been asked): an update alert can't badge the icon, so the group says so
+  // with the fix row, and the <NAME> Updates switch takes a group of its own for its footer (one hint per group).
+  // Notifications off too, with the check on: its group already says so with the same fix row; one is enough.
+  const badgeOff = st.badges === false && st.status !== "notDetermined" && (st.alerts !== false || st.backgroundOn === false);
+  const alertGroups = badgeOff
+    ? [{ header: "Update Alerts", rows: [row("Notifications"), row("Icon Badge"), { label: "Turn On in Settings", chevron: true, open: true }],
+      footer: "Icon Badge is off in iOS, so update alerts can't show a count on the icon." }, { rows: [selfRow], footer: self.footer }]
+    : [{ header: "Update Alerts", rows: [row("Notifications"), row("Icon Badge"), selfRow], footer: self.footer }];
+  return [...alertGroups, ...checkGroups(g, push)];
+}
+function checkGroups(g, push) {
+  const check ={ rows: g.rows.filter((r) => r.check).map(({ check: _, ...r }) => r), footer: g.footer };
+  if (!push) return [{ header: "Checking for Updates", ...check }];
+  return [{ header: "Checking for Updates", rows: [{ ...push.rows[0], toggle: "push" }, ...push.rows.slice(1)],
     footer: push.footer }, check];
 }
 function checkRows(st, now, { pushOn = false } = {}) {

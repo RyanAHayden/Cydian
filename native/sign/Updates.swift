@@ -12,6 +12,8 @@
 //   UpdateCheck.fresh(_:known:)   the ones not yet counted on screen or notified (key "<id> <version>")
 //   UpdateCheck.mergeKnown(...)   the known keys after the page sends a new watch list
 //   UpdateCheck.badge(_:pageCount:pageKeys:) the icon badge: Changes' last count plus updates it didn't count (B47)
+//   UpdateCheck.noticeBadge(...)  B207: a posted notice's badge, never under the updates it is about
+//   UpdateCheck.pageKeys(known:counted:) B207: the keys Changes counts (updates.watch's `counted`, else `known`)
 //   UpdateCheck.Counts / without(_:_:) / handedOff(_:ids:version:) B124: the badge's parts once iFizBox has handed
 //                                 iOS its own update, without that update's row
 //   UpdateCheck.BadgeSync         B158: the icon badge set in order, the latest count only (Notifications.setIcon)
@@ -140,6 +142,22 @@ enum UpdateCheck {
     static func badge(_ found: [Found], pageCount: Int, pageKeys: Set<String>) -> Int {
         let counted = Set(pageKeys.compactMap { k in k.firstIndex(of: " ").map { String(k[..<$0]) } })
         return max(0, pageCount) + Set(found.map(\.id)).subtracting(counted).count
+    }
+
+    // B207: the badge a posted notice carries (content.badge, and the icon set beside it). A notice about `fresh`
+    // updates never comes with a badge under their count: before, an app whose ignored version (F281) sat in the
+    // page's keys counted as already counted, so a notice about its next version could carry Changes' last count
+    // alone, 0 on a phone that showed nothing, and leave the icon bare under the banner.
+    static func noticeBadge(_ found: [Found], fresh: [Found], pageCount: Int, pageKeys: Set<String>) -> Int {
+        max(badge(found, pageCount: pageCount, pageKeys: pageKeys), Set(fresh.map(\.id)).count)
+    }
+
+    // B207: the keys Changes counts (updates.watch's `counted`; absent from a page that sent none, when it is `known`).
+    // `known` also holds versions the user ignored (F281), which Changes doesn't count, so they must not stand for
+    // counted rows in badge(_:pageCount:pageKeys:).
+    static func pageKeys(known: Set<String>, counted: Any?) -> Set<String> {
+        guard let list = counted as? [Any] else { return known }
+        return Set(list.compactMap { $0 as? String })
     }
 
     // B124: what the icon badge is made of (UpdateCheck.badge's parts, as BackgroundCheck stores them): Changes' last

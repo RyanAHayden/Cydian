@@ -574,7 +574,7 @@ export async function waitFor(read, ok, ms, env = {}, sleep = (t) => new Promise
 export const HOST_WAIT = 6000;
 const HOST_CHUNK = 1024 * 1024; // app.ipa goes out a MB a pull, so "finished" waits for iOS to read the last of it
 const hostIosKey = (t) => `${t}.ios`;
-async function hosted(req, u, env, ttl, t, what) {
+async function hosted(req, u, env, ttl, t, what, ctx = null) {
   const gone = () => fail("gone", "That install link has expired.", 404);
   if (what === "status") {
     const s = await iosStatus(env, t, hostIosKey(t));
@@ -610,8 +610,14 @@ async function hosted(req, u, env, ttl, t, what) {
       const stop = Math.min(end + 1, at + HOST_CHUNK);
       c.enqueue(new Uint8Array(data.slice(at, stop)));
       at = stop;
-      // the IPA's last byte is handed over (a Range that stops short of it isn't the end)
-      if (at > end && end === n - 1) await markIos(env, t, "finished", ttl, hostIosKey(t));
+      // the IPA's last byte is handed over (a Range that stops short of it isn't the end). B208: iOS hangs up once it
+      // has Content-Length bytes, and Cloudflare then cancels the request with this put still pending (as F190 saw on
+      // /sign/up): the mark was never written, so the app waited out its 10 minutes and never closed. waitUntil keeps it.
+      if (at > end && end === n - 1) {
+        const mark = markIos(env, t, "finished", ttl, hostIosKey(t));
+        ctx?.waitUntil?.(mark);
+        await mark;
+      }
     },
   });
   if (typeof FixedLengthStream === "function") { // Cloudflare: keeps the Content-Length on a streamed body
@@ -804,7 +810,7 @@ export default {
     }
 
     const h = /^\/sign\/host\/([0-9a-f]{48})\/(manifest\.plist|app\.ipa|status)$/.exec(u.pathname);
-    if (h && (req.method === "GET" || req.method === "HEAD")) return hosted(req, u, env, ttl, h[1], h[2]);
+    if (h && (req.method === "GET" || req.method === "HEAD")) return hosted(req, u, env, ttl, h[1], h[2], ctx);
 
     // Everything else is the website (web/app/, Workers static assets: revalidated on every load, so a phone never
     // keeps an old file). /add?url=… and other app routes fall back to index.html (single-page application).

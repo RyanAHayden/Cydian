@@ -31,6 +31,9 @@ helper. Parsing, Changes, upgrades and search all run in `core/` in both places.
 - Animate `transform` and `opacity` only (compositor). Nothing that triggers layout during scrolling or
   transitions. `node tools/smoke/smoke.mjs` (headless Chromium, outside the gate) pushes, pops, swipes back and
   opens a sheet, and fails if any animation on the way touched a layout property; run it after changing those.
+  The same fake-shell route makes UI concepts: `tools/concept/build.py` packs `web/app/` (a fake bridge and
+  sample sources) into one page with the live app in a phone frame, for the Artifact tool
+  (`.claude/skills/concept/SKILL.md`); `tools/concept/check.mjs` opens it in headless Chromium.
 - Long lists (BigBoss is tens of thousands of packages) get a virtualised list. `content-visibility: auto` alone
   isn't enough at that size.
 - Heavy parsing (`Packages` files are megabytes) runs in a Web Worker, so the UI thread never blocks. The parsed

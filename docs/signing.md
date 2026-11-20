@@ -314,8 +314,12 @@ IPA: after the Install prompt is answered it stays alive (silent audio) and poll
 when iOS has fetched `app.ipa` to its end it exits, with no notification (the progress page has said it will close;
 the icon badge drops this update as it goes). The This iPhone route closes the same way, without a notification, once
 installd has accepted the IPA. If iOS hasn't
-started the download within 2 minutes (or not finished it within the link's 10), iFizBox stays open and the progress
-page offers Try Again (`signing.selfUpdate`). The version handed to iOS is remembered, and if the next launch is
+started the download within 2 minutes, iFizBox stays open and the progress page offers Try Again
+(`signing.selfUpdate`). Once iOS has started it, iOS downloads from the server, so iFizBox closing can't break it: if
+the server hasn't said `finished` a minute after the start, iFizBox closes anyway, and from 15 s after the start the
+progress page says to close it from the app switcher if the new iFizBox is already installing on the Home Screen.
+The server keeps the `finished` mark's write alive past the response (`ctx.waitUntil`), since Cloudflare cancels the
+request the moment iOS has every byte. The version handed to iOS is remembered, and if the next launch is
 still the older version, a banner says the update didn't finish, with Try Again.
 
 `signing.export` (the `.p12` and password kept in the Keychain) is what iFizBox Account reads to sync the certificate

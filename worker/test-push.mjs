@@ -2,7 +2,7 @@
 // token's signature, the topic, the host and the payload. tools/check.sh runs it with the other worker/test*.mjs.
 import assert from "node:assert/strict";
 import w from "./src/index.js";
-import { push, runPushCheck, parseRegistration, offers, updatesFor, expiringFor, alertFor, keepNotified, pushConfig,
+import { push, runPushCheck, parseRegistration, offers, updatesFor, expiringFor, alertFor, keepNotified, pushConfig, badgeFor,
   runs, resetPushCache, APNS_PROD, APNS_DEV, EXPIRY_WARN, SELF_ID } from "./src/push.js";
 import { rateLimiter } from "./src/account.js";
 import { d1 } from "./src/d1-sqlite.js";
@@ -96,6 +96,17 @@ assert.deepEqual(updatesFor(dev, {}), [], "a source that failed tells nothing");
 assert.deepEqual(keepNotified(["com.example.velvet 2.0", "com.example.ember 3.1", "gone.app 2", "expires x 2026-01-01T00:00:00.000Z"], dev),
   ["com.example.velvet 2.0"], "installed, or no longer followed: forgotten");
 
+// B207: an update push's badge: Changes' counted rows plus updates not on screen, never under what it pushes
+assert.equal(badgeFor(dev, by), 1, "Velvet 2.0, not on screen");
+assert.equal(badgeFor({ ...dev, known: ["com.example.velvet 2.0", "other.app 4"] }, by), 2, "two rows on screen");
+assert.equal(badgeFor({ ...dev, known: ["com.example.velvet 1.9"] }, by), 1, "a newer version of a counted row is the same row");
+// an ignored version sits in `known` but not in `counted`: its next version counts, the ignored one doesn't
+assert.equal(badgeFor({ ...dev, known: ["com.example.velvet 2.0"], counted: [] }, by), 0, "the ignored version itself");
+assert.equal(badgeFor({ ...dev, known: ["com.example.velvet 1.9"], counted: [] }, by), 1, "the version after the ignored one");
+assert.equal(badgeFor({ ...dev, known: ["com.example.velvet 2.0"], counted: [] }, by, [{ id: "com.example.velvet" }]), 1, "never under the push");
+assert.equal(parseRegistration({ token: TOKEN_A, environment: "production", topic: SELF_ID, counted: ["a 1", 3, ""] }).device.counted.length, 2);
+assert.equal(parseRegistration({ token: TOKEN_A, environment: "production", topic: SELF_ID }).device.counted, null);
+
 // the alerts
 assert.deepEqual(alertFor([{ id: SELF_ID, name: NAME, version: "9.9" }], []).title, `${NAME} 9.9`);
 let a = alertFor([{ id: "x", name: "Velvet", version: "2.0" }, { id: SELF_ID, name: NAME, version: "9.9" }], []);
@@ -137,6 +148,8 @@ assert.deepEqual([c.devices, c.sources, c.pushed, c.gone], [3, 2, 2, 1]);
 const toA = sent.find((s) => s.token === TOKEN_A), toB = sent.find((s) => s.token === TOKEN_B);
 assert.deepEqual([toA.host, toA.payload.aps.alert.title, toA.payload.aps.alert.body, toA.payload.url],
   [APNS_PROD, "2 Updates", `${NAME} 9.9 and Velvet 2.0`, "#/changes"]);
+assert.equal(toA.payload.aps.badge, 2, "B207: an update push badges the icon");
+assert.equal(toB.payload.aps.badge, 2, "B207: Velvet 1.5 on its screen plus the push");
 assert.deepEqual([toB.host, toB.payload.aps.alert.title], [APNS_DEV, `${NAME} 9.9`], "Velvet 1.5 (iOS 16) is already on its screen");
 assert.equal((await (await call("/api/push/status", { token: TOKEN_DEAD })).json()).registered, false, "APNs said gone: forgotten");
 sent.length = 0;
@@ -152,6 +165,23 @@ sent.length = 0;
 await call("/api/push/register", { ...reg, expires: soon });
 await runPushCheck(env, { fetcher, now });
 assert.equal(sent.find((s) => s.token === TOKEN_A).payload.aps.alert.title, "Signature Expiring");
+assert.equal(sent.find((s) => s.token === TOKEN_A).payload.aps.badge, undefined, "B207: an expiry warning leaves the badge alone");
+// B207: `counted` is kept and read back; a table made before it gets the column
+await call("/api/push/register", { ...reg, known: ["com.example.velvet 2.0"], counted: [] });
+assert.equal((await db.prepare("SELECT counted FROM push_devices WHERE token = ?").bind(TOKEN_A).first()).counted, "[]");
+await call("/api/push/register", reg);
+assert.equal((await db.prepare("SELECT counted FROM push_devices WHERE token = ?").bind(TOKEN_A).first()).counted, null, "none sent: null");
+{
+  const old = d1(":memory:");
+  await old.prepare(`CREATE TABLE push_devices (token TEXT PRIMARY KEY, environment TEXT NOT NULL, topic TEXT NOT NULL,
+    team TEXT NOT NULL DEFAULT '', version TEXT NOT NULL DEFAULT '', ios TEXT NOT NULL DEFAULT '',
+    apps TEXT NOT NULL DEFAULT '[]', known TEXT NOT NULL DEFAULT '[]', expires TEXT NOT NULL DEFAULT '[]',
+    notified TEXT NOT NULL DEFAULT '[]', created INTEGER NOT NULL, updated INTEGER NOT NULL, checked INTEGER NOT NULL DEFAULT 0,
+    last_push INTEGER, last_status TEXT)`).run();
+  const e = { ...env, PUSH: old };
+  assert.equal((await call("/api/push/register", { ...reg, counted: ["x 1"] }, { e })).status, 200, "an older table gets the column");
+  assert.equal((await old.prepare("SELECT counted FROM push_devices").first()).counted, '["x 1"]');
+}
 // gone on unregister, and no key: the run does nothing
 assert.deepEqual(await (await call("/api/push/unregister", { token: TOKEN_A })).json(), { ok: true });
 assert.equal((await (await call("/api/push/status", { token: TOKEN_A })).json()).registered, false);

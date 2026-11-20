@@ -59,8 +59,14 @@ const SCHEMA = [
   "CREATE INDEX IF NOT EXISTS push_devices_checked ON push_devices (checked)",
 ];
 const ready = new WeakMap();
+// B207: `counted` (JSON keys, NULL = same as `known`) came after the first tables were made: added where missing.
+const COUNTED = "ALTER TABLE push_devices ADD COLUMN counted TEXT";
 function schema(db) {
-  if (!ready.has(db)) ready.set(db, db.batch(SCHEMA.map((s) => db.prepare(s))).catch((e) => { ready.delete(db); throw e; }));
+  if (!ready.has(db)) {
+    ready.set(db, db.batch(SCHEMA.map((s) => db.prepare(s)))
+      .then(() => db.prepare(COUNTED).run().catch(() => { /* already there */ }))
+      .catch((e) => { ready.delete(db); throw e; }));
+  }
   return ready.get(db);
 }
 
@@ -100,13 +106,16 @@ export function parseRegistration(b, topics = [BUNDLE_ID]) {
     if (id && version && source) apps.push({ id, name: text(a?.name, 100) ?? id, version, source });
   }
   const known = (Array.isArray(b.known) ? b.known : []).slice(0, MAX_KNOWN).map((k) => text(k, 300)).filter(Boolean);
+  // B207: the keys of Changes' counted rows, when the page sends them apart from `known` (which also holds ignored
+  // versions); null: `known` stands for them
+  const counted = Array.isArray(b.counted) ? b.counted.slice(0, MAX_KNOWN).map((k) => text(k, 300)).filter(Boolean) : null;
   const expires = [];
   for (const e of (Array.isArray(b.expires) ? b.expires : []).slice(0, MAX_EXPIRES)) {
     const id = text(e?.id, 200), at = Date.parse(e?.at ?? "");
     if (id && Number.isFinite(at)) expires.push({ id, name: text(e?.name, 100) ?? id, at: new Date(at).toISOString() });
   }
   return { ok: true, device: { token, environment, topic, team, version: text(b.version, 100) ?? "", ios: text(b.ios, 20) ?? "",
-    apps, known, expires } };
+    apps, known, counted, expires } };
 }
 
 // ---- what a device gets told -----------------------------------------------------------------------------------
@@ -162,6 +171,21 @@ export function updatesFor(device, offersBy) {
     if (!skip.has(key)) out.push({ id: w.id, name: w.name || o.name, installed: w.version, version: o.version, key });
   }
   return out.sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()) || a.id.localeCompare(b.id));
+}
+
+// B207: the icon badge an update push carries (aps.badge), as native/sign/Updates.swift's badge for the background
+// check: the rows Changes counted when last open (`counted`, else `known`), plus every app with an update now that
+// isn't on screen (pushed before or not); a newer version of a counted row is the same row. `pushed`: this run's
+// updates, never fewer than they. Before, pushes carried no badge, so an update alert left the icon bare.
+const keyId = (k) => { const i = String(k).lastIndexOf(" "); return i > 0 ? String(k).slice(0, i) : null; };
+export function badgeFor(device, offersBy, pushed = []) {
+  const known = new Set(device.known ?? []);
+  const ids = new Set((device.counted ?? device.known ?? []).map(keyId).filter(Boolean));
+  for (const w of device.apps ?? []) {
+    const o = offersBy[w.source]?.[w.id];
+    if (o && compareVersions(o.version, w.version) > 0 && !known.has(`${w.id} ${o.version}`)) ids.add(w.id);
+  }
+  return Math.max(ids.size, new Set(pushed.map((u) => u.id)).size);
 }
 
 // Signatures ending within EXPIRY_WARN (or already ended less than a day ago) not warned about yet.
@@ -239,6 +263,7 @@ export const resetPushCache = () => { cached = null; };
 export async function sendPush(device, alert, env, { fetcher = fetch, now = Date.now() } = {}) {
   const host = env.APNS_HOST || (device.environment === "development" ? APNS_DEV : APNS_PROD);
   const payload = { aps: { alert: { title: alert.title, body: alert.body }, sound: "default" } };
+  if (Number.isInteger(alert.badge) && alert.badge >= 0) payload.aps.badge = alert.badge; // B207
   if (alert.url) payload.url = alert.url;
   let r;
   try {
@@ -259,7 +284,8 @@ export async function sendPush(device, alert, env, { fetcher = fetch, now = Date
 
 const parse = (s, fallback = []) => { try { const v = JSON.parse(s); return Array.isArray(v) ? v : fallback; } catch { return fallback; } };
 const rowDevice = (r) => r && { token: r.token, environment: r.environment, topic: r.topic, team: r.team, version: r.version, ios: r.ios,
-  apps: parse(r.apps), known: parse(r.known), expires: parse(r.expires), notified: parse(r.notified),
+  apps: parse(r.apps), known: parse(r.known), counted: r.counted == null ? null : parse(r.counted, null),
+  expires: parse(r.expires), notified: parse(r.notified),
   lastPush: r.last_push ?? null, lastStatus: r.last_status ?? null };
 
 // The notified keys still worth keeping: an app still followed and not yet at that version, an expiry still listed.
@@ -323,12 +349,13 @@ export async function push(req, env = {}, { fetcher = fetch, now = Date.now(), l
     const d = p.device;
     const old = await getDevice(db, d.token);
     const notified = JSON.stringify(keepNotified(old?.notified ?? [], d));
-    await db.prepare(`INSERT INTO push_devices (token, environment, topic, team, version, ios, apps, known, expires, notified, created, updated)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT (token) DO UPDATE SET environment = excluded.environment,
+    await db.prepare(`INSERT INTO push_devices (token, environment, topic, team, version, ios, apps, known, counted, expires, notified, created, updated)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT (token) DO UPDATE SET environment = excluded.environment,
       topic = excluded.topic, team = excluded.team, version = excluded.version, ios = excluded.ios, apps = excluded.apps,
-      known = excluded.known, expires = excluded.expires, notified = excluded.notified, updated = excluded.updated`)
+      known = excluded.known, counted = excluded.counted, expires = excluded.expires, notified = excluded.notified,
+      updated = excluded.updated`)
       .bind(d.token, d.environment, d.topic, d.team, d.version, d.ios, JSON.stringify(d.apps), JSON.stringify(d.known),
-        JSON.stringify(d.expires), notified, now, now).run();
+        d.counted == null ? null : JSON.stringify(d.counted), JSON.stringify(d.expires), notified, now, now).run();
     return json({ ok: true, enabled: cfg.enabled, reason: cfg.reason });
   }
 
@@ -397,8 +424,10 @@ export async function runPushCheck(env, { fetcher = fetch, now = Date.now(), con
   };
   const counts = { enabled: true, reason: null, devices: devices.length, sources: urls.length, pushed: 0, failed: 0, gone: 0 };
   for (const d of devices) {
-    const ups = updatesFor(d, offersFor(d)), exp = expiringFor(d, now);
+    const offersBy = offersFor(d);
+    const ups = updatesFor(d, offersBy), exp = expiringFor(d, now);
     const alert = alertFor(ups, exp, now);
+    if (alert && ups.length) alert.badge = badgeFor(d, offersBy, ups); // B207: an update alert badges the icon
     let notified = d.notified;
     if (alert) {
       const r = await sendPush(d, alert, env, { fetcher, now });

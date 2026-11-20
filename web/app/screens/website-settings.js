@@ -22,9 +22,10 @@ export const LOCK_HOME_LABEL = `Lock Home Until ${NAME} Is Installed`;
 export const LOCK_HOME_FOOTER = `Home's rows below Install ${NAME} App and the other tabs stay locked, and ask to install `
   + `${NAME} first, until you tap Browse Anyway.`;
 export const WEBSITE_INSTALLS_LABEL = "Install on the Website";
-export const WEBSITE_INSTALLS_FOOTER = `Other apps' pages offer Install in ${NAME} first. Installing on the website is `
-  + "slower (download, sign in Safari, upload, then iOS downloads it again), can fail on big apps and uses this "
-  + `site's limited storage. ${NAME} itself always installs from here.`;
+// F316 (AGENTS.md Hints): by lock state; locked, the footer says how to unlock it.
+export const WEBSITE_INSTALLS_FOOTER = "Slower than the app, and big apps can fail.";
+export const WEBSITE_INSTALLS_LOCKED = "Locked until you tap Browse Anyway on Home.";
+export const websiteInstallsFooter = (locked) => (locked ? WEBSITE_INSTALLS_LOCKED : WEBSITE_INSTALLS_FOOTER);
 
 // Home's Install iFizBox App flow, loaded when asked (home.js imports Settings' module graph).
 const installiFizBox = () => import("./home.js").then((h) => h.installiFizBox());
@@ -50,7 +51,7 @@ export function websiteSection({ mode = detectMode(), storage, alert = showAlert
     let installs;
     if (locked) {
       // No switch while locked: a padlocked row (home.css .home-locked) that asks first.
-      installs = grouped([{ header: "Other Apps", footer: WEBSITE_INSTALLS_FOOTER,
+      installs = grouped([{ header: "Other Apps", footer: websiteInstallsFooter(true),
         rows: [{ label: WEBSITE_INSTALLS_LABEL, chevron: true, icon: rowIcon("websiteApps"), onClick: (e) => { e?.preventDefault?.(); return askToBrowse({ install, alert, storage }); } }] }]);
       installs.querySelector(".group")?.classList.add("home-locked", "website-locked");
     } else {
@@ -58,7 +59,7 @@ export function websiteSection({ mode = detectMode(), storage, alert = showAlert
         if (!want) { setWebsiteInstalls(false, storage); return; }
         if (!(await acceptWebsiteInstalls({ alert, storage }))) sw.setAttribute("aria-checked", "false"); // Cancel: back off
       } });
-      installs = switchRow(grouped([{ header: "Other Apps", rows: [{ label: WEBSITE_INSTALLS_LABEL, icon: rowIcon("websiteApps") }], footer: WEBSITE_INSTALLS_FOOTER }]),
+      installs = switchRow(grouped([{ header: "Other Apps", rows: [{ label: WEBSITE_INSTALLS_LABEL, icon: rowIcon("websiteApps") }], footer: websiteInstallsFooter(false) }]),
         WEBSITE_INSTALLS_LABEL, sw);
     }
     box.replaceChildren(lock, installs);

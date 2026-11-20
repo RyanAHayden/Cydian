@@ -3,8 +3,8 @@
 // signing-client.js siteCause).
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { deviceRows } from "./signing.js";
-import { deviceCheckText, notInProfileText, IN_PROFILE_TEXT, notLandedText, NOT_LANDED_TEXT, SENT_TO_IOS, UDID_HOW } from "../core/signing.js";
+import { deviceRows, DEVICE_HINTS } from "./signing.js";
+import { deviceCheckText, IN_PROFILE_TEXT, notLandedText, NOT_LANDED_TEXT, SENT_TO_IOS, UDID_HOW } from "../core/signing.js";
 import { answerFor, appHelpHref, openAppHelp, APP_HELP } from "./guides.js";
 import { siteCause } from "../signing-client.js";
 import { followInstall } from "../signing-sheet.js";
@@ -24,18 +24,20 @@ test("not in the profile: red, with the UDID and Copy UDID", () => {
   assert.equal(g.rows[0].detail, "Not in Profile");
   assert.equal(g.rows[1].subtitle, UDID);
   assert.equal(g.rows[2].copy, UDID);
-  assert.equal(g.footer, notInProfileText(UDID));
+  assert.equal(g.footer, DEVICE_HINTS.outCopy, "F316: the fix, short: the UDID is already a row");
   assert.equal(g.warn, true);
   const noUdid = deviceRows(deviceCheckText({ state: "out", count: 3 }));
   assert.deepEqual(noUdid.rows.map((r) => r.label), ["This iPhone"], "a set from the app's own profile: no UDID to copy");
+  assert.equal(noUdid.footer, DEVICE_HINTS.out);
   assert.equal(noUdid.warn, true);
 });
 
-test("unknown: the device count and how to find the UDID; skip: nothing", () => {
+test("unknown: not checked, and where to find the UDID (or, with the website's Find row, only what's missing); skip: nothing", () => {
   const g = deviceRows(deviceCheckText({ state: "unknown", count: 5 }));
   assert.equal(g.rows[0].detail, "Unknown");
-  assert.match(g.footer, /5 devices/);
-  assert.match(g.footer, /idevice_id -l/);
+  assert.equal(g.footer, DEVICE_HINTS.unknown);
+  assert.match(g.footer, /Finder/);
+  assert.equal(deviceRows(deviceCheckText({ state: "unknown", count: 5 }), { find: true }).footer, DEVICE_HINTS.unknownFind);
   assert.equal(g.warn, false);
   assert.equal(deviceRows(deviceCheckText({ state: "skip", count: 0 })), null);
   assert.equal(deviceRows(null), null);

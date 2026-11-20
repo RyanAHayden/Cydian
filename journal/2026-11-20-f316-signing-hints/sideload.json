@@ -1,0 +1,16 @@
+[
+  { "wait": 2000 },
+  { "eval": "localStorage.setItem('ifizbox.firstVisit','later'); 'ok'" },
+  { "nav": "#/home/settings/signing/certificate", "ms": 6000 },
+  { "eval": "location.hash + '\\n' + document.querySelector('.page.is-top').innerText" },
+  { "shot": "certificate-top" },
+  { "eval": "(() => { const h = [...document.querySelectorAll('.page.is-top .group-header')].find((e) => e.textContent === 'Provisioning Profile'); if (!h) return 'none'; document.querySelector('.page.is-top .page-body').scrollTop += h.getBoundingClientRect().top - 110; return 'ok'; })()" },
+  { "wait": 800 },
+  { "shot": "profile" },
+  { "eval": "(() => { const h = [...document.querySelectorAll('.page.is-top .group-header')].find((e) => e.textContent === 'Apple Developer Account'); if (!h) return 'none'; document.querySelector('.page.is-top .page-body').scrollTop += h.getBoundingClientRect().top - 110; return 'ok'; })()" },
+  { "wait": 800 },
+  { "shot": "account" },
+  { "nav": "#/home/settings/signing/apps", "ms": 6000 },
+  { "eval": "location.hash + '\\n' + document.querySelector('.page.is-top').innerText" },
+  { "shot": "certificate-status" }
+]

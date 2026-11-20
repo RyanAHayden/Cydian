@@ -15,6 +15,7 @@ struct SignedApp {
     var skipped: [String] = []     // B21: nested bundles whose executable is missing, sealed as resources;
                                    // B162: loose 32-bit-only Mach-Os, also sealed as resources
     var appID: String? = nil       // B138: the application-identifier it was signed with (TEAM.id)
+    var injected: [String] = []    // F288: load paths added to the app's executable (Tweaks.swift)
 }
 
 final class IPASigner {
@@ -237,6 +238,23 @@ final class IPASigner {
             }
         }
         if let icon = options.icon { for f in options.iconFiles { files[appDir + f] = .data(icon, mode: 0o100644) } }
+        // F288: the tweaks' files go in (over any the app has at those paths); their frameworks are bundles to sign
+        if let t = options.tweaks {
+            for f in t.files {
+                let isMachO = MachO.isMachO([UInt8](f.data.prefix(4)))
+                files[appDir + f.path] = .data(f.data, mode: isMachO ? 0o100755 : 0o100644)
+                if isMachO { machos.insert(appDir + f.path) }
+            }
+            for f in t.files where f.path.hasSuffix(".framework/Info.plist") && f.path.split(separator: "/").count == 3 {
+                let dir = appDir + String(f.path.dropLast("Info.plist".count))
+                var format = PropertyListSerialization.PropertyListFormat.binary
+                guard let pl = try? PropertyListSerialization.propertyList(from: f.data, format: &format) as? [String: Any],
+                      let exe = pl["CFBundleExecutable"] as? String, files[dir + exe] != nil else { continue } // else its binary is a loose one
+                bundles[dir] = BundleInfo(dir: dir, plist: pl, format: format)
+            }
+            log("Tweaks: \(t.names.joined(separator: ", ")) (\(t.files.count) files)")
+        }
+        var injected = [String]()
 
         var fixedArm64e = [String]()
         var thin32 = [String]() // B162: loose Mach-Os with no 64-bit code, left unsigned and sealed as resources
@@ -289,7 +307,11 @@ final class IPASigner {
             files[dir + "_CodeSignature/CodeResources"] = .data(resources, mode: 0o100644)
             if let exe = exe {
                 guard files[exe] != nil else { throw SignError("bad_ipa", "\(exe.dropFirst(appDir.count)) is missing.") }
-                let data = fixed(exe, try contents(exe, files, zip))
+                var data = fixed(exe, try contents(exe, files, zip))
+                if dir == appDir, let t = options.tweaks, !t.inject.isEmpty { // F288
+                    (data, injected) = try MachOEdit.inject(data, t.inject)
+                    for i in injected { log("Injected \(i)") }
+                }
                 let params = CodeSignParams(identifier: id, team: profile.team,
                                             entitlements: isApp ? profile.entitlements(for: keep || id == newID ? entID : id) : nil,
                                             infoPlist: infoData, codeResources: resources)
@@ -333,7 +355,7 @@ final class IPASigner {
                          name: main.plist["CFBundleDisplayName"] as? String ?? main.plist["CFBundleName"] as? String ?? "",
                          version: main.plist["CFBundleShortVersionString"] as? String ?? main.plist["CFBundleVersion"] as? String ?? "",
                          removed: removed.sorted(), fixedArm64e: fixedArm64e.sorted(), skipped: skipped.sorted(),
-                         appID: "\(profile.team).\(entID)")
+                         appID: "\(profile.team).\(entID)", injected: injected)
     }
 
     private struct Read { let sha1: Data, sha256: Data, macho: Bool }

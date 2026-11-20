@@ -720,5 +720,76 @@ test("device check") {
     check(DeviceCheck.phone(fromEmbedded: prof("")) == nil, "embedded: no list")
 }
 
+// F288: tweaks prepared by the page (core/tweaks.js) go into the app and its executable loads them weakly. The signed
+// IPA stays in work/tweaked.ipa for native/test_sign.py's own otool-style reading.
+test("F288: tweak injection") {
+    var dylib = try fixture("unsigned.macho")
+    dylib.putLE32(6, at: 12) // MH_DYLIB
+    let plist = try PropertyListSerialization.data(fromPropertyList: ["CFBundleExecutable": "TweakKit", "CFBundleIdentifier": "dev.tweak.kit",
+                                                                      "CFBundlePackageType": "FMWK"], format: .xml, options: 0)
+    let json: [String: Any] = [
+        "files": [["path": "Frameworks/Fixture.dylib", "data": dylib.base64EncodedString()],
+                  ["path": "Frameworks/TweakKit.framework/TweakKit", "data": dylib.base64EncodedString()],
+                  ["path": "Frameworks/TweakKit.framework/Info.plist", "data": plist.base64EncodedString()],
+                  ["path": "Fixture.bundle/Info.plist", "data": plist.base64EncodedString()]],
+        "inject": ["@rpath/Fixture.dylib", "@rpath/TweakKit.framework/TweakKit"],
+        "names": ["fixture.deb", "TweakKit.framework.zip"],
+    ]
+    let opts = try SignOptions(json: ["tweaks": json])
+    check(opts.tweaks?.files.count == 4 && opts.tweaks?.names == ["fixture.deb", "TweakKit.framework.zip"], "parsed")
+    check((try SignOptions(json: [:])).tweaks == nil, "none")
+    for bad: [String: Any] in [["files": [["path": "../evil.dylib", "data": "AA=="]], "inject": []],
+                               ["files": [["path": "Payload.dylib", "data": "AA=="]], "inject": []],
+                               ["files": [["path": "Frameworks/A.dylib", "data": "AA=="]], "inject": ["@rpath/B.dylib"]],
+                               ["files": [["path": "Frameworks/A.dylib", "data": "AA=="]], "inject": ["/usr/lib/A.dylib"]]] {
+        do { _ = try SignOptions(json: ["tweaks": bad]); check(false, "accepted \(bad)") } catch let e as SignError { check(e.code == "bad_options", "\(e)") }
+    }
+    // the stored options (Re-sign, My IPAs) keep them
+    let stored = try JSONDecoder().decode(SignedRecord.StoredOptions.self, from: try JSONEncoder().encode(opts.stored))
+    check(SignOptions(stored).tweaks == opts.tweaks, "stored and read back")
+    check(SignOptions().stored != opts.stored, "tweaks count in equality")
+
+    // MachOEdit on its own: once, then not twice; the rpath once
+    let exe = try fixture("unsigned.macho")
+    let (once, added) = try MachOEdit.inject(exe, ["@rpath/A.dylib"])
+    check(added == ["@rpath/A.dylib"] && once.count == exe.count, "added in place")
+    check(MachOEdit.dylibs(once).last == "@rpath/A.dylib" && MachOEdit.rpaths(once) == [TweakSet.rpath], "\(MachOEdit.dylibs(once))")
+    let (twice, again) = try MachOEdit.inject(once, ["@rpath/A.dylib"])
+    check(again.isEmpty && twice == once, "nothing twice")
+    let fat = try fixture("fat.macho")
+    let (fatOut, _) = try MachOEdit.inject(fat, ["@rpath/A.dylib"])
+    for (off, _) in MachOEdit.slices(fatOut) where fatOut.le32(at: off) == MachO.magic64 {
+        check(try MachOEdit.commands(fatOut, at: off).contains { $0.cmd == MachOEdit.loadWeakDylib && $0.name == "@rpath/A.dylib" }, "every slice")
+    }
+
+    let profile = try Profile(try fixture("profile.mobileprovision"))
+    let signer = IPASigner(profile: profile, identity: identity)
+    signer.options = opts
+    var logged = [String]()
+    signer.log = { logged.append($0) }
+    let out = work.appendingPathComponent("tweaked.ipa")
+    let app = try signer.sign(fixtures.appendingPathComponent("rich.ipa"), to: out)
+    check(app.injected == ["@rpath/Fixture.dylib", "@rpath/TweakKit.framework/TweakKit"], "\(app.injected)")
+    check(logged.contains("Injected @rpath/Fixture.dylib") && logged.contains { $0.hasPrefix("Tweaks: fixture.deb, TweakKit.framework.zip") }, "\(logged)")
+    let f = try entries(out)
+    let a = "Payload/Fixture.app/"
+    let main = f[a + "Fixture"]!
+    check(MachOEdit.dylibs(main).suffix(2) == ["@rpath/Fixture.dylib", "@rpath/TweakKit.framework/TweakKit"], "\(MachOEdit.dylibs(main))")
+    check(MachOEdit.rpaths(main).contains(TweakSet.rpath), "rpath")
+    try verifySigned(main, name: "Fixture-tweaked", expectIdent: "dev.ifizbox.fixture", team: team,
+                     info: f[a + "Info.plist"], resources: f[a + "_CodeSignature/CodeResources"], ents: true)
+    try verifySigned(f[a + "Frameworks/Fixture.dylib"]!, name: "tweak", expectIdent: "Fixture", team: team, info: nil, resources: nil, ents: false)
+    try verifySigned(f[a + "Frameworks/TweakKit.framework/TweakKit"]!, name: "TweakKit", expectIdent: "dev.tweak.kit", team: team,
+                     info: f[a + "Frameworks/TweakKit.framework/Info.plist"],
+                     resources: f[a + "Frameworks/TweakKit.framework/_CodeSignature/CodeResources"], ents: false)
+    let cr = try PropertyListSerialization.propertyList(from: f[a + "_CodeSignature/CodeResources"]!, format: nil) as! [String: Any]
+    let files2 = cr["files2"] as! [String: Any]
+    for rel in ["Frameworks/Fixture.dylib", "Frameworks/TweakKit.framework/TweakKit", "Fixture.bundle/Info.plist"] {
+        check((files2[rel] as? [String: Any])?["hash2"] as? Data == sha256(f[a + rel]!), "\(rel) sealed by the app")
+    }
+    let r = try ZipReader(url: out)
+    check(r.entries.first { $0.name == a + "Frameworks/Fixture.dylib" }?.unixMode == 0o100755, "a tweak binary is executable")
+}
+
 print(failures == 0 ? "all passed" : "\(failures) failure(s)")
 exit(failures == 0 ? 0 : 1)

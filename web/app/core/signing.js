@@ -573,6 +573,8 @@ export function installParams(info, edits = {}) {
   const known = new Set((app.extensions ?? []).map((e) => e.path));
   const drop = [...new Set(edits.removeExtensions ?? [])].filter((x) => known.has(x)).sort();
   if (drop.length) p.removeExtensions = drop;
+  // F288: tweaks, already prepared on the page (core/tweaks.js tweakParams: { files, inject, names })
+  if (edits.tweaks?.files?.length) p.tweaks = edits.tweaks;
   return p;
 }
 

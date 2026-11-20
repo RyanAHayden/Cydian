@@ -35,8 +35,10 @@ iOS's install prompt.
      again." (`CUT_TEXT`).
   2. *Signing*: `signing-worker.js` (a module Web Worker) runs `websign-job.js`: unzip, read `Info.plist`, the
      IDs (`core/websign.js signingIds`, see "Keep Bundle IDs" below), the profile's entitlements narrowed to the
-     profile's App ID (`appEntitlements`, never `get-task-allow`), then zsign on the folder (`-b` only when the app
-     is signed the old way). zsign's own last error is what the alert shows.
+     profile's App ID (`appEntitlements`, never `get-task-allow`), the app's injected tweaks (see "Tweak injection"
+     below: `websign-job.js putTweaks` writes their files into the folder and the weak load commands into the
+     executable), then zsign on the folder (`-b` only when the app is signed the old way). zsign's own last error is
+     what the alert shows.
   3. *Uploading*: the signed IPA to `POST /sign/upload` in 20 MB parts (KV holds 25 MB a value), kept 10 minutes
      (`TTL`), served at `/sign/up/<token>/manifest.plist` and `app.ipa` (Range too).
   4. iOS's install prompt (`itms-services`), with a banner saying to press Install.
@@ -438,7 +440,7 @@ cross-compiled into the app; this way neither. It writes what Apple's `codesign`
   app's signing time. FileHandle reads sit in an autorelease pool each: the signer runs as one long block, and
   without that every piece read stayed in memory until it ended. `native/sign/bench/` times it on a real IPA.
 
-Plus the arm64e fix-up and the user's edits (below). No dylib injection.
+Plus the arm64e fix-up, the user's edits and tweak injection (below).
 
 ### Before and around signing
 
@@ -459,7 +461,38 @@ Plus the arm64e fix-up and the user's edits (below). No dylib injection.
   still signs as its own ID) and extensions follow it (`old.share` -> `new.share`); the icon (a PNG the page sizes,
   180x180 best) is written as `iFizBoxIcon60x60@2x.png` and `@3x.png` and named in `CFBundleIcons` (and `~ipad`), with
   `CFBundleIconName` dropped so iOS doesn't take the asset catalog's; `removeExtensions` leaves those bundles out
-  (an unknown path is refused). Bad input answers `bad_options`.
+  (an unknown path is refused); `tweaks` injects tweaks (below). Bad input answers `bad_options`.
+- **Tweak injection.** The sign options (Custom Install's sheet, My IPAs' Sign Options, and on the website an IPA's
+  page) have an **Inject Tweaks** group: a row per added file (tap: Remove) and Add Tweak…, which takes `.dylib`,
+  `.deb` and zipped `.framework` files. The files are kept per app (by bundle ID) in the page's IndexedDB
+  (`ifizbox-tweaks`), so the next sign of that app injects them again; the app's signed record and My IPAs' options
+  keep the prepared tweaks too, so Re-sign All and the IPA queue inject them without the page. The page does the
+  unpacking for both signers (`web/app/core/tweaks.js prepareTweaks`, archive readers in `core/unpack.js`, plain JS
+  so an iOS 15 web view without `DecompressionStream` runs it):
+  - a `.deb` is read as ar, then its `data.tar` (`.gz`, `.xz`, `.lzma` or plain; `.zst` and `.bz2` are refused with
+    "add its .dylib instead"); paths lose `./` and the rootless `var/jb/` prefix. `Library/MobileSubstrate/
+    DynamicLibraries/*.dylib` and `usr/lib/TweakInject/*.dylib` go to `Frameworks/` and are injected;
+    `Library/Frameworks/*.framework` and `usr/lib/*.dylib` go to `Frameworks/` as what the tweaks link;
+    `Library/Application Support/*.bundle` goes to the app's top folder; symlinks and the rest (filter plists,
+    PreferenceLoader) stay out;
+  - a `.dylib` goes to `Frameworks/` and is injected; a zipped `.framework` goes to `Frameworks/` and is injected by
+    its executable (the stem, or its only Mach-O);
+  - every Mach-O among them has its load commands pointed at what is bundled (`@rpath/X.dylib`,
+    `@rpath/Y.framework/Y`) and its own ID set to its `@rpath` name. CydiaSubstrate (`CydiaSubstrate.framework`,
+    `libsubstrate.dylib`, and the ElleKit/libhooker names) points at the bundled `CydiaSubstrate.framework`, or
+    ElleKit's `libellekit.dylib` when only that is there. iFizBox doesn't carry ElleKit: a tweak that links
+    CydiaSubstrate with neither added is refused before signing ("… needs CydiaSubstrate … Add ElleKit's .deb"),
+    and the group's footer says so in red as soon as it's the case;
+  - 64 MB of tweaks at most, unpacked.
+
+  What the signer gets is `tweaks: {files: [{path, data}], inject: ["@rpath/…"], names}` (base64 data in the app's
+  bridge). It writes the files into the app (paths under `Frameworks/` or a top-level `.bundle` only), adds an
+  `LC_LOAD_WEAK_DYLIB` per `inject` path and `LC_RPATH @executable_path/Frameworks` (when missing) to every 64-bit
+  slice of the main executable, in the room after its load commands (16 bytes stay free for an unsigned binary's
+  `LC_CODE_SIGNATURE`; an executable with no room answers `tweak_no_room`), nothing twice, then signs as usual: the
+  tweaks' dylibs and frameworks like any other in `Frameworks/` (a framework with an `Info.plist` is a bundle with
+  its own seal). The app: `native/sign/Tweaks.swift` (`MachOEdit.inject`), called by `IPASigner`; the reply lists
+  `injected`. The website: `core/tweaks.js injectInto` before zsign.
 - **arm64e fix-up**, on by default: Feather's `_locateMachosAndFixupArm64eSlice` (via LiveContainer's
   `LCPatchMachOFixupARM64eSlice`, Apache-2.0): a fat binary's arm64e slice of the old pointer-auth ABI (subtype
   exactly 2) gets `CPU_SUBTYPE_LIB64` in its own header and the fat header, which iOS 26 wants. Done on every Mach-O

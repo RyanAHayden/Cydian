@@ -14,6 +14,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { isZip, profileInfo, signingIds, appEntitlements, plistXml, identityPlist, zsignArgs, zsignError, appInfo,
   IFIZBOX_ID, IDENTITY_FILE, TRANSFER_FILE } from "./core/websign.js";
+import { injectInto } from "./core/tweaks.js";
 
 const fail = (code, message) => Object.assign(new Error(message), { code });
 
@@ -39,7 +40,7 @@ export function removeTree(FS, path) {
   } else FS.unlink(path);
 }
 
-export async function runSignJob(createZsign, { ipa, p12, password = "", profile, bring = null, appBundleId = null, keepBundleId = true }, { progress = () => {} } = {}) {
+export async function runSignJob(createZsign, { ipa, p12, password = "", profile, bring = null, appBundleId = null, keepBundleId = true, tweaks = null }, { progress = () => {} } = {}) {
   const bytes = ipa instanceof Uint8Array ? ipa : new Uint8Array(ipa);
   if (!isZip(bytes)) throw fail("bad_ipa", "That file isn't an IPA (a zip archive).");
   let prof;
@@ -85,6 +86,9 @@ export async function runSignJob(createZsign, { ipa, p12, password = "", profile
       FS.writeFile(`${appDir}/${TRANSFER_FILE}`, bring.transfer);
     }
   }
+  // F288: tweaks (core/tweaks.js prepareTweaks, done on the page): their files into the app, and the weak load commands
+  // into the main executable, before zsign signs it all (it signs Frameworks/' dylibs and frameworks as any other).
+  const injected = tweaks?.files?.length ? putTweaks(FS, appDir, plist, tweaks) : [];
   FS.mkdir("/w/tmp");
   const args = zsignArgs({ p12: "/w/key.p12", password, profile: "/w/app.mobileprovision", entitlements: "/w/ents.plist",
     bundleId: bundleId !== info.bundleId ? bundleId : null, input: appDir, output: "/w/out.ipa", temp: "/w/tmp" });
@@ -96,7 +100,32 @@ export async function runSignJob(createZsign, { ipa, p12, password = "", profile
   let out = null;
   try { out = code === 0 ? FS.readFile("/w/out.ipa") : null; } catch { /* no output */ }
   if (!out?.length) throw fail("sign_failed", zsignError(log));
-  return { ipa: out, bundleId, originalId: info.bundleId, name: info.name, version: info.version };
+  return { ipa: out, bundleId, originalId: info.bundleId, name: info.name, version: info.version, ...(injected.length ? { injected } : {}) };
+}
+
+// mkdir -p inside emscripten's FS.
+function mkdirs(FS, path) {
+  let at = "";
+  for (const part of path.split("/").filter(Boolean)) {
+    at += `/${part}`;
+    try { FS.mkdir(at); } catch { /* there already */ }
+  }
+}
+
+// F288: { files: [{ path, data }], inject: [loadPath] } into the unpacked app; returns what the executable now loads.
+export function putTweaks(FS, appDir, plist, { files, inject = [] }) {
+  for (const f of files) {
+    if (!f?.path || f.path.startsWith("/") || f.path.split("/").includes("..")) throw fail("bad_tweak", `A tweak has a file outside the app (${f?.path}).`);
+    const at = `${appDir}/${f.path}`;
+    mkdirs(FS, at.slice(0, at.lastIndexOf("/")));
+    FS.writeFile(at, f.data instanceof Uint8Array ? f.data : new Uint8Array(f.data));
+  }
+  if (!inject.length) return [];
+  const exe = `${appDir}/${plist.CFBundleExecutable || ""}`;
+  let bin;
+  try { bin = FS.readFile(exe); } catch { throw fail("bad_ipa", "That IPA's app has no executable to inject the tweaks into."); }
+  try { FS.writeFile(exe, injectInto(bin, inject)); } catch (e) { throw fail(e?.code ?? "bad_tweak", e?.message ?? String(e)); }
+  return [...inject];
 }
 
 // F260: whether `password` opens the .p12, as zsign itself loads it (OpenSSL with the legacy provider: any .p12 the

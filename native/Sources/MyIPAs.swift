@@ -45,7 +45,10 @@ enum MyIPAs {
         b.on("library.options") { c in
             SignBridge.run(c) {
                 let file = c.params["file"] as? String ?? ""
-                try library.setOptions(file, try SignOptions(json: c.params))
+                var o = try SignOptions(json: c.params)
+                // F288: a page that doesn't send tweaks (an older one) keeps the saved ones; null or {} clears them
+                if c.params["tweaks"] == nil { o.tweaks = library.options(file).tweaks }
+                try library.setOptions(file, o)
                 return library.json(file, certificate: certificate())
             }
         }

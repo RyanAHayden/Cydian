@@ -262,7 +262,8 @@ struct IPALibrary {
         let o = options(file)
         j["options"] = ["name": o.name.map { $0 as Any } ?? NSNull(), "bundleId": o.bundleID.map { $0 as Any } ?? NSNull(), "icon": o.icon?.base64EncodedString() ?? NSNull(),
                         "removeExtensions": o.removeExtensions, "fixArm64e": o.fixArm64e,
-                        "keepBundleId": hasOptions(file) ? o.keepBundleID as Any : NSNull()]
+                        "keepBundleId": hasOptions(file) ? o.keepBundleID as Any : NSNull(),
+                        "tweaks": (o.tweaks?.names ?? []) as Any] as [String: Any] // F288: the names only; the page keeps the files per app
         if let s = signed(file, certificate: certificate, now: now, keep: keep) {
             var sj: [String: Any] = ["at": iso.string(from: s.signed), "bundleId": s.bundleID, "name": s.name, "version": s.version,
                                      "size": stat(signedURL(file)).0]

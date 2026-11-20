@@ -134,10 +134,11 @@ struct SignedRecord: Codable, Equatable {
         // F237: nil in a record written before Keep Bundle IDs, which signed the old way (under the profile's ID):
         // Re-sign keeps doing so, so it replaces the app it installed.
         var keepBundleID: Bool? = nil
+        var tweaks: TweakSet? = nil // F288: kept so Re-sign injects the same tweaks
 
         static func == (a: StoredOptions, b: StoredOptions) -> Bool {
             a.name == b.name && a.bundleID == b.bundleID && a.icon == b.icon && a.removeExtensions == b.removeExtensions
-                && a.fixArm64e == b.fixArm64e && (a.keepBundleID ?? false) == (b.keepBundleID ?? false)
+                && a.fixArm64e == b.fixArm64e && (a.keepBundleID ?? false) == (b.keepBundleID ?? false) && a.tweaks == b.tweaks
         }
     }
 
@@ -152,12 +153,13 @@ struct SignedRecord: Codable, Equatable {
 extension SignOptions {
     var stored: SignedRecord.StoredOptions {
         .init(name: name, bundleID: bundleID, icon: icon, removeExtensions: removeExtensions, fixArm64e: fixArm64e,
-              keepBundleID: keepBundleID)
+              keepBundleID: keepBundleID, tweaks: tweaks)
     }
     init(_ s: SignedRecord.StoredOptions) {
         self.init()
         name = s.name; bundleID = s.bundleID; icon = s.icon; removeExtensions = s.removeExtensions; fixArm64e = s.fixArm64e
         keepBundleID = s.keepBundleID ?? false
+        tweaks = s.tweaks
     }
 }
 

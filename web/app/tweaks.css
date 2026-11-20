@@ -1,0 +1,7 @@
+/* F288: Inject Tweaks (screens/tweaks.js), in the sign options sheet, My IPAs' Sign Options and the website's IPA
+   page. Grouped table cells are ios6.css's; this only lets a long file name end in an ellipsis, makes the add row a
+   plain label row, and colours a problem footer the red of Settings > Signing's warnings (signsheet.css). */
+.ss-tweak, .ss-tweak-add { width: 100%; text-align: left; cursor: pointer; }
+.ss-tweak .cell-text { flex: 1; min-width: 0; }
+.ss-tweak .cell-label, .ss-tweak .cell-subtitle { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.group-footer.ss-tweak-problem { color: #b5322c; text-shadow: none; }

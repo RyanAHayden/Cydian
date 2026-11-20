@@ -280,6 +280,9 @@ export function createFakeNative({ prefix, remote, net = {}, env = {}, helper = 
   };
 
   async function call(method, params = {}, onEvent) {
+    // F287: the screen's keep-awake switch (native/Sources/KeepAwake.swift) goes to `awake`, not `calls`, so tests
+    // that list a run's calls see only the work
+    if (method === "app.keepAwake") { awake.push(Boolean(params?.on)); return null; }
     calls.push({ method, params });
     const m = methods[method];
     if (!m) throw new Error(`unknown method ${method}`);
@@ -287,8 +290,10 @@ export function createFakeNative({ prefix, remote, net = {}, env = {}, helper = 
     return v === undefined ? null : v;
   }
 
+  const awake = []; // F287: each app.keepAwake { on } in order
   return {
     calls,
+    awake,
     keychain,
     call,
     emit() {},

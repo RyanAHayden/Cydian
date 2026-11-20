@@ -43,6 +43,11 @@ import { SELF_UPDATE_LINES, SELF_UPDATE_FAILED } from "../signing-client.js";
 // B139: the shell remembers cancelled tags for its whole life (native SignJob: a job begun under one starts cancelled),
 // so the tags carry this run's own id (`run`): a new run of the same queue counting from #1 again reused a tag an
 // earlier run's Stop or Cancel had cancelled, and that app ended "Failed: Cancelled" though nobody cancelled it.
+// F287: the backend's keepAwake (backend-native.js: the shell's idle timer; backend-http.js: Screen Wake Lock), loaded
+// only where there is a screen to keep on (the app's bridge, or a browser with navigator.wakeLock): never in node.
+const screenAwake = (on) => (globalThis.ifizboxNative?.call || globalThis.navigator?.wakeLock
+  ? import("../backend.js").then((m) => m.getBackend().keepAwake?.(on)) : undefined);
+
 let runs = 0;
 export const laneRunId = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}${++runs}`;
 export function phoneLanes(sc, { native, run = laneRunId() } = {}) {
@@ -230,6 +235,7 @@ export async function runAppRun(jobs, deps) {
     ...(lanes.local ? { local: (r) => lanes.local(r) } : {}), // B137: This iPhone: no iOS prompt to tap
     ...(deps.stallMs ? { stallMs: deps.stallMs } : {}),
     ...(deps.later ? { later: deps.later, clear: deps.clear } : {}),
+    keepAwake: deps.keepAwake ?? screenAwake, // F287: the screen stays on while the run works
     onChange: (r) => {
       draw(r);
       if (r.state === "installed" && !cleared.has(r.id)) {

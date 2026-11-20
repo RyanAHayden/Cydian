@@ -4,7 +4,7 @@
 //
 //   installSlides()            once, at start (nav/scroller.js initScroller): watches every slide root below
 //   slideChange(node, change)  run change() now and slide what it moved at once (for code that measures right after)
-//   isWatched(node)            whether node sits in a watched root (nav/ui.js collapse leaves the slide to us)
+//   isWatched(node)            whether node sits in a watched root
 //
 // A slide root is a scroller whose content flows (ROOT: a page's .page-body, a sheet's body, the pinned Search
 // results, an alert's scrim). After each change in one (a MutationObserver batch, or a ResizeObserver report: a row

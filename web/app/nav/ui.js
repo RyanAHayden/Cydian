@@ -10,8 +10,7 @@
 // into view (B148, nav/pagestate.js liveText), so a sub-page's change shows on the page below after Back.
 
 import { liveText } from "./pagestate.js";
-import { isWatched } from "./slide.js";
-import { EASE, DURATION } from "./motion.js";
+import { slideChange } from "./slide.js";
 
 export function el(tag, cls, text) {
   const e = document.createElement(tag);
@@ -90,20 +89,10 @@ export function plain(sections) {
   return ul;
 }
 
-// UITableView's delete: the row goes and everything under it slides up into its place. FLIP, by transform only:
-// remove the row, then start everything that was below it one row lower and let it ease up.
-// On a watched page (nav/slide.js) the watcher does it, and fades the row out as it goes.
+// UITableView's delete: the row goes and everything under it slides up into its place. nav/slide.js's watcher does
+// the slide (and fades the row out as it goes), measured right around the removal.
 export function collapse(li) {
-  if (isWatched(li)) { li.remove(); return; }
-  const h = li.getBoundingClientRect().height;
-  const below = [];
-  for (let n = li; n && !n.classList?.contains("page-body"); n = n.parentElement) {
-    for (let s = n.nextElementSibling; s; s = s.nextElementSibling) below.push(s);
-  }
-  li.remove();
-  for (const el of below) {
-    el.animate([{ transform: `translateY(${h}px)` }, { transform: "none" }], { duration: DURATION, easing: EASE });
-  }
+  slideChange(li, () => li.remove());
 }
 
 // Placeholders while a page loads (user 2026-11-17: show loading as little as possible): the shape of what's coming

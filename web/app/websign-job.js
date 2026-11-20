@@ -1,7 +1,7 @@
 // F93: one signing job on the website, inside the Web Worker (signing-worker.js): zsign (vendor/zsign, WebAssembly)
 // signs an IPA with the user's certificate, all in the worker's memory. Nothing here touches the network.
 //
-//   await runSignJob(createZsign, { ipa, p12, password, profile, bring, appBundleId, keepBundleId, refuseSha256 }, { progress })
+//   await runSignJob(createZsign, { ipa, p12, password, profile, bring, appBundleId, keepBundleId, tweaks, groupFix, refuseSha256 }, { progress })
 //     -> { ipa: Uint8Array (signed), bundleId (signed as), originalId, name, version, sha256 (of the IPA as it came) }
 //   Throws Error with .code: bad_ipa (not an IPA, no app inside), bad_profile, sign_failed (zsign's own reason),
 //   malware (F292: the IPA's SHA-256 is in refuseSha256, core/malicious.js malwareHashes).
@@ -12,10 +12,13 @@
 // app as ifizbox-identity.plist (the app imports it on first launch, native BundledIdentity) and { transfer: link }
 // writes the website's ifizbox://import link as web/transfer.link (app.js imports it once); both before zsign seals
 // the bundle, as the old server signer did.
+// groupFix (B211): the fix dylib's bytes (vendor/groupfix, signing-worker.js loads it); an app whose original
+// signature names app groups or keychain groups gets it injected (core/groupfix.js), iFizBox's own IPA never.
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { isZip, profileInfo, signingIds, appEntitlements, plistXml, identityPlist, zsignArgs, zsignError, appInfo,
   IFIZBOX_ID, IDENTITY_FILE, TRANSFER_FILE } from "./core/websign.js";
 import { injectInto } from "./core/tweaks.js";
+import { entitlementsRead, groupFixPlan, withGroupFix } from "./core/groupfix.js";
 import { MALWARE_REFUSED } from "./core/malicious.js";
 
 const fail = (code, message) => Object.assign(new Error(message), { code });
@@ -51,7 +54,7 @@ export async function ipaSha256(bytes) {
   } catch { return null; }
 }
 
-export async function runSignJob(createZsign, { ipa, p12, password = "", profile, bring = null, appBundleId = null, keepBundleId = true, tweaks = null, refuseSha256 = [] }, { progress = () => {} } = {}) {
+export async function runSignJob(createZsign, { ipa, p12, password = "", profile, bring = null, appBundleId = null, keepBundleId = true, tweaks = null, groupFix = null, refuseSha256 = [] }, { progress = () => {} } = {}) {
   const bytes = ipa instanceof Uint8Array ? ipa : new Uint8Array(ipa);
   if (!isZip(bytes)) throw fail("bad_ipa", "That file isn't an IPA (a zip archive).");
   // F292: hashed before signing; one on the known-malware list (core/malicious.js MALWARE_IPAS) goes no further
@@ -100,9 +103,13 @@ export async function runSignJob(createZsign, { ipa, p12, password = "", profile
       FS.writeFile(`${appDir}/${TRANSFER_FILE}`, bring.transfer);
     }
   }
+  // B211: the original signature's app groups and keychain groups, read before signing, decide whether the app gets
+  // the group fix (core/groupfix.js); never iFizBox's own IPA.
+  const plan = groupFix?.length && own !== IFIZBOX_ID ? groupFixPlan(fileEntitlements(FS, `${appDir}/${plist.CFBundleExecutable || ""}`), prof.entitlements) : null;
+  const all = withGroupFix(tweaks, plan, groupFix);
   // F288: tweaks (core/tweaks.js prepareTweaks, done on the page): their files into the app, and the weak load commands
   // into the main executable, before zsign signs it all (it signs Frameworks/' dylibs and frameworks as any other).
-  const injected = tweaks?.files?.length ? putTweaks(FS, appDir, plist, tweaks) : [];
+  const injected = all?.files?.length ? putTweaks(FS, appDir, plist, all) : [];
   FS.mkdir("/w/tmp");
   const args = zsignArgs({ p12: "/w/key.p12", password, profile: "/w/app.mobileprovision", entitlements: "/w/ents.plist",
     bundleId: bundleId !== info.bundleId ? bundleId : null, input: appDir, output: "/w/out.ipa", temp: "/w/tmp" });
@@ -116,6 +123,18 @@ export async function runSignJob(createZsign, { ipa, p12, password = "", profile
   if (!out?.length) throw fail("sign_failed", zsignError(log));
   return { ipa: out, bundleId, originalId: info.bundleId, name: info.name, version: info.version, ...(sha256 ? { sha256 } : {}),
     ...(injected.length ? { injected } : {}) };
+}
+
+// B211: a file's entitlements (core/groupfix.js entitlementsRead), read in pieces; null when there's none or no file.
+export function fileEntitlements(FS, path) {
+  let stream;
+  try { stream = FS.open(path, "r"); } catch { return null; }
+  try {
+    return entitlementsRead((pos, len) => {
+      const buf = new Uint8Array(len);
+      return buf.subarray(0, FS.read(stream, buf, 0, len, pos));
+    });
+  } finally { FS.close(stream); }
 }
 
 // mkdir -p inside emscripten's FS.

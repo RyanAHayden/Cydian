@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# Builds the app-group and keychain fix (groupfix.m, B211) as an arm64 iOS 15+ dylib into
+# web/app/vendor/groupfix/ifizbox-groupfix.dylib, which is committed: the website's signer (no toolchain in a
+# browser) and the app's own (it bundles web/app/) both inject that file. Run it after changing groupfix.m and commit
+# the result (and its .source-sha256); web/app/core/groupfix.test.js checks the committed dylib matches the current source.
+#
+#   build.sh            build it
+#   build.sh <out>      build it to <out> instead (the test's rebuild)
+#
+# Needs IOS_SDK, clang and ld64.lld, as native/build.sh (LD64_LLD, else rustup's or the one on PATH).
+set -euo pipefail
+cd "$(dirname "$0")"
+sdk=${IOS_SDK:?set IOS_SDK to an iPhoneOS.sdk}
+lld=${LD64_LLD:-$(rustc --print sysroot 2>/dev/null || true)/lib/rustlib/x86_64-unknown-linux-gnu/bin/gcc-ld/ld64.lld}
+[ -x "$lld" ] || lld=$(command -v ld64.lld)
+out=${1:-../../web/app/vendor/groupfix/ifizbox-groupfix.dylib}
+mkdir -p "$(dirname "$out")"
+# No debug paths or UUID that differ per checkout, so the same source builds the same bytes.
+clang -target arm64-apple-ios15.0 -isysroot "$sdk" -dynamiclib -fobjc-arc -O2 -Wall -Wextra -Werror \
+  -fdebug-prefix-map="$PWD"=. -fuse-ld=lld --ld-path="$lld" -Wl,-no_uuid -Wl,-adhoc_codesign \
+  -install_name @rpath/ifizbox-groupfix.dylib -framework Foundation -framework Security \
+  -o "$out" groupfix.m
+# The source it was built from, for the test (no toolchain needed to tell a stale dylib).
+[ $# -gt 0 ] || sha256sum groupfix.m | cut -d' ' -f1 > "$out.source-sha256"

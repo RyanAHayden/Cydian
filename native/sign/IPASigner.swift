@@ -238,8 +238,19 @@ final class IPASigner {
             }
         }
         if let icon = options.icon { for f in options.iconFiles { files[appDir + f] = .data(icon, mode: 0o100644) } }
+        // B211: the original signature's app groups and keychain groups, read before signing, decide whether the app
+        // gets the group fix (GroupFix.swift) beside the user's tweaks; never iFizBox's own IPA.
+        var tweaks = options.tweaks
+        if oldID != SignOptions.selfBundleID, let exe = main.plist["CFBundleExecutable"] as? String, files[appDir + exe] != nil,
+           let plan = GroupFix.plan(original: Inspect.entitlements(try contents(appDir + exe, files, zip)),
+                                    profile: profile.entitlements(for: entID)),
+           let dylib = GroupFix.dylib() {
+            tweaks = try GroupFix.adding(plan, dylib: dylib, to: tweaks)
+            log("Group fix: \(plan.groups.isEmpty ? "no app groups" : plan.groups.joined(separator: ", ")) -> "
+                + (plan.target.isEmpty ? "the app's own folder" : plan.target) + (plan.keychain ? "; keychain groups stripped" : ""))
+        }
         // F288: the tweaks' files go in (over any the app has at those paths); their frameworks are bundles to sign
-        if let t = options.tweaks {
+        if let t = tweaks {
             for f in t.files {
                 let isMachO = MachO.isMachO([UInt8](f.data.prefix(4)))
                 files[appDir + f.path] = .data(f.data, mode: isMachO ? 0o100755 : 0o100644)
@@ -252,7 +263,7 @@ final class IPASigner {
                       let exe = pl["CFBundleExecutable"] as? String, files[dir + exe] != nil else { continue } // else its binary is a loose one
                 bundles[dir] = BundleInfo(dir: dir, plist: pl, format: format)
             }
-            log("Tweaks: \(t.names.joined(separator: ", ")) (\(t.files.count) files)")
+            if !t.names.isEmpty { log("Tweaks: \(t.names.joined(separator: ", ")) (\(t.files.count) files)") }
         }
         var injected = [String]()
 
@@ -308,7 +319,7 @@ final class IPASigner {
             if let exe = exe {
                 guard files[exe] != nil else { throw SignError("bad_ipa", "\(exe.dropFirst(appDir.count)) is missing.") }
                 var data = fixed(exe, try contents(exe, files, zip))
-                if dir == appDir, let t = options.tweaks, !t.inject.isEmpty { // F288
+                if dir == appDir, let t = tweaks, !t.inject.isEmpty { // F288
                     (data, injected) = try MachOEdit.inject(data, t.inject)
                     for i in injected { log("Injected \(i)") }
                 }

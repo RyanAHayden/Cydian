@@ -7,6 +7,7 @@ import { readFileSync, existsSync } from "node:fs";
 import { runSignJob, putTweaks } from "./websign-job.js";
 import { prepareTweaks, dylibsOf, loadCommands, LC, RPATH } from "./core/tweaks.js";
 import { readZip } from "./core/unpack.js";
+import { GROUPFIX } from "./core/groupfix.js";
 
 const fx = (n) => new Uint8Array(readFileSync(new URL(`./core/fixtures/signing/${n}`, import.meta.url)));
 const tw = (n) => new Uint8Array(readFileSync(new URL(`./core/fixtures/tweaks/${n}`, import.meta.url)));
@@ -55,4 +56,38 @@ test("zsign WebAssembly signs an IPA with a tweak: the executable loads it weakl
   const cr = zip.find((e) => e.path === "Payload/Tiny.app/_CodeSignature/CodeResources");
   assert.ok(Buffer.from(cr.data).includes(Buffer.from("Frameworks/Plain.dylib")), "sealed by the app");
   assert.ok(zip.some((e) => e.path === "Payload/Tiny.app/Frameworks/Plain.dylib"));
+});
+
+test("B211: an app whose original signature names keychain groups gets the group fix injected; iFizBox's own IPA never", { skip: !existsSync(WASM) && "no vendor/zsign" }, async () => {
+  const { default: real } = await import(WASM);
+  const groupFix = new Uint8Array(readFileSync(new URL(`./${GROUPFIX.file}`, import.meta.url)));
+  let seen = null;
+  const createZsign = async (o) => {
+    const zs = await real(o);
+    const main = zs.callMain;
+    zs.callMain = (args) => {
+      try { return main(args); } finally {
+        const at = "/w/app/Payload/Tiny.app/";
+        const read = (p) => { try { return zs.FS.readFile(at + p); } catch { return null; } };
+        seen = { exe: read("Tiny"), dylib: read(GROUPFIX.dylib), config: read(GROUPFIX.config) };
+      }
+    };
+    return zs;
+  };
+  const base = { p12: P12, profile: PROFILE, password: "hunter2", groupFix };
+  // the fixture's executable is unsigned: nothing to fix
+  const first = await runSignJob(createZsign, { ...base, ipa: fx("tiny-ifizbox.ipa"), appBundleId: "com.example.box" });
+  assert.equal(first.injected, undefined);
+  // signed once, it carries keychain-access-groups: signed again as another app, it gets the fix
+  const r = await runSignJob(createZsign, { ...base, ipa: first.ipa, appBundleId: "com.example.box" });
+  assert.deepEqual(r.injected, [GROUPFIX.inject]);
+  assert.ok(loadCommands(seen.exe).some((c) => c.cmd === LC.LOAD_WEAK_DYLIB && c.name === GROUPFIX.inject));
+  assert.ok(Buffer.from(seen.dylib).includes(CSMAGIC_EMBEDDED_SIGNATURE), "zsign signed the fix");
+  assert.match(new TextDecoder().decode(seen.config), /<key>keychain<\/key><true\/>/);
+  const cr = readZip(r.ipa).find((e) => e.path === "Payload/Tiny.app/_CodeSignature/CodeResources");
+  assert.ok(Buffer.from(cr.data).includes(Buffer.from(GROUPFIX.config)), "its config sealed by the app");
+  // iFizBox's own IPA keeps its own groups: no fix
+  const own = await runSignJob(createZsign, { ...base, ipa: first.ipa, appBundleId: "com.ryha.ifizbox" });
+  assert.equal(own.injected, undefined);
+  assert.equal(seen.dylib, null);
 });

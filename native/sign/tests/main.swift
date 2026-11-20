@@ -791,5 +791,63 @@ test("F288: tweak injection") {
     check(r.entries.first { $0.name == a + "Frameworks/Fixture.dylib" }?.unixMode == 0o100755, "a tweak binary is executable")
 }
 
+// B211: an app whose original signature asks for app groups and keychain groups the profile can't give gets the group
+// fix (the committed web/app/vendor/groupfix dylib) and its config; iFizBox's own IPA never.
+test("B211: group fix") {
+    let insta: [String: Any] = ["application-identifier": "OLDTEAM.com.burbn.instagram",
+                                "com.apple.security.application-groups": ["group.com.burbn.instagram"],
+                                "keychain-access-groups": ["OLDTEAM.com.burbn.instagram"]]
+    let mine = ["com.apple.security.application-groups": ["group.com.me.box"]]
+    check(GroupFix.plan(original: insta, profile: mine) == GroupFix.Plan(groups: ["group.com.burbn.instagram"], target: "group.com.me.box", keychain: true), "to the profile's group")
+    check(GroupFix.plan(original: insta, profile: [:]) == GroupFix.Plan(groups: ["group.com.burbn.instagram"], target: "", keychain: true), "to the app's own folder")
+    check(GroupFix.plan(original: insta, profile: ["com.apple.security.application-groups": ["group.com.burbn.instagram"]])?.groups == [], "a group the profile has stays")
+    check(GroupFix.plan(original: ["application-identifier": "OLD.x"], profile: mine) == nil, "nothing to fix")
+    check(GroupFix.plan(original: nil, profile: mine) == nil, "unsigned")
+    let p = try Profile(try fixture("profile.mobileprovision"))
+    let narrowed = p.entitlements(for: "com.burbn.instagram")
+    check(p.entitlements.keys.allSatisfy { narrowed[$0] != nil }, "every profile entitlement (its app groups too) stays")
+
+    let dylib = try Data(contentsOf: URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+        .appendingPathComponent("../../../web/app/vendor/groupfix/ifizbox-groupfix.dylib"))
+    GroupFix.dylib = { dylib }
+    defer { GroupFix.dylib = { nil } }
+    // rich.ipa with its executable signed by "the App Store" with Instagram's groups (and, for the second, iFizBox's ID)
+    func ipa(_ name: String, id: String?) throws -> URL {
+        let src = try ZipReader(url: fixtures.appendingPathComponent("rich.ipa"))
+        let url = work.appendingPathComponent(name)
+        let w = try ZipWriter(url: url)
+        for e in src.entries {
+            var d = try src.data(e)
+            if e.name == "Payload/Fixture.app/Fixture" {
+                d = try MachO.sign(d, CodeSignParams(identifier: "com.burbn.instagram", team: "OLDTEAM", entitlements: insta), identity)
+            } else if e.name == "Payload/Fixture.app/Info.plist", let id = id {
+                var pl = try PropertyListSerialization.propertyList(from: d, format: nil) as! [String: Any]
+                pl["CFBundleIdentifier"] = id
+                d = try PropertyListSerialization.data(fromPropertyList: pl, format: .xml, options: 0)
+            }
+            try w.add(e.name, d, mode: e.unixMode)
+        }
+        w.close()
+        return url
+    }
+    let signer = IPASigner(profile: p, identity: identity)
+    var logged = [String]()
+    signer.log = { logged.append($0) }
+    let out = work.appendingPathComponent("groupfix.ipa")
+    let app = try signer.sign(try ipa("insta.ipa", id: nil), to: out)
+    check(app.injected == [GroupFix.inject], "\(app.injected)")
+    check(logged.contains("Group fix: group.com.burbn.instagram -> the app's own folder; keychain groups stripped"), "\(logged)")
+    let f = try entries(out)
+    let a = "Payload/Fixture.app/"
+    check(MachOEdit.dylibs(f[a + "Fixture"]!).last == GroupFix.inject, "\(MachOEdit.dylibs(f[a + "Fixture"]!))")
+    try verifySigned(f[a + GroupFix.dylibPath]!, name: "groupfix", expectIdent: "ifizbox-groupfix", team: team, info: nil, resources: nil, ents: false)
+    let config = try PropertyListSerialization.propertyList(from: f[a + GroupFix.configPath]!, format: nil) as? [String: Any]
+    check(config?["groups"] as? [String] == ["group.com.burbn.instagram"] && config?["target"] as? String == "" && config?["keychain"] as? Bool == true, "\(String(describing: config))")
+    check(signer.options.tweaks == nil, "the user's options stay without it")
+
+    let own = try IPASigner(profile: p, identity: identity).sign(try ipa("own.ipa", id: SignOptions.selfBundleID), to: work.appendingPathComponent("own-signed.ipa"))
+    check(own.injected.isEmpty, "iFizBox's own IPA: \(own.injected)")
+}
+
 print(failures == 0 ? "all passed" : "\(failures) failure(s)")
 exit(failures == 0 ? 0 : 1)

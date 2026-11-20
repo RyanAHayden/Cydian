@@ -52,7 +52,7 @@ html[data-style="ios7"][data-theme="light"] {
   /* the back chevron, in the 13px slot ios6.css's border-image gives the arrow (the slice is drawn at 1/2 x, 11/15 y,
      so the shape is pre-squashed: on screen a 9 x 21pt chevron, 3pt thick) */
   --bar-back: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='42' height='60'%3E%3Cpath d='M20 15.7 24.2 18.6 8.4 30 24.2 41.5 20 44.3 2 30z' fill='%23007aff'/%3E%3C/svg%3E");
-  --bar-back-pressed: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='42' height='60'%3E%3Cpath d='M20 15.7 24.2 18.6 8.4 30 24.2 41.5 20 44.3 2 30z' fill='%23007aff' fill-opacity='.3'/%3E%3C/svg%3E");
+  --bar-back-pressed: var(--bar-back); /* held: the whole button dims to .3 (the opacity rule below) */
   /* tab bar */
   --tabbar: linear-gradient(var(--i7-hairline), var(--i7-hairline)) top / 100% .5px no-repeat, #f7f7f7;
   --tabbar-shadow: none;
@@ -120,6 +120,9 @@ html[data-style="ios7"][data-theme="dark"] {
   --dk-red-pressed-edge: transparent; --dk-red-pressed-edge-top: transparent; --dk-red-pressed: none;
   --dk-back: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='42' height='60'%3E%3Cpath d='M20 15.7 24.2 18.6 8.4 30 24.2 41.5 20 44.3 2 30z' fill='%230a84ff'/%3E%3C/svg%3E");
   --dk-ctl-hi: transparent; --dk-seg: none; --dk-seg-pressed: none;
+  /* tokens both tones' rules read, which ios6.css / packages.css define only on :root */
+  --tabbar-shadow: none; --filter-shadow: none; --dk-store-head: #000;
+  --scope-done: none; --scope-done-pressed: none; --scope-done-edge: transparent; --scope-done-edge-top: transparent;
   --tab-text: #8d8d93; --tab-text-active: #0a84ff; --tab-active: none; --tab-active-edge: none;
   --tab-icon: currentColor; --tab-icon-active: currentColor; --tab-icon-emboss: none; --tab-icon-emboss-active: none;
   --badge-ring: 0 solid transparent; --badge: #ff453a; --badge-shadow: none;
@@ -204,18 +207,21 @@ html[data-style="ios7"][data-theme] .switch.is-held .sw-knob { background: var(-
 
 /* Segmented control: tinted 1pt outline and dividers, tinted text, the chosen segment filled. */
 html[data-style="ios7"] .store-segmented,
+html[data-style="ios7"][data-theme] .store-segmented,
 html[data-style="ios7"] .store-segmented:has(.store-segment.selected) {
   border-color: var(--i7-tint); border-radius: 4px; box-shadow: none;
 }
 html[data-style="ios7"] .store-segment,
-html[data-style="ios7"] .store-segment:not(.selected) {
+html[data-style="ios7"] .store-segment:not(.selected),
+html[data-style="ios7"][data-theme] .store-segment:not(.selected) {
   font-size: 13px; font-weight: 400; color: var(--i7-tint); text-shadow: none; background: none;
 }
 html[data-style="ios7"] .store-segment + .store-segment,
 html[data-style="ios7"] .store-segment.selected + .store-segment,
 html[data-style="ios7"] .store-segment + .store-segment.selected { border-left-color: var(--i7-tint); }
 html[data-style="ios7"] .store-segment:active:not(.selected) { background: var(--i7-seg-pressed); }
-html[data-style="ios7"] .store-segment.selected { color: var(--i7-tint-text); background: var(--i7-tint); }
+html[data-style="ios7"] .store-segment.selected,
+html[data-style="ios7"][data-theme] .store-segment.selected { color: var(--i7-tint-text); background: var(--i7-tint); }
 
 /* Scope bar (Changes' All / Installed, Installed's title, Search's scopes): the same tinted outline control. The
    [data-theme] copies tie with packages.css's dark rules and win by order. */

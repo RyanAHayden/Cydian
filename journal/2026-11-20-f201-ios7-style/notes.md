@@ -72,3 +72,19 @@ button. The switch and segments keep ios6.css's transform-only motion.
   a capture.
 - **The app shell's status strip** (`data-shell="app"` nav bar `::before`): not captured in the app shell; the site
   strip is `#f7f7f7` / black in the shots.
+
+## Spec review (fresh subagent, diff + brief only)
+
+- Fixed: a held back button faded twice (the pressed chevron at .3 under the button's .3 opacity); the pressed chevron
+  is now the plain one. OLED Black now sets the tokens that both tones' rules read but only `:root` defined
+  (`--tabbar-shadow`, `--filter-shadow`, `--scope-done*`, `--dk-store-head`). The segmented control gained
+  `[data-theme]` copies, as the switch and scope bar have, so a dark rule can't outrank it.
+- Kept, and why: theme-boot.js and screens/settings.js changes (the only way to put `data-style` on `<html>`);
+  scope bar, search bar, action sheet and store header tokens (on the Changes, Search and package pages the brief
+  asks to check, iOS 6's glossy controls looked broken next to iOS 7's flat bars); Themes rows hidden under iOS 7
+  (iOS 7 has only its own two themes); `style` in TRAVELS (the website's choice goes to the app with the rest).
+- Not a bug: an unknown stored style reads as the default through `get()` (options check), so `sections()` and
+  `themeState` agree. `.cell-inner.is-pressed *` inheriting the text colour matches iOS 6, where all of it went white.
+- Partial, filed: the status bar in the apps (B221); switch size, Mode control inset, icon-row separators and Home's
+  tiles need hooks first (F331, after C45/C47).
+- check.sh: run by `run done`, which refuses to tick unless it passes.

@@ -38,9 +38,15 @@ export function decideRoute(choice, status) {
   if (!status.paired) return { route: "server", alert: "notPaired" };
   const ts = status.tailscale;
   if (ts?.use) return { route: "idevice" };
-  if (ts?.connect === "tailscale") return { route: "server", alert: ts.signedIn ? "tailscaleOff" : "tailscaleSignIn" };
+  if (ts?.connect === "tailscale") {
+    if (ts.signedIn && status.otherVPN && !tailscaleVPNOn(status)) return { route: "server", alert: "otherVPNTailscale" }; // F284
+    return { route: "server", alert: ts.signedIn ? "tailscaleOff" : "tailscaleSignIn" };
+  }
   if (status.localDevVPN) return { route: "idevice" };
-  if (status.otherVPN) return { route: "server", alert: "otherVPN" };
+  // F284: Tailscale's own VPN on is never "another VPN": it is the route, once iFizBox is signed in to it (and
+  // Connect With isn't LocalDevVPN).
+  if (tailscaleVPNOn(status)) return { route: "server", alert: ts.signedIn ? "tailscaleConnect" : "tailscaleSignIn" };
+  if (status.otherVPN) return { route: "server", alert: setUpWithTailscale(ts) ? "otherVPNTailscale" : "otherVPN" };
   return { route: "server", alert: "vpnOff" };
 }
 
@@ -61,7 +67,71 @@ export const ALERTS = {
   },
   tailscaleOff: { title: "Tailscale Is Off", message: "This install goes through the Signing Server. Turn Tailscale on in the Tailscale app to install on this iPhone.", buttons: ["OK"] },
   tailscaleSignIn: { title: "Sign In to Tailscale", message: `This install goes through the Signing Server. Sign ${NAME} in to Tailscale in Settings > Installation.`, buttons: ["OK"] },
+  // F284: set up with Tailscale and a VPN that isn't Tailscale's is on (no Open: the shell's open is LocalDevVPN's)
+  otherVPNTailscale: { title: "Another VPN Is On", message: "Installing on this iPhone needs the Tailscale app's VPN, and iOS runs one VPN at a time. Turn Tailscale on, or install through the Signing Server.", buttons: ["OK"] },
+  tailscaleConnect: { title: "Tailscale Is On", message: "This install goes through the Signing Server because Connect With is LocalDevVPN. Pick Automatic in Settings > Installation & Signing > This iPhone to install through Tailscale.", buttons: ["OK"] },
 };
+
+// F284: the Tailscale app's VPN is on: idevice.status's tailscale.address is this phone's own tailnet address, there
+// only while that VPN is up (Tailscale.swift ownAddress), whether or not iFizBox is signed in.
+export const tailscaleVPNOn = (status) => Boolean(status?.tailscale?.address);
+
+// F284 (user 2026-11-20): the VPN follows what the user set up, never which apps are installed. Set up with Tailscale:
+// Connect With is Tailscale, or iFizBox is signed in to Tailscale (setup's Sign In) and Connect With isn't
+// LocalDevVPN. Otherwise (LocalDevVPN, or nothing chosen yet) LocalDevVPN, the default. `ts`: idevice.status.tailscale.
+export const setUpWithTailscale = (ts) => ts?.connect === "tailscale" || Boolean(ts?.signedIn && ts?.connect !== "localdevvpn");
+
+// ---- Installation & Signing's top cell (F284, option B of the concept): one two-line status and one action row
+// whose label changes. `choice` is Install Apps With; `st` idevice.status (null: it failed; undefined: not answered
+// yet); `host` the Signing Server's host. Which VPN an action opens follows setUpWithTailscale. Returns
+//   { state, title, subtitle, action, tone: "ok"|"warn"|"wait", local }
+// `local`: installs go straight onto this iPhone now (the Signing Server row then says This iPhone).
+// `action` is a key of STATUS_ACTIONS. Every subtitle fits two lines at 320pt (the cell keeps two lines' height).
+export const STATUS_ACTIONS = {
+  check: "Check Connection", checkServer: "Check Server", openVPN: `Open ${VPNS[0]}`, pair: "Start Pairing",
+  signIn: "Sign In to Tailscale", openTailscale: "Open Tailscale", useTailscale: "Use Tailscale",
+};
+export const CHECKING = { state: "checking", title: "Checking…", subtitle: "Pairing, Developer Mode and the VPN.", action: "check", tone: "wait", local: false };
+export function installStatus(choice, st, { host = DOMAIN } = {}) {
+  if (choice !== "iphone") return { state: "server", title: "Ready to Install", subtitle: `Through the Signing Server, ${host}.`, action: "checkServer", tone: "ok", local: false };
+  if (st === undefined) return CHECKING;
+  const later = `Installs use ${host} for now.`;
+  if (!st) return { state: "noStatus", title: "Can't Reach This iPhone", subtitle: later, action: "check", tone: "warn", local: false };
+  if (!st.paired) return { state: "pair", title: "Pair This iPhone", subtitle: `Installs use ${host} until it's paired.`, action: "pair", tone: "warn", local: false };
+  const ts = st.tailscale ?? {};
+  const ready = (via) => ({ state: "ready", via, title: "Ready to Install", subtitle: `Straight onto this iPhone, through ${via}.`, action: "check", tone: "ok", local: true });
+  if (ts.use) return ready("Tailscale");
+  const signIn = { state: "signIn", title: "Sign In to Tailscale", subtitle: `Tailscale is the way in. ${later}`, action: "signIn", tone: "warn", local: false };
+  const otherOn = st.otherVPN && !st.localDevVPN && !tailscaleVPNOn(st);
+  if (ts.connect === "tailscale") {
+    if (ts.signedIn && otherOn) return { state: "otherVPN", title: "Another VPN Is On", subtitle: `iOS runs one VPN at a time. ${later}`, action: "openTailscale", tone: "warn", red: true, local: false };
+    return ts.signedIn ? { state: "tailscaleOff", title: "Tailscale Is Off", subtitle: `Turn on the Tailscale app's VPN. ${later}`, action: "openTailscale", tone: "warn", local: false } : signIn;
+  }
+  if (st.localDevVPN) return ready(VPNS[0]);
+  if (tailscaleVPNOn(st)) {
+    return ts.signedIn ? { state: "tailscaleConnect", title: "Tailscale Is On", subtitle: `Connect With is ${VPNS[0]}. ${later}`, action: "useTailscale", tone: "warn", local: false } : signIn;
+  }
+  // Another VPN (not Tailscale's), or nothing on: the action opens the VPN the user set up (setUpWithTailscale)
+  const viaTs = setUpWithTailscale(ts);
+  if (st.otherVPN) return { state: "otherVPN", title: "Another VPN Is On", subtitle: `iOS runs one VPN at a time. ${later}`, action: viaTs ? "openTailscale" : "openVPN", tone: "warn", red: true, local: false };
+  if (viaTs) {
+    return ts.signedIn ? { state: "tailscaleOff", title: "Tailscale Is Off", subtitle: `Turn on the Tailscale app's VPN. ${later}`, action: "openTailscale", tone: "warn", local: false } : signIn;
+  }
+  return { state: "vpnOff", title: `${VPNS[0]} Is Off`, subtitle: `Turn it on to install here. ${later}`, action: "openVPN", tone: "warn", local: false };
+}
+
+// The Signing Server row's detail: This iPhone while installs go straight here, the server's host when they fall back.
+export const serverDetail = (status, host = DOMAIN) => (status?.local ? "This iPhone" : host);
+
+// The Certificate row's detail from signing.status's identity (`kept`, null for none) and whether files are picked.
+export function certificateDetail(kept, { staged = false, now = Date.now() } = {}) {
+  if (!kept) return { text: staged ? "Incomplete" : "None" };
+  const t = Date.parse(kept.expires || "");
+  if (!Number.isFinite(t)) return { text: "In Keychain" };
+  const days = Math.floor((t - now) / 86400000);
+  if (days < 0) return { text: "Expired", red: true };
+  return { text: `${days} day${days === 1 ? "" : "s"} left`, red: days <= 7 };
+}
 
 // After Open LocalDevVPN the install waits (signing-client.js waitForVPN): idevice.status is asked every VPN_POLL ms
 // and when the app comes back to the foreground, and the install goes on once this is true. Only Cancel stops it.
@@ -180,6 +250,7 @@ export const TAILSCALE_URL = "tailscale://";
 //   "tailscale"    only Tailscale (or both, with Connect With: Tailscale): its Sign In and Open Tailscale
 //   "ask"          both, nothing chosen yet: the page asks, and the answer is kept as Connect With
 //   "none"         neither: LocalDevVPN is needed (Install LocalDevVPN), Tailscale named as the other way
+// (F284, user 2026-11-20: the VPN follows what the user set up; Tailscale being installed doesn't switch to it.)
 export function vpnRoute(apps, connect = "auto") {
   if (!apps || typeof apps !== "object") return "localdevvpn";
   const ldv = Boolean(apps.localdevvpn), ts = Boolean(apps.tailscale);

@@ -29,5 +29,7 @@ test("outside the sideload build the page keeps its old title", () => {
   // these tests run as the website (no native bridge), where Settings > Signing stays Signing
   assert.equal(MERGED_TITLE, "Installation & Signing");
   assert.equal(nav({ path: ["signing"] }).title, "Signing");
-  assert.equal(nav({ path: ["installation", "pair"] }).title, "This iPhone");
+  assert.equal(nav({ path: ["installation", "pair"] }).title, "Pairing");
+  assert.equal(nav({ path: ["installation", "iphone"] }).title, "This iPhone");
+  assert.equal(nav({ path: ["installation", "with"] }).title, "Install Apps With");
 });

@@ -28,7 +28,8 @@ Like iOS 6's Settings app, the root is one list of short rows with no footers. E
 - Each group's footer says what its rows do in one line. A test keeps each footer to 120 characters or fewer.
 - Routes below Settings (`#/home/settings/…`): `general`, `theme` (`display` opens it too), `updates`, `installation[/pair]`, `<page>/<key>` (a list page),
   `<page>/holds`, `general/blocked`, `signing[/<key>]`, `signing/help` (How Signing Works), `account`, `logs[/<id>]`. In the sideload
-  build `installation` and `signing` both open Installation & Signing; `installation/pair` and `signing/help` stay their own pages. The one-segment routes (`device`,
+  build `installation` and `signing` both open Installation & Signing; `installation/with`, `installation/iphone`, `installation/pair`,
+  `signing/certificate`, `signing/server`, `signing/apps` and `signing/help` are the pages under it. The one-segment routes (`device`,
   `iosVersion`, `holds`) open their page too. Home's device hint and a package's "Set iOS Version" use them.
 
 ## Settings > Signing
@@ -56,19 +57,36 @@ dates and the switch would do nothing there.
 ## Settings > Installation & Signing
 
 Sideload build only: one page, the root's Installation & Signing row. Its title shrinks to fit beside the back button
-at 375pt, and the pages under it (This iPhone, How Signing Works) go back with "Back". Top to bottom: the groups
-below, drawn by `screens/installroute.js` (`installationBlock`, rules and texts in `core/installroute.js`), then
-Settings > Signing's groups from Certificate down (`mergedLayout()` in screens/settings.js):
+at 375pt, and the pages under it go back with "Back". The page (`mainPage` in `screens/installroute.js`, rules and
+texts in `core/installroute.js`) is built once and filled in place: every row is there from the first frame, a
+value still loading shows the grey spinner in its slot and fades in (opacity only), and answers never add or remove
+rows or change footers. Top to bottom:
+
+- A status cell, always two lines under its title (`installStatus`), and one action row whose label changes:
+  Checking… (Check Connection, dimmed); Ready to Install, "Straight onto this iPhone, through LocalDevVPN" (or
+  Tailscale), with Check Connection; Another VPN Is On, red, when a VPN that isn't Tailscale's is on, with Open
+  LocalDevVPN, or Open Tailscale when the user set up Tailscale (Connect With: Tailscale, or signed in to it);
+  Pair This iPhone with Start Pairing; Sign In to Tailscale when Tailscale's VPN is on and the app isn't signed in.
+  Tailscale's own VPN is never a conflict. With Signing Server chosen: Ready to Install through the server, Check Server.
+- **Installation**: Install Apps With › (`installation/with`, the choice) and This iPhone › (`installation/iphone`,
+  Paired / Not Paired).
+- **Signing**: Certificate › (`signing/certificate`, days left: the Certificate, Files, Provisioning Profile,
+  Apple Developer Account and options groups, and Share Your Certificate), Signing Server › (`signing/server`: This
+  iPhone while installs go straight here, the server's host when they fall back to it; Server, Check Server, Run
+  Your Own), Signed Apps › (`signing/apps`, the count: Certificate Status and the list).
+- How Signing Works › (`signing/help`).
+
+The pages under it:
 
 - **Install Apps With**: Signing Server (the manifest and iOS's Install prompt) or This iPhone (installd over
   LocalDevVPN or Tailscale, docs/sideload.md), each subtitle a short point per line, wrapped. This iPhone's says
   LocalDevVPN or Tailscale / No server, no install popup / Updates itself: installs through installation_proxy
   never show iOS's install prompt. Picking This iPhone before it is
   paired opens This iPhone's page.
-- With This iPhone chosen: **Pairing** (Paired / Not Paired, opens `installation/pair`), **LocalDevVPN** (On, Off or
+- **This iPhone**: **Pairing** (Paired / Not Paired, opens `installation/pair`), **LocalDevVPN** (On, Off or
   Another VPN) and **Open LocalDevVPN**, then **Connect With** (Automatic, LocalDevVPN, Tailscale) and **Tailscale**
-  (Sign In, or the device with Test Connection and Sign Out).
-- **This iPhone** (`installation/pair`), one page that runs by itself: a sentence on what it gives, the LocalDevVPN
+  (Sign In, or the device with Test Connection and Sign Out), always there.
+- **Pairing** (`installation/pair`), one page that runs by itself: a sentence on what it gives, the LocalDevVPN
   check (Turn On LocalDevVPN alert when it's off, rechecked when the app comes back), then on iOS 27 pairing starts
   on its own: the 6-digit code and where to type it, a line and a ringed Settings screenshot a step; before iOS 27,
   Import Pairing File; once paired, Paired with a check, Check Connection (Pair Again when the pairing is refused)

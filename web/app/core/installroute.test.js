@@ -145,7 +145,12 @@ test("pairing page: the state read back from native after the background", () =>
 test("Tailscale: used when the shell says so (no LocalDevVPN alert); chosen but off or signed out says why", () => {
   const ts = (o) => ({ paired: "rp", localDevVPN: false, otherVPN: true, tailscale: { connect: "auto", signedIn: true, address: "100.1.2.3", use: true, ...o } });
   assert.deepEqual(decideRoute("iphone", ts({})), { route: "idevice" });
-  assert.deepEqual(decideRoute("iphone", ts({ use: false })), { route: "server", alert: "otherVPN" }); // Automatic, not usable: as before
+  // F284: the VPN that's on is Tailscale's (its address): never "another VPN"
+  assert.deepEqual(decideRoute("iphone", ts({ use: false, connect: "localdevvpn" })), { route: "server", alert: "tailscaleConnect" });
+  assert.deepEqual(decideRoute("iphone", ts({ use: false, signedIn: false })), { route: "server", alert: "tailscaleSignIn" });
+  // a VPN that isn't Tailscale's: what the user set up says which VPN to turn on (signed in to Tailscale: Tailscale)
+  assert.deepEqual(decideRoute("iphone", ts({ use: false, address: null })), { route: "server", alert: "otherVPNTailscale" });
+  assert.deepEqual(decideRoute("iphone", ts({ use: false, address: null, signedIn: false })), { route: "server", alert: "otherVPN" });
   assert.deepEqual(decideRoute("iphone", ts({ use: false, connect: "tailscale" })), { route: "server", alert: "tailscaleOff" });
   assert.deepEqual(decideRoute("iphone", ts({ use: false, connect: "tailscale", signedIn: false })), { route: "server", alert: "tailscaleSignIn" });
   assert.deepEqual(decideRoute("iphone", { ...ts({ use: true }), paired: null }), { route: "server", alert: "notPaired" });
@@ -183,6 +188,7 @@ test("vpnRoute: one app goes its way, both ask until Connect With says, neither 
   assert.equal(vpnRoute({ localdevvpn: true, tailscale: false }), "localdevvpn");
   assert.equal(vpnRoute({ localdevvpn: false, tailscale: true }), "tailscale");
   assert.equal(vpnRoute({ localdevvpn: false, tailscale: true }, "localdevvpn"), "tailscale"); // the only one there
+  // F284 (user 2026-11-20): Tailscale being installed doesn't pick it; both installed still ask
   assert.equal(vpnRoute({ localdevvpn: true, tailscale: true }), "ask");
   assert.equal(vpnRoute({ localdevvpn: true, tailscale: true }, "auto"), "ask");
   assert.equal(vpnRoute({ localdevvpn: true, tailscale: true }, "tailscale"), "tailscale");

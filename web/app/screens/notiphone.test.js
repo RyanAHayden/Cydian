@@ -6,27 +6,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { NAME, DOMAIN } from "../brand.js";
 import { DISMISS_KEY } from "../core/platform.js";
+import { fakeDocument as fakeDom } from "../fakes.test-helper.js";
 
-function fakeDom() {
-  const make = (tag) => {
-    const e = {
-      tagName: String(tag).toUpperCase(), children: [], attrs: {}, listeners: {}, style: {}, dataset: {}, parentNode: null, _text: "",
-      _cls: new Set(), type: "", src: "", alt: "", href: "",
-      get className() { return [...e._cls].join(" "); },
-      set className(v) { e._cls = new Set(String(v).split(/\s+/).filter(Boolean)); },
-      classList: { add: (...c) => c.forEach((x) => e._cls.add(x)), contains: (c) => e._cls.has(c) },
-      get textContent() { return e._text + e.children.map((c) => c.textContent).join(""); },
-      set textContent(v) { e._text = String(v); e.children = []; },
-      setAttribute(k, v) { e.attrs[k] = String(v); }, getAttribute: (k) => e.attrs[k] ?? null,
-      append(...c) { for (const x of c) { x.remove?.(); x.parentNode = e; e.children.push(x); } },
-      remove() { if (e.parentNode) e.parentNode.children = e.parentNode.children.filter((y) => y !== e); e.parentNode = null; },
-      addEventListener(t, f) { (e.listeners[t] ??= []).push(f); },
-      click() { return Promise.all((e.listeners.click ?? []).map((f) => f({ target: e, type: "click" }))); },
-    };
-    return e;
-  };
-  return { createElement: make, createDocumentFragment: () => make("#fragment"), body: make("body") };
-}
 globalThis.document = fakeDom();
 globalThis.Image ??= function Image() { return document.createElement("img"); };
 const { showNotIphone, SITE_URL } = await import("./notiphone.js");

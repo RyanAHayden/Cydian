@@ -5,49 +5,10 @@ import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
 import { confirmCancel, openAppConfirm } from "./queue.js";
 import { createAppQueue } from "../core/appqueue.js";
+import { fakeDocument as fakeDom } from "../fakes.test-helper.js";
 
 const here = new URL(".", import.meta.url);
 const read = (rel) => readFileSync(new URL(rel, here), "utf8");
-
-// ---- a fake DOM, enough for modal() and the app Confirm's body ---------------------------------------------------
-function fakeDom() {
-  const make = (tag) => {
-    const e = {
-      tagName: String(tag).toUpperCase(), children: [], listeners: {}, style: { setProperty() {} }, attrs: {}, dataset: {},
-      parentNode: null, textContent: "", hidden: false, disabled: false, type: "", _cls: new Set(),
-      get className() { return [...e._cls].join(" "); },
-      set className(v) { e._cls = new Set(String(v).split(/\s+/).filter(Boolean)); },
-      classList: { add: (...c) => c.forEach((x) => e._cls.add(x)), remove: (...c) => c.forEach((x) => e._cls.delete(x)),
-        toggle: (c, on) => ((on ?? !e._cls.has(c)) ? e._cls.add(c) : e._cls.delete(c)), contains: (c) => e._cls.has(c) },
-      setAttribute(k, v) { e.attrs[k] = String(v); },
-      getAttribute(k) { return e.attrs[k] ?? null; },
-      removeAttribute(k) { delete e.attrs[k]; },
-      append(...c) {
-        for (const x of c) {
-          if (x?.isFragment) { x.children.splice(0).forEach((k) => e.append(k)); continue; }
-          if (typeof x !== "object" || x === null) continue;
-          x.parentNode = e;
-          e.children.push(x);
-        }
-      },
-      appendChild(x) { e.append(x); return x; },
-      prepend(...c) { e.append(...c); },
-      replaceChildren(...c) { e.children = []; e.append(...c); },
-      remove() { const p = e.parentNode; if (p) p.children.splice(p.children.indexOf(e), 1); e.parentNode = null; },
-      querySelector: () => null,
-      querySelectorAll: () => [],
-      addEventListener(t, f) { (e.listeners[t] ??= []).push(f); },
-      removeEventListener() {},
-      animate: () => ({ finished: Promise.resolve(), cancel() {} }),
-      click() { for (const f of e.listeners.click ?? []) f({ preventDefault() {}, stopPropagation() {} }); },
-    };
-    return e;
-  };
-  const body = make("body");
-  return { body, createElement: make, createElementNS: (_ns, t) => make(t),
-    createTextNode: (t) => Object.assign(make("#text"), { textContent: String(t) }),
-    createDocumentFragment: () => Object.assign(make("#fragment"), { isFragment: true }) };
-}
 
 function withDom(fn) {
   return async () => {

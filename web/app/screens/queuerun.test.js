@@ -5,27 +5,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { runQueue } from "./queuerun.js";
 import { parseSimulation, createQueue } from "../core/queue.js";
-
-function fakeDom() {
-  const make = (tag) => {
-    const e = {
-      tagName: String(tag).toUpperCase(), children: [], listeners: {}, style: {}, attrs: {}, dataset: {}, parentNode: null,
-      textContent: "", hidden: false, disabled: false, type: "", _cls: new Set(),
-      get className() { return [...e._cls].join(" "); },
-      set className(v) { e._cls = new Set(String(v).split(/\s+/).filter(Boolean)); },
-      classList: { add: (...c) => c.forEach((x) => e._cls.add(x)), remove: (...c) => c.forEach((x) => e._cls.delete(x)),
-        toggle: (c, on) => ((on ?? !e._cls.has(c)) ? e._cls.add(c) : e._cls.delete(c)), contains: (c) => e._cls.has(c) },
-      setAttribute(k, v) { e.attrs[k] = String(v); },
-      append(...c) { for (const x of c) { if (typeof x !== "object") continue; x.parentNode = e; e.children.push(x); } },
-      get firstChild() { return e.children[0] ?? null; },
-      remove() { const p = e.parentNode; if (p) p.children.splice(p.children.indexOf(e), 1); e.parentNode = null; },
-      addEventListener(t, f) { (e.listeners[t] ??= []).push(f); },
-      click() { for (const f of e.listeners.click ?? []) f({}); },
-    };
-    return e;
-  };
-  return { body: make("body"), createElement: make };
-}
+import { fakeDocument as fakeDom } from "../fakes.test-helper.js";
 
 // A stand-in for nav/progress.js's page: records what the run asks of it.
 function fakePage() {

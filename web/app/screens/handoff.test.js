@@ -2,6 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { shareItems, sourceUrlOf, APP_TILES, SIDELOAD_TOOLS, headerShareButton } from "./handoff.js";
+import { fakeDocument } from "../fakes.test-helper.js";
 
 const ORIGIN = "https://ifizbox.com";
 const APT = { key: "deb:https://repo.example/:./", uri: "https://repo.example/", dist: "./" };
@@ -78,32 +79,7 @@ test("F194: the jailbreak build lists no sideload-tool hand-offs; the sideload I
   assert.deepEqual(kinds(shareItems(ALT, { origin: ORIGIN })), kinds(shareItems(ALT, { origin: ORIGIN, mode: "site" })));
 });
 
-// A small fake DOM: enough for the header button and nav/sharesheet.js showShareSheet.
-function fakeDom() {
-  const make = (tag) => {
-    const e = {
-      tagName: String(tag).toUpperCase(), children: [], attrs: {}, listeners: {}, style: { setProperty() {} }, dataset: {},
-      parentNode: null, _cls: new Set(), _text: "", hidden: false, type: "",
-      get className() { return [...e._cls].join(" "); },
-      set className(v) { e._cls = new Set(String(v).split(/\s+/).filter(Boolean)); },
-      classList: { add: (...c) => c.forEach((x) => e._cls.add(x)), contains: (c) => e._cls.has(c), toggle() {} },
-      get textContent() { return e._text + e.children.map((c) => c.textContent).join(""); },
-      set textContent(v) { e._text = String(v); e.children = []; },
-      set innerHTML(v) { e._html = v; },
-      setAttribute(k, v) { e.attrs[k] = String(v); }, getAttribute: (k) => e.attrs[k] ?? null,
-      append(...c) { for (const x of c) { if (typeof x === "string") continue; x.parentNode = e; e.children.push(x); } },
-      remove() { if (e.parentNode) e.parentNode.children = e.parentNode.children.filter((y) => y !== e); e.parentNode = null; },
-      addEventListener(t, f) { (e.listeners[t] ??= []).push(f); },
-      dispatch(t) { (e.listeners[t] ?? []).forEach((f) => f({ stopPropagation() {}, preventDefault() {} })); },
-      animate: () => ({ finished: Promise.resolve() }),
-      focus() {},
-    };
-    return e;
-  };
-  const body = make("body");
-  globalThis.document = { createElement: make, body, addEventListener() {}, removeEventListener() {} };
-  return body;
-}
+const fakeDom = () => (globalThis.document = fakeDocument()).body;
 const all = (n, out = []) => { out.push(n); (n.children ?? []).forEach((c) => all(c, out)); return out; };
 
 test("F194: the app page header's Share button opens the share sheet with the source's hand-offs", async () => {

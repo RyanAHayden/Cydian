@@ -5,42 +5,7 @@ import assert from "node:assert/strict";
 // Imported before the fake DOM goes in: loading signing.js with a document links its stylesheet into document.head.
 import { homeLinks, lockHomeLinks, askOnLocked, openWhileLocked } from "./home.js";
 import { grouped } from "../nav/ui.js";
-
-// A small fake DOM: enough for nav/ui.js grouped() and Home's lock.
-function fakeDom() {
-  const make = (tag) => {
-    const e = {
-      tagName: String(tag).toUpperCase(), children: [], listeners: {}, style: {}, dataset: {}, parentNode: null, textContent: "",
-      _cls: new Set(),
-      get className() { return [...e._cls].join(" "); },
-      set className(v) { e._cls = new Set(String(v).split(/\s+/).filter(Boolean)); },
-      classList: {
-        add: (...c) => c.forEach((x) => e._cls.add(x)), remove: (...c) => c.forEach((x) => e._cls.delete(x)),
-        contains: (c) => e._cls.has(c),
-      },
-      append(...c) {
-        for (const x of c) {
-          if (x?.isFragment) { x.children.splice(0).forEach((k) => e.append(k)); continue; }
-          if (typeof x === "string") continue;
-          x.parentNode = e;
-          e.children.push(x);
-        }
-      },
-      addEventListener(t, f) { (e.listeners[t] ??= []).push(f); },
-      querySelectorAll(sel) {
-        const classes = sel.split(".").filter(Boolean);
-        const out = [];
-        const walk = (n) => { for (const k of n.children) { if (classes.every((c) => k._cls.has(c))) out.push(k); walk(k); } };
-        walk(e);
-        return out;
-      },
-      querySelector(sel) { return e.querySelectorAll(sel)[0] ?? null; },
-      closest(sel) { const c = sel.replace(/^\./, ""); for (let n = e; n; n = n.parentNode) if (n._cls?.has(c)) return n; return null; },
-    };
-    return e;
-  };
-  return { createElement: make, createDocumentFragment: () => Object.assign(make("#fragment"), { isFragment: true }) };
-}
+import { fakeDocument as fakeDom } from "../fakes.test-helper.js";
 
 // A tap on target, as the browser delivers it to box's capture listener: did anything stop it from opening?
 async function tap(box, target) {

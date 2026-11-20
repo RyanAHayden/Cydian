@@ -4,44 +4,8 @@
 // depiction's, and a server without reviews leaves the depiction's and the App Store's as they were.
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { fakeDocument as fakeDom, tick } from "../fakes.test-helper.js";
 
-function fakeDom() {
-  const make = (tag) => {
-    const e = {
-      tagName: String(tag).toUpperCase(), children: [], attrs: {}, listeners: {}, style: {}, dataset: {}, parentNode: null, _text: "",
-      _cls: new Set(), hidden: false, disabled: false, value: "", type: "", placeholder: "", maxLength: -1,
-      get className() { return [...e._cls].join(" "); },
-      set className(v) { e._cls = new Set(String(v).split(/\s+/).filter(Boolean)); },
-      classList: {
-        add: (...c) => c.forEach((x) => e._cls.add(x)), remove: (...c) => c.forEach((x) => e._cls.delete(x)),
-        contains: (c) => e._cls.has(c), toggle: (c, on = !e._cls.has(c)) => { if (on) e._cls.add(c); else e._cls.delete(c); return on; },
-      },
-      get textContent() { return e._text + e.children.map((c) => c.textContent).join(""); },
-      set textContent(v) { e._text = String(v); e.children = []; },
-      setAttribute(k, v) { e.attrs[k] = String(v); }, getAttribute: (k) => e.attrs[k] ?? null,
-      append(...c) {
-        for (const x of c) {
-          if (typeof x === "string") { e.children.push({ textContent: x, children: [], _cls: new Set(), isText: true }); continue; }
-          x.remove?.();
-          x.parentNode = e;
-          e.children.push(x);
-        }
-      },
-      replaceChildren(...c) { for (const k of e.children) k.parentNode = null; e.children = []; e._text = ""; e.append(...c); },
-      remove() { if (e.parentNode) e.parentNode.children = e.parentNode.children.filter((y) => y !== e); e.parentNode = null; },
-      replaceWith(x) { const p = e.parentNode; const i = p.children.indexOf(e); x.remove?.(); x.parentNode = p; p.children[i] = x; e.parentNode = null; },
-      addEventListener(t, f) { (e.listeners[t] ??= []).push(f); },
-      removeEventListener(t, f) { e.listeners[t] = (e.listeners[t] ?? []).filter((g) => g !== f); },
-      click() { return Promise.all((e.listeners.click ?? []).map((f) => f({ target: e }))); },
-      focus() {},
-    };
-    return e;
-  };
-  const body = make("body");
-  const doc = { createElement: make, body, listeners: {}, addEventListener(t, f) { (doc.listeners[t] ??= []).push(f); },
-    removeEventListener(t, f) { doc.listeners[t] = (doc.listeners[t] ?? []).filter((g) => g !== f); } };
-  return doc;
-}
 globalThis.document = fakeDom();
 const { writeReviewSheet, reviewsTab, starPicker } = await import("./reviews.js");
 
@@ -49,7 +13,6 @@ const all = (n, out = []) => { for (const c of n.children ?? []) { out.push(c); 
 const find = (n, cls) => all(n).filter((x) => x._cls?.has(cls));
 const one = (n, cls) => find(n, cls)[0];
 const byText = (n, text) => all(n).find((x) => x.tagName === "BUTTON" && x.textContent === text);
-const tick = () => new Promise((r) => setTimeout(r, 0));
 
 test("the star picker: tap sets it, aria says which", async () => {
   let picked = null;

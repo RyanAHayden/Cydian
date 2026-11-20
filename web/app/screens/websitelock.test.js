@@ -3,6 +3,7 @@
 // "Install iFizBox First" like Home's rows.
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { fakeDocument as fakeDom } from "../fakes.test-helper.js";
 
 // The page's window hears ifizbox:browse-lock (websign-gate.js setFirstVisit); Node's globalThis has no events of its own.
 if (!globalThis.addEventListener) {
@@ -10,62 +11,6 @@ if (!globalThis.addEventListener) {
   globalThis.addEventListener = bus.addEventListener.bind(bus);
   globalThis.removeEventListener = bus.removeEventListener.bind(bus);
   globalThis.dispatchEvent = bus.dispatchEvent.bind(bus);
-}
-
-// ---- a small fake DOM: enough for nav/ui.js grouped(), createSwitch and the settings pages ------------------------
-function fakeDom() {
-  const make = (tag) => {
-    const e = {
-      tagName: String(tag).toUpperCase(), children: [], attrs: {}, listeners: {}, style: { removeProperty() {}, setProperty() {} },
-      dataset: {}, parentNode: null, textContent: "", _cls: new Set(),
-      get className() { return [...e._cls].join(" "); },
-      set className(v) { e._cls = new Set(String(v).split(/\s+/).filter(Boolean)); },
-      classList: {
-        add: (...c) => c.forEach((x) => e._cls.add(x)), remove: (...c) => c.forEach((x) => e._cls.delete(x)),
-        contains: (c) => e._cls.has(c), toggle: (c, on = !e._cls.has(c)) => { if (on) e._cls.add(c); else e._cls.delete(c); return on; },
-      },
-      set innerHTML(_) { e.children = []; }, get innerHTML() { return ""; },
-      setAttribute(k, v) { e.attrs[k] = String(v); }, getAttribute: (k) => e.attrs[k] ?? null, removeAttribute(k) { delete e.attrs[k]; },
-      append(...c) {
-        for (const x of c) {
-          if (x?.isFragment) { const kids = x.children.splice(0); kids.forEach((k) => e.append(k)); continue; }
-          if (typeof x === "string") continue;
-          x.remove?.();
-          x.parentNode = e;
-          e.children.push(x);
-        }
-      },
-      replaceChildren(...c) { for (const k of e.children) k.parentNode = null; e.children = []; e.append(...c); },
-      remove() { if (e.parentNode) { e.parentNode.children = e.parentNode.children.filter((x) => x !== e); e.parentNode = null; } },
-      get isConnected() { let n = e; while (n.parentNode) n = n.parentNode; return n === body; },
-      get firstChild() { return e.children[0] ?? null; },
-      get lastChild() { return e.children.at(-1) ?? null; },
-      addEventListener(t, f) { (e.listeners[t] ??= []).push(f); },
-      removeEventListener(t, f) { e.listeners[t] = (e.listeners[t] ?? []).filter((x) => x !== f); },
-      click() { const ev = { currentTarget: e, target: e, preventDefault() {}, stopImmediatePropagation() {} }; for (const f of e.listeners.click ?? []) f(ev); },
-      querySelectorAll(sel) {
-        const classes = sel.split(".").filter(Boolean);
-        const out = [];
-        const walk = (n) => { for (const k of n.children) { if (classes.every((c) => k._cls?.has(c))) out.push(k); walk(k); } };
-        walk(e);
-        return out;
-      },
-      querySelector(sel) { return e.querySelectorAll(sel)[0] ?? null; },
-      closest(sel) { const c = sel.replace(/^\./, ""); for (let n = e; n; n = n.parentNode) if (n._cls?.has(c)) return n; return null; },
-      animate: () => ({ finished: Promise.resolve() }),
-      focus() {}, blur() {}, setPointerCapture() {},
-    };
-    return e;
-  };
-  const body = make("body");
-  return {
-    body,
-    createElement: make,
-    createDocumentFragment: () => Object.assign(make("#fragment"), { isFragment: true }),
-    addEventListener() {}, removeEventListener() {}, activeElement: null,
-    documentElement: { dataset: {}, classList: { add() {}, remove() {}, toggle() {}, contains: () => false }, getAttribute: () => null },
-    querySelectorAll: () => [],
-  };
 }
 
 const memory = () => {

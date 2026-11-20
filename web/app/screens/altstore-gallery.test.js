@@ -3,6 +3,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { previewSlot, galleryImage } from "./altstore.js";
+import { tick } from "../fakes.test-helper.js";
 
 // A small fake DOM: heights come from the class (strip 44, picture 360; a sideways .alt-shots is as tall as its
 // tallest picture, anything else the sum of its children).
@@ -57,7 +58,6 @@ function fakePictures() {
 }
 
 const shots = (n) => Array.from({ length: n }, (_, k) => ({ url: `https://x.dev/${k}.png` }));
-const tick = () => new Promise((r) => setTimeout(r, 0));
 
 test("previewSlot: starts as the 44px loading strip, no picture frames", () => withDom(async () => {
   const { image } = fakePictures();

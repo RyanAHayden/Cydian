@@ -2,42 +2,12 @@
 // per guide, Copy, and the lite set (Not Jailbroken) with no jailbreak guide or word in anything it renders.
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { fakeDocument } from "../fakes.test-helper.js";
 
 // Home first, with no document (its screens style themselves at load when there is one).
 const home = await import("./home.js");
 
-// ---- a small fake DOM: enough for nav/ui.js grouped()/row() and guides.js ------------------------------------
-function fakeDom() {
-  const make = (tag, frag = false) => {
-    const e = {
-      tagName: String(tag).toUpperCase(), isFragment: frag, children: [], attrs: {}, listeners: {}, style: {}, dataset: {},
-      parentNode: null, _text: "", _cls: new Set(), hidden: false,
-      get className() { return [...e._cls].join(" "); },
-      set className(v) { e._cls = new Set(String(v).split(/\s+/).filter(Boolean)); },
-      classList: {
-        add: (...c) => c.forEach((x) => e._cls.add(x)), remove: (...c) => c.forEach((x) => e._cls.delete(x)),
-        contains: (c) => e._cls.has(c), toggle: (c, on = !e._cls.has(c)) => { if (on) e._cls.add(c); else e._cls.delete(c); return on; },
-      },
-      get textContent() { return e._text + e.children.map((c) => c.textContent).join(""); },
-      set textContent(v) { e._text = String(v); e.children = []; },
-      setAttribute(k, v) { e.attrs[k] = String(v); }, getAttribute: (k) => e.attrs[k] ?? null,
-      append(...c) {
-        for (const x of c) {
-          if (typeof x === "string") { e._text += x; continue; }
-          if (x.isFragment) { x.children.splice(0).forEach((k) => e.append(k)); continue; }
-          x.parentNode?.children && (x.parentNode.children = x.parentNode.children.filter((y) => y !== x));
-          x.parentNode = e;
-          e.children.push(x);
-        }
-      },
-      addEventListener(t, f) { (e.listeners[t] ??= []).push(f); },
-      click() { return Promise.all((e.listeners.click ?? []).map((f) => f({ currentTarget: e }))); },
-    };
-    return e;
-  };
-  globalThis.document = { createElement: (t) => make(t), createDocumentFragment: () => make("#fragment", true) };
-}
-fakeDom();
+globalThis.document = fakeDocument();
 
 const all = (n, out = []) => { out.push(n); n.children.forEach((c) => all(c, out)); return out; };
 const byClass = (n, c) => all(n).filter((x) => x._cls.has(c));

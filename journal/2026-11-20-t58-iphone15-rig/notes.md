@@ -47,3 +47,16 @@ accessibility tree. The Mac (MBA, macOS 15.8.3, Xcode 26.3) is only needed to re
 - `open ifizbox://sources` and `wake` checked. `type` and `lock-button` not run (no text field focused; didn't want to lock the user's phone while
   they were using it).
 - Behaviour after a phone reboot (DDI remount through `up`).
+
+## Follow-up (T60)
+
+- `install` signs with a native zsign (the pinned commit, built from source) and the explicit ad hoc profile +
+  distribution cert, keeping the bundle ID; the released Lite 0.17.1 IPA signed and installed in about 3 s. A
+  non-IPA with `--as-is` fails with "install failed". (go-ios logs success on stderr, so the exit code is checked.)
+- `type` checked: "tennis" in Search showed OpenTennis.
+- `lock-button` with `/wda/lock` opened Siri setup (a held press on iOS 27). Replaced by
+  `/wda/performIoHidEvent` page 12 usage 48 (consumer power) for 0.05 s: `/wda/locked` true; `wake` -> false,
+  back in the app.
+- Reboot (`ios reboot`): back on USB in about 40 s; `up` remounted the DDI ("reusing existing device-side
+  manifest, skipping Apple TSS") and restarted WDA in 5 s.
+- Opening WebDriverAgent from the Home Screen closes it at once (user saw it): expected, it only runs under XCTest.

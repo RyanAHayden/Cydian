@@ -15,7 +15,7 @@ the Linux desktop's USB, and agents drive it from there with no Mac and no perso
 
 ```sh
 tools/ui-15.sh lock T99
-tools/ui-15.sh T99 install build/iFizBox.ipa   # signed for this phone
+tools/ui-15.sh T99 install build/iFizBox.ipa   # signs it for this phone, then installs
 tools/ui-15.sh T99 launch                      # the brand's bundle ID
 tools/ui-15.sh T99 tap 355 2400                # Sources tab
 tools/ui-15.sh T99 shot sources                # ref/15/screens/sources.png
@@ -32,6 +32,10 @@ In `$IFIZBOX_15_RIG` (default `~/.local/share/ifizbox-rig/`), never in the repo:
   signature; it stays mounted until the phone reboots.
 - `selfIdentity.plist`: go-ios's pairing identity. go-ios reads and writes it in the current directory, so
   `ui-15.sh` runs `ios` from this folder; run it there by hand too, or it makes a new one wherever you are.
+- `zsign` (native, built from the commit `tools/build-zsign-wasm.sh` pins) and `sign/` (`key.pem`, `cert.pem`,
+  `app.mobileprovision`: links to the team's distribution cert and the explicit ad hoc profile that lists this
+  phone). `install` signs every IPA with these, keeping its bundle ID, as the app's own signer does: the explicit
+  profile carries app groups and push, which the wildcard development profile can't. `--as-is` skips signing.
 - `ca-bundle.pem`: the system CA bundle plus Apple Root CA (https://www.apple.com/appleca/AppleIncRootCertificate.cer).
   gs.apple.com's chain ends at Apple's own root, which Linux doesn't trust.
 
@@ -65,5 +69,10 @@ keychain, put it on the search list (`security list-keychains -d user -s tmp.key
 - **While WDA runs, the phone shows WebDriverAgent's black app** if nothing else is in front, and the status bar
   offers "◀ WebDriverAgent…". `launch` brings the app you want forward.
 - **`home` from an app can land on the App Library** page; it's the Home Screen, just not page one.
-- **After a reboot**, the disk image is gone; `up` mounts it again (needs network for gs.apple.com).
+- **After a reboot**, the disk image is gone; `up` mounts it again and restarts WDA (about 5 s).
+- **Don't open WebDriverAgent from the Home Screen**: it only runs under the test runner and closes at once
+  otherwise. That's normal.
+- **`lock-button` is a short side-button press** (an IOHID event). WDA's own `/wda/lock` holds the button, which
+  on iOS 27 opens Siri setup instead of locking.
+- **Other phones on the same USB are fine**: every `ios` call names this phone's UDID (`IFIZBOX_15_UDID`).
 - **Developer Mode** must stay on, and the phone must be trusted by this desktop (usbmuxd pairing record).

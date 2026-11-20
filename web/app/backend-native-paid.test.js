@@ -70,6 +70,37 @@ test("device.info gives the UDID and model, and says when the UDID can't be read
   await assert.rejects(none.native.call("device.info"), /^Error: device: /);
 });
 
+test("B183: sideload build with no UDID anywhere: the price still shows, with why no UDID went", async (t) => {
+  const { native, client, vendor } = setup(t, { mode: "sideload", device: null });
+  await assert.rejects(native.call("device.info"), /^Error: device: this iPhone's UDID isn't known: pair this iPhone/);
+  // no UDID at all: the price still comes, saying why no UDID went
+  const info = await client.packageInfo(ID);
+  assert.equal(info.price, "$1.99");
+  assert.match(info.deviceError, /pair this iPhone/);
+  assert.deepEqual(vendor.log.at(-1).body, {});
+  await assert.rejects(client.authenticateUrl(), /pair this iPhone/);
+});
+
+test("B183: the fallback UDID goes to the vendor for the price and for sign-in", async (t) => {
+  const fx = makeFixture();
+  t.after(fx.cleanup);
+  const vendor = createFakeVendor({ packages: { [ID]: { price: "$1.99", version: "1.0-1" } } });
+  const native = createFakeNative({ prefix: fx.prefix, remote: fx.remote, mode: "sideload", vendors: [vendor],
+    device: null, phoneUdid: "00008030-001234560E01802E" });
+  assert.deepEqual(await native.call("device.info"), { udid: "00008030-001234560E01802E", model: "iPhone14,2" });
+  const request = async (req) => {
+    const r = await native.call("net.request", req);
+    let json = null;
+    try { json = JSON.parse(Buffer.from(r.body, "base64").toString("utf8")); } catch { json = null; }
+    return { status: r.status, json };
+  };
+  const client = createPaymentClient({ base: vendor.base, request, device: () => native.call("device.info"),
+    credentials: createCredentialStore({ storage: memoryStorage() }) });
+  assert.deepEqual(await client.packageInfo(ID), { price: "$1.99", purchased: false, available: true });
+  assert.deepEqual(vendor.log.at(-1).body, { udid: "00008030-001234560E01802E", device: "iPhone14,2" });
+  assert.match(await client.authenticateUrl(), /authenticate\?udid=00008030-001234560E01802E&model=iPhone14%2C2$/);
+});
+
 test("sign in, buy and install: the secret only in the Keychain, the .deb installed through install-paid", async (t) => {
   const s = setup(t);
   const { client, native, vendor, storage, status, paidDir } = s;

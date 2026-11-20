@@ -189,8 +189,15 @@ export function createPaymentClient({ base, request, device = () => ({}), creden
     return reply.data;
   }
 
-  async function who() {
-    const d = (await device()) ?? {};
+  // B183: `lenient` (the price lookup, where udid and device are optional): a device() that fails (the shell knows
+  // no UDID yet) sends the request without them instead of failing; `onDeviceError(e)` hears why.
+  async function who({ lenient = false, onDeviceError = null } = {}) {
+    let d;
+    try { d = (await device()) ?? {}; } catch (e) {
+      if (!lenient) throw e;
+      d = {};
+      onDeviceError?.(e);
+    }
     const c = (await credentials?.load(vendor)) ?? {};
     return { udid: d.udid, device: d.model, token: c.token };
   }
@@ -216,7 +223,14 @@ export function createPaymentClient({ base, request, device = () => ({}), creden
       const w = await who();
       try { if (w.token) await send("sign_out", { token: w.token }); } finally { await credentials?.forget(vendor); }
     },
-    packageInfo: async (packageId) => parsePackageInfo(await send("package_info", { ...(await who()), packageId })),
+    // B183: answers even when device() fails; `deviceError` (the shell's message) is then set, saying why no UDID
+    // went (and why Sign In and Buy will ask for one).
+    async packageInfo(packageId) {
+      let deviceError = null;
+      const w = await who({ lenient: true, onDeviceError: (e) => { deviceError = String(e?.message ?? e); } });
+      const info = parsePackageInfo(await send("package_info", { ...w, packageId }));
+      return deviceError ? { ...info, deviceError } : info;
+    },
     async purchase(packageId) {
       const c = (await credentials?.load(vendor)) ?? {};
       return parsePurchase(await send("purchase", { ...(await who()), secret: c.secret, packageId }));

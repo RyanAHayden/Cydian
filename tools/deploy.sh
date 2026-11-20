@@ -6,8 +6,8 @@
 #
 # tools/publish.sh runs it right after it tags a release; run it by hand to redeploy a tag (a rollback, or a deploy
 # that failed). It checks the tag out in a clean temporary worktree, writes web/app/build.json there
-# (tools/buildinfo.sh) and runs `npx wrangler deploy -c wrangler.ifizbox.toml` in its worker/, so nothing on disk
-# here (untracked files, a branch's work) reaches the site. Needs wrangler logged in to the account that owns the
+# (tools/buildinfo.sh, naming the built commit under a source.json-only tag commit) and runs
+# `npx wrangler deploy -c wrangler.ifizbox.toml` in its worker/, so nothing on disk here (untracked files, a branch's work) reaches the site. Needs wrangler logged in to the account that owns the
 # Worker (`npx wrangler login`; `npx wrangler whoami` shows it). --dry-run builds the Worker (wrangler deploy
 # --dry-run) and uploads nothing.
 #   IFIZBOX_WRANGLER  the wrangler npm package to run (default wrangler@4.164.0)
@@ -43,7 +43,14 @@ tmp=$(mktemp -d)
 trap 'git worktree remove --force "$tmp/w" >/dev/null 2>&1 || true; rm -rf "$tmp"' EXIT
 git worktree add -q --detach "$tmp/w" "$sha"
 echo "deploy: $tag ($sha) to https://$BRAND_DOMAIN${dry:+ (dry run: nothing is uploaded)}"
-(cd "$tmp/w" && tools/buildinfo.sh)
+# release.sh --tag-source tags the built commit plus a commit adding web/app/source.json: name the built commit in
+# build.json, so the site shows the same build number and commit as the release's apps
+built=$sha
+if [ "$(git rev-list --parents -n 1 "$sha" | wc -w)" = 2 ] &&
+   [ "$(git diff --name-only "$sha^" "$sha")" = web/app/source.json ]; then
+  built=$(git rev-parse "$sha^")
+fi
+(cd "$tmp/w" && tools/buildinfo.sh --rev "$built")
 (cd "$tmp/w/worker" && npx --yes "$wrangler" deploy -c wrangler.ifizbox.toml "${dry[@]}") ||
   die "wrangler deploy of $tag failed (logged in? npx wrangler whoami)"
 if [ ${#dry[@]} = 0 ]; then echo "deploy: https://$BRAND_DOMAIN now runs $tag"

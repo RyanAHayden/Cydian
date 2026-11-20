@@ -125,6 +125,31 @@ class Deploy(unittest.TestCase):
         self.assertFalse(os.path.exists(os.path.join(self.repo, "web/app/build.json")))
         self.assertNotIn(".git/worktrees/w", git(self.repo, "worktree", "list"))
 
+    def test_source_only_tag_counts_the_built_commit(self):
+        # release.sh --tag-source tags the built commit plus web/app/source.json: build.json names the built commit,
+        # so the site's build number and commit match the release's apps
+        built = git(self.repo, "rev-parse", "v9.9.9")
+        git(self.repo, "checkout", "-q", "--detach", built)
+        with open(os.path.join(self.repo, "web/app/source.json"), "w") as f:
+            f.write("{}\n")
+        git(self.repo, "add", "web/app/source.json")
+        git(self.repo, "commit", "-q", "-m", "source")
+        git(self.repo, "tag", "v9.9.10")
+        git(self.repo, "checkout", "-q", "main")
+        r = self.deploy("v9.9.10")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        info = json.loads(re.search(r"build.json=(.*)\n", self.calls()).group(1))
+        self.assertEqual(info["commit"], built[:len(info["commit"])])
+        self.assertEqual(info["build"], git(self.repo, "rev-list", "--count", built))
+        self.assertEqual(info["files"], ["index.html", "source.json"])  # the tag's files all the same
+
+    def test_other_tag_counts_the_tag(self):
+        r = self.deploy("v9.9.9")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        info = json.loads(re.search(r"build.json=(.*)\n", self.calls()).group(1))
+        self.assertEqual(info["build"], git(self.repo, "rev-list", "--count", "v9.9.9"))
+        self.assertEqual(info["commit"], self.tagged[:len(info["commit"])])
+
     def test_dry_run(self):
         r = self.deploy("v9.9.9", "--dry-run")
         self.assertEqual(r.returncode, 0, r.stderr)

@@ -123,6 +123,10 @@ The app arrives with your certificate, sources and settings, and updates itself.
 
 No certificate? [docs/developer-account.md](docs/developer-account.md).
 
+Signed apps keep their own bundle ID, so they replace the originals. With a profile that has Push (one explicit App ID
+in an Ad Hoc profile covers every app, your own or a signing service's), they get their own notifications:
+**Home > User Guides > Notifications for Signed Apps**.
+
 Also on Feather, AltStore or SideStore: `https://ifizbox.com/repo/source.json`
 
 <br clear="right">

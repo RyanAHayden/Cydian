@@ -290,3 +290,17 @@ test("C15: the signing page is named the build's way in answers, steps and rows"
   assert.equal(g.linkRow("signing").label, "Settings > Signing", "website");
   assert.equal(g.linkRow("signing", "jailbreak").label, "Settings > Signing");
 });
+
+// Notifications for Signed Apps says how push works now: the Info.plist ID gets it whoever signed, one App ID with
+// Push covers every app, a signing service's profile works, and a renamed copy loses its notifications.
+test("Notifications guide: one Push App ID for every app, any signer, renamed copies lose it", () => {
+  const page = draw(["guides", "keep-bundle-id"], { lite: true, store: { getItem: () => null, setItem: () => {} } });
+  const text = page.textContent;
+  assert.match(text, /whoever signed it/);
+  assert.match(text, /One such App ID covers every app/);
+  assert.match(text, /signing service's \.p12 and Push profile/);
+  assert.match(text, /development profile gets test pushes only/);
+  assert.match(text, /renamed copy and gets no notifications/);
+  assert.match(text, /enough for every app's notifications/);
+  assert.equal(text.includes("One App ID per app:"), false, "no longer reads as one App ID per app being needed");
+});

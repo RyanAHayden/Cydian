@@ -162,11 +162,16 @@ class LaunchThemes(unittest.TestCase):
         self.assertIsNotNone(m, name)
         return " ".join(m.group(1).split())
 
+    def token(self, value):
+        """C44's era tokens: a bar's background is var(--x), its layers in ios6.css's :root."""
+        m = re.fullmatch(r"\s*var\((--[\w-]+)\)\s*", value)
+        return self.var(self.ios6, m.group(1)[2:]) if m else value
+
     def css_theme(self, key):
         """What the CSS says the theme's frame is, in make.THEMES's terms."""
         light_nav = self.block(self.ios6, ".navbar")
-        light_nav = re.search(r"background:(.*?);", light_nav, re.S).group(1)
-        light_tab = re.search(r"background:(.*?);", self.block(self.ios6, ".tabbar"), re.S).group(1)
+        light_nav = self.token(re.search(r"background:(.*?);", light_nav, re.S).group(1))
+        light_tab = self.token(re.search(r"background:(.*?);", self.block(self.ios6, ".tabbar"), re.S).group(1))
         if key == "classic":
             root = self.block(self.ios6, ":root")
             pins = (hex6(self.var(root, "pin-dark")), hex6(self.var(root, "pin-light")))
@@ -224,7 +229,8 @@ class LaunchThemes(unittest.TestCase):
         css = self.ios6 + self.pal
         rules = re.findall(r"(?m)^([^{}\n]*\.tabbar::before[^{]*)\{([^}]*)\}", css)
         self.assertEqual(len(rules), 1, rules)
-        self.assertIn("rgba(0,0,0,.18)", rules[0][1].replace(" ", ""))
+        bg = re.search(r"background:(.*?);", rules[0][1], re.S).group(1)
+        self.assertIn("rgba(0,0,0,.18)", self.token(bg).replace(" ", ""))
 
     def test_themes_dir_is_what_make_writes(self):
         """native/launch/themes/ is make.py's output (rerun native/launch/make.py)."""

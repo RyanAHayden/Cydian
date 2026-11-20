@@ -13,10 +13,10 @@
 // comes back after the user was away (they answered iOS). Every banner also goes when the page comes back.
 import { detectMode } from "../core/settings.js";
 import { NAME } from "../brand.js";
+import { EASE, DURATION } from "./motion.js";
 
 export const AUTO_MS = 5000;
 export const ACTION_MS = 8000;
-const EASE = "cubic-bezier(.25,.1,.25,1)";
 const SWIPE_PX = 16;   // an upward drag past this dismisses; a move under TAP_PX is still a tap
 const TAP_PX = 8;
 
@@ -111,7 +111,7 @@ function present({ title = NAME, message = "", icon = ownIcon(), duration = 0, a
   const line = ms ? Object.assign(document.createElement("div"), { className: "banner-timer" }) : null;
   if (line) b.append(line);
   host(document).append(b);
-  b.animate([{ transform: "translateY(-100%)" }, { transform: "none" }], { duration: 300, easing: EASE });
+  b.animate([{ transform: "translateY(-100%)" }, { transform: "none" }], { duration: DURATION, easing: EASE });
 
   let gone = false;
   // The line running out is the timer: pausing it pauses the banner, its end hides it.

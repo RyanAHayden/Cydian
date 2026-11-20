@@ -16,6 +16,8 @@
 //   cls                          more classes on the .sheet ("confirm-sheet", "console progress-page")
 //   bodyCls                      more classes on the .sheet-body
 //   escape                       false: Escape does nothing (sheets whose close has more to do than slide down)
+import { EASE, DURATION, SHEET_IN } from "./motion.js";
+
 export function showSheet({ title = "", body = null, onClose = () => {}, left = null, right, cls = "", bodyCls = "", escape = true } = {}) {
   const doc = globalThis.document;
   const make = (tag, className, text) => {
@@ -51,8 +53,7 @@ export function showSheet({ title = "", body = null, onClose = () => {}, left = 
   sheet.append(bar, content);
   doc.body.append(sheet);
 
-  const ease = "cubic-bezier(.25,.1,.25,1)";
-  sheet.animate?.([{ transform: "translateY(100%)" }, { transform: "none" }], { duration: 350, easing: ease });
+  sheet.animate?.([{ transform: "translateY(100%)" }, { transform: "none" }], { duration: SHEET_IN, easing: EASE });
 
   let gone = null;
   const onKey = (e) => { if (e.key === "Escape") close(); };
@@ -64,7 +65,7 @@ export function showSheet({ title = "", body = null, onClose = () => {}, left = 
         sheet.remove();
         try { onClose(); } finally { resolve(); }
       };
-      const a = sheet.animate?.([{ transform: "none" }, { transform: "translateY(100%)" }], { duration: 300, easing: ease, fill: "forwards" });
+      const a = sheet.animate?.([{ transform: "none" }, { transform: "translateY(100%)" }], { duration: DURATION, easing: EASE, fill: "forwards" });
       if (a?.finished) a.finished.then(end, end); else end();
     });
     return gone;

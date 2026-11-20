@@ -26,6 +26,7 @@ import { storedZip } from "../core/freecert.js";
 import { parseProfile } from "../core/signing.js";
 import { storedUdid } from "./signing.js";
 import { MERGED_PAGE } from "../core/signingpage.js";
+import { loadStyle } from "../nav/motion.js";
 
 export const FREE_KEY = "ifizbox.freeid";
 const ANISETTE_KEY = "ifizbox.freeid.anisette";
@@ -378,13 +379,7 @@ function readyView(ctx, saved) {
 }
 
 // The stylesheet, once (the checklist's spinner and ticks), from this module's own folder.
-let styled = false;
-function style() {
-  if (styled || typeof document === "undefined") return;
-  styled = true;
-  const link = Object.assign(document.createElement("link"), { rel: "stylesheet", href: new URL("../freeid.css", import.meta.url).href });
-  document.head.append(link);
-}
+function style() { loadStyle("freeid.css"); }
 
 // ---- F254i: Developer Mode and Trust, step by step ----
 // The Ready page's "Before the First Install" opens this page; it goes away once an app on this route installed fine

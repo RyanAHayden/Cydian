@@ -15,12 +15,13 @@
 //   s.reset(row)                      // a recycled row (vlist.js rebinds it): drop any drag at once
 //   playHint(row, { distance, duration })  // the first-run hint: eases left once and back (WAAPI, transform only)
 import { haptic } from "./haptic.js";
+import { EASE } from "./motion.js";
 
 export const EDGE = 30;   // px from the left edge where the back swipe owns the touch
 export const SLOP = 10;   // px before deciding between a swipe and a scroll
 export const ARM = 0.3;   // of the row's width: past this, letting go runs the action
 const BAND = 0.5;         // of the width: how far past ARM the rubber band can ever stretch
-const SPRING = "transform .32s cubic-bezier(.25,.1,.25,1)";
+const SPRING = `transform .32s ${EASE}`;
 
 // What a move of (dx, dy) from the touch means so far: "wait" (inside the slop or not clear yet), "scroll" (mostly
 // vertical: the list's), "none" (rightward: the back-swipe side, never ours) or "swipe" (clearly leftward).

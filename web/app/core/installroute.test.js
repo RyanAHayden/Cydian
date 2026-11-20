@@ -176,3 +176,35 @@ test("Tailscale's footer warns ahead of key expiry", () => {
   assert.match(tailscaleFooter({ signedIn: true, keyExpiry: "2027-05-01T00:00:00Z", address: "100.1.2.3" }, now), /100\.1\.2\.3/);
   assert.match(tailscaleFooter({ signedIn: false }, now), /joins your tailnet/);
 });
+
+// B120: the way to connect is decided from the VPN apps installed (idevice.vpnApps) before sending anyone anywhere.
+test("vpnRoute: one app goes its way, both ask until Connect With says, neither needs LocalDevVPN", async () => {
+  const { vpnRoute, connectAlert, LOCALDEVVPN_STORE, TAILSCALE_URL } = await import("./installroute.js");
+  assert.equal(vpnRoute({ localdevvpn: true, tailscale: false }), "localdevvpn");
+  assert.equal(vpnRoute({ localdevvpn: false, tailscale: true }), "tailscale");
+  assert.equal(vpnRoute({ localdevvpn: false, tailscale: true }, "localdevvpn"), "tailscale"); // the only one there
+  assert.equal(vpnRoute({ localdevvpn: true, tailscale: true }), "ask");
+  assert.equal(vpnRoute({ localdevvpn: true, tailscale: true }, "auto"), "ask");
+  assert.equal(vpnRoute({ localdevvpn: true, tailscale: true }, "tailscale"), "tailscale");
+  assert.equal(vpnRoute({ localdevvpn: true, tailscale: true }, "localdevvpn"), "localdevvpn");
+  assert.equal(vpnRoute({ localdevvpn: false, tailscale: false }), "none");
+  assert.equal(vpnRoute({}), "none");
+  assert.equal(vpnRoute(null), "localdevvpn"); // an older shell: as before
+  assert.equal(connectAlert("localdevvpn").title, "Turn On LocalDevVPN");
+  assert.equal(connectAlert("localdevvpn").buttons[connectAlert("localdevvpn").open], "Open LocalDevVPN");
+  for (const r of ["tailscale", "ask", "none"]) assert.equal(connectAlert(r), null);
+  assert.match(LOCALDEVVPN_STORE, /^https:\/\/apps\.apple\.com\/app\/localdevvpn\/id6755608044$/);
+  assert.equal(TAILSCALE_URL, "tailscale://");
+  assert.equal(setupState(undefined), "checking"); // nothing asked yet: the page draws with a spinner
+});
+
+test("the VPN apps' schemes match the native side and Info-sideload.plist", async () => {
+  const swift = readFileSync(new URL("../../../native/sideload/idevice/IDeviceBridge.swift", import.meta.url), "utf8");
+  const plist = readFileSync(new URL("../../../native/Info-sideload.plist", import.meta.url), "utf8");
+  const { TAILSCALE_URL } = await import("./installroute.js");
+  assert.match(swift, /localDevVPNScheme = "localdevvpn:\/\/"/);
+  assert.ok(swift.includes(`tailscaleScheme = "${TAILSCALE_URL}"`));
+  assert.match(swift, /b\.on\("idevice\.vpnApps"\)/);
+  const queries = /<key>LSApplicationQueriesSchemes<\/key><array>(.*?)<\/array>/.exec(plist)[1];
+  for (const s of ["localdevvpn", "tailscale"]) assert.ok(queries.includes(`<string>${s}</string>`), s);
+});

@@ -136,10 +136,12 @@ export function pairState(status) {
 // This iPhone's page (screens/installroute.js drawPair), what it shows from idevice.status and the pairing under way:
 //   "paired"   Paired with a check, Check Connection, Forget Pairing
 //   "file"     older iOS: Import Pairing File
-//   "connect"  iOS 27, the VPN is off: Turn On … (alert and row), rechecked when the app comes back
+//   "checking" nothing known yet: drawn at once, with a spinner, while idevice.status answers
+//   "connect"  iOS 27, the VPN is off: the way to connect (vpnRoute), rechecked when the app comes back
 //   "pairing"  iOS 27, the VPN is on: pairing runs by itself, the code big at the top, then PAIR_GUIDE
 export function setupState(status, pairing = null) {
   if (pairing) return "pairing";
+  if (status === undefined) return "checking";
   const s = pairState(status);
   if (s !== "phone") return s;
   return vpnOn(status) ? "pairing" : "connect";
@@ -148,6 +150,36 @@ export function setupState(status, pairing = null) {
 // A way to reach this iPhone: LocalDevVPN (10.7.0.1 reachable, idevice.status localDevVPN) or Tailscale (the shell's
 // tailscale.use: its VPN on and signed in, or Connect With: Tailscale).
 export function vpnOn(status) { return Boolean(status?.localDevVPN || status?.tailscale?.use); }
+
+// ---- Which VPN app to pair and install through, decided before sending anyone to an app
+
+// LocalDevVPN's App Store page (App Store ID 6755608044, com.jkcoxson.LocalDevVPN), offered when no VPN app is
+// installed, and the Tailscale app's URL scheme (Tailscale's own deep links, tailscale/tailscale tka/deeplink.go).
+export const LOCALDEVVPN_STORE = "https://apps.apple.com/app/localdevvpn/id6755608044";
+export const TAILSCALE_URL = "tailscale://";
+
+// The way to connect from idevice.vpnApps ({localdevvpn, tailscale}: installed or not) and Connect With:
+//   "localdevvpn"  only LocalDevVPN (or both, with Connect With: LocalDevVPN), or an older shell with no answer
+//   "tailscale"    only Tailscale (or both, with Connect With: Tailscale): its Sign In and Open Tailscale
+//   "ask"          both, nothing chosen yet: the page asks, and the answer is kept as Connect With
+//   "none"         neither: LocalDevVPN is needed (Install LocalDevVPN), Tailscale named as the other way
+export function vpnRoute(apps, connect = "auto") {
+  if (!apps || typeof apps !== "object") return "localdevvpn";
+  const ldv = Boolean(apps.localdevvpn), ts = Boolean(apps.tailscale);
+  if (ldv && ts) return connect === "localdevvpn" || connect === "tailscale" ? connect : "ask";
+  if (ts) return "tailscale";
+  return ldv ? "localdevvpn" : "none";
+}
+
+// The Turn On alert shown once a visit for the LocalDevVPN way (null for the others: their page says what to do).
+export function connectAlert(route) {
+  if (route !== "localdevvpn") return null;
+  return {
+    title: `Turn On ${VPN}`,
+    message: `${NAME} pairs with this iPhone and installs through ${VPN}. Turn it on, then come back here.`,
+    buttons: ["Cancel", `Open ${VPN}`], open: 1,
+  };
+}
 
 export const CONNECT_ALERT = {
   title: `Turn On ${vpnList()}`,

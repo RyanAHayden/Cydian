@@ -11,6 +11,9 @@
 //   idevice.verify        connects once: {ok: true, kind} or "not_paired:/connect_failed:/bad_pairing: ..."
 //   idevice.forget        deletes the pairing -> status
 //   idevice.openLocalDevVPN  opens the LocalDevVPN app ({opened: false} when it isn't installed)
+//   idevice.vpnApps       {localdevvpn: bool, tailscale: bool}: which VPN apps are installed (canOpenURL on their
+//                         schemes, listed in Info-sideload.plist LSApplicationQueriesSchemes); the page picks the
+//                         way to connect from it (web/app/core/installroute.js vpnRoute)
 // Installing through this route is IDevice.install(_:progress:), called by the install run.
 import Foundation
 import UIKit
@@ -20,6 +23,9 @@ enum IDeviceBridge {
     private static var pairing: IDevice.PairCancel? // on IDevice.queue's callers; guarded by lock
     private static let lock = NSLock()
     static let localDevVPNScheme = "localdevvpn://" // LocalDevVPN's URL scheme, to open it
+    // The Tailscale app's URL scheme: Tailscale's own deep links use it (tailscale/tailscale tka/deeplink.go,
+    // DeeplinkTailscaleURLScheme = "tailscale").
+    static let tailscaleScheme = "tailscale://"
     static let codeNoteID = "ifizbox-pairing-code"
     private static var now: [String: Any] = ["active": false] // idevice.pairState; guarded by lock
 
@@ -98,6 +104,13 @@ enum IDeviceBridge {
             DispatchQueue.main.async {
                 guard AppMode.current != .jailbreak, let u = URL(string: localDevVPNScheme) else { return c.reply(["opened": false], nil) }
                 UIApplication.shared.open(u, options: [:]) { ok in c.reply(["opened": ok], nil) }
+            }
+        }
+        b.on("idevice.vpnApps") { c in
+            DispatchQueue.main.async { // canOpenURL is main-thread UIKit
+                guard AppMode.current != .jailbreak else { return Apt.reply(c, nil, "jailbreak: the jailbreak app installs IPAs through its helper") }
+                let has = { (s: String) in URL(string: s).map { UIApplication.shared.canOpenURL($0) } ?? false }
+                c.reply(["localdevvpn": has(localDevVPNScheme), "tailscale": has(tailscaleScheme)], nil)
             }
         }
     }

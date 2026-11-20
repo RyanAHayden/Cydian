@@ -3,7 +3,9 @@
 //   installation       the merged page (screens/settings.js draws it, with installationBlock below at its top):
 //                      the choice, then (This iPhone) Pairing and the VPN's state
 //   installation/pair  This iPhone, one page that runs by itself (core setupState): one sentence on what it gives,
-//                      then the VPN check (Turn On … with Open LocalDevVPN, rechecked when the app comes back), then
+//                      drawn at once with a spinner while it checks, then the VPN: which way is decided from the VPN
+//                      apps installed (core vpnRoute: LocalDevVPN's Open, Tailscale's Sign In and Open, a choice when
+//                      both are, Install LocalDevVPN when neither is; rechecked when the app comes back), then
 //                      pairing starts on its own: the 6-digit code big at the top and where to type it, a line and a
 //                      screenshot a step; it keeps pairing while the page is open. Paired: a check, Check Connection
 //                      (Pair Again when it fails) and Forget. Older iOS: Import Pairing File.
@@ -15,7 +17,8 @@ import { format, settingsRoute } from "../router.js";
 import { showAlert } from "../nav/alert.js";
 import { copyText } from "../nav/menu.js";
 import { toBase64 } from "../core/signing.js";
-import { ROUTE_KEY, ROUTE_OPTIONS, VPNS, VPN_POLL, vpnList, vpnOn, IPHONE_INTRO, setupState, CONNECT_ALERT, PAIR_GUIDE, pairEvent, pairFooter, pairFromNative, pinText, PAIR_STEPS, verifyFailure,
+import { vpnRoute, connectAlert, LOCALDEVVPN_STORE, TAILSCALE_URL } from "../core/installroute.js";
+import { ROUTE_KEY, ROUTE_OPTIONS, VPNS, VPN_POLL, vpnList, vpnOn, IPHONE_INTRO, setupState, PAIR_GUIDE, pairEvent, pairFooter, pairFromNative, pinText, PAIR_STEPS, verifyFailure,
   CONNECT_OPTIONS, connectFooter, tailscaleFooter, tailscaleTestResult } from "../core/installroute.js";
 import { ringStyle } from "../core/installroute.js";
 import { NAME } from "../brand.js";
@@ -94,14 +97,20 @@ export function installationBlock({ store, native = globalThis.ifizboxNative, al
   return box;
 }
 
+// B120: tapping This iPhone acts at once: it is checked when the status already read says paired, and otherwise the
+// pair page opens straight away (it draws with a spinner, and checks This iPhone itself once it finds a pairing),
+// instead of waiting on idevice.status with nothing on screen.
+export function pickRoute(v, known, { set, open }) {
+  if (v !== "iphone") return set(v);
+  if (known?.paired) return set("iphone");
+  return open("pair");
+}
+
 async function paintInstallation(el, { store, native, alert, redraw }) {
   const choice = store.get(ROUTE_KEY);
+  let known = null; // idevice.status once read, for the tap above
   const paint = (st) => el.replaceChildren(grouped(installationGroups(choice, st, {
-    pick: async (v) => {
-      if (v !== "iphone") return store.set(ROUTE_KEY, v);
-      const s = await status(native);
-      if (s?.paired) store.set(ROUTE_KEY, "iphone"); else goTo("pair");
-    },
+    pick: (v) => pickRoute(v, known, { set: (r) => store.set(ROUTE_KEY, r), open: goTo }),
     openVPN: () => openVPN(native, alert),
     connect: async (v) => { await call(native, "tailscale.setConnect", { value: v }).catch(() => {}); redraw(); },
     signIn: () => tailscaleSignIn(native, alert, redraw),
@@ -115,10 +124,11 @@ async function paintInstallation(el, { store, native, alert, redraw }) {
     busy: signingIn,
   })));
   paint(null);
-  if (choice === "iphone") paint(await status(native));
+  known = await status(native); // read for the Signing Server choice too, so a tap on This iPhone knows the pairing
+  if (choice === "iphone") paint(known);
 }
 
-async function tailscaleSignIn(native, alert, redraw) {
+async function tailscaleSignIn(native, alert, redraw, done = `${NAME} is on your tailnet. Tap Test Connection to check it reaches this iPhone.`) {
   if (signingIn) return;
   signingIn = "Starting…";
   redraw();
@@ -131,7 +141,7 @@ async function tailscaleSignIn(native, alert, redraw) {
     });
     signingIn = null;
     redraw();
-    await alert({ title: "Signed In", message: `${NAME} is on your tailnet. Tap Test Connection to check it reaches this iPhone.`, buttons: ["OK"] });
+    await alert({ title: "Signed In", message: done, buttons: ["OK"] });
   } catch (e) {
     signingIn = null;
     redraw();
@@ -162,7 +172,10 @@ let visit = null; // this visit of the page: { started, asked, failed, poll }; n
 
 // The page's groups for `state` (core setupState) and the pairing `p` (pure, for tests). The code and the steps
 // with their screenshots are drawn after the groups marked `pin` and `guide` (drawPair).
-export function setupGroups(state, st, p, { openVPN = () => {}, retry = () => {}, check = () => {}, forget = () => {}, failed = false } = {}) {
+// "checking" is drawn at once while idevice.status answers, with a spinner (`spinner` marks the group). "connect"
+// draws the way to connect `vpn` (core vpnRoute) with connectGroups.
+export function setupGroups(state, st, p, { openVPN = () => {}, retry = () => {}, check = () => {}, forget = () => {}, failed = false,
+  vpn = "localdevvpn", choose = () => {}, signIn = () => {}, openTailscale = () => {}, install = () => {}, busy = null } = {}) {
   const intro = { header: "Install on This iPhone", footer: IPHONE_INTRO };
   if (state === "paired") {
     return [intro,
@@ -172,17 +185,77 @@ export function setupGroups(state, st, p, { openVPN = () => {}, retry = () => {}
       { rows: [{ label: "Forget Pairing", cls: "sign-import", onClick: forget }] }];
   }
   if (state === "file") return [intro, { header: "Pair This iPhone", footer: PAIR_STEPS.file.map((s, i) => `${i + 1}. ${s}`).join(" ") }];
-  const conn = { rows: [{ label: VPN, detail: state === "connect" ? vpnDetail(st) : "On" }] };
-  if (state === "connect") {
-    conn.rows.push({ label: `Open ${VPN}`, cls: "sign-import", onClick: openVPN });
-    conn.footer = `Turn on ${vpnList()} to pair. This page goes on by itself when it's on.`;
-    return [intro, conn];
-  }
+  if (state === "checking") return [intro, { spinner: "Checking…" }];
+  if (state === "connect") return [intro, ...connectGroups(vpn, st, { openVPN, choose, signIn, openTailscale, install, busy })];
+  const conn = { rows: [{ label: VPN, detail: "On" }] };
   const line = failed && !p ? `Pairing stopped.` : p ? pairFooter(p) : "Starting…";
   return [intro, conn,
     { header: "Pairing Code", pin: true },
     { header: "Where to Type It", guide: true, footer: line },
     ...(failed && !p ? [{ rows: [{ label: "Try Again", cls: "sign-import", onClick: retry }] }] : [])];
+}
+
+// The VPN is off: what to turn on, from the VPN apps installed (core vpnRoute's answer `vpn`).
+//   localdevvpn  its state and Open LocalDevVPN
+//   tailscale    Sign In (or its state once signed in) and Open Tailscale
+//   ask          both installed: Connect With, LocalDevVPN or Tailscale; the answer is kept
+//   none         neither: Install LocalDevVPN (its App Store page), Tailscale named as the other way
+export function connectGroups(vpn, st, { openVPN = () => {}, choose = () => {}, signIn = () => {}, openTailscale = () => {}, install = () => {}, busy = null } = {}) {
+  const goesOn = "This page goes on by itself when it's on.";
+  if (vpn === "ask") {
+    return [{
+      header: "Connect With",
+      rows: VPNS.map((label) => ({ label, onClick: () => choose(label.toLowerCase()) })),
+      footer: `${VPNS.join(" and ")} are both installed. Pick the one ${NAME} pairs and installs through; Connect With in Installation & Signing changes it later.`,
+    }];
+  }
+  if (vpn === "tailscale") {
+    const ts = st?.tailscale ?? null;
+    const rows = busy
+      ? [{ label: "Signing In…", detail: busy }]
+      : ts?.signedIn ? [{ label: "Tailscale", detail: ts.address ? "On" : "Off" }] : [{ label: "Sign In", cls: "sign-import", onClick: signIn }];
+    rows.push({ label: "Open Tailscale", cls: "sign-import", onClick: openTailscale });
+    return [{
+      header: "Tailscale",
+      rows,
+      footer: ts?.signedIn ? `Turn on the Tailscale app's VPN. ${goesOn}` : `Sign ${NAME} in to your tailnet, then turn on the Tailscale app's VPN. ${goesOn}`,
+    }];
+  }
+  if (vpn === "none") {
+    return [{
+      rows: [{ label: VPN, detail: "Not Installed" }, { label: `Install ${VPN}`, cls: "sign-import", onClick: install }],
+      footer: `${NAME} pairs with this iPhone and installs through ${VPN}, a free app. The other way is Tailscale: install the Tailscale app and sign in to it. This page checks again when you come back.`,
+    }];
+  }
+  return [{
+    rows: [{ label: VPN, detail: vpnDetail(st) }, { label: `Open ${VPN}`, cls: "sign-import", onClick: openVPN }],
+    footer: `Turn on ${VPN} to pair. ${goesOn}`,
+  }];
+}
+
+// setupGroups' sections as DOM: the code after the `pin` group, the steps after the `guide` group's header, and the
+// grey spinner with its line in the `spinner` group (packages.css .loading).
+export function pairSections(sections) {
+  const frag = grouped(sections);
+  const groups = [...frag.children];
+  sections.forEach((s, i) => {
+    if (s.pin) groups[i].append(el("p", "pair-code", pinText(pairing?.pin) || "––– –––"));
+    if (s.guide) groups[i].querySelector(".group-header").after(pairGuide());
+    if (s.spinner) {
+      const wait = el("div", "loading");
+      wait.setAttribute("aria-busy", "true");
+      wait.append(el("span", "loading-spinner"), el("span", null, s.spinner));
+      groups[i].append(wait);
+    }
+  });
+  return frag;
+}
+
+// Opens another app or its App Store page; says so when iOS couldn't.
+async function openApp(native, alert, url, name) {
+  let opened = false;
+  try { opened = (await call(native, "app.openURL", { url }))?.opened === true; } catch { /* below */ }
+  if (!opened) await alert({ title: `Couldn't Open ${name}`, message: name === "Tailscale" ? "Get the Tailscale app from the App Store, sign in and turn it on." : "Try again.", buttons: ["OK"] });
 }
 
 // The steps: a short line each, and the screenshot of the Settings row to tap, ringed.
@@ -224,7 +297,7 @@ async function reread() {
   const now = pairFromNative(st);
   if (now && pairing) { pairing = now; redraw(); } // not active: idevice.pair's reply settles it
 }
-function leave() {
+export function leave() { // also for tests: ends a visit (its VPN poll) without a hashchange
   if (visit?.poll) clearInterval(visit.poll);
   visit = null;
   if (pairing && shown) call(shown.native, "idevice.pairCancel").catch(() => {});
@@ -235,15 +308,23 @@ if (typeof document !== "undefined" && typeof window !== "undefined") {
   window.addEventListener("hashchange", () => { if (!onPairPage()) leave(); });
 }
 
+async function vpnApps(native) { try { return await call(native, "idevice.vpnApps"); } catch { return null; } }
+
 async function drawPair(box, { store, native, alert, redraw }) {
   shown = { native, redraw };
   visit ??= { started: false, asked: false, failed: false, poll: null };
   const v = visit;
+  // B120: the page draws at once, a spinner while idevice.status answers (a redraw keeps what is on screen).
+  if (!pairing && !box.firstChild) box.replaceChildren(pairSections(setupGroups("checking")));
   // In pairing mode the page draws from `pairing` alone, without waiting on idevice.status.
-  const st = pairing ? null : await status(native);
+  const [st, apps] = pairing ? [null, null] : await Promise.all([status(native), vpnApps(native)]);
   if (v !== visit) return; // left while idevice.status answered
   const state = setupState(st, pairing);
   if (state !== "connect" && v.poll) { clearInterval(v.poll); v.poll = null; }
+  const connect = st?.tailscale?.connect ?? "auto";
+  const vpn = vpnRoute(apps, connect);
+  // Only Tailscale installed: acting on it makes Connect With Tailscale, as picking it does when both are.
+  const useTailscale = () => connect === "tailscale" ? Promise.resolve() : call(native, "tailscale.setConnect", { value: "tailscale" }).catch(() => {});
 
   const start = async () => {
     if (pairing) return;
@@ -275,13 +356,15 @@ async function drawPair(box, { store, native, alert, redraw }) {
     retry: start,
     check: () => check(native, alert, redraw, store),
     forget: async () => { await call(native, "idevice.forget").catch(() => {}); store.set(ROUTE_KEY, "server"); v.started = false; redraw(); },
+    vpn,
+    busy: signingIn,
+    choose: async (value) => { await call(native, "tailscale.setConnect", { value }).catch(() => {}); redraw(); },
+    signIn: async () => { await useTailscale(); tailscaleSignIn(native, alert, redraw, `${NAME} is on your tailnet. Turn on the Tailscale app's VPN to pair.`); },
+    openTailscale: async () => { await useTailscale(); openApp(native, alert, TAILSCALE_URL, "Tailscale"); },
+    install: () => openApp(native, alert, LOCALDEVVPN_STORE, "App Store"),
   });
-  const frag = grouped(sections);
-  const groups = [...frag.children];
-  sections.forEach((s, i) => {
-    if (s.pin) groups[i].append(el("p", "pair-code", pinText(pairing?.pin) || "––– –––"));
-    if (s.guide) groups[i].querySelector(".group-header").after(pairGuide());
-  });
+  if (state === "paired" && store.get(ROUTE_KEY) !== "iphone") store.set(ROUTE_KEY, "iphone"); // picked This iPhone, already paired
+  const frag = pairSections(sections);
   if (state === "file") {
     const input = Object.assign(document.createElement("input"), { type: "file", className: "visually-hidden" });
     input.addEventListener("change", async () => {
@@ -303,10 +386,11 @@ async function drawPair(box, { store, native, alert, redraw }) {
 
   if (state === "connect") {
     v.poll ??= setInterval(async () => { if (visit === v && !pairing && vpnOn(await status(native))) redraw(); }, VPN_POLL);
-    if (!v.asked) {
+    const ask = connectAlert(vpn);
+    if (ask && !v.asked) {
       v.asked = true;
-      const { index } = await alert({ ...CONNECT_ALERT, cancel: 0 }) || {};
-      if (index === CONNECT_ALERT.open) openVPN(native, alert);
+      const { index } = await alert({ ...ask, cancel: 0 }) || {};
+      if (index === ask.open) openVPN(native, alert);
     }
   } else if (state === "pairing" && !pairing && !v.started) {
     start();

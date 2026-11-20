@@ -15,6 +15,7 @@ import { sourceCalls, sortSources, loadAppSources } from "./core/sources.js";
 import { withAltSources } from "./core/altstore.js";
 import { validatorCache } from "./core/health.js";
 import { reviewsApi } from "./core/reviews.js";
+import { createKeepAwake, wakeLockScreen } from "./core/keepawake.js";
 
 export class BackendError extends Error {
   constructor(code, message, status) {
@@ -27,7 +28,8 @@ export class BackendError extends Error {
 
 // `sourceOptions` go to core/sources.js sourceCalls (indexedDB, arch, count): the source list lives in this
 // browser's IndexedDB, the same code the app runs.
-export function createHttpBackend({ base = "", fetchFn = globalThis.fetch.bind(globalThis), sourceOptions = {} } = {}) {
+export function createHttpBackend({ base = "", fetchFn = globalThis.fetch.bind(globalThis), sourceOptions = {},
+  screen = wakeLockScreen() } = {}) {
   const endpoint = (params) => `${base}/api/fetch?${new URLSearchParams(params.url ? { ...params, url: freshUrl(params.url) } : params)}`;
 
   // F19: the proxy answers with an ETag (and the repo's Last-Modified); text() sends them back, and a 304 reuses
@@ -86,6 +88,11 @@ export function createHttpBackend({ base = "", fetchFn = globalThis.fetch.bind(g
   };
   // F182: user reviews, on the same server as the proxy (core/reviews.js; worker/src/reviews.js).
   backend.reviews = reviewsApi({ base, fetcher: fetchFn });
+  // F287: keepAwake(on) from a job runner (core/apprun.js): the screen stays on (Screen Wake Lock, where the browser
+  // has it) from the first job's true to the last one's false. Counted, so overlapping runs share it.
+  const awake = createKeepAwake(screen);
+  backend.keepAwake = (on) => awake.set(on);
+  backend.awake = awake;
   // AltStore sources (F9) sit beside the APT list, in their own store (core/altstore.js withAltSources). Both lists
   // seed from the site's own tweak-sources.json / app-sources.json (core/sources.js loadTweakSources, loadAppSources).
   return Object.assign(backend, withAltSources(sourceCalls(backend, sourceOptions), backend, { altDefaults: () => loadAppSources(), ...sourceOptions, sort: sortSources }));

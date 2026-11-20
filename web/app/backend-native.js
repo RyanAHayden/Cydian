@@ -57,6 +57,13 @@ import { NAME } from "./brand.js";
 import { encodeUrl } from "./core/urlencode.js";
 import { reviewsApi, reviewsBase } from "./core/reviews.js";
 import { updateFailures, failureFor, liveUpdate } from "./core/aptupdate.js";
+import { createKeepAwake } from "./core/keepawake.js";
+
+// F287: the shell calls that are work the screen must stay on for: a streamed helper run (apt-get update, an apply,
+// a rollback, an uninstall with its console), a .deb's download and install, an IPA or paid package's install.
+// A quick helper call (simulate, auto, app-versions) has no stream and lets the screen be.
+const LONG_CALLS = new Set(["share.debFetch", "share.debInstall", "ipa.install", "paid.install"]);
+export const longCall = (method, params) => LONG_CALLS.has(method) || (method === "helper.run" && Boolean(params?.stream));
 
 // The one apt source file iFizBox writes (ifizbox-helper addsource/removesource, F33).
 const IFIZBOX_SOURCES = /(^|\/)sources\.list\.d\/ifizbox\.sources$/;
@@ -88,7 +95,12 @@ const lastLine = (s) => String(s ?? "").trim().split("\n").filter(Boolean).pop()
 // as for core/sources.js sourceCalls; `name` is the IndexedDB database the source records live in.
 export function createNativeBackend({ native = globalThis.ifizboxNative, sourceOptions = {} } = {}) {
   if (!native?.call) throw new Error("no native bridge (ifizboxNative.call)");
-  const call = (method, params, onEvent) => native.call(method, params, onEvent).catch((e) => { throw backendError(e); });
+  // F287: the screen stays on while a long call runs (longCall: an apt run, a .deb's download or install) and from a
+  // job runner's keepAwake(true) to its keepAwake(false) (core/apprun.js); the shell's app.keepAwake
+  // (native/Sources/KeepAwake.swift) sets iOS's idle timer. Counted, so overlapping jobs share it.
+  const awake = createKeepAwake((on) => native.call("app.keepAwake", { on }));
+  const raw = (method, params, onEvent) => native.call(method, params, onEvent).catch((e) => { throw backendError(e); });
+  const call = (method, params, onEvent) => (longCall(method, params) ? awake.during(raw(method, params, onEvent)) : raw(method, params, onEvent));
 
   // A file in apt's lists directory for an index URL, or null when apt has none (not refreshed, or not a source).
   async function localList(url) {
@@ -210,6 +222,8 @@ export function createNativeBackend({ native = globalThis.ifizboxNative, sourceO
   }
   // F182: user reviews on the app's server (core/reviews.js), straight from the web view (CORS), as Account does.
   backend.reviews = reviewsApi({ base: reviewsBase("app") });
+  backend.keepAwake = (on) => awake.set(on); // F287
+  backend.awake = awake;
   return Object.assign(backend, sources);
 }
 

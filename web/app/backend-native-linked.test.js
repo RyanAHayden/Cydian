@@ -56,7 +56,7 @@ function setup(t, { served = { [URL_DEB]: DEB }, env = {} } = {}) {
   const native = {
     calls,
     async call(method, params = {}, onEvent) {
-      calls.push({ method, params });
+      if (method !== "app.keepAwake") calls.push({ method, params }); // F287: the screen switch isn't the run's work
       if (share[method]) return (await share[method](params, onEvent)) ?? null;
       return fake.call(method, params, onEvent);
     },

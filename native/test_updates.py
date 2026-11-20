@@ -95,19 +95,29 @@ class Wiring(unittest.TestCase):
         self.assertIn("forKey: BackgroundCheck.pageCountKey", read("Sources", "Notifications.swift"))
 
     def test_self_update_clears_its_badge(self):
-        # B124: iFizBox's own update comes off the icon badge when it is handed to iOS (both routes), the closing
-        # notification carries the new count, and permission is asked before the hosted route's handoff.
+        # B124: iFizBox's own update comes off the icon badge when it is handed to iOS (both routes). B178: the close
+        # posts no notification, and nothing asks for notification permission before the hosted route's handoff.
         side = read("Sources", "Sideload.swift")
         close = side[side.index("private static func closeWith"):]
         close = close[:close.index("\n    }\n")]
         self.assertIn("BackgroundCheck.selfHandedOff(", close)
-        self.assertIn("c.badge = NSNumber(value: n)", close)
+        self.assertNotIn("UNNotificationRequest", close)
+        self.assertNotIn("UNMutableNotificationContent", close)
+        cfu = side[side.index("enum CloseForUpdate"):side.index("final class HereClose")]
+        for gone in ("Finishing the", "Updating \\(Brand.name)", "askToNotify", "requestAuthorization"):
+            self.assertNotIn(gone, cfu)
+        for f in ("private static func finish()", "private static func guess()", "static func hereReady()"):
+            body = cfu[cfu.index(f):]
+            body = body[:body.index("\n    }\n")]
+            self.assertIn("closeWith(", body)
+            self.assertNotIn("UNMutableNotificationContent", body)
         here = side[side.index("static func installHere"):]
         here = here[:here.index("IDevice.queue.async")]
         self.assertIn("BackgroundCheck.selfHandedOff(", here)
         host = side[side.index("static func hostAndOpen"):]
         host = host[:host.index("\n    }\n")]
-        self.assertLess(host.index("CloseForUpdate.askToNotify("), host.index("UIApplication.shared.open(link)"))
+        self.assertNotIn("askToNotify", host)
+        self.assertIn("UIApplication.shared.open(link)", host)
         self.assertIn("afterPrompt(status: status, app: app)", host)
         self.assertIn("UpdateCheck.without(", self.src)
         self.assertIn("UpdateCheck.handedOff(", self.src)

@@ -123,3 +123,15 @@ test("the pull is drawn with transform and opacity only, its listeners passive",
   const block = css.slice(css.indexOf(".pull-refresh {"), css.indexOf("@media (prefers-reduced-motion: reduce) { .pull-arrow"));
   for (const t of block.matchAll(/transition: ([^;]+);/g)) assert.match(t[1], /^(transform|opacity) /);
 });
+
+test("the pull area is the list's own background in every theme, never a colour of its own", () => {
+  const css = readFileSync(new URL("../ios6.css", import.meta.url), "utf8");
+  const rules = [...css.matchAll(/([^{}]*\.pull-(?:clip|refresh|inner)[^{}]*)\{([^}]*)\}/g)];
+  assert.ok(rules.length >= 3);
+  const area = rules.find((r) => r[1].trim() === ".pull-refresh");
+  assert.match(area[2], /background: var\(--plain\);/);
+  for (const [, sel, body] of rules) {
+    if (sel.trim() === ".pull-refresh") continue;
+    assert.doesNotMatch(body, /background/, sel.trim());
+  }
+});

@@ -928,8 +928,10 @@ html[data-theme="dark"] .store-segment:active:not(.selected) { background: var(-
    the arrow at the left, bold "Pull down to refresh..." / "Release to refresh..." and "Last Updated: ..." under it.
    Arrow, text colour and size sampled from the 4S's Twitter (ref/4s/screens/f270-pull1.png, -pull2.png) and redrawn:
    a 12pt shaft of 4pt bars with 2pt gaps over a 21x13pt head, #9b9b9b fading out towards the tail; bold 14px #777
-   with a white emboss under it. Its Twitter draws on the page's own grey; the blue-grey here is the classic pull
-   area's (the concept the user picked). Past the trigger the arrow turns over (transform only). */
+   with a white emboss under it. The area is the list's own background (--plain: white in light, each dark theme's
+   list colour), so the space a pull opens is one colour from the first point to past the trigger: a blue-grey area
+   showed only once it switched on, over the scroller's white, and the pull flashed between the two (user
+   screenshots 2026-11-20). Past the trigger the arrow turns over (transform only). */
 .pull-clip {
   position: absolute; left: 0; right: 0; z-index: 1; overflow: hidden; visibility: hidden; pointer-events: none;
   -webkit-user-select: none; user-select: none;
@@ -937,7 +939,7 @@ html[data-theme="dark"] .store-segment:active:not(.selected) { background: var(-
 .pull-clip.on { visibility: visible; }
 .pull-refresh {
   position: absolute; left: 0; right: 0; top: 0; height: 480px; transform: translateY(-480px);
-  background: #e2e7ed; color: #777;
+  background: var(--plain); color: #777;
 }
 .pull-inner { position: absolute; left: 0; right: 0; bottom: 0; height: 60px; }
 .pull-arrow {
@@ -952,6 +954,6 @@ html[data-theme="dark"] .store-segment:active:not(.selected) { background: var(-
 }
 .pull-title { font-size: 14px; font-weight: bold; line-height: 17px; }
 .pull-time { font-size: 12px; line-height: 15px; }
-html[data-theme="dark"] .pull-refresh { background: var(--dk-field); color: var(--dk-index); }
+html[data-theme="dark"] .pull-refresh { color: var(--dk-index); }
 html[data-theme="dark"] .pull-text { text-shadow: 0 -1px 0 rgba(0,0,0,.8); }
 @media (prefers-reduced-motion: reduce) { .pull-arrow { transition: none; } }

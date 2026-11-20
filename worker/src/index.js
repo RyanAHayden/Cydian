@@ -59,6 +59,7 @@ import { setup, isSetupPath } from "./setup.js";
 import { push, isPushPath, scheduled as pushScheduled } from "./push.js";
 import { NAME, GITHUB_REPO, DOMAIN } from "../../web/app/brand.js";
 import { githubApi, githubApiTarget } from "./github.js"; // F304
+import { blockedHost, REFUSED_CODE } from "./ssrf.js"; // B190
 
 const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type" };
@@ -98,8 +99,9 @@ export function loopbackUrl(q) {
 
 // ---- /api/fetch: the website's fetch proxy (APT and AltStore sources don't let a page read them) ----------------
 // ?url=<URL>: the body. ?url=<repo dir>&kind=packages: the repo's Packages as gzip-encoded text, Packages.gz first,
-// then plain Packages (gzipped here). Cloudflare's fetch can't reach private or loopback addresses, which is the SSRF
-// guard the old server had to build itself. ponytail: no .xz/.bz2 (no decompressor here); the app reads those itself.
+// then plain Packages (gzipped here). Cloudflare's fetch can't reach private or loopback addresses; the self-hosted
+// server (node.mjs) hands env.FETCH, src/ssrf-node.js's fetch, which resolves and checks every host and redirect
+// itself. Literal private hosts and localhost are refused here on both runtimes (src/ssrf.js). ponytail: no .xz/.bz2 (no decompressor here); the app reads those itself.
 const CYDIA = { "User-Agent": "Telesphoreo APT-HTTP/1.0.592", "X-Machine": "iPhone14,2", "X-Firmware": "16.5" };
 const SAFE = { "X-Content-Type-Options": "nosniff", "Content-Security-Policy": "default-src 'none'; sandbox", "Cache-Control": "no-store", ...CORS };
 const PASS = ["image/png", "image/jpeg", "image/gif", "image/webp", "text/plain", "application/json"];
@@ -265,21 +267,46 @@ export function ownRepoUrl(target, u) {
   return target.protocol === "https:" && hosts.has(target.host) && /^\/repo(\/|$)/.test(target.pathname) ? target : null;
 }
 
+// B190: the plain path's body is capped (bytes and overall time) on both runtimes: sources, icons and Release
+// files, never IPAs (kind=ipa streams untouched, B95) or Packages (kind=packages).
+export const FETCH_MAX_BYTES = 64 * 1024 * 1024, FETCH_BODY_MS = 120000;
+export function cappedBody(body, maxBytes = FETCH_MAX_BYTES, ms = FETCH_BODY_MS) {
+  if (!body) return body;
+  const reader = body.getReader();
+  let seen = 0, timer;
+  const stop = (c, e) => { clearTimeout(timer); reader.cancel(e).catch(() => {}); c.error(e); };
+  return new ReadableStream({
+    start(c) { timer = setTimeout(() => stop(c, new Error(`the upstream body took longer than ${ms / 1000} s`)), ms); },
+    async pull(c) {
+      try {
+        const { done, value } = await reader.read();
+        if (done) { clearTimeout(timer); c.close(); return; }
+        seen += value.byteLength;
+        if (seen > maxBytes) return stop(c, new Error(`the upstream body is over ${Math.round(maxBytes / 1024 / 1024)} MB`));
+        c.enqueue(value);
+      } catch (e) { clearTimeout(timer); try { c.error(e); } catch {} }
+    },
+    cancel(why) { clearTimeout(timer); return reader.cancel(why); },
+  });
+}
+
 async function apiFetch(u, maxBytes = MAX_UPLOAD, token = null, env = {}, range = null) {
   const target = httpUrl(u.searchParams.get("url") ?? "");
   if (!target) return fetchErr("bad_url", "Only http(s) URLs can be fetched.", 400);
+  if (blockedHost(target.hostname)) return fetchErr("refused", `${target.hostname} is a private or local address; this server only fetches public ones.`, 403);
+  const fetcher = env.FETCH ?? globalThis.fetch; // B190: node.mjs's guarded fetch
   const kind = u.searchParams.get("kind") ?? "";
   if (!kind && ownRepoUrl(target, u)) {
     const r = await repo(new Request(target.href), target, env);
     if (!r.ok) return fetchErr("upstream", `upstream answered HTTP ${r.status}`, r.status >= 400 && r.status < 600 ? r.status : 502);
     return new Response(r.body, { headers: { ...SAFE, "Content-Type": r.headers.get("content-type") ?? "application/octet-stream", "X-Source-URL": encodeURI(target.href) } });
   }
-  if (!kind && githubApiTarget(target)) return githubApi(target, env); // F304: a GitHub repo as a source
+  if (!kind && githubApiTarget(target)) return githubApi(target, env, { fetcher: env.FETCH }); // F304: a GitHub repo as a source
   try {
     if (kind === "packages") {
       const dir = target.href.endsWith("/") ? target.href : target.href + "/";
       for (const [name, gz] of [["Packages.gz", true], ["Packages", false]]) {
-        const r = await upstream(dir + name);
+        const r = await upstream(dir + name, { fetcher });
         if (!r.ok) continue;
         const body = gz ? r.body : r.body.pipeThrough(new CompressionStream("gzip"));
         return new Response(body, { encodeBody: "manual", headers: { ...SAFE, "Content-Type": "text/plain; charset=utf-8",
@@ -287,14 +314,18 @@ async function apiFetch(u, maxBytes = MAX_UPLOAD, token = null, env = {}, range 
       }
       return fetchErr("not_found", "This repo has no Packages.gz or Packages file.", 404);
     }
-    if (kind === "ipa") return ipaFetch(target, maxBytes, token, range);
+    if (kind === "ipa") return await ipaFetch(target, maxBytes, token, range, fetcher); // awaited: its errors land in the catch below
     if (kind) return fetchErr("bad_url", `unknown kind ${kind}`, 400);
-    const r = await upstream(target.href, { token });
+    const r = await upstream(target.href, { token, fetcher });
     if (!r.ok) return fetchErr("upstream", `upstream answered HTTP ${r.status}`, r.status >= 400 && r.status < 600 ? r.status : 502);
+    if (Number(r.headers.get("content-length") || 0) > FETCH_MAX_BYTES) {
+      r.body?.cancel(); return fetchErr("too_large", `The file is over ${FETCH_MAX_BYTES / 1024 / 1024} MB.`, 413);
+    }
     const ctype = (r.headers.get("content-type") ?? "").split(";")[0].trim().toLowerCase();
-    return new Response(r.body, { headers: { ...SAFE, "Content-Type": PASS.includes(ctype) ? r.headers.get("content-type") : "application/octet-stream",
+    return new Response(cappedBody(r.body), { headers: { ...SAFE, "Content-Type": PASS.includes(ctype) ? r.headers.get("content-type") : "application/octet-stream",
       "X-Source-URL": encodeURI(r.url), ...(r.headers.get("last-modified") ? { "Last-Modified": r.headers.get("last-modified") } : {}) } });
   } catch (e) {
+    if (e?.code === REFUSED_CODE) return fetchErr("refused", e.message, 403);
     return fetchErr("network", String(e?.message ?? e), 502);
   }
 }
@@ -308,11 +339,11 @@ const tooBig = (max) => `The website signs apps up to ${Math.round(max / 1024 / 
 
 // The IPA, streamed through (no buffering: a Worker has 128 MB): headers within 30 s, then as long as the body takes,
 // refused up front when its Content-Length is over maxBytes. `rangeAsked`: the website's Range (bytes=n-) to resume.
-async function ipaFetch(target, maxBytes, token = null, rangeAsked = null) {
+async function ipaFetch(target, maxBytes, token = null, rangeAsked = null, fetcher = globalThis.fetch) {
   if (!maxBytes) return fetchErr("refused", "This server doesn't sign on the website.", 403);
   const range = /^bytes=\d+-$/.test(rangeAsked ?? "") ? rangeAsked : null;
   // The same download as everything else: retries, a day's edge cache for GitHub release files, the token on a 429.
-  const r = await upstream(target.href, { token, range });
+  const r = await upstream(target.href, { token, range, fetcher });
   if (!r.ok) return fetchErr("upstream", `upstream answered HTTP ${r.status}`, r.status >= 400 && r.status < 600 ? r.status : 502);
   const len = Number(r.headers.get("content-length") || 0);
   if (len > maxBytes) { r.body?.cancel(); return fetchErr("too_large", tooBig(maxBytes), 413); }
@@ -675,7 +706,11 @@ export function rangeReader(url, { fetcher = fetch, timeout = 20000, maxRequests
     try {
       r = await fetcher(url, { headers: { "User-Agent": DOMAIN, Range: `bytes=${start}-${end}` },
         redirect: "follow", signal: ctl.signal });
-    } catch { clearTimeout(timer); throw new IpaError("upstream", "The IPA's server didn't answer."); }
+    } catch (e) {
+      clearTimeout(timer);
+      if (e?.code === REFUSED_CODE) throw new IpaError("refused", e.message); // B190
+      throw new IpaError("upstream", "The IPA's server didn't answer.");
+    }
     try {
       if (r.status === 200) { r.body?.cancel?.(); throw new IpaError("no_range", "The IPA's server doesn't answer Range requests."); }
       if (r.status === 404 || r.status === 410) { r.body?.cancel?.(); throw new IpaError("not_found", `The IPA's server answered HTTP ${r.status}.`); }
@@ -697,6 +732,7 @@ export function rangeReader(url, { fetcher = fetch, timeout = 20000, maxRequests
 export async function ipaInfo(u, env = {}, { fetcher = fetch, cache = env.LOOKUP_CACHE ?? globalThis.caches?.default ?? null, timeout } = {}) {
   const target = httpUrl(u.searchParams.get("url") ?? "");
   if (!target) return fail("bad_url", "Send the IPA's http(s) URL as url.");
+  if (blockedHost(target.hostname)) return fail("refused", `${target.hostname} is a private or local address; this server only fetches public ones.`, 403); // B190
   const key = new Request(`https://ipainfo.ifizbox.internal/?${new URLSearchParams({ url: target.href })}`);
   const hit = cache ? await cache.match(key).catch(() => null) : null;
   if (hit) return hit;
@@ -709,7 +745,7 @@ export async function ipaInfo(u, env = {}, { fetcher = fetch, cache = env.LOOKUP
   } catch (e) {
     const code = e instanceof IpaError ? e.code : "upstream";
     const permanent = PERMANENT.has(code);
-    res = answer({ code, error: e instanceof IpaError ? e.message : "The IPA couldn't be read." }, permanent ? 422 : 502, permanent ? 86400 : 0);
+    res = answer({ code, error: e instanceof IpaError ? e.message : "The IPA couldn't be read." }, permanent ? 422 : code === "refused" ? 403 : 502, permanent ? 86400 : 0);
     if (!permanent) return res;
   }
   if (cache) await cache.put(key, res.clone()).catch(() => {});
@@ -733,9 +769,9 @@ export default {
     if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
 
     if (u.pathname === "/api/fetch" && req.method === "GET") return apiFetch(u, uploadCap(env), env.GITHUB_TOKEN ?? null, env, req.headers.get("Range"));
-    if (u.pathname === "/api/applookup" && req.method === "GET") return appLookup(u, env);
-    if (u.pathname === "/api/appreviews" && req.method === "GET") return appReviews(u, env); // B37
-    if (u.pathname === "/api/ipainfo" && req.method === "GET") return ipaInfo(u, env); // F160
+    if (u.pathname === "/api/applookup" && req.method === "GET") return appLookup(u, env, { fetcher: env.FETCH });
+    if (u.pathname === "/api/appreviews" && req.method === "GET") return appReviews(u, env, { fetcher: env.FETCH }); // B37
+    if (u.pathname === "/api/ipainfo" && req.method === "GET") return ipaInfo(u, env, { fetcher: env.FETCH }); // F160
     if (u.pathname === "/repo" || u.pathname.startsWith("/repo/")) return repo(req, u, env);
     if (u.pathname === "/healthz") return new Response("ok\n", { headers: { "Content-Type": "text/plain", "Cache-Control": "no-store" } });
     if (u.pathname === "/sign/status") return json({ ok: true, ttl, worker: true, zsign: false, upload: uploadCap(env) });

@@ -108,7 +108,7 @@ export function showShareSheet({ items = [], cancel = "Cancel", title = "Share" 
       document.removeEventListener("keydown", onKey);
       scrim.style.pointerEvents = "none";
       dim.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 250, easing: "ease-in", fill: "forwards" });
-      const a = sheet.animate([{ transform: "none" }, { transform: "translateY(100%)" }], { duration: 250, easing: ease, fill: "forwards" });
+      const a = sheet.animate([{ transform: "none" }, { transform: "translateY(100%)" }], { duration: 250, easing: EASE, fill: "forwards" });
       const end = () => scrim.remove();
       a.finished.then(end, end);
       // Run the item's action inside the tap (clipboard writes and app links need the user's gesture).

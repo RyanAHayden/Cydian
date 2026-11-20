@@ -10,6 +10,7 @@
 // into view (B148, nav/pagestate.js liveText), so a sub-page's change shows on the page below after Back.
 
 import { liveText } from "./pagestate.js";
+import { isWatched } from "./slide.js";
 
 export function el(tag, cls, text) {
   const e = document.createElement(tag);
@@ -90,7 +91,9 @@ export function plain(sections) {
 
 // UITableView's delete: the row goes and everything under it slides up into its place. FLIP, by transform only:
 // remove the row, then start everything that was below it one row lower and let it ease up.
+// On a watched page (nav/slide.js) the watcher does it, and fades the row out as it goes.
 export function collapse(li) {
+  if (isWatched(li)) { li.remove(); return; }
   const h = li.getBoundingClientRect().height;
   const below = [];
   for (let n = li; n && !n.classList?.contains("page-body"); n = n.parentElement) {

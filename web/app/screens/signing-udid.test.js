@@ -3,7 +3,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { storedUdid, saveUdid, forgetUdid, udidPending, startUdid, pollUdid, udidFindRows, canFindUdid, FIND_UDID,
-  udidFindText, UDID_KEY } from "./signing.js";
+  UDID_STEPS, UDID_WAITING, UDID_KEY } from "./signing.js";
 import { UDID_KEY as WORKER_KEY } from "../../../worker/src/udid.js";
 import { deviceCheck } from "../core/signing.js";
 
@@ -58,12 +58,13 @@ test("stored UDIDs are checked, and can be forgotten", () => {
 test("Find This iPhone's UDID shows only while an iPhone's check is unknown", () => {
   const profile = { udids: [UDID, "00008030-AAAA"] };
   const unknown = deviceCheck(profile, null);
-  assert.deepEqual(udidFindRows(unknown), { rows: [{ label: FIND_UDID, find: true }], footer: udidFindText });
-  assert.deepEqual(udidFindRows(unknown, { pending: true }).rows, [{ label: FIND_UDID, detail: "Waiting" }]);
+  // F316: its own group, no footer (the steps are on the page it opens); waiting, the footer says what to do
+  assert.deepEqual(udidFindRows(unknown), { rows: [{ label: FIND_UDID, find: true }] });
+  assert.deepEqual(udidFindRows(unknown, { pending: true }), { rows: [{ label: FIND_UDID, find: true, detail: "Waiting" }], footer: UDID_WAITING });
   assert.equal(udidFindRows(unknown, { can: false }), null);
   assert.equal(udidFindRows(deviceCheck(profile, { udid: UDID })), null); // known: In Profile
   assert.equal(udidFindRows(deviceCheck({ udids: [] }, null)), null);    // no device list
-  assert.match(udidFindText, /Not Verified/);
+  assert.match(UDID_STEPS.join(" "), /Not Verified/);
 });
 
 test("an iPhone or iPad can take the profile, a computer can't", () => {

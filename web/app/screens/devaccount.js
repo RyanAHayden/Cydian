@@ -112,7 +112,7 @@ async function addKey(files, native, redraw) {
       writeJson(KEY, k);
     }
   } catch (e) {
-    return alertOK("Key Not Accepted", String(e?.message ?? e).replace(/^\w+: /, ""));
+    return alertOK("Key Not Accepted", withRoleHint(e));
   }
   redraw();
 }
@@ -394,7 +394,7 @@ async function checkAccount(native, redraw = () => {}) {
     lines.push(line);
     find = !!n?.call && udidUnknown(udid, line);
   } catch (e) {
-    lines.push(String(e?.message ?? e).replace(/^\w+: /, ""));
+    lines.push(withRoleHint(e)); // F316: the role hint only when the check fails
   }
   if (!find && !noCert) return alertOK("Developer Account", lines.join("\n\n"));
   // F277: not paired, and the app's own profile doesn't show this iPhone in the account: offer the website's visit
@@ -409,6 +409,23 @@ async function checkAccount(native, redraw = () => {}) {
   try { await findUdidViaSite(native); } catch (e) { await alertOK("UDID Not Found", String(e?.message ?? e).replace(/^\w+: /, "")); }
 }
 
+// F316 (AGENTS.md Hints): two short sentences under the key rows; with no key, what one is for. The role the key
+// needs is said only when Apple refuses it (withRoleHint: Key Not Accepted, Check Account's failure).
+export const ROLE_HINT = "Use a key with the Admin or App Manager role.";
+// Only for a refusal about the key's rights (403 / forbidden / permission), not a network error or a typo'd ID.
+export const roleRefusal = (e) => e?.status === 403 || e?.code === "key-role"
+  || /\b403\b|forbidden|permission|not allowed|role/i.test(String(e?.message ?? e));
+export const withRoleHint = (e) => {
+  const m = String(e?.message ?? e).replace(/^\w+: /, "").trim();
+  if (!roleRefusal(e) || m.includes(ROLE_HINT)) return m;
+  return `${m}${/[.!?]$/.test(m) || !m ? "" : "."} ${ROLE_HINT}`.trim();
+};
+export function accountFooter({ key = false, app = true } = {}) {
+  if (!key) return `With an App Store Connect API key, ${NAME} makes a profile with Push for each app you sign.`;
+  return `${NAME} makes a profile with Push for each app you sign. `
+    + (app ? "The key stays in this iPhone's Keychain." : "The key stays in this browser.");
+}
+
 export function accountGroup({ native, redraw = () => {} } = {}) {
   const box = document.createElement("div");
   const input = document.createElement("input");
@@ -417,11 +434,9 @@ export function accountGroup({ native, redraw = () => {} } = {}) {
   input.multiple = true; // F277: the .p8 and a .txt holding the Issuer ID, or the .zip they came in
   input.hidden = true;
   input.addEventListener("change", () => { const f = [...(input.files ?? [])]; input.value = ""; if (f.length) addKey(f, native, redraw); });
-  const footer = `With an App Store Connect API key, ${NAME} makes an App ID and an Ad Hoc profile (with Push) for each app it signs `
-    + "with Keep Bundle IDs on, and adds this iPhone to your account. Use a key with the Admin or App Manager role. "
-    + (nativeOf(native)?.call ? "The key stays in this iPhone's Keychain and goes only to Apple." : "The key stays in this browser; calls pass through this site to Apple, which keeps nothing.");
   (async () => {
     const info = await keyInfo(native);
+    const footer = accountFooter({ key: Boolean(info), app: Boolean(nativeOf(native)?.call) });
     const rows = info
       ? [{ label: "API Key", detail: info.keyId }, { label: "Issuer ID", subtitle: info.issuerId },
         { label: "Check Account", onClick: () => checkAccount(native, redraw) },
@@ -432,8 +447,8 @@ export function accountGroup({ native, redraw = () => {} } = {}) {
     const made = info ? profileRows(await cache(native)) : [];
     const frag = grouped([{ header: "Apple Developer Account", rows, footer }, ...(made.length ? [{ header: `Profiles Made by ${NAME}`, rows: made }] : [])]);
     frag.querySelector(".asc-add")?.append(input);
-    // F277: the how-to (screens/guides.js) linked from the footer
-    const foot = frag.querySelector(".group-footer");
+    // F277: the how-to (screens/guides.js) linked from the footer, while there is no key to add one
+    const foot = info ? null : frag.querySelector(".group-footer");
     if (foot) {
       const a = Object.assign(document.createElement("a"), { href: ascGuideHref(), textContent: ASC_GUIDE_LINK, className: "asc-guide-link" });
       foot.append(" ", a);

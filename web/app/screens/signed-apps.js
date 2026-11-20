@@ -33,17 +33,29 @@ export function signingExtras({ identity = null, redraw = () => {}, native = glo
   return box;
 }
 
+// F316 (AGENTS.md Hints): the footer is the most important warning (revoked first), else when Apple was last asked;
+// when signatures made now end is a status row, not a sentence. Pure, for the tests.
+export const STATUS_UNCHECKED = "Asks Apple whether the certificate is still good.";
+export const SIGNATURES_UNTIL = "Signatures Until";
+export function statusLayout(identity, now = new Date()) {
+  const rev = identity?.revocation ?? null;
+  const warnings = certificateWarnings(identity, now);
+  const checked = rev?.checked ? day(rev.checked) : null;
+  const until = identity?.signatureExpires ? day(identity.signatureExpires) : null;
+  return {
+    rows: [{ label: "Check Certificate", detail: revocationLabel(rev) }, ...(until ? [{ label: SIGNATURES_UNTIL, detail: until }] : [])],
+    footer: warnings[0] ?? (checked ? `Last checked ${checked}.` : STATUS_UNCHECKED),
+    warn: warnings.length > 0,
+  };
+}
+
 function statusGroup(identity, { redraw, native, alert, hud }) {
   const rev = identity.revocation ?? null;
-  const warnings = certificateWarnings(identity);
-  const checked = rev?.checked ? day(rev.checked) : null;
-  const footer = warnings.length ? warnings.join(" ")
-    : `Asks Apple (ocsp.apple.com) whether the certificate is still good.${checked ? ` Last checked ${checked}.` : ""}`
-      + (identity.signatureExpires ? ` Signatures made now last until ${day(identity.signatureExpires)}.` : "");
+  const { rows, footer, warn } = statusLayout(identity);
   const frag = grouped([{ header: "Certificate Status", footer,
-    rows: [{ label: "Check Certificate", detail: revocationLabel(rev), onClick: () => check({ redraw, native, alert, hud }) }] }]);
+    rows: rows.map((r, i) => (i === 0 ? { ...r, onClick: () => check({ redraw, native, alert, hud }) } : r)) }]);
   const g = frag.querySelector(".group");
-  if (warnings.length) g.querySelector(".group-footer")?.classList.add("sign-warning");
+  if (warn) g.querySelector(".group-footer")?.classList.add("sign-warning");
   if (rev?.status === "revoked") g.querySelector(".cell-detail")?.classList.add("sign-warning-text");
   return g;
 }

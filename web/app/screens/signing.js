@@ -216,17 +216,32 @@ export function drawWalkthrough(el, { status = null, failure = "", certificate =
 }
 
 // ---- F236: "This iPhone is in the profile", under the Provisioning Profile's rows ------------------------------
-// core/signing.js deviceCheckText's answer ({ ok, text, udid } or null: not checked) as the group's extra rows and
-// its footer: In Profile; Not in Profile (red, with the UDID and Copy UDID when it is known); Unknown (how to find it).
-// Pure: settings.js draws it (Settings > Signing, the app's and the website's).
-export function deviceRows(device) {
+// core/signing.js deviceCheckText's answer ({ ok, text, udid } or null: not checked) as its own group under the
+// profile's status rows: In Profile; Not in Profile (red, with the UDID and Copy UDID when it is known); Unknown.
+// F316 (AGENTS.md Hints): its footer is a short hint by state (deviceHint), the fix when it's off; the profile's
+// status rows get none. `find`: the website's Find This iPhone's UDID group follows (udidFindRows), so Unknown's
+// hint only says what's missing. Pure: settings.js draws it (Settings > Signing, the app's and the website's).
+export const DEVICE_HINTS = {
+  in: "This iPhone is in the profile.",
+  outCopy: "Add this UDID to your developer account, then make the profile again.",
+  out: "This iPhone isn't in the profile. Add its UDID to your developer account, then make the profile again.",
+  unknownFind: "Not checked: this iPhone's UDID isn't known yet.",
+  unknown: "Not checked: the UDID can't be read here. A Mac shows it in Finder, under the iPhone's name.",
+};
+export function deviceHint(device, { find = false } = {}) {
+  if (!device?.text) return null;
+  if (device.ok === true) return DEVICE_HINTS.in;
+  if (device.ok === false) return device.udid ? DEVICE_HINTS.outCopy : DEVICE_HINTS.out;
+  return find ? DEVICE_HINTS.unknownFind : DEVICE_HINTS.unknown;
+}
+export function deviceRows(device, { find = false } = {}) {
   if (!device?.text) return null;
   const state = device.ok === true ? "In Profile" : device.ok === false ? "Not in Profile" : "Unknown";
   const rows = [{ label: "This iPhone", detail: state }];
   if (device.ok === false && device.udid) {
     rows.push({ label: "UDID", subtitle: device.udid }, { label: "Copy UDID", copy: device.udid });
   }
-  return { rows, footer: device.text, warn: device.ok === false };
+  return { rows, footer: deviceHint(device, { find }), warn: device.ok === false };
 }
 
 // ---- F253: the website reads This iPhone's UDID through a configuration profile ----------------------------------
@@ -242,7 +257,7 @@ export function deviceRows(device) {
 //   watchUdid(onDone, opts)            polls every 2 s while a visit is pending (and at once when the page shows
 //                                      again); calls onDone() once the UDID is saved. Idempotent across redraws
 //   canFindUdid(nav)                   an iPhone or iPad (where iOS takes a profile), not a computer
-//   udidFindText                       the footer under Find This iPhone's UDID (Not Verified, Settings steps)
+//   udidPageSections({ pending, udid })   F316: the page Find This iPhone's UDID opens, one group per step
 export const UDID_KEY = "ifizbox.udid";
 const UDID_PENDING = "ifizbox.udid.pending";
 const local = (store) => {
@@ -308,16 +323,35 @@ export function canFindUdid(nav = globalThis.navigator) {
   return /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && Number(nav?.maxTouchPoints) > 1);
 }
 
-export const udidFindText = `Find This iPhone's UDID downloads a small profile from ${NAME}'s website. Allow it, then open the `
-  + `Settings app > Profile Downloaded and tap Install: it shows "Not Verified" because it isn't signed, which is fine. `
-  + `iOS sends ${NAME} this iPhone's UDID, model and iOS version, keeps no profile, and opens a page in Safari; come back `
-  + `here and This iPhone fills in.`;
+// F316: the page Find This iPhone's UDID opens (settings.js, #settings/signing/udid), one group per step, each with its
+// own short footer; Download Profile starts the visit (settings.js wires `start: true`). Once the UDID is here the
+// page says so. Pure.
+export const UDID_PAGE = "udid";
+export const UDID_PAGE_TITLE = "Find UDID";
+export const DOWNLOAD_PROFILE = "Download Profile";
+export const UDID_STEPS = [
+  `Downloads a small profile from ${NAME}'s website. Tap Allow when Safari asks.`,
+  `Open the Settings app > Profile Downloaded and tap Install. It says "Not Verified", which is fine.`,
+  `iOS sends ${NAME} the UDID, model and iOS version, and keeps no profile. Come back here and This iPhone fills in.`,
+];
+export const UDID_WAITING = "Waiting for iOS: install the profile in Settings > Profile Downloaded.";
+export const UDID_FOUND = "This iPhone's UDID is here. Go back to see it checked against the profile.";
+export function udidPageSections({ pending = false, udid = null } = {}) {
+  if (udid) return [{ header: "This iPhone", rows: [{ label: "UDID", subtitle: udid }], footer: UDID_FOUND }];
+  return [
+    { header: "Steps", rows: [{ label: DOWNLOAD_PROFILE, start: true, ...(pending ? { detail: "Waiting" } : {}) }],
+      footer: pending ? UDID_WAITING : `1. ${UDID_STEPS[0]}` },
+    { footer: `2. ${UDID_STEPS[1]}` }, // numbered step groups, as Pairing's (installroute.js setupGroups)
+    { footer: `3. ${UDID_STEPS[2]}` },
+  ];
+}
 
-// The website's extra rows under This iPhone: Find This iPhone's UDID (`find: true`: settings.js starts it) while
-// the check is "unknown" on an iPhone, "Waiting" once a visit is pending. Nothing when the UDID is known, the
-// profile lists no devices, or this is a computer. Pure.
+// The website's Find This iPhone's UDID group under This iPhone's (`find: true`: settings.js makes it open the page
+// above) while the check is "unknown" on an iPhone; "Waiting" once a visit is pending, and then its footer says what to
+// do. Nothing when the UDID is known, the profile lists no devices, or this is a computer. Pure.
 export const FIND_UDID = "Find This iPhone's UDID";
 export function udidFindRows(check, { pending = false, can = true } = {}) {
   if (!can || check?.state !== "unknown") return null;
-  return { rows: [pending ? { label: FIND_UDID, detail: "Waiting" } : { label: FIND_UDID, find: true }], footer: udidFindText };
+  if (pending) return { rows: [{ label: FIND_UDID, find: true, detail: "Waiting" }], footer: UDID_WAITING };
+  return { rows: [{ label: FIND_UDID, find: true }] };
 }

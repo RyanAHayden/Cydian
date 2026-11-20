@@ -1,88 +1,114 @@
 /* F182: reviews written here (screens/reviews.js): Tap to Rate, Write a Review, Report, and the Write a Review sheet,
    per journal/F181/concept/TweakReviews.dc.html and WriteReview.dc.html. Colours from the concept (the App Store's
-   orange star #e08a1e, the empty star #a9b0bc; the white button #fdfdfd -> #e7e8ea, 1px #a3a7ae, label #385487). */
+   orange star #e08a1e, the empty star #a9b0bc; the white button #fdfdfd -> #e7e8ea, 1px #a3a7ae, label #385487).
+   Each part's layout is in its own rules; what it paints is in the look-only stretch after them (docs/eras.md), and
+   the iOS 6 decorations (the white button's gradient and edge, embosses) come from the tokens in the first stretch. */
 
 /* five stars to tap: 44px targets, the star drawn as text so it stays sharp at 3x */
 .review-stars { display: inline-flex; }
+.review-star { width: 44px; height: 44px; padding: 0; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.review-stars.small .review-star { width: 30px; height: 43px; }
+
+/* Tap to Rate: the last row of the ratings card */
+.review-tap { display: flex; align-items: center; gap: 8px; height: 43px; padding: 0 6px 0 12px; }
+.review-tap-status { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+/* F216: Remove, beside Your Rating while one is set: a small text button like Report */
+.review-tap-remove { flex: none; padding: 0 2px; -webkit-tap-highlight-color: transparent; }
+.review-tap-remove[hidden] { display: none; }
+
+/* ==== look-only { ==== the stars and the Tap to Rate row */
+:root {
+  --review-star-emboss: 0 1px 0 rgba(255,255,255,.75);
+  /* the concept's white rounded button, and pressed */
+  --review-btn: linear-gradient(#fdfdfd, #e7e8ea);
+  --review-btn-edge: #a3a7ae;
+  --review-btn-emboss: 0 1px 0 #fff;
+  --review-btn-pressed: linear-gradient(#e2e3e6, #c9cbcf);
+}
 .review-star {
-  width: 44px; height: 44px; padding: 0; border: 0; background: none; cursor: pointer;
-  font: 30px/44px "Helvetica Neue", Helvetica, Arial, sans-serif; color: #a9b0bc; text-shadow: 0 1px 0 rgba(255,255,255,.75);
-  -webkit-tap-highlight-color: transparent;
+  border: 0; background: none;
+  font: 30px/44px "Helvetica Neue", Helvetica, Arial, sans-serif; color: #a9b0bc; text-shadow: var(--review-star-emboss);
 }
 .review-star.on { color: #e08a1e; }
-.review-stars.small .review-star { width: 30px; height: 43px; font-size: 24px; line-height: 43px; color: #c4c4c4; text-shadow: none; }
+.review-stars.small .review-star { font-size: 24px; line-height: 43px; color: #c4c4c4; text-shadow: none; }
 .review-stars.small .review-star.on { color: #e08a1e; }
 html[data-theme="dark"] .review-star { color: var(--dk-dot); text-shadow: none; }
 html[data-theme="dark"] .review-star.on { color: var(--dk-star-on); }
 
-/* Tap to Rate: the last row of the ratings card */
-.review-tap {
-  display: flex; align-items: center; gap: 8px; height: 43px; padding: 0 6px 0 12px;
-  border-top: 1px solid var(--divider); box-shadow: inset 0 1px 0 var(--divider-hi);
-}
+.review-tap { border-top: 1px solid var(--divider); box-shadow: inset 0 1px 0 var(--divider-hi); }
 .review-tap-label { font-size: 15px; font-weight: bold; color: var(--text); }
-.review-tap-status { flex: 1; min-width: 0; font-size: 12px; color: var(--subtitle); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-/* F216: Remove, beside Your Rating while one is set: a small text button like Report */
-.review-tap-remove {
-  flex: none; padding: 0 2px; border: 0; background: none; font: 12px "Helvetica Neue", Helvetica, Arial, sans-serif;
-  color: #385487; -webkit-tap-highlight-color: transparent;
-}
-.review-tap-remove[hidden] { display: none; }
+.review-tap-status { font-size: 12px; color: var(--subtitle); }
+.review-tap-remove { border: 0; background: none; font: 12px "Helvetica Neue", Helvetica, Arial, sans-serif; color: #385487; }
 html[data-theme="dark"] .review-tap-remove { color: var(--dk-link); }
 .review-tap-remove:active { opacity: .5; }
+/* ==== } look-only ==== */
 
 /* Write a Review / More Reviews: the concept's white rounded button */
 .review-actions { display: flex; gap: 10px; margin: 12px 10px 0; }
-.review-button {
-  flex: 1; display: flex; align-items: center; justify-content: center; height: 44px; border-radius: 9px;
-  font: bold 15px "Helvetica Neue", Helvetica, Arial, sans-serif; color: #385487; text-shadow: 0 1px 0 #fff;
-  border: 1px solid #a3a7ae; background: linear-gradient(#fdfdfd, #e7e8ea); background-origin: border-box; cursor: pointer;
-}
-.review-button:active { background: linear-gradient(#e2e3e6, #c9cbcf); background-origin: border-box; }
-.review-button:disabled { color: #8a96ab; }
+.review-button { flex: 1; display: flex; align-items: center; justify-content: center; height: 44px; cursor: pointer; }
 .review-more { width: calc(100% - 20px); margin: 10px 10px 0; }
-html[data-theme="dark"] .review-button { color: var(--dk-review-btn-text); text-shadow: none; border-color: var(--table-edge); background: var(--dk-review-btn); background-origin: border-box; }
-.review-hidden-note { margin: 10px 19px 0; font-size: 14px; line-height: 18px; text-align: center; color: var(--head); text-shadow: var(--emboss); }
+.review-hidden-note { margin: 10px 19px 0; }
 
 /* Report on a review written here: a small link, right-aligned under its text */
-.review-report, .review-reported { align-self: flex-end; padding: 2px 0; border: 0; background: none; font: 12px "Helvetica Neue", Helvetica, Arial, sans-serif; }
-.review-report { color: #385487; cursor: pointer; }
-.review-reported { color: var(--subtitle); }
-html[data-theme="dark"] .review-report { color: var(--dk-link); }
+.review-report, .review-reported { align-self: flex-end; padding: 2px 0; }
+.review-report { cursor: pointer; }
 .store-review-text { white-space: pre-wrap; overflow-wrap: anywhere; }
 .store-reviews-footer { margin-bottom: 14px; }
 
+/* ==== look-only { ==== Write a Review / More Reviews, the hidden note, Report */
+.review-button {
+  border-radius: 9px;
+  font: bold 15px "Helvetica Neue", Helvetica, Arial, sans-serif; color: #385487; text-shadow: var(--review-btn-emboss);
+  border: 1px solid var(--review-btn-edge); background: var(--review-btn); background-origin: border-box;
+}
+.review-button:active { background: var(--review-btn-pressed); background-origin: border-box; }
+.review-button:disabled { color: #8a96ab; }
+html[data-theme="dark"] .review-button { color: var(--dk-review-btn-text); text-shadow: none; border-color: var(--table-edge); background: var(--dk-review-btn); background-origin: border-box; }
+.review-hidden-note { font-size: 14px; line-height: 18px; text-align: center; color: var(--head); text-shadow: var(--emboss); }
+
+.review-report, .review-reported { border: 0; background: none; font: 12px "Helvetica Neue", Helvetica, Arial, sans-serif; }
+.review-report { color: #385487; }
+.review-reported { color: var(--subtitle); }
+html[data-theme="dark"] .review-report { color: var(--dk-link); }
+/* ==== } look-only ==== */
+
 /* the Write a Review sheet: pinstripe, stars, a grouped form, a note */
-.review-sheet { background: repeating-linear-gradient(90deg, var(--pin-dark) 0 2.5px, var(--pin-light) 2.5px 8px) var(--pin-light); }
 .sheet-left { justify-self: start; display: flex; }
 .review-sheet-scroll { overflow-y: auto; -webkit-overflow-scrolling: touch; padding-top: var(--nav-h); }
-.review-rate { display: flex; flex-direction: column; align-items: center; gap: 0; margin-top: 12px; color: var(--head); text-shadow: var(--emboss); }
-.review-rate-label { font-size: 14px; }
-.review-form {
-  margin: 16px 10px 0; overflow: hidden; background: #fff; border: 1px solid var(--table-edge); border-radius: 9.5px; font-size: 17px;
-}
-html[data-theme="dark"] .review-form { background: var(--table); }
+.review-rate { display: flex; flex-direction: column; align-items: center; gap: 0; margin-top: 12px; }
+.review-form { margin: 16px 10px 0; overflow: hidden; }
 .review-field { display: flex; align-items: center; height: 44px; padding: 0 10px; }
-.review-field + .review-field { border-top: 1px solid var(--divider); }
-.review-field-label { flex: none; width: 70px; font-weight: bold; color: var(--text); }
-.review-input { flex: 1; min-width: 0; border: 0; outline: none; background: none; font: inherit; color: #4c566c; }
-html[data-theme="dark"] .review-input { color: var(--head); }
+.review-field-label { flex: none; width: 70px; }
+.review-input { flex: 1; min-width: 0; }
 .review-field-text { display: block; height: auto; padding: 0; }
-.review-field-text .review-input {
-  display: block; width: 100%; height: 170px; box-sizing: border-box; padding: 10px; resize: none;
-  font: 15px/20px "Helvetica Neue", Helvetica, Arial, sans-serif; color: var(--text);
-}
-.review-error { margin: 10px 19px 0; font-size: 14px; line-height: 18px; text-align: center; font-weight: bold; color: #c8231a; }
+.review-field-text .review-input { display: block; width: 100%; height: 170px; box-sizing: border-box; padding: 10px; resize: none; }
+.review-error { margin: 10px 19px 0; }
 .review-error[hidden] { display: none; }
-html[data-theme="dark"] .review-error { color: var(--dk-bad); }
-.review-note { margin: 10px 19px 20px; font-size: 14px; line-height: 18px; text-align: center; color: var(--head); text-shadow: var(--emboss); }
+.review-note { margin: 10px 19px 20px; }
 /* F207: Delete Review. In the sheet: the action sheet's red button (packages.css .action-button.destructive), full
    width like Settings > Account's Delete Account. On your own review's row: Report's small text button, in red. */
 .review-delete-wrap { display: flex; padding: 0 10px 30px; }
 .review-delete { flex: 1; }
-.review-delete-own { align-self: flex-end; padding: 2px 0; border: 0; background: none; font: 12px "Helvetica Neue", Helvetica, Arial, sans-serif; color: #c8231a; cursor: pointer; }
+.review-delete-own { align-self: flex-end; padding: 2px 0; cursor: pointer; }
+
+/* ==== look-only { ==== the Write a Review sheet */
+.review-sheet { background: repeating-linear-gradient(90deg, var(--pin-dark) 0 2.5px, var(--pin-light) 2.5px 8px) var(--pin-light); }
+.review-rate { color: var(--head); text-shadow: var(--emboss); }
+.review-rate-label { font-size: 14px; }
+.review-form { background: #fff; border: 1px solid var(--table-edge); border-radius: 9.5px; font-size: 17px; }
+html[data-theme="dark"] .review-form { background: var(--table); }
+.review-field + .review-field { border-top: 1px solid var(--divider); }
+.review-field-label { font-weight: bold; color: var(--text); }
+.review-input { border: 0; outline: none; background: none; font: inherit; color: #4c566c; }
+html[data-theme="dark"] .review-input { color: var(--head); }
+.review-field-text .review-input { font: 15px/20px "Helvetica Neue", Helvetica, Arial, sans-serif; color: var(--text); }
+.review-error { font-size: 14px; line-height: 18px; text-align: center; font-weight: bold; color: #c8231a; }
+html[data-theme="dark"] .review-error { color: var(--dk-bad); }
+.review-note { font-size: 14px; line-height: 18px; text-align: center; color: var(--head); text-shadow: var(--emboss); }
+.review-delete-own { border: 0; background: none; font: 12px "Helvetica Neue", Helvetica, Arial, sans-serif; color: #c8231a; }
 .review-delete-own:disabled { opacity: .5; }
 html[data-theme="dark"] .review-delete-own { color: var(--dk-bad); }
+/* ==== } look-only ==== */
 
 /* B82: an app page's This Build | App Store toggle (nav/ui.js segmented, ios6.css .store-segmented) as wide as
    the groups under it, and its two views; only the view's opacity animates when it switches. */
@@ -90,6 +116,10 @@ html[data-theme="dark"] .review-delete-own { color: var(--dk-bad); }
 .store-review-view[hidden] { display: none; }
 /* the App Store view's card: the average big (bold 28px) beside its stars and count, no bars, then the note row */
 .store-appstore-top { display: flex; align-items: center; gap: 12px; padding: 10px 12px; }
-.store-appstore-big { flex: none; font-size: 28px; font-weight: bold; line-height: 32px; letter-spacing: -.02em; color: var(--text); }
+.store-appstore-big { flex: none; }
 .store-appstore-side { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+
+/* ==== look-only { ==== the App Store view's card */
+.store-appstore-big { font-size: 28px; font-weight: bold; line-height: 32px; letter-spacing: -.02em; color: var(--text); }
 .store-appstore-count { font-size: 13px; color: var(--subtitle); }
+/* ==== } look-only ==== */

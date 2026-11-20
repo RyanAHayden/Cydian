@@ -1,49 +1,76 @@
 /* AltStore sources (F9, screens/altstore.js): the source page in the source's tint, news cards and screenshots
-   (the version history has its own page, F29). --alt-tint comes from the source's (or app's, or news item's) tintColor, hex only. */
-.alt-source, .alt-app { --alt-tint: var(--detail); }
+   (the version history has its own page, F29). --alt-tint comes from the source's (or app's, or news item's) tintColor, hex only.
+   Each part's layout is in its own rules; what it paints is in the look-only stretch after them (docs/eras.md), and
+   the iOS 6 decorations (shades, shadows, embosses, the gloss buttons) come from the tokens in the first stretch. */
 
-.alt-header { position: relative; margin: 10px 10px 0; border-radius: 10px; overflow: hidden; background: var(--alt-tint, #385487); min-height: 96px; }
+.alt-header { position: relative; margin: 10px 10px 0; overflow: hidden; min-height: 96px; }
 .alt-banner { display: block; width: 100%; max-height: 160px; object-fit: cover; }
-.alt-id { position: absolute; left: 0; right: 0; bottom: 0; display: flex; align-items: center; gap: 10px; padding: 10px;
-  background: linear-gradient(rgba(0,0,0,0), rgba(0,0,0,.45)); color: #fff; }
+.alt-id { position: absolute; left: 0; right: 0; bottom: 0; display: flex; align-items: center; gap: 10px; padding: 10px; }
 .alt-header:not(:has(.alt-banner)) { min-height: 0; }
-.alt-header:not(:has(.alt-banner)) .alt-id { position: static; background: none; }
-.alt-icon { width: 57px; height: 57px; border-radius: 10px; flex: none; box-shadow: 0 1px 2px rgba(0,0,0,.4); }
-.alt-names { display: flex; flex-direction: column; min-width: 0; text-shadow: 0 -1px 0 rgba(0,0,0,.4); }
-.alt-name { font-size: 20px; font-weight: bold; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.alt-subtitle { font-size: 14px; opacity: .9; }
+.alt-header:not(:has(.alt-banner)) .alt-id { position: static; }
+.alt-icon { width: 57px; height: 57px; flex: none; }
+.alt-names { display: flex; flex-direction: column; min-width: 0; }
+.alt-name { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 
-.alt-news { display: block; margin-bottom: 10px; overflow: hidden; color: var(--text); text-decoration: none; border-left: 5px solid var(--alt-tint); }
+.alt-news { display: block; margin-bottom: 10px; overflow: hidden; }
 .alt-news-image { display: block; width: 100%; max-height: 150px; object-fit: cover; }
 .alt-news-text { display: flex; flex-direction: column; gap: 2px; padding: 9px 12px; }
-.alt-news-title { font-size: 16px; font-weight: bold; }
-.alt-news-caption { font-size: 14px; line-height: 18px; }
-.alt-news-date { font-size: 12px; color: var(--subtitle); }
 
 .alt-app-icon { overflow: hidden; }
-.alt-app-icon img { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; }
-.alt-app-icon img.loaded { opacity: 1; }
+.alt-app-icon img { position: absolute; inset: 0; width: 100%; height: 100%; }
 
 .alt-shots { display: flex; gap: 8px; overflow-x: auto; scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch; padding-bottom: 4px;
   scrollbar-width: none; } /* the page dots under it are the indicator (iOS 6 page control), not a scrollbar */
 .alt-shots::-webkit-scrollbar { display: none; }
-.alt-shot { flex: none; height: 360px; aspect-ratio: 9 / 19.5; object-fit: cover; border-radius: 10px; scroll-snap-align: start;
-  border: 1px solid rgba(0,0,0,.2); background: rgba(0,0,0,.05); }
+.alt-shot { flex: none; height: 360px; aspect-ratio: 9 / 19.5; object-fit: cover; scroll-snap-align: start; }
+
+/* ==== look-only { ==== the header, news cards and screenshots */
+:root {
+  --alt-id-shade: linear-gradient(rgba(0,0,0,0), rgba(0,0,0,.45)); /* under the name over a banner */
+  --alt-icon-shadow: 0 1px 2px rgba(0,0,0,.4);
+  --alt-name-emboss: 0 -1px 0 rgba(0,0,0,.4);
+  --alt-glyph-emboss: drop-shadow(0 -1px 0 rgba(0,0,0,.45)); /* the nav bar toggles' glyphs */
+  /* the kit's "Button (Gloss Blue)" on an alert, and pressed */
+  --alert-btn-blue-edge: #1f3f86;
+  --alert-btn-blue: linear-gradient(#79a1f3, #3b71e1 49%, #215fdd 51%, #2361dd);
+  --alert-btn-blue-pressed: linear-gradient(#5f86d6, #2a5bc0 49%, #164bb8 51%, #184db9);
+}
+.alt-source, .alt-app { --alt-tint: var(--detail); }
+.alt-header { border-radius: 10px; background: var(--alt-tint, #385487); }
+.alt-id { background: var(--alt-id-shade); color: #fff; }
+.alt-header:not(:has(.alt-banner)) .alt-id { background: none; }
+.alt-icon { border-radius: 10px; box-shadow: var(--alt-icon-shadow); }
+.alt-names { text-shadow: var(--alt-name-emboss); }
+.alt-name { font-size: 20px; font-weight: bold; }
+.alt-subtitle { font-size: 14px; opacity: .9; }
+
+.alt-news { color: var(--text); text-decoration: none; border-left: 5px solid var(--alt-tint); }
+.alt-news-title { font-size: 16px; font-weight: bold; }
+.alt-news-caption { font-size: 14px; line-height: 18px; }
+.alt-news-date { font-size: 12px; color: var(--subtitle); }
+
+.alt-app-icon img { opacity: 0; }
+.alt-app-icon img.loaded { opacity: 1; }
+
+.alt-shot { border-radius: 10px; border: 1px solid rgba(0,0,0,.2); background: rgba(0,0,0,.05); }
+/* ==== } look-only ==== */
 
 /* Permissions' "N More Permissions" row (screens/altstore.js): centred in iOS 6's table-button blue, a small down
    chevron after it; tapping lists the rest in place. */
 .perm-more .cell-inner { justify-content: center; }
-.perm-more .cell-label { flex: none; color: #385487; font-weight: bold; text-align: center; }
-.perm-more .cell-label::after {
-  content: ""; display: inline-block; width: 6px; height: 6px; margin: 0 0 3px 8px; vertical-align: middle;
-  border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg);
-}
+.perm-more .cell-label { flex: none; }
+.perm-more .cell-label::after { display: inline-block; width: 6px; height: 6px; margin: 0 0 3px 8px; vertical-align: middle; transform: rotate(45deg); }
 .perm-more.up .cell-label::after { transform: rotate(-135deg); margin-bottom: -1px; }
+
+/* ==== look-only { ==== the More Permissions row, the website's greyed Install row */
+.perm-more .cell-label { color: #385487; font-weight: bold; text-align: center; }
+.perm-more .cell-label::after { content: ""; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; }
 .perm-more .cell-inner.is-pressed .cell-label { color: #fff; }
 html[data-theme="dark"] .perm-more .cell-label { color: var(--dk-link); }
 /* F96: the website's Install on the Website row before its warning was accepted: greyed out like a disabled cell
    (a tap opens the warning, websign-gate.js). */
 .websign-off .cell-label { color: var(--subtitle); }
+/* ==== } look-only ==== */
 
 /* F122: the screenshots gallery (screens/altstore.js galleryImage): a landscape picture (a banner, an iPad or Mac
    screenshot) fills the width at its own aspect instead of a phone-tall crop. */
@@ -61,27 +88,32 @@ html[data-theme="dark"] .perm-more .cell-label { color: var(--dk-link); }
    checkmark, white on a dark shadow 1pt up. Outline: not installed (a tap marks it); filled with the check cut out:
    installed (a tap forgets it). */
 .bar-button.bar-icon.mark-toggle { min-width: 34px; width: 34px; }
-.bar-button.mark-toggle::before {
-  content: ""; width: 19px; height: 19px; filter: drop-shadow(0 -1px 0 rgba(0,0,0,.45));
-  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Ccircle cx='10' cy='10' r='8.6' fill='none' stroke='%23fff' stroke-width='1.7'/%3E%3Cpath d='M5.8 10.3l2.9 2.9 5.6-6.2' fill='none' stroke='%23fff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 19px 19px no-repeat;
-}
-.bar-button.mark-toggle.is-marked::before {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cmask id='m'%3E%3Crect width='20' height='20' fill='%23fff'/%3E%3Cpath d='M5.8 10.3l2.9 2.9 5.6-6.2' fill='none' stroke='%23000' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/mask%3E%3Ccircle cx='10' cy='10' r='9.4' fill='%23fff' mask='url(%23m)'/%3E%3C/svg%3E");
-}
+.bar-button.mark-toggle::before { width: 19px; height: 19px; }
 
 /* F242a: the jailbreak app page's queue toggle in the same place (screens/altstore.js queueToggle): the same narrow
    bordered bar button holding UIKit's Add glyph (UIButtonBarPlus: a 16x17pt plus, 4pt bars) while the app isn't
    queued, its Stop glyph (UIButtonBarStop: a 17pt round-ended X) while it is; white on the dark shadow 1pt up. */
 .bar-button.bar-icon.queue-toggle { min-width: 34px; width: 34px; }
+.bar-button.queue-toggle::before { width: 16px; height: 17px; }
+.bar-button.queue-toggle.is-queued::before { width: 17px; }
+
+/* ==== look-only { ==== the Installed and queue toggles' glyphs */
+.bar-button.mark-toggle::before {
+  content: ""; filter: var(--alt-glyph-emboss);
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Ccircle cx='10' cy='10' r='8.6' fill='none' stroke='%23fff' stroke-width='1.7'/%3E%3Cpath d='M5.8 10.3l2.9 2.9 5.6-6.2' fill='none' stroke='%23fff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 19px 19px no-repeat;
+}
+.bar-button.mark-toggle.is-marked::before {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cmask id='m'%3E%3Crect width='20' height='20' fill='%23fff'/%3E%3Cpath d='M5.8 10.3l2.9 2.9 5.6-6.2' fill='none' stroke='%23000' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/mask%3E%3Ccircle cx='10' cy='10' r='9.4' fill='%23fff' mask='url(%23m)'/%3E%3C/svg%3E");
+}
 .bar-button.queue-toggle::before {
-  content: ""; width: 16px; height: 17px; filter: drop-shadow(0 -1px 0 rgba(0,0,0,.45));
+  content: ""; filter: var(--alt-glyph-emboss);
   background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 34'%3E%3Cpath d='M12 1h8v12h12v9H20v12h-8V22H0v-9h12z' fill='%23fff'/%3E%3C/svg%3E") center / 16px 17px no-repeat;
 }
 .bar-button.queue-toggle.is-queued::before {
-  width: 17px;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 34 34'%3E%3Cpath d='M4.2 4.2l25.6 25.6M29.8 4.2L4.2 29.8' stroke='%23fff' stroke-width='7.4' stroke-linecap='round'/%3E%3C/svg%3E");
   background-size: 17px 17px;
 }
+/* ==== } look-only ==== */
 
 /* B54: the gallery's slot (screens/altstore.js previewSlot): a 44px row with iOS 6's grey spinner while the pictures
    load, then the gallery at once, faded in, while the page below slides down to its new place (nav/slide.js: a
@@ -89,14 +121,17 @@ html[data-theme="dark"] .perm-more .cell-label { color: var(--dk-link); }
    is what the page below moves by. */
 .preview-slot { display: flow-root; }
 .shots-loading { height: 44px; display: flex; align-items: center; justify-content: center; }
-.shots-spinner { width: 20px; height: 20px; background: var(--spinner-gray) center / 20px no-repeat; animation: hud-spin .96s linear infinite; }
+.shots-spinner { width: 20px; height: 20px; animation: hud-spin .96s linear infinite; }
 @media (prefers-reduced-motion: reduce) { .shots-spinner { animation-duration: 3s; } }
 
+/* ==== look-only { ==== the gallery's spinner; a size too big for the website; the Too Big alert's Download IPA */
+.shots-spinner { background: var(--spinner-gray) center / 20px no-repeat; }
 /* F257: a version too big for the website: its Size in iOS 6's red (the sign sheet's warning red), and the Too Big
    alert's Download IPA as the kit's "Button (Gloss Blue)" (sources.css .bar-button.done's values) over the alert's
    navy, the way to go; the others stay plain and Cancel dark. background-origin: border-box after each background. */
 .cell.size-over .cell-detail, .store-tile.size-over .store-tile-value { color: #b5322c; }
-.alert-button.blue { border-color: #1f3f86;
-  background: linear-gradient(#79a1f3, #3b71e1 49%, #215fdd 51%, #2361dd); background-origin: border-box; }
+.alert-button.blue { border-color: var(--alert-btn-blue-edge);
+  background: var(--alert-btn-blue); background-origin: border-box; }
 .alert-button.blue:active, .alert-button.blue.is-pressed {
-  background: linear-gradient(#5f86d6, #2a5bc0 49%, #164bb8 51%, #184db9); background-origin: border-box; }
+  background: var(--alert-btn-blue-pressed); background-origin: border-box; }
+/* ==== } look-only ==== */

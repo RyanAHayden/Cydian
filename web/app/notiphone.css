@@ -1,5 +1,6 @@
 /* F266: the Not-an-iPhone page (screens/notiphone.js). Layout only: the bar, pinstripes, tables, bar button and step
-   badges are ios6.css's and guides.css's, so the page follows every light and dark palette with no colours here. */
+   badges are ios6.css's and guides.css's, so the page follows every light and dark palette with no colours here.
+   The type, the hero's ink and the icon's shadow are in the look-only stretch at the end (docs/eras.md). */
 .notiphone { position: fixed; inset: 0; z-index: 50; }
 /* The nav bar: ios6.css's, alone (no nav stack), its title in the 44px under the status bar */
 .notiphone-bar { padding-top: env(safe-area-inset-top); }
@@ -8,22 +9,31 @@
 .notiphone-body.page-body { padding-bottom: calc(var(--safe-bottom) + 20px); touch-action: pan-y; }
 
 /* Icon, title and why, on the pinstripes in the group header's ink and emboss */
-.notiphone-hero { margin: 24px 19px 14px; text-align: center; color: var(--head); text-shadow: var(--emboss); }
-.notiphone-icon {
-  display: block; width: 76px; height: 76px; margin: 0 auto 12px; border-radius: 13px;
-  box-shadow: 0 1px 3px rgba(0,0,0,.35);
-}
-.notiphone-title { margin: 0; font-size: 22px; font-weight: bold; line-height: 26px; }
-.notiphone-why { margin: 6px 0 0; font-size: 15px; line-height: 19px; text-wrap: balance; }
+.notiphone-hero { margin: 24px 19px 14px; }
+.notiphone-icon { display: block; width: 76px; height: 76px; margin: 0 auto 12px; }
+.notiphone-title { margin: 0; }
+.notiphone-why { margin: 6px 0 0; text-wrap: balance; }
 .notiphone .group:first-of-type > .group-header { margin-top: 0; }
 
 /* The code: white cell, the code centred (core/qr.js draws its own white quiet zone) */
 .notiphone-qr { justify-content: center; padding: 12px 10px; }
 .notiphone-qr img { display: block; width: 176px; height: 176px; image-rendering: pixelated; }
 .notiphone-addr { padding-right: 9px; }
-.notiphone-domain { font-weight: normal; -webkit-user-select: text; user-select: text; }
+.notiphone-domain { -webkit-user-select: text; user-select: text; }
 .notiphone-copy { flex: none; }
 
 /* Steps: the guides' number badge, then the step in plain text */
 .notiphone-step { align-items: center; }
-.notiphone-step-text { flex: 1; min-width: 0; font-size: 16px; line-height: 20px; }
+.notiphone-step-text { flex: 1; min-width: 0; }
+
+/* ==== look-only { ==== the hero, the domain, the steps' text */
+:root {
+  --notiphone-icon-shadow: 0 1px 3px rgba(0,0,0,.35);
+}
+.notiphone-hero { text-align: center; color: var(--head); text-shadow: var(--emboss); }
+.notiphone-icon { border-radius: 13px; box-shadow: var(--notiphone-icon-shadow); }
+.notiphone-title { font-size: 22px; font-weight: bold; line-height: 26px; }
+.notiphone-why { font-size: 15px; line-height: 19px; }
+.notiphone-domain { font-weight: normal; }
+.notiphone-step-text { font-size: 16px; line-height: 20px; }
+/* ==== } look-only ==== */

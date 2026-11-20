@@ -1,77 +1,107 @@
 /* F157: Home's User Guides as iOS 6 app pages (screens/guides.js). Built on ios6.css's grouped tables and
    ios6.css's .store-segmented (nav/ui.js segmented); this file only adds what those don't draw: the answer page's question heading and
    wrapping text, the step number badges (the kit's blue gloss, green once ticked), the terminal panel (F151's log
-   look, progress.css .pl-raw) with its Copy button, and the yellow warning row. */
+   look, progress.css .pl-raw) with its Copy button, and the yellow warning row.
+   Each part's layout is in its own rules; what it paints is in the look-only stretch after them (docs/eras.md), and
+   the iOS 6 decorations (the badge and Copy glosses, embosses) come from the tokens in the first stretch. */
 
 /* an answer page: the question in bold, left-aligned, above its white cell */
-.guide-q {
-  margin: 10px 9px 8px; font-size: 19px; font-weight: bold; line-height: 23px; text-align: left;
-  color: var(--head); text-shadow: var(--emboss);
-}
-.guide-answer.table.grouped { background: var(--plain); }
-.guide .guide-text { display: block; margin: 0; font-size: 15px; line-height: 20px; font-weight: normal; text-align: left; white-space: normal; }
+.guide-q { margin: 10px 9px 8px; }
+.guide .guide-text { display: block; margin: 0; white-space: normal; }
 .guide .cell-inner > .guide-text { padding: 10px 0; }
 
 /* a step: number badge at the left, bold title above its text */
 .guide-step { align-items: flex-start; gap: 10px; padding-top: 10px; padding-bottom: 10px; }
 .guide-step-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
-.guide-step-title { font-size: 17px; font-weight: bold; line-height: 21px; }
 .guide .guide-step > .guide-text { flex: 1; padding: 3px 0 0; }
 
 /* the number badge: a round glossy blue button (the kit's matte blue split at half), green with a tick when done */
-.guide-num {
-  flex: none; width: 26px; height: 26px; padding: 0; border: 1px solid #1d4fae; border-radius: 50%;
-  display: grid; place-items: center; font: bold 14px/1 "Helvetica Neue", Helvetica, sans-serif; color: #fff;
-  text-shadow: 0 -1px 0 rgba(0,0,0,.35); box-shadow: inset 0 1px 0 rgba(255,255,255,.45);
-  background: linear-gradient(#8db3f0, #4d86e6 50%, #2a6be0 50%, #3b7fec); background-origin: border-box;
-}
+.guide-num { flex: none; width: 26px; height: 26px; padding: 0; display: grid; place-items: center; }
 .guide-tick { cursor: pointer; -webkit-tap-highlight-color: transparent; transition: opacity .15s; }
+
+/* ==== look-only { ==== the answer text, the steps and their number badges */
+:root {
+  /* the step badge: the kit's matte blue split at half, and the green once ticked */
+  --guide-num: linear-gradient(#8db3f0, #4d86e6 50%, #2a6be0 50%, #3b7fec);
+  --guide-num-edge: #1d4fae;
+  --guide-num-emboss: 0 -1px 0 rgba(0,0,0,.35);
+  --guide-num-shine: inset 0 1px 0 rgba(255,255,255,.45);
+  --guide-done: linear-gradient(#a2dc7c, #5fb53a 50%, #439d1f 50%, #55b02d);
+  --guide-done-edge: #2f7a12;
+  /* the terminal's Copy button, and pressed or copied */
+  --guide-copy: linear-gradient(#6d6d6d, #474747 50%, #333 50%, #3d3d3d);
+  --guide-copy-emboss: 0 -1px 0 rgba(0,0,0,.5);
+  --guide-copy-pressed: linear-gradient(#85a7e9, #4f80e1 50%, #2765db 50%, #2f6fe2);
+}
+.guide-q {
+  font-size: 19px; font-weight: bold; line-height: 23px; text-align: left;
+  color: var(--head); text-shadow: var(--emboss);
+}
+.guide-answer.table.grouped { background: var(--plain); }
+.guide .guide-text { font-size: 15px; line-height: 20px; font-weight: normal; text-align: left; }
+.guide-step-title { font-size: 17px; font-weight: bold; line-height: 21px; }
+.guide-num {
+  border: 1px solid var(--guide-num-edge); border-radius: 50%;
+  font: bold 14px/1 "Helvetica Neue", Helvetica, sans-serif; color: #fff;
+  text-shadow: var(--guide-num-emboss); box-shadow: var(--guide-num-shine);
+  background: var(--guide-num); background-origin: border-box;
+}
 .guide-tick.is-done {
-  border-color: #2f7a12; font-size: 0;
-  background: linear-gradient(#a2dc7c, #5fb53a 50%, #439d1f 50%, #55b02d); background-origin: border-box;
+  border-color: var(--guide-done-edge); font-size: 0;
+  background: var(--guide-done); background-origin: border-box;
 }
 .guide-tick.is-done::after { content: "✓"; font-size: 15px; font-weight: bold; }
+/* ==== } look-only ==== */
 
 /* the terminal panel: black, monospace, as F151's log */
 .guide-term-cell { padding: 0; }
-.guide-term {
-  position: relative; margin: 8px 10px; padding: 9px 10px; border-radius: 6px; background: #000;
-  -webkit-user-select: text; user-select: text;
-}
+.guide-term { position: relative; margin: 8px 10px; padding: 9px 10px; -webkit-user-select: text; user-select: text; }
 .guide-term:has(.guide-copy) { padding-right: 66px; }
+.guide-copy { position: absolute; top: 6px; right: 6px; height: 26px; padding: 0 9px; cursor: pointer; }
+/* the transcript panel stands alone in its group, outside a table */
+.group > .guide-term { margin: 0; }
+
+/* ==== look-only { ==== the terminal panel and its Copy button */
+.guide-term { border-radius: 6px; background: #000; }
 .guide-term-out .pl-raw { font-size: 12px; line-height: 17px; }
 .guide-prompt { color: #6f6f6f; }
 .guide-cmd-text { color: #fff; font-weight: bold; }
 .guide-copy {
-  position: absolute; top: 6px; right: 6px; height: 26px; padding: 0 9px; border: 1px solid #000; border-radius: 5px;
-  font: bold 12px/24px "Helvetica Neue", Helvetica, sans-serif; color: #fff; text-shadow: 0 -1px 0 rgba(0,0,0,.5);
-  background: linear-gradient(#6d6d6d, #474747 50%, #333 50%, #3d3d3d); background-origin: border-box; cursor: pointer;
+  border: 1px solid #000; border-radius: 5px;
+  font: bold 12px/24px "Helvetica Neue", Helvetica, sans-serif; color: #fff; text-shadow: var(--guide-copy-emboss);
+  background: var(--guide-copy); background-origin: border-box;
 }
 .guide-copy:active, .guide-copy.is-copied {
-  background: linear-gradient(#85a7e9, #4f80e1 50%, #2765db 50%, #2f6fe2); background-origin: border-box;
+  background: var(--guide-copy-pressed); background-origin: border-box;
 }
-/* the transcript panel stands alone in its group, outside a table */
-.group > .guide-term { margin: 0; }
+/* ==== } look-only ==== */
 
 /* the warning row: pale yellow with a yellow triangle */
-.guide-warning.table.grouped { background: #fdf5c4; border-color: #d9c35a; }
-.guide-warning .cell-inner { align-items: flex-start; gap: 10px; color: #4a3d00; }
-.guide-warning-icon {
-  flex: none; width: 22px; height: 22px; margin-top: 10px; background: no-repeat center / 22px 22px;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 26 26'%3E%3Cpath d='M13 1.5L25 24H1z' fill='%23ffcc00' stroke='%23c79a00' stroke-linejoin='round' stroke-width='1.5'/%3E%3Cpath d='M13 9v7' stroke='%23000' stroke-width='3' stroke-linecap='round'/%3E%3Ccircle cx='13' cy='20.2' r='1.7'/%3E%3C/svg%3E");
-}
-html[data-theme="dark"] .guide-warning.table.grouped { background: var(--dk-warn-table); border-color: var(--dk-warn-edge); }
-html[data-theme="dark"] .guide-warning .cell-inner { color: var(--dk-warn-text); }
+.guide-warning .cell-inner { align-items: flex-start; gap: 10px; }
+.guide-warning-icon { flex: none; width: 22px; height: 22px; margin-top: 10px; }
 
 /* Copying Files: the segmented control sits on the pinstripes like the groups under it */
 .guide-segmented { margin: 10px 10px 0; }
 .guide-pane[hidden] { display: none; }
-.guide-plain-row .cell-label { font-weight: normal; font-size: 16px; }
 
 /* F176: Copying Files' icons, our own glyphs as SVG tiles (guides.js glyph()) over the tile colour and its letter,
    and rows whose subtitle wraps (one per computer: the app, where to tap, which systems) */
 .guide .cell-icon.guide-glyph { position: relative; overflow: hidden; }
-.guide .cell-icon.guide-glyph img { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; }
-.guide .cell-icon.guide-glyph img.loaded { opacity: 1; }
+.guide .cell-icon.guide-glyph img { position: absolute; inset: 0; width: 100%; height: 100%; }
 .guide-wrap-row .cell-inner { padding-top: 7px; padding-bottom: 7px; }
-.guide-wrap-row .cell-subtitle { white-space: normal; line-height: 18px; }
+.guide-wrap-row .cell-subtitle { white-space: normal; }
+
+/* ==== look-only { ==== the warning row, Copying Files' rows and glyphs */
+.guide-warning.table.grouped { background: #fdf5c4; border-color: #d9c35a; }
+.guide-warning .cell-inner { color: #4a3d00; }
+.guide-warning-icon {
+  background: no-repeat center / 22px 22px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 26 26'%3E%3Cpath d='M13 1.5L25 24H1z' fill='%23ffcc00' stroke='%23c79a00' stroke-linejoin='round' stroke-width='1.5'/%3E%3Cpath d='M13 9v7' stroke='%23000' stroke-width='3' stroke-linecap='round'/%3E%3Ccircle cx='13' cy='20.2' r='1.7'/%3E%3C/svg%3E");
+}
+html[data-theme="dark"] .guide-warning.table.grouped { background: var(--dk-warn-table); border-color: var(--dk-warn-edge); }
+html[data-theme="dark"] .guide-warning .cell-inner { color: var(--dk-warn-text); }
+.guide-plain-row .cell-label { font-weight: normal; font-size: 16px; }
+.guide .cell-icon.guide-glyph img { opacity: 0; }
+.guide .cell-icon.guide-glyph img.loaded { opacity: 1; }
+.guide-wrap-row .cell-subtitle { line-height: 18px; }
+/* ==== } look-only ==== */

@@ -14,6 +14,9 @@ export function el(tag, cls, text) {
   return e;
 }
 
+// The grey centred note a list shows in place of rows ("No packages.", a load error): ios6.css p.empty.
+export const note = (text) => el("p", "empty", text);
+
 // A navigation bar button (ios6.css .bar-button); cls adds a variant class.
 export function barButton(label, cls = "") {
   const b = el("button", `bar-button${cls ? ` ${cls}` : ""}`, label);

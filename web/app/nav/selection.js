@@ -72,3 +72,19 @@ export function ghostFor(sel, root, win = globalThis) {
   sel.mark = selectRow(findRow(root, sel.key), win);
   return sel.mark?.el ?? null;
 }
+
+// C12: the Select / Deselect bar button of a list in manage mode (Installed > Apps, My IPAs). With something picked
+// it deselects everything (no sheet); otherwise an action sheet of presets ("All", "Expiring Soon", ...) replaces
+// the selection with the chosen preset's rows. The screen passes in its own parts:
+//   selecting   true when the button reads Select (nothing picked)
+//   options()   [{ label, preset }] for the sheet
+//   apply(p)    select preset p's rows;  clear()  deselect everything
+// Resolves with the preset picked, "none" after a deselect, or null when the sheet is cancelled.
+export async function selectPreset({ selecting, options, apply, clear, sheet }) {
+  if (!selecting) { clear(); return "none"; }
+  const opts = options();
+  const i = await sheet({ buttons: opts.map((o) => o.label) });
+  if (!(i >= 0) || !opts[i]) return null;
+  apply(opts[i].preset);
+  return opts[i].preset;
+}

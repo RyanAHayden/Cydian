@@ -25,7 +25,7 @@
 // the certificate is needed, with Download IPA (altstore.js siteCertificateAlert).
 // Rules and labels: core/myipas.js.
 // SPDX-License-Identifier: GPL-3.0-or-later
-import { grouped, placeholder, el } from "../nav/ui.js";
+import { grouped, placeholder, el, note } from "../nav/ui.js";
 import { searchBar, pinned } from "../nav/searchbar.js";
 import * as browse from "./browse.js";
 import { catalog, ALL } from "../catalog.js";
@@ -35,6 +35,7 @@ import { format, mounted, parse, settingsRoute } from "../router.js";
 import { showAlert } from "../nav/alert.js";
 import { showActionSheet } from "../nav/actionsheet.js";
 import { showHUD } from "../nav/hud.js";
+import { selectPreset } from "../nav/selection.js";
 import { cleanSourceUrl } from "../core/sources.js";
 import { detectMode } from "../core/settings.js";
 import { deviceError, phaseLabel, isCgBI, fromBase64 } from "../core/signing.js";
@@ -163,7 +164,6 @@ function style() {
   }
 }
 
-const note = (text) => el("p", "empty", text);
 const go = (path) => { location.hash = format({ tab: "installed", path }).replace(/^#/, ""); };
 const ipaPath = (file) => [MYIPAS, ipaToken(file)];
 
@@ -496,12 +496,13 @@ const manageRows = () => lib.ctl?.rows ?? [];
 // row picked the button is Deselect, which drops it. -> the preset, "none" (Deselect), or null (Cancel).
 export async function selectButton({ sheet = showActionSheet, ctl = lib.ctl } = {}) {
   const rows = ctl?.rows ?? [];
-  if (ipaSelectLabel(rows, ctl?.state.selected) !== IPA_SELECT) { ctl?.step({ type: "deselectAll" }); return "none"; }
-  const opts = ipaSelectSheet(rows);
-  const i = await sheet({ buttons: opts.map((o) => o.label) });
-  if (!(i >= 0) || !opts[i]) return null;
-  ctl?.step({ type: "selectAll", files: ipaPresetFiles(rows, opts[i].preset) });
-  return opts[i].preset;
+  return selectPreset({
+    selecting: ipaSelectLabel(rows, ctl?.state.selected) === IPA_SELECT,
+    options: () => ipaSelectSheet(rows),
+    apply: (preset) => ctl?.step({ type: "selectAll", files: ipaPresetFiles(rows, preset) }),
+    clear: () => ctl?.step({ type: "deselectAll" }),
+    sheet,
+  });
 }
 
 function syncManage() {
@@ -741,7 +742,7 @@ async function renderFiltered(body, route, fetchRows, hint) { // hint: the searc
   if (!rows.length) { wait.replaceWith(note("No apps.")); return; }
   wait.remove();
   const lettered = (list) => withLetterHeaders(list, (r) => indexLetter(r.name));
-  const none = el("p", "empty", "No Results");
+  const none = note("No Results");
   none.hidden = true;
   // C10: the shared bar (nav/searchbar.js), pinned over the list.
   const results = pinned(body, searchBar({ placeholder: "Search Apps", ariaLabel: hint, delay: 120, onQuery: (t) => {

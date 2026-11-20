@@ -18,7 +18,7 @@
 import { grouped, segmented } from "../nav/ui.js";
 import { format, parse, settingsRoute } from "../router.js";
 import { createSettings, detectMode, themeState, paletteFor, DARK_THEME_KEY, SETTINGS, SIGNING_GROUPS } from "../core/settings.js";
-import { showAlert } from "../nav/alert.js";
+import { showAlert, alertOK } from "../nav/alert.js";
 import { showHUD } from "../nav/hud.js";
 import { parseProfile, checkP12Password, deviceSummary, deviceError, summary, profileKind, deviceCheck, deviceCheckText } from "../core/signing.js";
 import { sortCertFiles, resolvePassword } from "../core/certfiles.js";
@@ -748,7 +748,6 @@ function redrawAll() {
   }
 }
 
-const alertOK = (title, message) => showAlert({ title, message, buttons: ["OK"] });
 
 // Everything picked at once: the .p12 and profile are checked and saved as if picked alone, then the password is
 // found among any text files (or the empty password), unless the saved one already opens the certificate.

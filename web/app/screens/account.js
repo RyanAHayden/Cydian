@@ -16,7 +16,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { grouped } from "../nav/ui.js";
 import { format, settingsRoute } from "../router.js";
-import { showAlert } from "../nav/alert.js";
+import { showAlert, alertOK } from "../nav/alert.js";
 import { showHUD } from "../nav/hud.js";
 import { copyText } from "../nav/menu.js";
 import { onPageOpen } from "../nav/pagestate.js";
@@ -257,7 +257,6 @@ function keyBlock(code) {
   return box;
 }
 
-const alertOK = (title, message) => showAlert({ title, message, buttons: ["OK"] });
 const problem = (e) => e?.message ?? String(e);
 
 async function createFlow(el) {

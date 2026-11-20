@@ -835,6 +835,13 @@ enum Sideload {
         let bg = nc.addObserver(forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main) { _ in away = true }
         func done(_ installed: Bool?) {
             nc.removeObserver(bg)
+            if installed == false {
+                // B146: why the watch says "not installed", so a later fix can make Installed real (the page now ends
+                // such a row Sent to iOS, as isInstalled is unreliable on iOS 27 and for re-signed apps)
+                let why = "B146 watch \(bid): not installed; progress seen \(seen), last \(last)%, away \(away), "
+                    + "after \(Int(Date().timeIntervalSince(start))) s, isInstalled now \(Workspace.isInstalled(bid).map { String($0) } ?? "unknown")"
+                NSLog("\(Brand.name) " + why.replacingOccurrences(of: "%", with: "%%"))
+            }
             if installed == false, lost(seen, away) { return finish(nil, true) }
             finish(installed, false)
         }

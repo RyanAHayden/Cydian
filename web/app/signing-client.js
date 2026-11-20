@@ -587,6 +587,8 @@ export async function watchSelfUpdate(onState = () => {}, native) {
 //   await openPrepared(row, { tag, signal, progress, log, host, wait })   hand it to iOS (progress("asking")), then
 //                                      wait for iOS's install (progress("installing", f)) -> { installed, expires,
 //                                      dismissed? (B85: iOS's prompt closed and iOS never asked for the IPA) };
+//                                      B146: on the prompt route installed is true or null (Sent to iOS), never false
+//                                      unless dismissed; This iPhone's installd answer is passed as it is
 //                                      again (B91): signing.reprompt instead of signing.open (the IPA is still
 //                                      served), then the same wait; throws code "gone" when it isn't
 //                                      host (iFizBox's own) doesn't wait: iOS closes iFizBox to install it
@@ -679,7 +681,10 @@ export async function openPrepared(row, { tag, signal = null, progress = () => {
     return { installed: null, expires: opened?.expires ?? null }; // iOS can't be asked: the prompt was shown
   }
   // B85: dismissed: iOS's prompt closed and iOS never asked for the IPA (the user tapped Cancel on it)
-  return { installed: r?.installed ?? null, expires: opened?.expires ?? null, ...(r?.dismissed ? { dismissed: true } : {}) };
+  if (r?.dismissed) return { installed: r?.installed ?? null, expires: opened?.expires ?? null, dismissed: true };
+  // B146: once iOS took the IPA, "not installed" can't be told apart from "installed but not seen" (isInstalled is
+  // unreliable on iOS 27, a re-signed app may not show): the row ends Sent to iOS (null), never Failed
+  return { installed: r?.installed === true ? true : null, expires: opened?.expires ?? null };
 }
 
 // B111: signing.install's {here: "copying" | "installing", progress} event (This iPhone) -> { label } for the page's

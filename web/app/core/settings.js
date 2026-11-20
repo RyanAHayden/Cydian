@@ -87,6 +87,8 @@ export const RETIRED_DAEMON_KEYS = ["checkUpdates", "cellular"];
 
 // kind: "choice" (one row per option, the chosen one checked), "segmented" (an iOS 6 segmented control, F199), "toggle" (a switch), "list" (pushes a page that
 // picks one option; its footer shows there), "holds" (pushes the held packages). `default` is a value, or a function of the mode.
+// F315: `hint` is the footer under the row's group on the Settings page when it differs from `footer` (true: the
+// footer, for a list); `with` names the row whose group it joins (sections()).
 export const SETTINGS = [
   {
     // F199: Theme's Mode, drawn as an iOS 6 segmented control. Kept under its old key (ifizbox.appearance) so a
@@ -154,8 +156,8 @@ export const SETTINGS = [
     // F35: the check, X or ? beside every package in lists, Search and the package page.
     key: "compatMarks", section: "compat", kind: "toggle", feature: "compat", modes: ALL, default: true,
     label: "Compatibility Marks", options: onOff,
-    // F205: shares the compat group's footer with Works on My Phone now, so short (the pair stays under 120).
-    footer: "Marks put a check, an X or a ? by each package.",
+    // F315: its own group and footer now, below Works on My Phone's.
+    footer: "Puts a check, an X or a ? by each package.",
   },
   {
     // The site's picker (F17): the app knows its iOS version from the bridge.
@@ -210,17 +212,18 @@ export const SETTINGS = [
   },
   { key: "autoInstallIdle", section: "automatic", kind: "toggle", feature: "auto-install", modes: ["jailbreak"], default: true,
     label: "When Charging and Locked", options: onOff,
-    footer: "On, automatic installs wait until this iPhone is charging and locked." },
+    footer: "Automatic installs wait until this iPhone is charging and locked." }, // F315: its own group
   {
     key: "respring", section: "automatic", kind: "list", feature: "auto-install", modes: ["jailbreak"], default: "notify",
-    label: "After a Respring Update",
+    label: "After a Respring Update", with: "autoInstall", // F315: up with Install Updates Automatically, no hint
     options: [{ value: "notify", label: "Just Notify Me" }, { value: "locked", label: "Respring When Locked" }],
   },
   {
     key: "keepVersions", section: "automatic", kind: "list", feature: "rollback", modes: ["jailbreak"], default: 1,
     label: "Keep Previous Versions",
     options: [{ value: 0, label: "None" }, { value: 1, label: "1" }, { value: 2, label: "2" }],
-    footer: "Cached .debs to roll back to.",
+    // F315: a list, but its own group, its footer shown under it on Updates too (hint) and on its page.
+    footer: "Older versions kept on this iPhone, to go back to.", hint: true,
   },
   {
     // F134: the days left on signed apps (Installed's pills, an app page's Signature row, Signed Apps' days). Off
@@ -229,10 +232,12 @@ export const SETTINGS = [
     key: "showExpiry", section: "signing", kind: "toggle", feature: "resign", modes: ["sideload"], default: true,
     label: "Show Expiry Dates", options: onOff,
     footer: "Shows how many days each signed app has left.",
+    // F315: the group's one footer, for Re-sign Reminder too (`with` below)
+    hint: "Shows how many days each signed app has left, and reminds you before it runs out.",
   },
   {
     key: "resignReminder", section: "signing", kind: "list", feature: "resign", modes: ["sideload"], default: 2,
-    label: "Re-sign Reminder",
+    label: "Re-sign Reminder", with: "showExpiry",
     options: [
       { value: 0, label: "Off" }, { value: 1, label: "1 Day Before" }, { value: 2, label: "2 Days Before" },
       { value: 3, label: "3 Days Before" }, { value: 7, label: "7 Days Before" },
@@ -245,7 +250,8 @@ export const SETTINGS = [
     // screens/settings.js makeSwitch).
     key: "keepBundleId", section: "signing", kind: "toggle", feature: "keep-id", modes: ["site", "sideload"], default: true,
     label: "Keep Bundle IDs", options: onOff, confirmOff: OLD_WAY_ALERT,
-    footer: "Apps keep their own IDs and notifications. Off: a copy under your ID.",
+    // F315: its own group; screens/settings.js keepHint swaps in what's wrong (off, or the profile can't notify).
+    footer: "Apps keep their own IDs and notifications.",
   },
   {
     // F244: Home's certificate-expiry tile (core/signing.js expiryWarning). Off (people with auto-renew): no amber or
@@ -256,7 +262,7 @@ export const SETTINGS = [
   },
   {
     key: "expiryWarning", section: "expiry", kind: "list", feature: "expiry-warning", modes: ["sideload"], default: 7,
-    needs: "showExpiryWarning", label: "Expiry Warning",
+    needs: "showExpiryWarning", with: "showExpiryWarning", label: "Expiry Warning",
     options: [
       { value: 3, label: "3 Days" }, { value: 7, label: "1 Week" }, { value: 14, label: "2 Weeks" },
       { value: 30, label: "1 Month" }, { value: 60, label: "2 Months" },
@@ -750,12 +756,36 @@ export function createSettings({ storage = globalThis.localStorage, mode = "site
     return out;
   }
 
+  // F315: iOS 6 hint style (AGENTS.md Hints): a footer explains only the group above it, so a section's rows are
+  // split into groups and footers are never joined. A row with a hint of its own (hintOf) starts a group whose
+  // footer it is; a row with `with: <key>` joins that row's group (Re-sign Reminder under Show Expiry Dates, Expiry
+  // Warning under its switch); any other row joins the group before it while that group has no footer, else starts
+  // a bare one. Only the section's first group carries its title; later groups are named by their first row's key.
   function sections() {
-    return SECTIONS.map((s) => {
-      const settings = SETTINGS.filter((d) => d.section === s.id && shown(d));
-      const footers = settings.filter((d) => d.kind !== "list").map((d) => resolve(d.footer, mode)).filter(Boolean);
-      return { ...s, settings, footer: footers.join(" ") || undefined };
-    }).filter((s) => s.settings.length);
+    const out = [];
+    for (const s of SECTIONS) {
+      const groups = [];
+      for (const d of SETTINGS.filter((x) => x.section === s.id && shown(x))) {
+        const hint = hintOf(d);
+        const host = d.with ? groups.find((g) => g.settings.some((x) => x.key === d.with)) : null;
+        const last = groups[groups.length - 1];
+        if (host) host.settings.push(d);
+        else if (!hint && last && !last.footer) last.settings.push(d);
+        else groups.push({ settings: [d], footer: hint || undefined });
+      }
+      groups.forEach((g, i) => {
+        const { title, ...rest } = s;
+        out.push(i === 0 ? { ...s, section: s.id, ...g } : { ...rest, id: g.settings[0].key, section: s.id, ...g });
+      });
+    }
+    return out;
+  }
+  // The footer a row puts under its group on the Settings page: `hint` (true: its footer), else a footer of its own
+  // unless it is a list (a list's footer shows on the page it pushes).
+  function hintOf(d) {
+    if (d.hint === true) return resolve(d.footer, mode) || null;
+    if (d.hint != null) return resolve(d.hint, mode) || null;
+    return d.kind === "list" ? null : resolve(d.footer, mode) || null;
   }
 
   return {

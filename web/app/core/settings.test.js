@@ -74,35 +74,39 @@ test("F128: pages like iOS 6's Settings: General, Theme, Updates (Signing in the
   const layout = (mode) => createSettings({ storage: memStorage(), mode }).pages()
     .map((p) => [p.id, p.title, p.sections.map((x) => x.settings.map((d) => d.key))]);
   const theme = ["theme", "Theme", [["appearance"], ["lightTheme", "darkTheme"]]]; // F199: Mode, then Themes
-  const compat = ["worksOnMyPhone", "compatMarks"];
+  // F315: a row with its own hint has its own group (Works on My Phone, Compatibility Marks; Refresh Sources on
+  // Launch, then Return to Home After bare)
+  const compat = [["worksOnMyPhone"], ["compatMarks"]];
   assert.deepEqual(layout("site"), [
-    ["general", "General", [["device", "iosVersion"], compat, ["returnHome"]]], // C14: the site refreshes by itself
+    ["general", "General", [["device", "iosVersion"], ...compat, ["returnHome"]]], // C14: the site refreshes by itself
     theme,
     ["updates", "Updates", [["holds"]]],
     ["signing", "Signing", [["keepBundleId"]]], // F237: the website signs too
   ]);
   assert.deepEqual(layout("jailbreak"), [
-    ["general", "General", [compat, ["refreshOnLaunch", "returnHome"]]],
+    ["general", "General", [...compat, ["refreshOnLaunch"], ["returnHome"]]],
     theme,
-    ["updates", "Updates", [["holds"], ["upgradeNotifications"], ["autoInstall", "autoInstallIdle", "respring", "keepVersions"]]],
+    ["updates", "Updates", [["holds"], ["upgradeNotifications"], ["autoInstall", "respring"], ["autoInstallIdle"], ["keepVersions"]]],
   ]);
   assert.deepEqual(layout("sideload"), [
-    ["general", "General", [compat, ["refreshOnLaunch", "returnHome"]]],
+    ["general", "General", [...compat, ["refreshOnLaunch"], ["returnHome"]]],
     theme,
     ["updates", "Updates", [["holds"]]],
     ["installation", "Installation", [["installRoute"]]],
-    ["signing", "Signing", [["showExpiry", "resignReminder", "keepBundleId"], ["showExpiryWarning", "expiryWarning"]]], // F244
+    ["signing", "Signing", [["showExpiry", "resignReminder"], ["keepBundleId"], ["showExpiryWarning", "expiryWarning"]]], // F244
   ]);
   const s = createSettings({ storage: memStorage(), mode: "jailbreak" });
   assert.equal(s.pageOf("theme").title, "Theme");
   assert.equal(s.pageOf("display"), null); // the old id is the screen's alias (screens/settings.js OLD_PAGES)
-  assert.equal(s.sections().find((x) => x.id === "compat").footer,
-    "Hides packages that say they don't work on this iPhone. Marks put a check, an X or a ? by each package.");
+  assert.equal(s.sections().find((x) => x.id === "compat").footer, "Hides packages that say they don't work on this iPhone.");
+  assert.equal(s.sections().find((x) => x.id === "compatMarks").footer, "Puts a check, an X or a ? by each package.");
   assert.equal(s.pageOf("appearance"), null); // a section, not a page
   // every group's footer is one or two short sentences
   for (const mode of ["site", "jailbreak", "sideload"]) {
     for (const sec of createSettings({ storage: memStorage(), mode }).sections()) {
       if (sec.footer) assert.ok(sec.footer.length <= 120, `${mode} ${sec.id}: ${sec.footer}`);
+      // F315: never two hints joined: at most two sentences, and no row's own footer glued to another's
+      if (sec.footer) assert.ok((sec.footer.match(/[.!?](\s|$)/g) ?? []).length <= 2, `${mode} ${sec.id}: ${sec.footer}`);
     }
   }
   // no page key collides with a setting's key or the Settings routes (screens/settings.js draw)
@@ -274,7 +278,11 @@ test("rows wait for their feature: today Appearance, the sources settings, Works
 
 test("sections come in page order, empty ones dropped", () => {
   const s = createSettings({ storage: memStorage(), mode: "sideload", features: everything });
-  assert.deepEqual(s.sections().map((x) => x.id), ["compat", "sources", "appearance", "themes", "updates", "installation", "signing", "expiry"]);
+  // F315: a section's later groups are named by their first row; `section` keeps the section's id, only the first
+  // group carries its title
+  assert.deepEqual(s.sections().map((x) => x.id), ["compat", "compatMarks", "sources", "returnHome", "appearance", "themes", "updates",
+    "installation", "signing", "keepBundleId", "expiry"]);
+  assert.deepEqual([...new Set(s.sections().map((x) => x.section))], ["compat", "sources", "appearance", "themes", "updates", "installation", "signing", "expiry"]);
   assert.equal(s.sections().find((x) => x.id === "appearance").settings[0].key, "appearance");
 });
 
@@ -402,11 +410,36 @@ test("F38: Roothide is a device type on the site and a bridge type in the app (i
 
 test("F70: the Automatic Installs rows show in the jailbreak app only, in their own section", () => {
   const jb = createSettings({ storage: memStorage(), mode: "jailbreak" });
-  const auto = jb.sections().find((x) => x.id === "automatic");
-  assert.deepEqual(auto.settings.map((d) => d.key), ["autoInstall", "autoInstallIdle", "respring", "keepVersions"]);
+  const auto = jb.sections().filter((x) => x.section === "automatic");
+  // F315: the two lists under the header with no hint; When Charging and Locked and Keep Previous Versions each
+  // their own group and hint (a list's footer is no longer dropped when it has `hint`)
+  assert.deepEqual(auto.map((g) => [g.title, g.settings.map((d) => d.key), g.footer]), [
+    ["Automatic Installs", ["autoInstall", "respring"], undefined],
+    [undefined, ["autoInstallIdle"], "Automatic installs wait until this iPhone is charging and locked."],
+    [undefined, ["keepVersions"], "Older versions kept on this iPhone, to go back to."],
+  ]);
   for (const mode of ["site", "sideload"]) {
-    assert.equal(createSettings({ storage: memStorage(), mode }).sections().some((x) => x.id === "automatic"), false);
+    assert.equal(createSettings({ storage: memStorage(), mode }).sections().some((x) => x.section === "automatic"), false);
   }
+});
+
+// F315: Settings > Installation & Signing's options: Show Expiry Dates and Re-sign Reminder one group with one
+// footer; Keep Bundle IDs its own (screens/settings.js keepHint gives its footer by state); Expiry Warning stays
+// with its switch.
+test("F315: Signing's groups, one hint each", () => {
+  const groups = createSettings({ storage: memStorage(), mode: "sideload" }).sections().filter((x) => x.page === "signing");
+  assert.deepEqual(groups.map((g) => [g.settings.map((d) => d.key), g.footer]), [
+    [["showExpiry", "resignReminder"], "Shows how many days each signed app has left, and reminds you before it runs out."],
+    [["keepBundleId"], "Apps keep their own IDs and notifications."],
+    [["showExpiryWarning", "expiryWarning"], "Warns on Home before your certificate or profile expires."],
+  ]);
+  // the site has Keep Bundle IDs only
+  assert.deepEqual(createSettings({ storage: memStorage(), mode: "site" }).sections().filter((x) => x.page === "signing")
+    .map((g) => g.settings.map((d) => d.key)), [["keepBundleId"]]);
+  // a list's own page footer stays its own (Re-sign Reminder's page), not the group's
+  const s = createSettings({ storage: memStorage(), mode: "sideload" });
+  assert.equal(s.footerOf("resignReminder"), "Reminds you before an app's signature expires.");
+  assert.equal(s.footerOf("showExpiry"), "Shows how many days each signed app has left.");
 });
 
 test("F70: Update Automatically marks: sorted, unique, stored on the device, listeners told only on a change", () => {
@@ -487,7 +520,7 @@ test("F134: Show Expiry Dates is a switch on Settings > Signing, on by default, 
   assert.equal(d.label, "Show Expiry Dates");
   const s = createSettings({ storage: memStorage(), mode: "sideload" });
   assert.equal(s.get("showExpiry"), true);
-  assert.deepEqual(s.sections().find((x) => x.page === "signing").settings.map((x) => x.key), ["showExpiry", "resignReminder", "keepBundleId"]);
+  assert.deepEqual(s.sections().find((x) => x.page === "signing").settings.map((x) => x.key), ["showExpiry", "resignReminder"]);
   s.set("showExpiry", false);
   assert.equal(s.get("showExpiry"), false);
   for (const mode of ["site", "jailbreak"]) assert.equal(createSettings({ storage: memStorage(), mode }).isShown("showExpiry"), false, mode);

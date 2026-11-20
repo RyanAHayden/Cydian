@@ -227,6 +227,7 @@ function settingsGroups(list, page) {
         rows.push({ label: d.label, detail: holdsDetail(), live: () => holdsDetail(), href: format(settingsRoute([page, "holds"])), ...icon(d) });
       }
     }
+    rows.push(...(s.extraRows ?? [])); // F315: a fix row in the group its footer explains (Keep Bundle IDs' guide)
     return { header: s.title, footer: s.footer, rows, id: s.id, switches: switches.splice(0), segs: segs.splice(0), needs: needs.splice(0) };
   });
   const frag = grouped(sections);
@@ -1255,12 +1256,45 @@ const SERVER_FOOTER = `Hands iOS the install manifests when apps don't install s
 export function keepNotes(profile, keep) {
   return profileNotes(profile, { keep }).filter((n) => n.id !== "one-app");
 }
-function withKeepNotes(frag, profile) {
-  const notes = keepNotes(profile, keepOn((k) => settings.get(k)));
-  if (notes.length) {
-    const rows = notes.some((n) => n.guide) ? [{ label: GUIDE_LINK, href: keepGuideHref() }] : [];
-    frag.append(grouped([{ rows, footer: notes.map((n) => n.text).join(" ") }]));
-  }
+
+// F315: Keep Bundle IDs' group footer, by state (AGENTS.md Hints: the footer turns into what's wrong when something
+// is): off, the old way in a line; on, the profile's one notification problem, shortened (wildcard, development, no
+// Push), with How to Get Notifications in the group (`guide`); else what the switch does. One sentence each.
+export const KEEP_SHORT = {
+  "old-way": "Off, each app becomes a copy under your ID, without its notifications.",
+  wildcard: "Your wildcard profile can't get notifications for kept IDs.",
+  development: "Your development profile gets only Apple's test notifications, which apps don't use.",
+  "no-push": "Your profile has no Push, so kept IDs get no notifications.",
+};
+export function keepHint(profile, keep, fine = SETTINGS.find((d) => d.key === "keepBundleId")?.footer ?? "") {
+  const note = keepNotes(profile, keep)[0];
+  if (!note) return { footer: fine, guide: false };
+  return { footer: KEEP_SHORT[note.id] ?? note.text, guide: Boolean(note.guide) };
+}
+
+// Settings > Signing's generated groups (Show Expiry Dates and Re-sign Reminder; Keep Bundle IDs), with Keep Bundle
+// IDs' footer by state and its guide row. The switch doesn't redraw the page (it keeps its slide), so the footer
+// and the guide row follow it in place; nav/slide.js slides what moves.
+function keepGroups(list, profile) {
+  const has = (s) => s.settings.some((d) => d.key === "keepBundleId");
+  const keep = keepOn((k) => settings.get(k));
+  const guide = keepHint(profile, true).guide;
+  const shaped = list.map((s) => (has(s) ? { ...s, footer: keepHint(profile, keep).footer,
+    extraRows: guide ? [{ label: GUIDE_LINK, href: keepGuideHref() }] : [] } : s));
+  const frag = settingsGroups(shaped, "signing");
+  const group = frag.querySelector?.('.switch[data-key="keepBundleId"]')?.closest(".group");
+  if (!group) return frag;
+  const foot = group.querySelector(".group-footer");
+  const cells = group.querySelectorAll(".table > *");
+  const guideRow = guide ? cells[cells.length - 1] : null;
+  if (guideRow) guideRow.hidden = !keep;
+  const off = settings.onChange((key) => {
+    if (key !== "keepBundleId") return;
+    if (!group.isConnected) { off(); return; } // a redraw replaced it, or its page was popped
+    const on = keepOn((k) => settings.get(k));
+    if (foot) foot.textContent = keepHint(profile, on).footer;
+    if (guideRow) guideRow.hidden = !on;
+  });
   return frag;
 }
 
@@ -1385,7 +1419,7 @@ async function drawDeviceSigning(el, { only = null } = {}) {
     files: () => certificateBlock(el, id, status ?? { identity: null }, { files: true }),
     profile: () => profileGroup(split.profile, info.device), // F236: with "This iPhone is in the profile"
     account: () => accountGroup({ redraw: redrawAll }),
-    options: () => withKeepNotes(settingsGroups(settings.sections().filter((s) => s.page === "signing"), "signing"), kept?.profile),
+    options: () => keepGroups(settings.sections().filter((s) => s.page === "signing"), kept?.profile),
     server: () => serverGroup(el),
     status: () => signingExtras({ identity: kept, redraw: redrawAll, dates: settings.get("showExpiry") }),
     help: () => helpGroup(),
@@ -1733,7 +1767,7 @@ async function drawSiteSigning(el) {
     // profile that lists devices says how to check it
     profile: () => profileGroup(split.profile, check ? deviceCheckText(check) : null, siteUdidFind(check)),
     account: () => accountGroup({ native: false, redraw: redrawAll }),
-    options: () => withKeepNotes(settingsGroups(settings.sections().filter((s) => s.page === "signing"), "signing"), profile),
+    options: () => keepGroups(settings.sections().filter((s) => s.page === "signing"), profile),
     app: () => { const f = document.createDocumentFragment(); f.append(...siteAppSection(id)); return f; },
     // F254j: the same Free Apple ID group as How Signing Works' (it stays hidden unless the Worker's relay is on)
     free: () => freeRouteBlock(),

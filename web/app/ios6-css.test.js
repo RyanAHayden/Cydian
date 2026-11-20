@@ -3,7 +3,7 @@
 // that appends several groups straight into .page-body (Settings root, the package page), pushing the rest down.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 
 const css = readFileSync(new URL("./ios6.css", import.meta.url), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
 const rules = [...css.matchAll(/([^{}]+)\{([^}]*)\}/g)].map(([, sel, decl]) => ({ sel: sel.trim(), decl }));
@@ -90,4 +90,48 @@ test("B154: modal sheets cover the reload bar", () => {
     assert.doesNotMatch(r.decl, /z-index/, `${r.sel} must not lift the strip`);
   }
   assert.ok(!rules.some((x) => /\.sheet\b[^,{]*\.reload-bar/.test(x.sel)), "no rule moves the strip onto a sheet");
+});
+
+// B191: 120 Hz (AGENTS.md): only transform and opacity animate. No `transition` in any web/app stylesheet names a
+// layout property (or leaves the property out, which means `all`); a size change slides with a transform instead
+// (nav/slide.js, or a counter-transform as on sources.css's rows).
+const LAYOUT = /^(all|width|height|(min|max)-(width|height)|inline-size|block-size|(min|max)-(inline|block)-size|margin(-[a-z]+)*|padding(-[a-z]+)*|top|right|bottom|left|inset(-[a-z]+)*|border(-(top|right|bottom|left|inline|block)(-(start|end))?)?(-width)?|flex(-[a-z]+)*|(row-|column-)?gap|grid(-[a-z]+)*|font|font-size|line-height|letter-spacing|word-spacing|text-indent|vertical-align)$/;
+const EASING = /^(ease|ease-in|ease-out|ease-in-out|linear|step-start|step-end|normal|allow-discrete|initial|inherit|unset)$/;
+const splitTop = (s) => { // on commas outside parentheses (cubic-bezier(...))
+  const out = [];
+  let depth = 0, cur = "";
+  for (const ch of s) {
+    if (ch === "(") depth++;
+    if (ch === ")") depth--;
+    if (ch === "," && depth === 0) { out.push(cur.trim()); cur = ""; } else cur += ch;
+  }
+  out.push(cur.trim());
+  return out.filter(Boolean);
+};
+export function transitionedProps(src) {
+  const props = [];
+  const text = src.replace(/\/\*[\s\S]*?\*\//g, "");
+  for (const [, name, value] of text.matchAll(/(?:^|[;{\s])(transition(?:-property)?)\s*:\s*([^;}]*)/g)) {
+    for (const item of splitTop(value.replace(/!important/, ""))) {
+      if (name === "transition-property") { props.push(item); continue; }
+      const words = item.replace(/\([^)]*\)/g, "").split(/\s+/).filter((w) => /^-?[a-z][a-z-]*$/.test(w) && !EASING.test(w));
+      if (words[0] === "none") continue;
+      props.push(words[0] ?? "all");
+    }
+  }
+  return props;
+}
+
+test("B191: no transition in web/app/*.css animates a layout property", () => {
+  assert.deepEqual(transitionedProps(".a { transition: width .3s ease, opacity .2s; } .b{transition:.3s}"), ["width", "opacity", "all"]);
+  assert.deepEqual(transitionedProps(".a { transition: transform .3s cubic-bezier(.25,.1,.25,1), opacity .3s linear; }"), ["transform", "opacity"]);
+  assert.deepEqual(transitionedProps(".a { transition: none; transition-duration: 0s; transition-property: margin-left; }"), ["margin-left"]);
+  const dir = new URL("./", import.meta.url);
+  const files = readdirSync(dir).filter((f) => f.endsWith(".css"));
+  assert.ok(files.length > 5, "the stylesheets are there");
+  const bad = [];
+  for (const f of files) {
+    for (const p of transitionedProps(readFileSync(new URL(f, dir), "utf8"))) if (LAYOUT.test(p)) bad.push(`${f}: ${p}`);
+  }
+  assert.deepEqual(bad, [], "animate transform/opacity instead (nav/slide.js FLIP, or a counter-transform)");
 });

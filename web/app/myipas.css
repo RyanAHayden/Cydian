@@ -25,7 +25,8 @@
    Delete takes its place, Manage hides it and the chevron while the circles slide the row's content right. */
 /* The chevron is the cell's last flex item (ios6.css): the button's room is kept before it, so name and line
    ellipsize short of the button and the chevron stays at the cell's right edge. A swipe or Manage gives the room back. */
-.myipa-row.has-price .cell-inner.chevron::after { margin-left: 96px; transition: margin-left .3s ease-in-out, opacity .2s ease; }
+/* The room changes at once (120 Hz: no layout transitions): the chevron stays put, only the name's ellipsis moves. */
+.myipa-row.has-price .cell-inner.chevron::after { margin-left: 96px; transition: opacity .2s ease; }
 .myipa-row.has-price.armed .cell-inner.chevron::after, .managing .myipa-row.has-price .cell-inner.chevron::after { margin-left: 0; }
 .myipa-row .price-btn { position: absolute; right: 28px; top: 50%; margin-top: -12px; transition: opacity .2s ease; }
 .myipa-row.armed .price-btn, .managing .myipa-row .price-btn { opacity: 0; pointer-events: none; }

@@ -565,11 +565,13 @@ html.no-zoom, html.no-zoom body { touch-action: pan-x pan-y; }
 .scroll-indicator {
   position: fixed; top: 0; right: 2px; z-index: 6; width: 5px; border-radius: 3px;
   background: rgba(0,0,0,.5); box-shadow: 0 0 0 1px rgba(255,255,255,.15);
-  opacity: 0; transition: opacity .3s, width .1s; pointer-events: none; touch-action: none; will-change: transform;
+  opacity: 0; transition: opacity .3s, scale .1s; pointer-events: none; touch-action: none; will-change: transform;
 }
 .scroll-indicator.on { opacity: 1; } /* never takes touches: a hold on it grabs (nav/scroller.js) */
 .bar-touch, .bar-touch * { -webkit-user-select: none !important; user-select: none !important; -webkit-touch-callout: none !important; }
-.scroll-indicator.grab { width: 7px; right: 1px; border-radius: 4px; }
+/* Grabbed, it widens from 5 to 7px about the same centre (was width 7, right 1): `scale`, since 120 Hz animates no width,
+   and apart from the translateY nav/scroller.js writes into `transform`. */
+.scroll-indicator.grab { scale: 1.4 1; }
 
 /* Short pages still rubber-band like iOS: a scroller only bounces when it can scroll, so every page is at least
    1px taller than its box. A zero-width float does it without changing any element's size (stretching the first

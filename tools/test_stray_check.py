@@ -48,10 +48,10 @@ class StrayCheck(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stderr)
 
     def test_ignored_file_refused(self):
-        self.write("web/app/dl/Cydian.ipa", "x")
+        self.write("web/app/dl/stray.ipa", "x")
         r = self.run_([CHECK, self.tree])
         self.assertEqual(r.returncode, 1)
-        self.assertIn("web/app/dl/Cydian.ipa", r.stderr)
+        self.assertIn("web/app/dl/stray.ipa", r.stderr)
 
     def test_untracked_file_refused(self):
         self.write("web/app/new.js", "x")
@@ -67,20 +67,20 @@ class StrayCheck(unittest.TestCase):
 
     def test_release_dry_run_refuses(self):
         """release.sh stops before building or reading --dist."""
-        self.write("web/app/dl/Cydian.ipa", "x")
+        self.write("web/app/dl/stray.ipa", "x")
         r = self.run_([RELEASE, "--dry-run", "--dist", os.path.join(self.tree, "nodist")])
         self.assertEqual(r.returncode, 1, r.stdout)
-        self.assertIn("web/app/dl/Cydian.ipa", r.stderr)
+        self.assertIn("web/app/dl/stray.ipa", r.stderr)
         self.assertIn("not releasing", r.stderr)
         self.assertNotIn("nodist", r.stderr)
 
     def test_setup_release_dry_run_refuses(self):
         """setup/release.sh stops before any cargo build."""
-        self.write("web/app/dl/Cydian.ipa", "x")
+        self.write("web/app/dl/stray.ipa", "x")
         out = os.path.join(self.tree, "out")
         r = self.run_([SETUP_RELEASE, "--dry-run", "--out", out])
         self.assertEqual(r.returncode, 1, r.stdout)
-        self.assertIn("web/app/dl/Cydian.ipa", r.stderr)
+        self.assertIn("web/app/dl/stray.ipa", r.stderr)
         self.assertIn("not releasing", r.stderr)
         self.assertNotIn("building", r.stderr)
         self.assertFalse(os.path.exists(out))

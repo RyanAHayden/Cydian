@@ -42,6 +42,7 @@ import { MODES, MODE_LABEL, changeCount, runTitle, createRepeatFilter, CONFFILE_
 import { appQueue } from "../app-queue.js";
 import { appPlan, runOrder, sizeText, SELF_ID, customParams, APP_MODES, APP_MODE_LABEL } from "../core/appqueue.js";
 import { NAME } from "../brand.js";
+import { storedRoute } from "../core/installroute.js"; // B137
 import { rowIcon } from "../icons/rowicons.js";
 import { runQueue, markNeededBy } from "./queuerun.js";
 import { createQueueHint } from "../nav/queuehint.js";
@@ -663,7 +664,8 @@ export async function runAppQueueRun(jobs, { queue = appQueue, record = recordAp
     const sc = lanes ? null : await import("../signing-client.js");
     const { runAppRun, phoneLanes } = await import("./apprun.js");
     return await (run ?? runAppRun)(jobs.filter((j) => queue.get(j.id)), {
-      queue, record, lanes: lanes ?? phoneLanes(sc),
+      // B137: on Settings > Installation's This iPhone route the rows say Installing, not Tap Install (no iOS prompt)
+      queue, record, lanes: lanes ?? { ...phoneLanes(sc), local: () => storedRoute() === "iphone" },
       onClose: () => { appRunning = false; updateAppChrome(); },
       reopenConfirm: (footer) => { appRunning = false; openAppConfirm(queue, { footer }); },
     });

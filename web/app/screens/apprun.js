@@ -215,6 +215,7 @@ export async function runAppRun(jobs, deps) {
     install: (r, hooks) => lanes.install(r, hooks, (text) => line("raw", text, r.id)),
     discard: (r) => lanes.discard(r),
     ...(lanes.reprompt ? { reprompt: (r) => lanes.reprompt(r) } : {}),
+    ...(lanes.local ? { local: (r) => lanes.local(r) } : {}), // B137: This iPhone: no iOS prompt to tap
     ...(deps.stallMs ? { stallMs: deps.stallMs } : {}),
     ...(deps.later ? { later: deps.later, clear: deps.clear } : {}),
     onChange: (r) => {

@@ -435,3 +435,49 @@ test("B85: the asking row's reprompt asks the phone again and logs it; only whil
   assert.equal(await run2.reprompt("c"), false);
   run2.cancel();
 });
+
+// B137: the This iPhone route (local) has no iOS prompt: its rows and the bottom status say Installing while the
+// route is settled, never Tap Install; the Signing Server route keeps the tap words.
+test("B137: rowStatus and runStatus per route: local says Installing, the server route says Tap Install", async () => {
+  const ph = phone();
+  const asked = [];
+  const rows = appRows(jobs("a", "b"));
+  const run = createAppRun({ rows, sign: ph.sign, install: ph.install, local: (r) => r.id === "a", reprompt: (r) => { asked.push(r.id); return true; } });
+  const end = run.start();
+  await flush();
+  ph.signed("a"); ph.signed("b");
+  await flush();
+  // a: This iPhone, its route not settled yet (phase null)
+  assert.equal(rows[0].state, "asking");
+  assert.equal(rows[0].local, true);
+  assert.equal(rowStatus(rows[0]), "Installing");
+  assert.equal(runStatus(rows), "Installing A (1 of 2)");
+  assert.equal(await run.reprompt("a"), false); // no prompt to show again
+  assert.deepEqual(asked, []);
+  const hooks = ph.pending.install.get("a").hooks;
+  hooks.progress("copying", 0.4);
+  assert.equal(rowStatus(rows[0]), "Copying to iPhone 40%");
+  assert.equal(runStatus(rows), "Copying A to iPhone (1 of 2)");
+  hooks.progress("installing", 0.5);
+  assert.equal(rowStatus(rows[0]), "Installing 50%");
+  assert.equal(runStatus(rows), "Installing A (1 of 2)");
+  ph.installed("a");
+  await flush();
+  // b: the Signing Server route keeps iOS's prompt words
+  assert.equal(rows[1].local, false);
+  assert.equal(rowStatus(rows[1]), "Tap Install on the iOS prompt");
+  assert.equal(runStatus(rows), "Tap Install for B (2 of 2)");
+  ph.installed("b");
+  await end;
+});
+
+test("B137: a local row whose install goes through the Signing Server after all (phase asking) says Tap Install", () => {
+  const rows = appRows(jobs("a", "b"));
+  Object.assign(rows[0], { state: "asking", local: true, phase: "vpn" });
+  assert.equal(rowStatus(rows[0]), "Waiting for LocalDevVPN…");
+  rows[0].phase = "asking";
+  assert.equal(rowStatus(rows[0]), "Tap Install on the iOS prompt");
+  assert.equal(runStatus(rows), "Tap Install for A (1 of 2)");
+  rows[0].local = false; rows[0].phase = null; // no local hint (website, tests): the old words
+  assert.equal(rowStatus(rows[0]), "Tap Install on the iOS prompt");
+});

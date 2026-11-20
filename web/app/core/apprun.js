@@ -22,6 +22,8 @@
 //                              isn't served any more (the row then signs again from the start)
 //       discard(row)        frees a signed copy that will never be installed (its row stopped, or the run cancelled)
 //       reprompt(row)       -> true | false: B85, iOS's prompt for the app with iOS ("asking") again
+//       local(row)          -> true when the row's install goes the This iPhone route (B137: its row and the bottom
+//                              status say Installing, never Tap Install, until iOS's prompt really shows: promptUp)
 //     .start() -> a promise for the end (every row installed, failed or cancelled)
 //     .stop(id)   the working row's round stop button: aborts that app only (its download, signing or iOS's prompt);
 //                 the next one goes on
@@ -85,7 +87,7 @@ export function appRows(jobs = []) {
   return runOrder(jobs).map((j) => ({
     id: j.id, name: j.name || j.id, mode: j.mode || "install", job: j, size: Number(j.size) > 0 ? Number(j.size) : null,
     state: "waiting", phase: null, fraction: 0, error: null, token: null, bundleId: null, expires: null, unsure: false,
-    dismissed: false, again: false, here: false,
+    dismissed: false, again: false, here: false, local: false,
   }));
 }
 
@@ -111,7 +113,7 @@ export function stallText(row, limit = APP_STALL) {
 }
 
 export function createAppRun({ rows, sign, install, discard = () => {}, reprompt = null, ahead = 2, stallMs = APP_STALL,
-  later = setTimeout, clear = clearTimeout, onChange = () => {}, onLog = () => {} }) {
+  later = setTimeout, clear = clearTimeout, onChange = () => {}, onLog = () => {}, local = () => false }) {
   const flights = new Map(); // id -> { ctl: AbortController, timer, why }
   let running = false;
   let stopping = false;
@@ -122,6 +124,8 @@ export function createAppRun({ rows, sign, install, discard = () => {}, reprompt
   const log = (r, kind, text) => { try { onLog({ id: r?.id ?? null, kind, text }); } catch { /* as above */ } };
 
   const set = (r, patch) => { Object.assign(r, patch); changed(r); };
+  // B137: the row's install starts on the This iPhone route (Settings > Installation): no iOS prompt to tap
+  const localRoute = (r) => { try { return Boolean(local(r)); } catch { return false; } };
 
   const finishRow = (r, state, patch = {}) => {
     const f = flights.get(r.id);
@@ -212,7 +216,7 @@ export function createAppRun({ rows, sign, install, discard = () => {}, reprompt
   async function startInstall(r) {
     const f = fly(r);
     const again = Boolean(r.again);
-    set(r, { state: "asking", phase: null, fraction: 0, again: false, here: false });
+    set(r, { state: "asking", phase: null, fraction: 0, again: false, here: false, local: localRoute(r) });
     let res;
     try {
       res = await install(r, { signal: f.ctl.signal, progress: progressOf(r, f), ...(again ? { again: true } : {}) });
@@ -315,7 +319,7 @@ export function createAppRun({ rows, sign, install, discard = () => {}, reprompt
     },
     async reprompt(id) {
       const r = rows.find((x) => x.id === id);
-      if (!r || r.state !== "asking" || !reprompt || !flights.has(r.id)) return false;
+      if (!r || r.state !== "asking" || !reprompt || !flights.has(r.id) || !promptUp(r)) return false;
       let ok = false;
       try { ok = Boolean(await reprompt(r)); } catch { ok = false; }
       if (r.state !== "asking") return false;
@@ -397,7 +401,9 @@ export function rowStatus(row, opts = {}) {
       return p > 0 ? `Downloading ${p}%` : "Downloading";
     case "signing": return p > 0 && p < 100 ? `Signing ${p}%` : "Signing";
     case "signed": return "Signed";
-    case "asking": return row.phase === "vpn" ? VPN_WAIT : "Tap Install on the iOS prompt";
+    case "asking":
+      if (row.phase === "vpn") return VPN_WAIT;
+      return promptUp(row) ? "Tap Install on the iOS prompt" : "Installing"; // B137: This iPhone has no prompt
     case "installing":
       if (row.phase === "copying") return p > 0 && p < 100 ? `Copying to iPhone ${p}%` : "Copying to iPhone";
       if (row.here && isSelf(row) && p >= 100) return SELF_RESTART;
@@ -430,7 +436,7 @@ export function runStatus(rows) {
   if (ios?.phase === "vpn") return VPN_WAIT;
   if (ios?.phase === "copying") return `Copying ${label(ios)} to iPhone (${pos(ios)})`; // B111: This iPhone
   if (ios?.here && isSelf(ios)) return `Installing ${label(ios)}: ${SELF_RESTART}`;
-  if (ios) return ios.state === "asking" ? `Tap Install for ${label(ios)} (${pos(ios)})` : `Installing ${label(ios)} (${pos(ios)})`;
+  if (ios) return ios.state === "asking" && promptUp(ios) ? `Tap Install for ${label(ios)} (${pos(ios)})` : `Installing ${label(ios)} (${pos(ios)})`;
   const s = rows.filter((r) => SIGNING.has(r.state));
   if (s.length && s.every(helperRow)) return "Preparing";
   if (s.length === 1) return `${s[0].state === "signing" ? "Signing" : "Downloading"} ${label(s[0])} (${pos(s[0])})`;
@@ -456,3 +462,8 @@ export function runPercent(rows) {
 }
 
 export const isSelf = (row) => row?.id === SELF_ID;
+
+// B137: whether an "asking" row has iOS's Install prompt to tap. A row on the This iPhone route (`local`, from
+// createAppRun's local(row)) has none while its route is settled (idevice.status, the LocalDevVPN alert); it says
+// Installing. Its install going through the Signing Server after all sends phase "asking": the prompt is up then.
+export const promptUp = (row) => !row?.local || row.phase === "asking";

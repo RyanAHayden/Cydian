@@ -34,7 +34,7 @@ import { el, barButton } from "../nav/ui.js";
 import { openProgress, openOn, RETURN_LABEL, CLOSING_LABEL, WAITING_LABEL, TRY_AGAIN_LABEL, CLOSE_GRACE, CLOSE_BY_HAND,
   RESTART_BY_HAND } from "../nav/progress.js";
 import { fitFileNames } from "../core/midtrunc.js";
-import { appRows, createAppRun, rowStatus, summaryLine, runStatus, runPercent, ended, isSelf, DIDNT_DOWNLOAD } from "../core/apprun.js";
+import { appRows, createAppRun, rowStatus, summaryLine, runStatus, runPercent, ended, isSelf, DIDNT_DOWNLOAD, barOf } from "../core/apprun.js";
 import { recordWhen } from "../core/apprun.js"; // B136
 import { SELF_UPDATE_LINES, SELF_UPDATE_FAILED } from "../signing-client.js";
 
@@ -201,8 +201,11 @@ export async function runAppRun(jobs, deps) {
     v.status.textContent = rowStatus(r);
     const busy = ["downloading", "signing", "asking", "installing"].includes(r.state);
     v.bar.hidden = !busy;
-    v.bar.classList.toggle("is-indeterminate", r.state === "asking" || !r.fraction);
-    v.fill.style.transform = `scaleX(${r.fraction || 0})`;
+    // B152: the app's whole way (barOf: download, signing, iOS's install by weight), never backwards; it sweeps only
+    // until the first percent, so it doesn't flip between the sweep and the fill at each stage
+    const fill = barOf(r);
+    v.bar.classList.toggle("is-indeterminate", !(fill > 0));
+    v.fill.style.transform = `scaleX(${fill})`;
     v.act.hidden = !WORKING.includes(r.state) || run.stopping;
   };
 

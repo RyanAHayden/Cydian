@@ -588,3 +588,74 @@ test("B153: each start of an idle run is a new pass, told before its first line"
   run.cancel();
   await third;
 });
+
+// B152: the row's bar went back and forth while signing X: the signer reads the IPA (0..1) and then signs it (0..1),
+// both under "signing", and every stage (iOS's prompt, its install) starts at 0. The bar is one overall value per app
+// that never goes backwards, and so is the bottom bar.
+test("B152: interleaved stage events never move a row's bar or the run's percent backwards", async () => {
+  const { barOf, SIGN_STEPS } = await import("./apprun.js");
+  assert.ok(SIGN_STEPS.reading && SIGN_STEPS.signing);
+  const ph = phone();
+  const rows = appRows(jobs("x", "y"));
+  const seen = { x: [], y: [] };
+  const percents = [];
+  const run = createAppRun({ rows, sign: ph.sign, install: ph.install, discard: ph.discard,
+    onChange: (r) => { seen[r.id].push(barOf(r)); percents.push(runPercent(rows)); } });
+  const end = run.start();
+  await flush();
+  const sx = ph.pending.sign.get("x").hooks.progress;
+  const sy = ph.pending.sign.get("y").hooks.progress;
+  // two apps signing ahead, their events interleaved, each stage restarting at 0, one late lower value
+  const steps = [
+    [sx, "downloading", 0], [sy, "downloading", 0.2], [sx, "downloading", 0.5], [sy, "downloading", 1],
+    [sx, "downloading", 0.4], [sx, "downloading", 1], [sy, "signing", 0, "reading"], [sx, "signing", 0, "reading"],
+    [sy, "signing", 0.6, "reading"], [sx, "signing", 1, "reading"], [sy, "signing", 1, "reading"],
+    [sx, "signing", 0, "signing"], [sy, "signing", 0, "signing"], [sx, "signing", 0.5, "signing"],
+    [sy, "signing", 0.3], [sx, "signing", 1, "signing"], [sy, "signing", 0.9, "signing"],
+  ];
+  for (const [p, phase, f, step] of steps) p(phase, f, step);
+  assert.equal(rowStatus(rows[0]), "Signing"); // reading done, signing done: 100% says no number
+  ph.signed("x");
+  await flush();
+  const ix = ph.pending.install.get("x").hooks.progress;
+  ix("asking", 0);
+  ix("installing", 0);
+  ix("installing", 0.7);
+  ix("installing", 0.2); // iOS's percent stepping back
+  ph.signed("y");
+  ph.installed("x");
+  await flush();
+  const iy = ph.pending.install.get("y").hooks.progress;
+  iy("copying", 0); iy("copying", 1); iy("installing", 0); iy("installing", 0.5);
+  ph.installed("y");
+  await end;
+  const rising = (xs) => xs.every((v, i) => i === 0 || v >= xs[i - 1]);
+  assert.ok(rising(seen.x), `x went back: ${seen.x}`);
+  assert.ok(rising(seen.y), `y went back: ${seen.y}`);
+  assert.ok(rising(percents), `the run went back: ${percents}`);
+  assert.equal(seen.x.at(-1), 1);
+  assert.equal(percents.at(-1), 100);
+  // reading then signing fill one Signing: halfway once the IPA is read
+  const r = appRows(jobs("z"))[0];
+  r.state = "signing"; r.fraction = 0.5;
+  assert.equal(barOf(r), 0.375);
+});
+
+test("B152: a retry starts the row's bar again from the start", async () => {
+  const { barOf } = await import("./apprun.js");
+  const ph = phone();
+  const rows = appRows(jobs("x"));
+  const run = createAppRun({ rows, sign: ph.sign, install: ph.install, discard: ph.discard });
+  const end = run.start();
+  await flush();
+  ph.pending.sign.get("x").hooks.progress("signing", 1, "signing");
+  assert.equal(barOf(rows[0]), 0.5);
+  ph.pending.sign.get("x").reject(new Error("broke"));
+  await end;
+  const again = run.retry("x");
+  await flush();
+  assert.equal(rows[0].state, "downloading");
+  assert.equal(barOf(rows[0]), 0);
+  run.cancel();
+  await again;
+});

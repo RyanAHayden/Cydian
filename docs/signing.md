@@ -486,6 +486,9 @@ Notifications:
 - One explicit App ID with Push in an Ad Hoc profile covers every app's notifications. A signing service's `.p12`
   and Push profile work as well as your own account's. One App ID per app is not needed for push: it only keeps
   apps' keychains and App Groups apart.
+- With an App Store Connect API key (Settings > Signing > Apple Developer Account, see "Own provisioning profiles"
+  above), iFizBox makes one App ID per app, with Push turned on, and an Ad Hoc profile for it. That gives each app its
+  own keychain and App Groups; for notifications alone the one Push App ID above is already enough.
 - Wildcard profiles never get Push (Apple doesn't allow it on a wildcard App ID). Development profiles get
   sandbox push only, which apps' own servers don't send to.
 - A renamed copy (Keep Bundle IDs off) has a bundle ID the app's server doesn't know, so it gets no notifications.

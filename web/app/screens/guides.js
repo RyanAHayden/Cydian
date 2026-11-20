@@ -342,7 +342,8 @@ STEPS[KEEP_GUIDE] = [
   { title: "Make an App ID with Push", text: "On developer.apple.com, Certificates, IDs & Profiles > Identifiers > +: "
     + "App IDs, App. Choose Explicit and type an ID of your own, such as com.yourname.apps. Tick Push Notifications, "
     + "then Register. This one App ID is enough for every app's notifications. An App ID per app only keeps apps' "
-    + "keychains and App Groups apart, so their sign-ins don't mix.",
+    + "keychains and App Groups apart, so their sign-ins don't mix. With an API key (Settings > Signing > Apple "
+    + `Developer Account), ${NAME} makes that per-app App ID and its Ad Hoc profile itself, for every app it signs.`,
     rows: [{ label: "Identifiers", subtitle: "developer.apple.com", chevron: true,
       onClick: () => globalThis.open?.(DEVELOPER_URL, "_blank", "noopener") }] },
   { title: "Register Your iPhones", text: "Devices > +: a name and the iPhone's UDID. A Mac's Finder shows it: click "

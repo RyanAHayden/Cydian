@@ -17,7 +17,7 @@
 // live in core/sourcelist.js; the QR code in core/qr.js. A change here (add, delete, reorder) tells sources.js
 // through onSourcesChanged, so the tab's list is right when the user goes back.
 import { cleanSourceUrl, httpsInput } from "../core/sources.js";
-import { grouped, plain, collapse, placeholder, el } from "../nav/ui.js";
+import { grouped, plain, collapse, placeholder, el, note } from "../nav/ui.js";
 import { showAlert } from "../nav/alert.js";
 import { showSheet } from "../nav/sheet.js";
 import { showActionSheet } from "../nav/actionsheet.js";
@@ -96,7 +96,7 @@ export function render(body, route, ctx) {
     case "recommended": return renderRecommendedPage(body, ctx);
     case "review": return renderReview(body);
     case "preview": return renderPreview(body, route);
-    default: body.append(el("p", "empty", "Nothing here."));
+    default: body.append(note("Nothing here."));
   }
 }
 
@@ -184,7 +184,7 @@ async function renderSources(body) {
   try {
     ({ shown: list } = await shownSources());
   } catch (e) {
-    body.replaceChildren(el("p", "empty", e.message));
+    body.replaceChildren(note(e.message));
     return;
   }
   const backend = getBackend();
@@ -195,7 +195,7 @@ async function renderSources(body) {
   list.forEach((s, i) => editRow(cells[i], s, backend, body));
   attachReorder(ul, body);
   body.replaceChildren(ul);
-  if (!list.length) body.append(el("p", "empty", "No sources. Tap Add."));
+  if (!list.length) body.append(note("No sources. Tap Add."));
   const foot = el("div", "manage-foot");
   if (list.length > 1) {
     const sort = el("button", "manage-link", "Sort by Name");
@@ -495,7 +495,7 @@ async function startReview(text, route, ctx) {
 
 function renderReview(body) {
   if (!pending) {
-    body.replaceChildren(el("p", "empty", "Nothing to import. Go back and pick a file or copy a list."));
+    body.replaceChildren(note("Nothing to import. Go back and pick a file or copy a list."));
     return;
   }
   const row = (e) => ({ label: e.uri.replace(/^https?:\/\//, ""), subtitle: e.dist && e.dist !== "./" ? `${e.dist} ${e.components.join(" ")}` : undefined });
@@ -759,7 +759,7 @@ async function addFromPreview(route, ctx) {
 async function renderPreview(body, route) {
   const row = await previewRow(route);
   if (!row) {
-    body.replaceChildren(el("p", "empty", "Nothing here."));
+    body.replaceChildren(note("Nothing here."));
     return;
   }
   const head = { header: row.label, rows: [{ label: row.subtitle, subtitle: row.rec.why }],
@@ -770,7 +770,7 @@ async function renderPreview(body, route) {
   try {
     p = await loadPreview(row);
   } catch (e) {
-    body.replaceChildren(grouped([head]), el("p", "empty", e.message));
+    body.replaceChildren(grouped([head]), note(e.message));
     body.classList.add("manage-why");
     return;
   }
@@ -838,7 +838,7 @@ async function renderRepoPreview(body, route, row, head) {
   try {
     preview = await loadRepoPreview(row);
   } catch (e) {
-    body.replaceChildren(grouped([head]), el("p", "empty", e?.message || String(e)));
+    body.replaceChildren(grouped([head]), note(e?.message || String(e)));
     return;
   }
   if (!body.isConnected) return;
@@ -846,7 +846,7 @@ async function renderRepoPreview(body, route, row, head) {
     + (row.added ? "." : ". Add it to install them; its packages then show under Sources.") };
   body.replaceChildren(grouped([head, summary]));
   if (!preview.total) {
-    body.append(el("p", "empty", "No packages for this iPhone."));
+    body.append(note("No packages for this iPhone."));
     return;
   }
   const items = preview.sections.flatMap((s) => [{ header: `${s.name} (${s.packages.length.toLocaleString()})` },

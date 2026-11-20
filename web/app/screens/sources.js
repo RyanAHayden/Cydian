@@ -6,7 +6,7 @@
 // Above the sources, Cydia's "All Sources" row; a source (or All Sources) opens its Sections, and everything
 // below that is screens/browse.js.
 import { cleanSourceUrl } from "../core/sources.js";
-import { plain, collapse } from "../nav/ui.js";
+import { plain, collapse, note } from "../nav/ui.js";
 import * as browse from "./browse.js";
 import { showAlert } from "../nav/alert.js";
 import { showMenu, longPress, copyText, nativePaste } from "../nav/menu.js";
@@ -502,7 +502,7 @@ function draw() {
   if (!state.sources) { el.classList.remove("search-root"); el.replaceChildren(); return; }
   if (state.loadError) {
     el.classList.remove("search-root");
-    el.replaceChildren(Object.assign(document.createElement("p"), { className: "empty", textContent: state.loadError }));
+    el.replaceChildren(note(state.loadError));
     return;
   }
   const bar = sourcesSearchBar();
@@ -560,8 +560,7 @@ function draw() {
   attachRowGestures(ul);
   box.replaceChildren(ul);
   if (!list.length) {
-    box.append(Object.assign(document.createElement("p"), { className: "empty",
-      textContent: searching ? "No sources match." : "No sources. Tap Manage, then Sources." }));
+    box.append(note(searching ? "No sources match." : "No sources. Tap Manage, then Sources."));
   }
 }
 

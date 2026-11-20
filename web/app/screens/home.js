@@ -13,7 +13,7 @@
 // (F124: New, Recently Updated, Popular, Featured, Free Apps / Tweaks / Themes, then the categories), browse/<list id>
 // (core/catalog.js BROWSE_LISTS: new, updated, popular, featured, free-apps...), browse/category:<name>, and below those browse.js's tokens
 // (package:<id>, author:<name>, versions:<id>), as in the Search tab.
-import { grouped, el, placeholder } from "../nav/ui.js";
+import { grouped, el, placeholder, note } from "../nav/ui.js";
 import { format, settingsRoute, parse } from "../router.js";
 import { getBackend } from "../backend.js";
 import { showAlert } from "../nav/alert.js";
@@ -844,7 +844,7 @@ async function renderCategories(body) {
     await catalog.ensure();
     cats = await catalog.categories();
   } catch (e) {
-    box.replaceChildren(el("p", "empty", e.message));
+    box.replaceChildren(note(e.message));
     return;
   }
   const [lists, rest] = browseGroups(cats, { jailbroken: showsThemes(settings.deviceType()) });

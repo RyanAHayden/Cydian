@@ -61,7 +61,7 @@
 // record's url is library:..., native MyIPAs.fileOf) and re-sign from that file (signing.resign does).
 import * as browse from "./browse.js";
 import * as myipas from "./myipas.js";
-import { grouped, plain, placeholder, segments, barButton } from "../nav/ui.js";
+import { grouped, plain, placeholder, segments, barButton, note } from "../nav/ui.js";
 import { searchBar, pinned } from "../nav/searchbar.js";
 import { format, mounted, parse } from "../router.js";
 import { catalog, ALL } from "../catalog.js";
@@ -87,6 +87,7 @@ import { deviceError } from "../core/signing.js";
 import { getBackend } from "../backend.js";
 import { liveHUD } from "../nav/hud.js";
 import { onPageOpen } from "../nav/pagestate.js";
+import { selectPreset } from "../nav/selection.js";
 import { flagPiracy, packageWarning, PIRACY_SUBTITLE } from "../core/warnings.js";
 import { scanRequest, malwareFindings, removalIds, orphanFiles, malwareAlert, deleteConfirm } from "../core/known-malware.js";
 import { installQueue } from "../queue.js";
@@ -319,10 +320,6 @@ export function render(body, route, ctx) {
   state.route = route;
   body.append(placeholder("list"));
   load();
-}
-
-function note(text) {
-  return Object.assign(document.createElement("p"), { className: "empty", textContent: text });
 }
 
 export function emptyText(source) {
@@ -1216,17 +1213,13 @@ export function togglePick(id, view = appView) {
 // Select…'s sheet (All Apps, Expiring Soon (n), Not Signed Here (n), With Updates (n), Cancel) picks a preset's apps in
 // place of the selection; with every row picked the button is Deselect, which drops it. -> the preset, or null.
 export async function selectButton({ view = appView, sheet = showActionSheet, sync = syncManage } = {}) {
-  if (selectLabel(view.manageRows, view.selected) !== SELECT) {
-    view.selected = new Set();
-    sync();
-    return "none";
-  }
-  const opts = selectSheet(view.manageRows);
-  const i = await sheet({ buttons: opts.map((o) => o.label) });
-  if (!(i >= 0)) return null;
-  view.selected = new Set(presetIds(view.manageRows, opts[i].preset));
-  sync();
-  return opts[i].preset;
+  return selectPreset({
+    selecting: selectLabel(view.manageRows, view.selected) === SELECT,
+    options: () => selectSheet(view.manageRows),
+    apply: (preset) => { view.selected = new Set(presetIds(view.manageRows, preset)); sync(); },
+    clear: () => { view.selected = new Set(); sync(); },
+    sheet,
+  });
 }
 const onSelectButton = () => selectButton();
 

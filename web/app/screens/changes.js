@@ -20,7 +20,7 @@
 // signing.installed), count in the tab badge (and so the icon badge) and in Upgrade (N), which queues them as
 // "resign" jobs (core/appqueue.js resignJob): Cydia's queue does both. An app with an upgrade is left to the upgrade,
 // which signs it anew.
-import { placeholder, el, segments } from "../nav/ui.js";
+import { placeholder, el, segments, note } from "../nav/ui.js";
 import { searchBar, pinned } from "../nav/searchbar.js";
 import { pullToRefresh } from "../nav/pullrefresh.js";
 import * as browse from "./browse.js";
@@ -297,10 +297,6 @@ function filterBar() {
 
 function drawScope(current = state.scope ?? (state.data ? scopeOf(null, state.data.installed) : null)) {
   state.segs?.select(current);
-}
-
-function note(text) {
-  return Object.assign(document.createElement("p"), { className: "empty", textContent: text });
 }
 
 // Rows as the package list draws them, with each group's header in front: the upgrades first, then a group per

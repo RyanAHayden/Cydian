@@ -10,7 +10,7 @@
 // e.g. #/sources/deb%3Ahttps%3A%2F%2Frepo.chariz.com%2F%3A.%2F/section%3ATweaks/package%3Acom.example.tweak
 //
 // Lists come from the catalog in the parse worker (catalog.js); long ones are virtualised (nav/vlist.js).
-import { grouped, placeholder, el, segments } from "../nav/ui.js";
+import { grouped, placeholder, el, segments, note } from "../nav/ui.js";
 import { createVList, withLetterHeaders } from "../nav/vlist.js";
 import { createSectionIndex } from "../nav/sectionindex.js";
 import { onPageOpen } from "../nav/pagestate.js";
@@ -165,7 +165,7 @@ export function render(body, route, ctx) {
     case "package": return renderPackage(body, route, p.key, p.value, ctx);
     case "versions": return renderVersions(body, route, p.key, p.value);
     default:
-      body.append(Object.assign(document.createElement("p"), { className: "empty", textContent: "Nothing here." }));
+      body.append(note("Nothing here."));
   }
 }
 
@@ -198,7 +198,7 @@ async function drawSections(page) {
     await catalog.ensure();
     data = await catalog.sections(key, editing ? { hidden: true } : undefined);
   } catch (e) {
-    if (turn === page.draw) body.replaceChildren(el("p", "empty", e.message));
+    if (turn === page.draw) body.replaceChildren(note(e.message));
     return;
   }
   if (turn !== page.draw) return;
@@ -214,9 +214,9 @@ async function drawSections(page) {
   }
   body.replaceChildren(ul);
   if (!editing) body.prepend(filterRow(() => drawSections(page)));
-  if (status?.error) body.append(el("p", "empty", status.error));
+  if (status?.error) body.append(note(status.error));
   else if (editing ? !data.sections.length : !data.total) {
-    body.append(el("p", "empty", data.sections.length ? "Every section is hidden. Tap Edit to show them." : "No packages for this device."));
+    body.append(note(data.sections.length ? "Every section is hidden. Tap Edit to show them." : "No packages for this device."));
   }
   // F76: Share in the nav bar (the iOS 6 share sheet: Copy Link, Add on Another Device, the APT managers) took the
   // place of F8's Open In group under the sections.
@@ -816,11 +816,11 @@ async function renderList(body, route, fetchRows, letters) {
     await catalog.ensure();
     rows = await fetchRows();
   } catch (e) {
-    body.replaceChildren(el("p", "empty", e.message));
+    body.replaceChildren(note(e.message));
     return;
   }
   body.replaceChildren();
-  if (!rows.length) { body.append(el("p", "empty", "No packages.")); return; }
+  if (!rows.length) { body.append(note("No packages.")); return; }
   const list = packageList(body, route, rows, { letters });
   body.append(list.el);
 }
@@ -830,18 +830,18 @@ async function renderList(body, route, fetchRows, letters) {
 // headers (lists by name); else `headers(rows)` may return the items with { header } rows of its own (New's days).
 export async function renderSearchableList(body, route, fetchRows, { letters = false, headers = null, empty = "No packages.", label = "Search this list" } = {}) {
   const bar = listSearchBar(label);
-  const note = el("p", "empty");
-  note.hidden = true;
+  const none = note();
+  none.hidden = true;
   const ph = placeholder("list");
-  body.append(bar.el, note, ph);
+  body.append(bar.el, none, ph);
   let rows;
   try {
     await catalog.ensure();
     rows = await fetchRows();
   } catch (e) {
     ph.remove();
-    note.textContent = e.message;
-    note.hidden = false;
+    none.textContent = e.message;
+    none.hidden = false;
     return;
   }
   ph.remove();
@@ -850,8 +850,8 @@ export async function renderSearchableList(body, route, fetchRows, { letters = f
   let list = null;
   const draw = (q) => {
     const rs = shown(q);
-    note.textContent = rs.length ? "" : q.trim() ? "No packages match your search." : empty;
-    note.hidden = rs.length > 0;
+    none.textContent = rs.length ? "" : q.trim() ? "No packages match your search." : empty;
+    none.hidden = rs.length > 0;
     rememberNames(rs);
     if (!list) {
       list = packageList(body, route, letters ? rs : itemsFor(rs), { letters }); // packageList adds the letters itself
@@ -899,11 +899,11 @@ export async function renderWishlist(body, route) {
     const found = await Promise.all(ids.map((id) => catalog.package(id).then((p) => (p && !p.installedOnly ? p.row : null), () => null)));
     rows = wishRows(ids, found, installed);
   } catch (e) {
-    body.replaceChildren(el("p", "empty", e.message));
+    body.replaceChildren(note(e.message));
     return;
   }
   body.replaceChildren();
-  if (!rows.length) { body.append(el("p", "empty", WISH_EMPTY)); return; }
+  if (!rows.length) { body.append(note(WISH_EMPTY)); return; }
   const list = packageList(body, route, rows, { letters: false });
   body.append(list.el);
 }
@@ -931,7 +931,7 @@ async function renderAuthor(body, route, name) {
     await catalog.ensure();
     rows = await catalog.author(name);
   } catch (e) {
-    body.replaceChildren(el("p", "empty", e.message));
+    body.replaceChildren(note(e.message));
     return;
   }
   body.replaceChildren();
@@ -945,7 +945,7 @@ async function renderAuthor(body, route, name) {
     g.classList.add("author-hide");
     body.append(g);
   }
-  if (!rows.length) { body.append(el("p", "empty", "No packages.")); return; }
+  if (!rows.length) { body.append(note("No packages.")); return; }
   const list = packageList(body, route, rows);
   authorLists.set(body, list);
   body.append(list.el);
@@ -1007,7 +1007,7 @@ async function renderPackage(body, route, key, id, ctx) {
     await catalog.ensure();
     [pkg, sources] = await Promise.all([catalog.package(id, key), getBackend().sources()]);
   } catch (e) {
-    body.replaceChildren(el("p", "empty", e.message));
+    body.replaceChildren(note(e.message));
     return;
   }
   if (!pkg) {
@@ -1254,14 +1254,14 @@ export function relatedRow(r, route) {
 async function relatedPane(pane, route, pkg, id) {
   const section = pkg.row?.section;
   if (!section || section === NO_SECTION || pkg.installedOnly) {
-    pane.replaceChildren(el("p", "empty", "No related packages."));
+    pane.replaceChildren(note("No related packages."));
     return;
   }
   pane.replaceChildren(spinner("Loading Packages"));
   let rows;
-  try { rows = await catalog.list(pkg.key ?? ALL, section); } catch (e) { pane.replaceChildren(el("p", "empty", e.message)); return; }
+  try { rows = await catalog.list(pkg.key ?? ALL, section); } catch (e) { pane.replaceChildren(note(e.message)); return; }
   rows = rows.filter((r) => r.id !== id);
-  if (!rows.length) { pane.replaceChildren(el("p", "empty", `Nothing else in ${section}.`)); return; }
+  if (!rows.length) { pane.replaceChildren(note(`Nothing else in ${section}.`)); return; }
   pane.replaceChildren(grouped([{ header: `More in ${section}`, rows: rows.slice(0, RELATED).map((r) => relatedRow(r, route)), footer: rows.length > RELATED ? `${RELATED} of ${rows.length}: all of them are in ${section}.` : null }]));
   if (rows.length > RELATED) pane.append(grouped([{ rows: [{ label: `All of ${section}`, href: deeper(route, token("section", section)) }] }]));
 }
@@ -1506,7 +1506,7 @@ async function renderVersions(body, route, key, id) {
     await catalog.ensure();
     [history, pkg, sources] = await Promise.all([catalog.history(id, key), catalog.package(id, key), getBackend().sources()]);
   } catch (e) {
-    body.replaceChildren(el("p", "empty", e.message));
+    body.replaceChildren(note(e.message));
     return;
   }
   if (!history || !pkg) {
@@ -1723,7 +1723,7 @@ function openSileoSheet(url, title) {
     card.append(renderSileo(JSON.parse(t), { open: openSileoSheet }));
     g.append(card);
     box.replaceChildren(g);
-  }).catch((e) => box.replaceChildren(el("p", "empty", e.message)));
+  }).catch((e) => box.replaceChildren(note(e.message)));
 }
 
 // HTML depictions open in a sheet, in a sandboxed iframe with no bridge to us (docs/cydia.md). An http
@@ -1846,12 +1846,12 @@ async function drawFilterList(page, turn) {
     await catalog.ensure();
     rows = await v.rows();
   } catch (e) {
-    if (turn === page.turn) body.replaceChildren(page.bar, el("p", "empty", e.message));
+    if (turn === page.turn) body.replaceChildren(page.bar, note(e.message));
     return;
   }
   if (turn !== page.turn || !body.isConnected) return;
   body.replaceChildren(page.bar);
-  if (!rows.length) { body.append(el("p", "empty", v.empty)); return; }
+  if (!rows.length) { body.append(note(v.empty)); return; }
   const items = v.ranked ? rows.map((r, i) => ({ ...r, rank: i + 1 })) : page.headers ? page.headers(rows) : rows;
   page.list = packageList(body, route, items, { letters: false, decorate: v.ranked ? rankRow : null });
   page.list.el.classList.add(v.ranked ? "browse-ranked" : "browse-new");
@@ -1899,7 +1899,7 @@ async function drawFeatured(page, turn) {
       catalog.fresh("new").catch(() => []),
     ]);
   } catch (e) {
-    if (turn === page.turn) heroSlot.replaceChildren(el("p", "empty", e.message));
+    if (turn === page.turn) heroSlot.replaceChildren(note(e.message));
   }
   if (turn !== page.turn || !body.isConnected) return;
   // Tweak of the Day: the sources' featured packages and the popular ones, of this build's kind when there are any.

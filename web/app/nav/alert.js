@@ -13,6 +13,9 @@
 // `colors`: { [button index]: "green" | "red" } (sources.css .alert-button.green/.red): the way to go, and the one to avoid.
 // `onTap(index)` runs inside the tap's own click (before the promise resolves), for what Safari only allows from a
 // user gesture, such as opening an itms-services link.
+// A one-button (OK) alert: title, message. `alert` swaps in another showAlert (tests pass a fake).
+export const alertOK = (title, message, alert = showAlert) => alert({ title, message, buttons: ["OK"] });
+
 export function showAlert({ title = "", message = "", input = null, buttons = ["OK"], cancel = 0, stacked = false, countdown = null, colors = {}, onTap = null } = {}) {
   return new Promise((resolve) => {
     const scrim = document.createElement("div");

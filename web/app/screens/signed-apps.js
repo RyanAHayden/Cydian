@@ -7,7 +7,7 @@
 // queueApp), which signs each through signing.resign, iFizBox last, instead of running at once.
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { grouped, collapse } from "../nav/ui.js";
-import { showAlert } from "../nav/alert.js";
+import { showAlert, alertOK } from "../nav/alert.js";
 import { liveHUD } from "../nav/hud.js";
 import { certificateWarnings, revocationLabel, resignLabel, signedAppRows, deviceError, callWithStall } from "../core/signing.js";
 import { resignJob } from "../core/appqueue.js";
@@ -23,7 +23,6 @@ function style() {
   document.head.append(link);
 }
 
-const alertOK = (alert, title, message) => alert({ title, message, buttons: ["OK"] });
 const day = (iso) => { const d = new Date(iso ?? ""); return Number.isNaN(d.getTime()) ? null : d.toLocaleDateString(); };
 
 // `identity`: signing.status's identity (null without one). `redraw()` draws the page again (status asked anew).
@@ -61,14 +60,14 @@ async function check({ redraw, native, alert, hud }) {
     r = await native.call("signing.checkCertificate", {});
   } catch (e) {
     h.hide();
-    await alertOK(alert, "Couldn't Check", deviceError(e).message);
+    await alertOK("Couldn't Check", deviceError(e).message, alert);
     return;
   }
   h.hide();
   if (r?.status === "revoked") {
-    await alertOK(alert, "Certificate Revoked", `Apple revoked it${r.revokedAt ? ` on ${day(r.revokedAt)}` : ""}. Apps signed with it won't open. Import a new certificate.`);
+    await alertOK("Certificate Revoked", `Apple revoked it${r.revokedAt ? ` on ${day(r.revokedAt)}` : ""}. Apps signed with it won't open. Import a new certificate.`, alert);
   } else if (r?.status === "unknown") {
-    await alertOK(alert, "Not Known", "Apple's answer didn't say whether this certificate is good or revoked. Try again later.");
+    await alertOK("Not Known", "Apple's answer didn't say whether this certificate is good or revoked. Try again later.", alert);
   }
   redraw();
 }
@@ -108,7 +107,7 @@ function armable(li, row, { native, alert, redraw }) {
       await native.call("signing.forget", { bundleId: row.bundleId });
     } catch (e) {
       li.classList.remove("removing", "armed");
-      await alertOK(alert, "Couldn't Forget", deviceError(e).message);
+      await alertOK("Couldn't Forget", deviceError(e).message, alert);
       return;
     }
     setTimeout(() => { collapse(li); if (!li.parentNode?.querySelector?.(".signed-row")) redraw(); }, 200);
@@ -173,15 +172,15 @@ export async function resignAll(count, { redraw, native, alert, hud }) {
     r = await callWithStall(native, "signing.resignAll", { manifestServer: getServer(), ...route }, (ev) => { const t = resignLabel(ev); if (t) h.set(t); }); // B65
   } catch (e) {
     h.hide();
-    await alertOK(alert, "Couldn't Re-sign", deviceError(e).message);
+    await alertOK("Couldn't Re-sign", deviceError(e).message, alert);
     return;
   }
   h.hide();
   const done = r?.done?.length ?? 0;
   const failed = Array.isArray(r?.failed) ? r.failed : [];
   if (failed.length) {
-    await alertOK(alert, done ? `Re-signed ${done} of ${done + failed.length}` : "Couldn't Re-sign",
-      failed.map((f) => `${f.name || f.bundleId}: ${f.error || "failed"}`).join("\n"));
+    await alertOK(done ? `Re-signed ${done} of ${done + failed.length}` : "Couldn't Re-sign",
+      failed.map((f) => `${f.name || f.bundleId}: ${f.error || "failed"}`).join("\n"), alert);
   }
   redraw();
 }

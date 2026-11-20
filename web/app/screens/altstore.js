@@ -5,7 +5,7 @@
 //                                         All Apps, Website; Share in the nav bar (F76)
 //   a package page whose stanza is an app (kind "ipa") -> renderApp
 // Styles: altstore.css. Every remote image goes through mediaUrl (http ones through the proxy on the site).
-import { grouped, placeholder, el } from "../nav/ui.js";
+import { grouped, placeholder, el, note } from "../nav/ui.js";
 import { format } from "../router.js";
 import { catalog, ALL } from "../catalog.js";
 import { getBackend } from "../backend.js";
@@ -167,7 +167,7 @@ export async function renderAltSource(body, route, key) {
     await catalog.ensure();
     [meta, source] = await Promise.all([catalog.altSource(key), getBackend().sources().then((l) => l.find((s) => s.key === key))]);
   } catch (e) {
-    body.replaceChildren(el("p", "empty", e.message));
+    body.replaceChildren(note(e.message));
     return;
   }
   const status = catalog.status(key);
@@ -179,7 +179,7 @@ export async function renderAltSource(body, route, key) {
     return;
   }
   if (!meta) {
-    body.replaceChildren(el("p", "empty", status?.error || source?.error || "This source could not be loaded. Tap Refresh on Sources."));
+    body.replaceChildren(note(status?.error || source?.error || "This source could not be loaded. Tap Refresh on Sources."));
     return;
   }
   const page = el("div", "alt-source");
@@ -232,7 +232,7 @@ export async function renderAltSource(body, route, key) {
   // (the iOS 6 share sheet, screens/handoff.js), in place of F8's Open In group.
   setSourceShare(body, source ?? { key });
   if (meta.website) body.append(grouped([{ rows: [{ label: "Website", subtitle: meta.website, onClick: () => window.open(meta.website, "_blank", "noopener") }] }]));
-  if (status?.error) body.append(el("p", "empty", status.error));
+  if (status?.error) body.append(note(status.error));
 }
 
 // ---- the app page ----------------------------------------------------------------------------------------------

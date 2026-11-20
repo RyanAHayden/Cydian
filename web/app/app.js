@@ -9,7 +9,9 @@
 // { title, back (the back button's label above it; else the title), style: "grouped" | "plain", left: { label, onClick }, right: { label, onClick } | [several] } and `init(ctx)`,
 // run once at start (e.g. to set the tab's badge). ctx: { go, back, setBadge, showHUD }.
 import { detectMode } from "./core/settings.js";
-import { TABS, BAR_TABS, createRouter, format, parent, mounted } from "./router.js";
+import { TABS, BAR_TABS, createRouter, format, parent, mounted, parse, mountLink, lazyFor, LAZY_TABS, TAB_TITLES } from "./router.js";
+import { load, loaded, mod, missing, loadAll, NotLoaded } from "./lazy.js";
+import { grouped, placeholder } from "./nav/ui.js";
 import { createStacks, swipeCommits } from "./nav/stack.js";
 import { animate, setProgress, clear, DURATION, EASE_OUT } from "./nav/transition.js";
 import { attachEdgeSwipe } from "./nav/swipe.js";
@@ -23,19 +25,12 @@ import { makeScrollToTop } from "./nav/statusbar.js";
 import { pageOpened, pageShown } from "./nav/pagestate.js";
 import { createHomeTop, homeRootOf } from "./nav/hometop.js";
 import * as home from "./screens/home.js";
-import * as sources from "./screens/sources.js";
-import * as changes from "./screens/changes.js";
-import * as installed from "./screens/installed.js";
-import * as search from "./screens/search.js";
 import * as settingsScreen from "./screens/settings.js";
 import { sourceFilter } from "./core/sources.js";
 import { getBackend } from "./backend.js";
 import { appSchemeFor, openOutside } from "./core/applinks.js";
 import { launchURL } from "./launch.js";
 import { isAddPath, parseAddLink } from "./core/handoff.js";
-import { addSource } from "./screens/manage.js";
-import { initQueue } from "./screens/queue.js";
-import { initIpaLinks } from "./screens/ipa-install.js";
 import { lookForUpdates, appVersion } from "./essential-ui.js";
 import { showReloadBar } from "./nav/reloadbar.js";
 import { catalog } from "./catalog.js";
@@ -58,7 +53,25 @@ if (notIphone) {
   if (route) history.replaceState(null, "", location.pathname + location.search + route);
 }
 
-const SCREENS = { home, sources, changes, installed, search, settings: settingsScreen };
+// F313: Home and Settings come with app.js; the other tabs' screens load after the first page is up, or at their
+// routes (lazy.js, router.js lazyFor). screenOf throws lazy.js NotLoaded for one not in yet (drawPage draws it later);
+// loadedScreen gives null instead.
+const STATIC_SCREENS = { home, settings: settingsScreen };
+const screenOf = (tab) => STATIC_SCREENS[tab] ?? mod(tab);
+const loadedScreen = (tab) => STATIC_SCREENS[tab] ?? loaded(tab);
+// A lazy tab's init(ctx) (Changes' badge, Installed's queue chrome) and Sources' context run once its module is in,
+// before any of its pages is drawn.
+const inited = new Set();
+function initLoadedTabs() {
+  for (const tab of LAZY_TABS) {
+    const screen = !inited.has(tab) && loaded(tab);
+    if (!screen) continue;
+    inited.add(tab);
+    screen.init?.(ctx);
+    if (tab === "sources") screen.useContext?.(ctx); // B141: loads started outside a screen (the website's import) get the reload bar
+  }
+}
+const loadTabs = (tabs = LAZY_TABS) => loadAll(tabs).then(() => initLoadedTabs());
 
 const screensEl = document.getElementById("screens");
 const navbarEl = document.getElementById("navbar");
@@ -76,7 +89,7 @@ for (const tab of BAR_TABS) {
 
 // F65: the icon badge N5's daemon sets goes once the Changes tab shows no upgrades (jailbreak app only).
 const upgradeNotices = createUpgradeNotices({ settings: settingsScreen.settings, current: () => router.current() }); // called only once the screens init, after router exists
-const tabbar = createTabbar(document.getElementById("tabbar"), BAR_TABS, (t) => SCREENS[t].title);
+const tabbar = createTabbar(document.getElementById("tabbar"), BAR_TABS, (t) => TAB_TITLES[t]);
 const ctx = {
   go: (route) => router.go(route),
   back: () => goBack(),
@@ -108,16 +121,12 @@ function button(spec, cls) {
 // Called by stacks.sync while it builds a stack, root first: the parent is already the stack's last entry.
 function makePage(tab, path) {
   const route = mounted({ tab, path }); // another tab's page opened here (router.js mounted): that screen draws it
-  const screen = SCREENS[route.tab];
   pageOpened(route); // B43: a page built here starts on its default segment, filter or pane (nav/pagestate.js)
-  const info =(screen.nav && screen.nav(route, ctx)) || {};
   const below = stacks.stack(tab).at(-1);
-  const title = info.title ?? screen.title;
 
   const page = document.createElement("section");
   page.className = "page";
   const body = document.createElement("div");
-  body.className = "page-body " + (info.style === "plain" ? "plain" : "grouped");
   const shade = document.createElement("div");
   shade.className = "page-shade";
   page.append(body, shade);
@@ -125,6 +134,47 @@ function makePage(tab, path) {
 
   const item = document.createElement("div");
   item.className = "nav-item";
+  navStacks[tab].append(item);
+
+  const entry = { el: page, body, shade, item, title: "", back: "" }; // back: the label pages above it show
+  drawPage(entry, route, below);
+  return entry;
+}
+
+// The page's nav bar and body, from its screen. F313: a screen or part not loaded yet (lazy.js NotLoaded: a route
+// router.js lazyFor doesn't list, or a load that failed) leaves the loading placeholder under its tab's title, and
+// draws the page again once the module is in.
+function drawPage(entry, route, below) {
+  try {
+    const screen = screenOf(route.tab);
+    const info = (screen.nav && screen.nav(route, ctx)) || {};
+    const title = info.title ?? screen.title;
+    entry.title = title;
+    entry.back = info.back ?? title;
+    entry.body.className = "page-body " + (info.style === "plain" ? "plain" : "grouped");
+    entry.body.replaceChildren();
+    entry.item.replaceChildren(...navParts(info, below, title));
+    screen.render(entry.body, route, ctx);
+  } catch (e) {
+    if (!(e instanceof NotLoaded)) throw e;
+    entry.title ||= TAB_TITLES[route.tab];
+    entry.back ||= entry.title;
+    entry.body.className = "page-body grouped";
+    entry.body.replaceChildren(placeholder());
+    entry.item.replaceChildren(...navParts({ title: entry.title }, below, entry.title));
+    load(e.module).then(() => {
+      initLoadedTabs();
+      if (!entry.el.isConnected) return;
+      drawPage(entry, route, below);
+      if (stacks.top()?.page === entry) document.title = entry.title === NAME ? NAME : `${entry.title} · ${NAME}`;
+    }, () => {
+      // The browser keeps a failed module fetch for the rest of the session: only a reload tries again.
+      if (entry.el.isConnected) entry.body.replaceChildren(grouped([{ footer: `This page didn't load. Check the connection, then reload ${NAME}.` }]));
+    });
+  }
+}
+
+function navParts(info, below, title) {
   const left = document.createElement("div");
   left.className = "nav-left";
   const bar = navButtons(info, !!below); // B176: a pushed root keeps its Refresh, on the right (nav/navbuttons.js)
@@ -141,11 +191,7 @@ function makePage(tab, path) {
   right.className = "nav-right";
   // `right` may be one button or several side by side (Sources: Add and Manage).
   for (const b of bar.right) right.append(button(b, b.moved ? "bar-button " + MOVED_CLASS : "bar-button"));
-  item.append(left, h1, right);
-  navStacks[tab].append(item);
-
-  screen.render(body, route, ctx);
-  return { el: page, body, shade, item, title, back: info.back ?? title }; // back: the label pages above it show
+  return [left, h1, right];
 }
 
 // withSelect (F163): a pop, so the row that opened `top` (below.selected, nav/selection.js) fades with it. Its
@@ -213,9 +259,23 @@ function slide(top, below, p0, p1, cleanup, { withSelect = false, ...opts } = {}
   });
 }
 
-const router = createRouter({
-  win: window,
-  onRoute(route) {
+// F313: a route whose pages draw with modules not loaded yet (router.js lazyFor) shows once they're in, so a push
+// still slides in drawn; a newer route meanwhile wins. A failed load shows it anyway (drawPage draws what it can).
+let routeSeq = 0;
+let firstShown = false;
+function onRoute(route) {
+  const seq = ++routeSeq;
+  const need = missing(lazyFor(route));
+  if (!need.length) return showRoute(route);
+  const show = () => { initLoadedTabs(); if (seq === routeSeq) showRoute(router.current()); };
+  loadAll(need).then(show, show);
+}
+
+const router = createRouter({ win: window, onRoute });
+
+function showRoute(route) {
+  initLoadedTabs(); // a tab a press or the background load brought in starts before its pages draw
+  { // (the body router.onRoute had before F313, kept as it was)
     if (running) running.finish();
     const r = stacks.sync(route);
     const all = stacks.stack(r.tab);
@@ -248,8 +308,10 @@ const router = createRouter({
     ownBack = false;
     updateEdge();
     document.title = r.to.page.title === NAME ? NAME : `${r.to.page.title} · ${NAME}`;
-  },
-});
+  }
+  // The loading screen goes once the first page is drawn: at start, or once a deep link's modules are in.
+  if (!firstShown) { firstShown = true; document.getElementById("boot")?.remove(); }
+}
 
 // Back: history.back() when the parent is right behind us in history (we pushed here), so the browser's back and
 // forward stay in step; on a deep link there is nothing behind, so replace the route with the parent instead.
@@ -350,7 +412,7 @@ document.getElementById("tabbar").addEventListener("click", (e) => {
   const tab = a.dataset.tab;
   homeTop.tabTapped(tab); // F211: Home shows at its top when its tab is tapped from elsewhere (nav/hometop.js)
   // Back to the root of the tab you are on is our own pop, so it slides like Back (not a jump).
-  tapTab(tab, router.current(), { selectTab: (t) => { ownBack = true; router.selectTab(t); }, reselect: SCREENS[tab].reselect,
+  tapTab(tab, router.current(), { selectTab: (t) => { ownBack = true; router.selectTab(t); }, reselect: loadedScreen(tab)?.reselect,
     // C10: a page with the pinned search bar scrolls its results (nav/searchbar.js), not its body.
     scrollTop: () => scrollToTop(scrollerOf(stacks.top()?.page.body)), sliding: () => isSliding(scrollerOf(stacks.top()?.page.body)) });
 });
@@ -401,10 +463,13 @@ document.addEventListener("click", (e) => {
 document.addEventListener("touchstart", () => {}, { passive: true });
 
 initScroller(document.getElementById("screens"));
-for (const tab of TABS) if (SCREENS[tab].init) SCREENS[tab].init(ctx);
-// N4: the install queue (jailbreak build: the backend has one): Confirm opens when a package is queued.
-if (typeof getBackend().queue === "function") initQueue(ctx);
-initIpaLinks(); // F67: a tapped .ipa link offers Install IPA (jailbreak build only)
+// The other tabs' init runs once their screens load (initLoadedTabs: after the first page, below).
+for (const tab of TABS) if (STATIC_SCREENS[tab]?.init) STATIC_SCREENS[tab].init(ctx);
+// N4: the install queue (jailbreak build: the backend has one): Confirm opens when a package is queued. F313: queue.js
+// and ipa-install.js load after the first page.
+const afterFirstPage = [];
+if (typeof getBackend().queue === "function") afterFirstPage.push(() => load("queue").then((q) => q.initQueue(ctx)));
+afterFirstPage.push(() => load("ipaInstall").then((m) => m.initIpaLinks())); // F67: a tapped .ipa link offers Install IPA (jailbreak build only)
 // Home Screen launches open on Home (F32, launch.js); a return from the background runs none of this.
 const startAt = launchURL(window);
 if (startAt) history.replaceState(null, "", startAt);
@@ -463,18 +528,42 @@ if (globalThis.ifizboxNative) {
 }
 upgradeNotices.start();
 createPrefsMirror({ settings: settingsScreen.settings }).start(); // F70: N7's settings to the daemon
-document.getElementById("boot")?.remove(); // the first page is drawn: the loading screen goes
-if (addFrom) requestAnimationFrame(() => addSource(ctx, addFrom));
+if (addFrom) requestAnimationFrame(() => load("manage").then((m) => m.addSource(ctx, addFrom)).catch(() => {}));
 
 // Refresh Sources on Launch (Settings): in the background, no HUD; the Sources tab shows the result when it next loads.
 // Refresh on Launch: in the background, with the Sources tab's spinning red badge (screens/sources.js).
 // The website instead refreshes each launch once browsing is unlocked (F250), whatever the setting says: one path each
 // (websign-gate.js launchRefresh).
 const refreshSetting = () => settingsScreen.settings.isShown("refreshOnLaunch") && settingsScreen.settings.get("refreshOnLaunch");
-SCREENS.sources.useContext?.(ctx); // B141: loads started outside a screen (the website's import) get the reload bar
+// F313: Sources' screen loads for it (its context, B141, set by initLoadedTabs first).
 const refreshAtOpen = () => launchRefresh({ mode: detectMode(), settingOn: refreshSetting,
-  background: () => SCREENS.sources.refreshInBackground?.(ctx) });
+  background: () => loadTabs(["sources"]).then(() => loaded("sources").refreshInBackground?.(ctx)).catch(() => {}) });
 refreshAtOpen();
+
+// F313: once the first page is up, the other tabs (their init: Changes' badge), queue.js and ipa-install.js's
+// listeners, then every other lazily loaded module, in the background, so a later tap never waits for one. After a
+// frame, or half a second when no frame comes (a launch in the background).
+{
+  let started = false;
+  const rest = () => {
+    if (started) return;
+    started = true;
+    loadTabs().catch(() => {}).then(() => {
+      for (const f of afterFirstPage) f().catch(() => {});
+      return loadAll();
+    }).catch(() => {});
+  };
+  requestAnimationFrame(() => setTimeout(rest, 0));
+  setTimeout(rest, 500);
+}
+// F313: a press on a link starts loading what its route draws with, ahead of the click (router.js lazyFor).
+document.addEventListener("pointerdown", (e) => {
+  const a = e.target.closest?.("a[href^='#/']");
+  if (!a) return;
+  const to = parse(a.getAttribute("href"));
+  const need = missing(lazyFor(mountLink(router.current(), to) ?? to));
+  if (need.length) loadAll(need).catch(() => {});
+}, { passive: true, capture: true });
 
 // Back from the background after Settings' Return to Home After (2 minutes unless changed; Never: 0) counts as a
 // fresh open (user 2026-11-18): Home's root, and the launch refresh again. iOS rarely cold-launches the app or a

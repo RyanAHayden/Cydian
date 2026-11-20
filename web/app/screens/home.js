@@ -21,20 +21,22 @@ import { popupOpen, whenNoPopup } from "../nav/popups.js";
 import { sourceKey, sourcesFor } from "../core/sources.js";
 import { settings } from "./settings.js";
 import { pullToRefresh } from "../nav/pullrefresh.js";
-import * as browse from "./browse.js";
-import * as roulette from "./roulette.js";
+import { lazyNs, load } from "../lazy.js";
+// F313: Browse and Tweak Roulette load at their routes (lazy.js; router.js lazyFor), not with Home.
+const browse = lazyNs("browse");
+const roulette = lazyNs("roulette");
 import { catalog } from "../catalog.js";
 import { footLine, versionLines, buildInfo } from "./version-foot.js";
 import { signAndInstall, signingReady, getBring, deviceStatus, getServer, statusReady, serverReachable } from "../signing-client.js";
 import { expiryWarning, expiryWarningDays, resignWindow, signingTile } from "../core/signing.js";
 import { rememberInstall } from "./signing.js";
-import { featuredRefs } from "./extras.js";
+const featuredRefs = () => load("extras").then((m) => m.featuredRefs()); // F313: loaded with the Featured list
 import { browseList, browseListsFor, FRESH_DAYS, collection } from "../core/catalog.js";
 import { dayOf, dayTitle } from "../core/changes.js";
 import { isAltKey } from "../core/altstore.js";
 import { homeOffer, debUrl, debAlert, REPO_URL, APP_IPA_URL, APP_NAME, ownBuilds, APP_APT_REPO } from "../core/appoffer.js";
 import { fetchRelease, debFor } from "../core/selfupdate.js";
-import { refreshInBackground } from "./sources.js";
+const refreshInBackground = (ctx) => load("sources").then((m) => m.refreshInBackground(ctx)); // F313: Sources loads after Home
 import { markiFizBoxInstalled, browsingLocked, askToBrowse } from "../websign-gate.js";
 import * as guides from "./guides.js";
 import { guideRows, JAILBREAK_INFO_URL } from "./guides.js";

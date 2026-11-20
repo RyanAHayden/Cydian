@@ -22,7 +22,7 @@
 //                                         "other-install" | "other-app" | null (not one of ours)
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { showAlert } from "./nav/alert.js";
-import { showHUD } from "./nav/hud.js";
+import { showHUD, liveHUD } from "./nav/hud.js";
 import { format, ALL_TABS } from "./router.js";
 import { parseAddLink } from "./core/handoff.js";
 import { parseOtherLink, otherLinksOn } from "./core/otherlinks.js";
@@ -45,7 +45,28 @@ export function startIncoming({ native = globalThis.ifizboxNative } = {}) {
     } finally { busy = false; }
   };
   addEventListener("ifizbox:url", take);
+  const receiving = onReceiving();
+  addEventListener("ifizbox:receiving", (e) => receiving(e.detail));
   take();
+}
+
+// B163: a file another app handed over is being copied in (a 185 MB IPA from Safari takes a while): the shell sends
+// "ifizbox:receiving" with {name, progress} (0...1), then progress null once done or failed (native/Sources/App.swift
+// Incoming.receiving). A live HUD "Copying <name>… 42%" until then; the link that follows opens its page or an alert.
+//   onReceiving({ hud }) -> (detail) => void   (hud: liveHUD's shape, for tests)
+export function onReceiving({ hud = liveHUD } = {}) {
+  let live = null;
+  return (detail) => {
+    const p = detail?.progress;
+    if (typeof p !== "number" || !Number.isFinite(p)) {
+      live?.hide();
+      live = null;
+      return;
+    }
+    const text = `Copying ${String(detail?.name ?? "the file").slice(0, 60)}… ${Math.round(Math.min(1, Math.max(0, p)) * 100)}%`;
+    if (live) live.set(text);
+    else live = hud(text);
+  };
 }
 
 export async function handleIncoming(url, { native = globalThis.ifizboxNative, alert = showAlert, hud = showHUD,

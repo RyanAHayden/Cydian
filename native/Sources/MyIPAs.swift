@@ -210,20 +210,25 @@ enum MyIPAs {
     // it. False for anything else. One already in Documents (tapped in Files) just opens.
     static func receive(_ url: URL) -> Bool {
         guard url.isFileURL, url.pathExtension.lowercased() == "ipa", AppMode.current == .sideload else { return false }
+        // B163: the security scope from the moment iOS hands the URL over (documents open in place), not later.
+        let scoped = url.startAccessingSecurityScopedResource()
         SignBridge.queue.async {
-            let scoped = url.startAccessingSecurityScopedResource()
             defer { if scoped { url.stopAccessingSecurityScopedResource() } }
             let docs = library.root.standardizedFileURL.resolvingSymlinksInPath().path
             let dir = url.standardizedFileURL.resolvingSymlinksInPath().deletingLastPathComponent().path
-            let file: String?
+            let file: String
             if dir == docs, IPALibrary.validName(url.lastPathComponent) {
                 file = url.lastPathComponent
             } else {
-                // iOS's Documents/Inbox copy is ours to move; anything else is copied.
-                let inbox = dir == docs + "/Inbox"
-                file = try? library.add(url, name: url.lastPathComponent, move: inbox)
+                // iOS's Documents/Inbox copy is ours to move; anything else is copied (B163: in pieces, with the
+                // page's Copying HUD, and an alert when it fails, never silence).
+                do { file = try SharedInbox.keep(url, name: url.lastPathComponent, move: ShareInbox.isOurInbox(url, documents: library.root)) } catch {
+                    Incoming.receiving(url.lastPathComponent, progress: nil)
+                    return SharedInbox.refuse((error as? IntentFailure)?.message ?? "\(Brand.name) couldn't keep a copy of \(url.lastPathComponent): \(error.localizedDescription)")
+                }
             }
-            guard let f = file, var q = URLComponents(string: "ifizbox://myipas") else { return }
+            guard var q = URLComponents(string: "ifizbox://myipas") else { return }
+            let f = file
             q.queryItems = [URLQueryItem(name: "file", value: f)]
             if let link = q.url { DispatchQueue.main.async { Incoming.receive(link) } }
         }

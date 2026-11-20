@@ -251,6 +251,58 @@ test("stage: a fresh copy with a name the helper takes") {
     check((try? ShareInbox.stage(file("notes.txt"), kind: .unknown, dirs: host.dirs)) == nil, "unknown isn't staged")
 }
 
+// B163: Safari's download preview opens the IPA in place: a file of another app's (here: a folder outside "Documents",
+// one of the user's called Inbox too), copied in pieces with progress, never moved or removed; a big file whole.
+test("B163: a file opened in place is copied in pieces into My IPAs, big ones too, never moved") {
+    let root = (ProcessInfo.processInfo.environment["TMPDIR"] ?? NSTemporaryDirectory()) + "/b163-\(UUID().uuidString)"
+    let docs = URL(fileURLWithPath: root + "/Documents", isDirectory: true)
+    let safari = URL(fileURLWithPath: root + "/Mobile Documents/Downloads", isDirectory: true)
+    let userInbox = URL(fileURLWithPath: root + "/iCloud/Inbox", isDirectory: true)
+    for d in [docs, safari, userInbox, docs.appendingPathComponent("Inbox")] { try fm.createDirectory(at: d, withIntermediateDirectories: true) }
+    defer { try? fm.removeItem(atPath: root) }
+
+    // a 40 MB IPA-shaped file (a zip header, then noise), as big as needed to take many pieces
+    let src = safari.appendingPathComponent("Yingxia-1.8.26-ios.ipa")
+    var block = Data([0x50, 0x4B, 0x03, 0x04]) + Data(count: 1 << 20 - 4)
+    for i in stride(from: 4, to: block.count, by: 4093) { block[i] = UInt8(i % 251) }
+    fm.createFile(atPath: src.path, contents: nil)
+    let h = try FileHandle(forWritingTo: src)
+    for i in 0..<40 { block[5] = UInt8(i); try h.write(contentsOf: block) }
+    try h.close()
+    let dest = docs.appendingPathComponent("Yingxia-1.8.26-ios.ipa")
+    var seen = [Double]()
+    try ShareInbox.copyIn(src, to: dest, chunk: 1 << 20) { seen.append($0) }
+    check(fm.fileExists(atPath: src.path), "the original stays where Safari keeps it")
+    check(fm.contentsEqual(atPath: src.path, andPath: dest.path), "a whole, equal copy")
+    check(seen.first == 0 && seen.last == 1 && seen.count >= 10 && seen == seen.sorted(), "progress 0...1, in order: \(seen)")
+    check(Set(seen).count == seen.count, "at most once per percent: \(seen)")
+    let left = (try fm.contentsOfDirectory(atPath: docs.path)).filter { $0.hasSuffix(".part") }
+    check(left.isEmpty, "no partial file left: \(left)")
+
+    // too big, empty, unreadable: plain words, nothing left in Documents
+    let small = docs.appendingPathComponent("Small.ipa")
+    do { try ShareInbox.copyIn(src, to: small, max: 1 << 20); check(false, "too big expected") } catch let e as IntentFailure {
+        check(e.message.contains("too big"), e.message)
+    }
+    let empty = safari.appendingPathComponent("Empty.ipa")
+    fm.createFile(atPath: empty.path, contents: Data())
+    do { try ShareInbox.copyIn(empty, to: small); check(false, "empty expected") } catch let e as IntentFailure {
+        check(e.message.contains("empty"), e.message)
+    }
+    let gone = safari.appendingPathComponent("Gone.ipa")
+    do { try ShareInbox.copyIn(gone, to: small); check(false, "unreadable expected") } catch let e as IntentFailure {
+        check(e.message.contains("couldn't read Gone.ipa") && e.message.contains("Save to Files"), e.message)
+    }
+    let after = try fm.contentsOfDirectory(atPath: docs.path).sorted()
+    check(after == ["Inbox", "Yingxia-1.8.26-ios.ipa"], "only the good copy: \(after)")
+
+    // only iOS's own Documents/Inbox copy is ours to move and delete
+    check(ShareInbox.isOurInbox(docs.appendingPathComponent("Inbox/A.ipa"), documents: docs), "Documents/Inbox")
+    check(!ShareInbox.isOurInbox(userInbox.appendingPathComponent("A.ipa"), documents: docs), "the user's own Inbox folder")
+    check(!ShareInbox.isOurInbox(src, documents: docs), "Safari's Downloads")
+    check(!ShareInbox.isOurInbox(docs.appendingPathComponent("A.ipa"), documents: docs), "Documents itself")
+}
+
 test("jailbreak ipa: install-ipa through the helper, version for I3") {
     let host = try FakeHost(.jailbreak)
     host.env["FAKE_APPSYNC"] = "1"

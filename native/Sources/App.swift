@@ -99,6 +99,20 @@ enum Incoming {
                                 completionHandler: nil)
     }
 
+    // B163: a handed-over file being copied in (SharedInbox.keep): "ifizbox:receiving" on window with {name, progress}
+    // (0...1) for the page's "Copying" HUD (web/app/incoming.js), and progress null once it's done or failed. Any
+    // thread; nothing when the page isn't there yet (the HUD is a nicety, the link that follows is what counts).
+    static func receiving(_ name: String, progress: Double?) {
+        DispatchQueue.main.async {
+            let web = UIApplication.shared.connectedScenes
+                .compactMap { ($0 as? UIWindowScene)?.windows.first?.rootViewController?.view as? WKWebView }.first
+            guard let web, !web.isLoading, web.url != nil else { return }
+            let p: Any = progress ?? NSNull()
+            web.callAsyncJavaScript("window.dispatchEvent(new CustomEvent('ifizbox:receiving', { detail: { name, progress } }))",
+                                    arguments: ["name": name, "progress": p], in: nil, in: .page, completionHandler: nil)
+        }
+    }
+
     static func register(_ b: Bridge) {
         b.on("app.takeURL") { c in
             DispatchQueue.main.async {

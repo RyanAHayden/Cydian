@@ -11,9 +11,11 @@
 	<key>LSSupportsOpeningDocumentsInPlace</key><true/>
 	<key>CFBundleDocumentTypes</key><array>
 		<dict>
+			<!-- B163: Owner, as the other sideloaders declare .ipa, so iFizBox is offered for an IPA (Quick Look's open
+			     button, the share sheet's app row) like them, not only as an alternate. -->
 			<key>CFBundleTypeName</key><string>iOS App</string>
 			<key>CFBundleTypeRole</key><string>Viewer</string>
-			<key>LSHandlerRank</key><string>Alternate</string>
+			<key>LSHandlerRank</key><string>Owner</string>
 			<key>LSItemContentTypes</key><array><string>com.apple.itunes.ipa</string></array>
 		</dict>
 		<dict>

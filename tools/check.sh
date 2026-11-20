@@ -1,11 +1,21 @@
 #!/usr/bin/env bash
 # Test gate for agent-runner: every test_*.py under the repo, the zsign WebAssembly build (where emcc is),
 # `node --test web/app` and the Worker's own test.
-# Then the native builds (jailbreak .deb and sideload IPA) when their toolchain is there.
+# The native builds (jailbreak .deb and sideload IPA) come first, when their toolchain is there.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
 PY=python3
+
+# Native builds (native/, N1 and I2), before the tests: native/*/test_*.py's Built cases check these outputs and
+# skip when they're older than the sources, so building after the tests skipped them cold and tested the last build
+# warm. Only where their toolchain is set up (SWIFT_TOOLCHAIN or swiftc on PATH,
+# IOS_SDK, ld64.lld). build.sh builds native/build/iFizBox.deb and iFizBox.ipa and checks them (mkdeb.py/mkipa.py).
+if native/build.sh --probe 2>/dev/null; then
+  make -s -C native package
+else
+  echo "check: native build skipped: $(native/build.sh --probe 2>&1 | tr '\n' ' ')"
+fi
 
 # ponytail: unittest exits 5 when it finds no tests; that's an empty dir, not a failure.
 # Discover per directory: dirs like web/ are not packages, so one discover from the root would skip them.
@@ -38,11 +48,3 @@ fi
 
 node --test web/app
 node worker/test.mjs
-
-# Native builds (native/, N1 and I2): only where their toolchain is set up (SWIFT_TOOLCHAIN or swiftc on PATH,
-# IOS_SDK, ld64.lld). build.sh builds native/build/iFizBox.deb and iFizBox.ipa and checks them (mkdeb.py/mkipa.py).
-if native/build.sh --probe 2>/dev/null; then
-  make -s -C native package
-else
-  echo "check: native build skipped: $(native/build.sh --probe 2>&1 | tr '\n' ' ')"
-fi

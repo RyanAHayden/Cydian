@@ -94,7 +94,7 @@ clang "${hflags[@]}" -c sideload/tailscale/stub.c -o "$out/tsnet-stub.o"
 # (Go's runtime and Tailscale: ~10 MB the jailbreak app doesn't need).
 link() {
   clang -target "$target" -isysroot "$sdk" -fuse-ld=lld --ld-path="$lld" "$out/$BRAND_NAME.o" "$out/availability.o" \
-    "$out/mode.o" "$out/spawn.o" -L "$sdk/usr/lib/swift" -lz -Wl,-rpath,/usr/lib/swift -Wl,-dead_strip -Wl,-adhoc_codesign \
+    "$out/mode.o" "$out/spawn.o" -L "$sdk/usr/lib/swift" -lz -lbz2 -Wl,-rpath,/usr/lib/swift -Wl,-dead_strip -Wl,-adhoc_codesign \
     -L "$out/idevice/lib" -lidevice_ffi -liconv \
     -Wl,-weak_framework,AppIntents "$@"
 }

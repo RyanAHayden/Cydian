@@ -78,7 +78,8 @@ enum Apt {
             guard let dir = c.params["dir"] as? String, dir.hasSuffix("/"), httpURL(dir) != nil else {
                 return reply(c, nil, "bad_url: not an http(s) directory URL")
             }
-            packages(dir, ["Packages.xz", "Packages.gz", "Packages"]) { reply(c, $0, $1) }
+            // The site's proxy's order (backend-http.js): BigBoss serves Packages.bz2 alone.
+            packages(dir, ["Packages.xz", "Packages.bz2", "Packages.gz", "Packages"]) { reply(c, $0, $1) }
         }
         b.on("helper.run") { c in
             guard let words = c.params["words"] as? [String], !words.isEmpty else {
@@ -294,8 +295,9 @@ enum Apt {
             return try? (data as NSData).decompressed(using: .lzma) as Data
         }
         if name.hasSuffix(".gz") { return gunzip(data) }
-        // A plain index, not an HTML page some hosts send for every path.
-        return data.first == UInt8(ascii: "<") ? nil : data
+        if name.hasSuffix(".bz2") { return PackagesIndex.bunzip2(data) }
+        // A plain index, not an HTML page some hosts send for every path (BigBoss's starts with blank lines).
+        return PackagesIndex.looksLikeHTML(data) ? nil : data
     }
 
     // gzip (RFC 1952) = header + raw deflate + crc32/size; NSData's .zlib is raw deflate.

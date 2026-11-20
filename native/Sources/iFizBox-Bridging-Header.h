@@ -5,3 +5,5 @@
 
 int ifizbox_mode_at(const char *helper);
 #include <zlib.h>
+/* libbz2 for Packages.bz2 (Sources/Apt.swift bunzip2) */
+#include <bzlib.h>

@@ -10,7 +10,9 @@
 //                                      wait for iOS's install (progress("installing", f)) -> { installed, expires,
 //                                      dismissed? (B85: iOS's prompt closed and iOS never asked for the IPA) };
 //                                      B146: on the prompt route installed is true or null (Sent to iOS), never false
-//                                      unless dismissed; This iPhone's installd answer is passed as it is
+//                                      unless dismissed; This iPhone's installd answer is passed as it is.
+//                                      B200: it answers once iOS has the whole IPA ({installed: null, handedOff,
+//                                      later: a promise for true | null, the watch's own end}), not when iOS finishes
 //                                      again (B91): signing.reprompt instead of signing.open (the IPA is still
 //                                      served), then the same wait; throws code "gone" when it isn't
 //                                      host (iFizBox's own) doesn't wait: iOS closes iFizBox to install it
@@ -27,6 +29,7 @@ import { chooseRoute } from "./route.js";
 export { hereLabel, shownName, finishHere } from "./common.js";
 
 export const ASK_WAIT = 600; // seconds the queue waits for Install on iOS's prompt before the row fails
+const SENT = Symbol("sent"); // B200: openPrepared's race: iOS had the whole IPA before the watch answered
 
 export function prepareParams(job) {
   if (!job) return null;
@@ -113,15 +116,28 @@ export async function openPrepared(row, { tag, signal = null, progress = () => {
   if (host) return { installed: null, expires: opened?.expires ?? null, host: true };
   const bundleId = opened?.bundleId || row.bundleId;
   if (!bundleId) return { installed: null, expires: opened?.expires ?? null };
+  // B200: once iOS has every byte of the IPA (signing.progress's {served: true}), the install is iOS's: the call
+  // answers then (Sent to iOS, handedOff) so the queue starts the next app, and `later` carries the watch's own
+  // answer (true: the run confirms Installed). Its progress events after that are dropped (the row has ended).
+  let release = null;
+  const sent = new Promise((resolve) => { release = resolve; });
+  let handed = false;
+  const watched = abortable(native, "signing.progress", { bundleId, wait }, (ev) => {
+    if (ev?.log) log(ev.log);
+    if (handed) return;
+    if (ev?.served === true) { handed = true; release(); }
+    else if (ev?.phase === "installing") progress("installing", Number(ev.progress) || 0);
+  }, { tag, signal });
   let r;
   try {
-    r = await abortable(native, "signing.progress", { bundleId, wait }, (ev) => {
-      if (ev?.log) log(ev.log);
-      else if (ev?.phase === "installing") progress("installing", Number(ev.progress) || 0);
-    }, { tag, signal });
+    r = await Promise.race([watched, sent.then(() => SENT)]);
   } catch (e) {
     if (e?.code === "cancelled") throw e;
     return { installed: null, expires: opened?.expires ?? null }; // iOS can't be asked: the prompt was shown
+  }
+  if (r === SENT) {
+    const later = watched.then((x) => (x?.installed === true ? true : null), () => null);
+    return { installed: null, expires: opened?.expires ?? null, handedOff: true, later };
   }
   // B85: dismissed: iOS's prompt closed and iOS never asked for the IPA (the user tapped Cancel on it)
   if (r?.dismissed) return { installed: r?.installed ?? null, expires: opened?.expires ?? null, dismissed: true };

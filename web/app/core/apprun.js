@@ -14,7 +14,9 @@
 //                              prompt; progress("copying", f) then ("installing", installd's f), the row's `here`
 //                              turns true and its words say Copying to iPhone / Installing. handedOff: true (the
 //                              shell's word that iOS had the whole IPA, or iFizBox was in the background) turns a
-//                              false into "sent" too (B76, below). dismissed: true (B85: iOS's prompt closed and
+//                              false into "sent" too (B76, below). later (B200): a promise for the install's
+//                              real end when the call answered at the handoff; true turns the "Sent" row Installed.
+//                              dismissed: true (B85: iOS's prompt closed and
 //                              iOS never asked for the IPA) ends the row Failed ("Failed: iOS didn't download it":
 //                              B91, the user's Cancel and a frozen server look the same) and the next app goes on.
 //                              hooks.again (B91): that row's Try Again: no new signing; the shell's IPA (still
@@ -348,10 +350,22 @@ export function createAppRun({ rows, sign, install, discard = () => {}, reprompt
     const handedOff = Boolean(res?.handedOff || f.away);
     if (res?.installed === false && !handedOff) { fail(r, "iOS didn't install it"); return; }
     const unsure = res?.installed !== true;
-    finishRow(r, "installed", { token: null, expires, unsure, phase: null, fraction: 1 });
+    // B200: `finishing` while the call's `later` (iOS still installing what it fully has) hasn't answered
+    const finishing = unsure && typeof res?.later?.then === "function";
+    finishRow(r, "installed", { token: null, expires, unsure, phase: null, fraction: 1, ...(finishing ? { finishing } : {}) });
     if (r.mode === "resign") log(r, "step", `Re-signed ${label(r)}${expires ? `, expires ${dateText(expires)}` : ""}`);
     else if (r.mode === "remove") log(r, "step", `Removed ${label(r)}`);
     else log(r, "step", unsure ? `Sent ${label(r)} to iOS` : `Installed ${label(r)}`);
+    // B200: answered once iOS had the whole IPA: the watch goes on, and its true later makes the row Installed
+    if (finishing) {
+      const row = r;
+      res.later.then((v) => {
+        if (!row.finishing) return;
+        if (v !== true || row.state !== "installed" || !row.unsure) { set(row, { finishing: false }); return; }
+        set(row, { unsure: false, finishing: false });
+        if (row.mode !== "resign") log(row, "step", `Installed ${label(row)}`);
+      }, () => {});
+    }
     pump();
   }
 
@@ -360,7 +374,7 @@ export function createAppRun({ rows, sign, install, discard = () => {}, reprompt
   const retryPatch = (r) => {
     const back = r.state === "failed" && r.dismissed && Boolean(reprompt) && Boolean(r.bundleId) && !helperRow(r);
     return { state: back ? "signed" : "waiting", again: back, phase: null, fraction: back ? 1 : 0, progress: back ? 0.5 : 0, error: null,
-      token: null, unsure: false, dismissed: false, busy: false };
+      token: null, unsure: false, dismissed: false, busy: false, finishing: false };
   };
 
   function pump() {
@@ -540,7 +554,8 @@ export function rowStatus(row, opts = {}) {
       return p > 0 && p < 100 ? `Installing ${p}%` : "Installing";
     case "installed":
       if (row.mode === "resign") return row.expires ? `Re-signed, expires ${dateText(row.expires, opts)}` : "Re-signed";
-      return row.unsure ? "Sent to iOS" : "Installed";
+      if (!row.unsure) return "Installed";
+      return row.finishing ? "Finishing on iOS" : "Sent to iOS"; // B200: handed off, iOS still installing
     case "failed": return row.error ? `Failed: ${row.error}` : "Failed";
     case "cancelled": return "Cancelled";
     default: return "";

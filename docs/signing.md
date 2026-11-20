@@ -524,7 +524,8 @@ Plus the arm64e fix-up, the user's edits and tweak injection (below).
 - **Install progress.** `signing.progress {bundleId}` streams iOS's own progress from the private
   `LSApplicationWorkspace installProgressForBundleID:makeSynchronous:` (looked up at run time, as Feather does) and
   answers `installed: true/false` when it ends, `false` when none showed in 45 seconds, `null` when the API isn't
-  there. It is its own call because the bridge drops a call's stream once it has answered, and `signing.install`
+  there. Once iOS has fetched every byte of the IPA it also sends `{served: true}`, once, and goes on watching. It is
+  its own call because the bridge drops a call's stream once it has answered, and `signing.install`
   answers as soon as iOS has the link.
 - **Re-sign All.** Every install is recorded in `Application Support/Signing/signed.json` (installed and original ID,
   name, version, the IPA's URL, when, its signature's expiry (the earlier of the certificate's and the profile's),
@@ -681,7 +682,9 @@ A web page can't read the UDID, but iOS gives it to a "Profile Service" profile 
   last. Every app is downloaded and signed first, two at a time (`signing.prepare`, which keeps the signed IPA for 30
   minutes; a Re-sign without a url signs from the phone's record, `{record: bundleId}`), and the rows read Downloading
   / Signing / Signed. Then iOS gets them one at a time in order (`signing.open {token}`, then `signing.progress
-  {bundleId, wait: 600}`): "Tap Install on the iOS prompt", and the next waits until iOS has installed it. Each try
+  {bundleId, wait: 600}`): "Tap Install on the iOS prompt", and the next waits until iOS has the whole IPA (the
+  watch's `{served: true}` event): the row reads Sent to iOS and turns Installed when the watch, still going, sees
+  iOS finish. Each try
   of an app carries its own `tag`: the working row's round stop button sends `signing.cancel {tag}`, which stops only
   that app's download, signing, serving or watch, and the next app goes on. A prompt that closed without iOS asking
   for the IPA ends its row "Failed: iOS didn't download it" (the user's Cancel and a frozen server look the same;

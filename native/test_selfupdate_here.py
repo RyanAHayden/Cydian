@@ -46,7 +46,7 @@ class HereSelfClose(unittest.TestCase):
         ready = block(self.side, "static func hereReady()")
         self.assertIn("guard state != .finished", ready)  # B173: no other state keeps iFizBox open
         self.assertIn("set(.finished)", ready)
-        self.assertIn("closeWith(c, after: 3, exitAfter: hereExit)", ready)
+        self.assertIn("closeWith(exitAfter: hereExit)", ready)  # B178: no notification
         began = block(self.side, "static func hereBegan(")
         self.assertIn("run += 1", began)  # an older hosted run's polls stop
         self.assertIn("set(.waiting)", began)

@@ -10,7 +10,6 @@ parsed). Finish with `agent-runner done <ID> "msg"`.
 
 ### Web: browse and upgrade (in order)
 
-- [ ] **C18** Credits > Artwork: drop the 'Pairing Screenshots — Ryan Hayden (Fizlo), their own iPhone's Settings' row (web/app/screens/home.js ~line 822, F268): the project owner's own screenshots need no credit (user 2026-11-20). Remove any matching README Credits line; update tests. | files: web/app/screens/home.js, README.md
 - [~] **F15d** (follow-up, later) Phone check of the idevice route (F15b), with the user in the coordinator session: on the iPhone 15 (iOS 27) pair via Developer Mode > Pair with iFizBox, install a test IPA with LocalDevVPN on, LocalDevVPN-off and other-VPN alerts, self-update. Open questions: mdns pairable-host advertisement without the multicast entitlement (fallback: NWListener Bonjour _remotepairing-pairable-host._tcp), LocalDevVPN URL scheme (localdevvpn:// guessed), VPNCheck with Tailscale on, port 49152 on other phones; iOS 15 lockdown path on a sideload iPhone. | files: native/sideload/idevice/**, journal/** BLOCKED: being done with the user in the coordinator session (test build at the tailnet page) — Done with the user 2026-11-19 on the iPhone 15 (iOS 27.0.1): paired via Developer Mode > Pair with iFizBox (PIN), installed openMX through LocalDevVPN in 2.3 s with no prompt and no server. iOS 15 lockdown path on a sideload phone still unchecked.
 ### Research (any time, parallel)
 

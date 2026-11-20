@@ -823,10 +823,7 @@ function renderCredits(body) {
       rows: [{ label: "Section Icons", subtitle: "Jay Freeman (saurik)\nFrom Cydia, GPLv3", cls: "thanks-row",
         icon: { text: "C", color: "#7a8a99", src: "icons/sections/Tweaks.png" } },
       { label: "Interface Wording", subtitle: "Jay Freeman (saurik)\nFrom Cydia, GPLv3", cls: "thanks-row",
-        icon: { text: "C", color: "#7a8a99", src: "icons/sections/Text_Editors.png" } },
-      // F268: Settings > Installation > This iPhone's pairing steps show the user's own Settings screenshots
-      { label: "Pairing Screenshots", subtitle: "Ryan Hayden (Fizlo)\nTheir own iPhone's Settings", cls: "thanks-row",
-        icon: { text: "S", color: "#7a8a99" } }],
+        icon: { text: "C", color: "#7a8a99", src: "icons/sections/Text_Editors.png" } }],
       footer: `${NAME} uses Cydia's section icons and purpose badges and some of its interface wording (titles, `
         + "buttons and alerts, typos fixed), under GPLv3, from its source at git.saurik.com/cydia.git. "
         + `${NAME} is not affiliated with SaurikIT.`,

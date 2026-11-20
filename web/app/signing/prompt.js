@@ -12,7 +12,7 @@
 //   p.state        "watching" | "asked" | "cancelled" | "unknown" (an older Worker) | "stopped"
 //   p.stop()       stops polling and listening (the upload is done, or the job ended)
 import { TRY_AGAIN_LABEL } from "../nav/progress.js";
-import { signFail } from "./browser.js";
+import { signFail } from "./common.js";
 import { EARLY_WINDOW, dropEarly } from "./early.js";
 
 // grace: room for iOS's HEAD after an Install tap, its KV mark and the next look; a cancel read wrongly kills a real

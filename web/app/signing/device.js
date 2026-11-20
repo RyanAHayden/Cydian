@@ -15,7 +15,7 @@ import { format, settingsRoute } from "../router.js";
 import { showAlert } from "../nav/alert.js";
 import { NAME } from "../brand.js";
 import { bridge, sleep } from "./common.js";
-import { getServer } from "./identity.js";
+import { getServer } from "./common.js";
 
 export async function deviceStatus(native) {
   return bridge(native).call("signing.status", {});

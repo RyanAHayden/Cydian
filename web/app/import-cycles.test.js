@@ -14,8 +14,6 @@ const root = dirname(fileURLToPath(import.meta.url));
 
 const KNOWN = [
   "core/catalog.js core/installed.js",
-  "signing/browser.js signing/device.js signing/early.js signing/identity.js signing/install.js signing/password.js " +
-    "signing/prompt.js signing/queue.js signing/route.js signing/watch.js",
   "screens/browse.js screens/manage.js screens/roulette.js",
 ];
 

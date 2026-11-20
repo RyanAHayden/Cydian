@@ -24,6 +24,7 @@ import { showAlert } from "../nav/alert.js";
 import { askInsecure, bridge, keepIpaHash, refusing, storageOf } from "./common.js";
 import { getServer } from "./identity.js";
 import { chooseRoute } from "./route.js";
+export { hereLabel, shownName, finishHere } from "./common.js";
 
 export const ASK_WAIT = 600; // seconds the queue waits for Install on iOS's prompt before the row fails
 
@@ -127,36 +128,6 @@ export async function openPrepared(row, { tag, signal = null, progress = () => {
   // B146: once iOS took the IPA, "not installed" can't be told apart from "installed but not seen" (isInstalled is
   // unreliable on iOS 27, a re-signed app may not show): the row ends Sent to iOS (null), never Failed
   return { installed: r?.installed === true ? true : null, expires: opened?.expires ?? null };
-}
-
-// B111: signing.install's {here: "copying" | "installing", progress} event (This iPhone) -> { label } for the page's
-// step and bar ("Copying to iPhone 40%", "Installing 75%"), or null
-export function hereLabel(ev) {
-  const word = { copying: "Copying to iPhone", installing: "Installing" }[ev?.here];
-  if (!word) return null;
-  const p = Math.round(Math.max(0, Math.min(1, Number(ev.progress) || 0)) * 100);
-  return { label: p > 0 && p < 100 ? `${word} ${p}%` : word };
-}
-
-// B150: the name an install's page shows: the caller's (a source's app name, the variant it was picked as, or Custom
-// Install's), else the signed IPA's own (`result.name`, its Info.plist). A bare file name ("App.ipa") isn't a name:
-// the IPA's own wins over it.
-export function shownName(name, result) {
-  const given = String(name ?? "").trim();
-  return (given && !/\.ipa$/i.test(given) ? given : "") || result?.name || given;
-}
-
-// B111: the single install's end on This iPhone: installd has the app, so "Installed <app>", the bar full, and
-// Open <app> (signing.openApp) above the Return button.
-export function finishHere(h, result, { native, name = "", later = setTimeout } = {}) {
-  const app = shownName(name, result) || "the app"; // B150: the source's name before the IPA's
-  const text = `Installed ${app}`;
-  const bid = result?.bundleId;
-  if (typeof h.finish === "function") {
-    h.set(`${text} 100%`);
-    const open = () => { try { Promise.resolve(bridge(native).call("signing.openApp", { bundleId: bid })).catch(() => {}); } catch { /* no bridge */ } return false; };
-    h.finish({ status: text, ...(bid ? { also: { label: `Open ${app}`, action: open } } : {}) });
-  } else later(() => (h.done ? h.done(text) : h.hide()), 1200);
 }
 
 // B111: signing.open's event on the This iPhone route -> the run's { phase: "copying" | "installing", fraction 0..1 },

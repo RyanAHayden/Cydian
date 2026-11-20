@@ -10,8 +10,7 @@
 import { deviceCheck, parseProfile, notLandedText, notInProfileText } from "../core/signing.js";
 import { profileInfo, IFIZBOX_ID, targetBundleId } from "../core/websign.js";
 import { storedKeep } from "../core/keepid.js";
-import { isSelfIpa } from "./install.js";
-import { retrying, signFail } from "./browser.js";
+import { isSelfIpa, retrying, signFail } from "./common.js";
 
 // F132: iOS's installer retries a held app.ipa for at least 5 minutes (R14, docs/signing.md: HEAD 30 s, HEAD 30 s,
 // GET 60 s, then HEAD/GET pairs), each request held up to the Worker's IPA_WAIT; so the early link stays good for

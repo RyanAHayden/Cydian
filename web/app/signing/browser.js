@@ -21,7 +21,7 @@ import { progressHUD } from "../nav/progress.js";
 import { showAlert } from "../nav/alert.js";
 import { KNOWN_MALWARE, failed, keepIpaHash, refusing, storageOf, untilCancel } from "./common.js";
 import { identityNow, loadIdentity } from "./identity.js";
-import { isSelfIpa, signAndInstall } from "./install.js";
+import { isSelfIpa } from "./common.js";
 import { openRoute } from "./device.js";
 import { EARLY_WINDOW, buffer, dropEarly, earlyLink, expectedBundleId, iconLeftText, keptBytes, reserveUpload,
   siteCause, siteRefusal, siteUdid } from "./early.js";
@@ -29,44 +29,13 @@ import { memoryNote, tooBigAlert, tooLargeText } from "./toobig.js";
 import { watchInstall } from "./watch.js";
 import { eitherSignal, iosCancelled, promptStop, watchPrompt, websiteTransfer } from "./prompt.js";
 
-export const signFail = (code, message) => Object.assign(new Error(message), { code });
-
-// The Web Worker, as one call: resolves the worker's answer ({ ipa, bundleId, name, version }), or throws its error.
-// F188: `signal` (the progress page's Cancel) ends the worker, and zsign with it, mid-signing.
-export function runInWorker(job, { make = () => new Worker(new URL("../signing-worker.js", import.meta.url), { type: "module" }), onProgress = () => {}, signal = null } = {}) {
-  return new Promise((resolve, reject) => {
-    if (signal?.aborted) { reject(signFail("cancelled", "Cancelled")); return; }
-    let w;
-    try { w = make(); } catch (e) { reject(signFail("unsupported", `This browser can't sign apps (${e?.message ?? e}).`)); return; }
-    signal?.addEventListener?.("abort", () => { w.terminate?.(); reject(signFail("cancelled", "Cancelled")); }, { once: true });
-    w.onmessage = (e) => {
-      const m = e.data ?? {};
-      if (m.progress) { onProgress(m.progress); return; }
-      w.terminate?.();
-      if (m.ok) resolve(m); else reject(signFail(m.code ?? "sign_failed", m.error ?? "Signing failed."));
-    };
-    w.onerror = (e) => { w.terminate?.(); reject(signFail("sign_failed", `The signer stopped: ${e?.message ?? "no reason given"}.`)); };
-    const t = [job.ipa, job.p12, job.profile].filter((b) => b instanceof ArrayBuffer);
-    w.postMessage(job, t);
-  });
-}
+import { signFail, runInWorker, retrying } from "./common.js";
+export { signFail, runInWorker, retrying };
 
 async function answerError(res) {
   let b = null;
   try { b = await res.json(); } catch { /* not JSON */ }
   return signFail(b?.code ?? "network", b?.error ?? `The server answered HTTP ${res.status}.`);
-}
-
-// A request that failed for want of a connection (Safari: "Load failed") is tried again, up to `tries` times with a
-// pause, as phones drop a request now and then mid-upload (user 2026-11-18: an upload stopped after its second part).
-// An answer from the server, even an error, is final.
-export async function retrying(send, { tries = 3, wait = (ms) => new Promise((r) => setTimeout(r, ms)), signal = null } = {}) {
-  for (let i = 1; ; i++) {
-    try { return await send(); } catch (e) {
-      if (i >= tries || signal?.aborted) throw e; // F188: Cancel isn't a dropped request
-      await wait(800 * i);
-    }
-  }
 }
 
 // The IPA's bytes through /api/fetch, the label following the download ("Downloading 40%").
@@ -212,7 +181,8 @@ export async function signInBrowser({ url, name = "", onInstalled = () => {}, br
   if (!id?.p12 || !id?.profile) {
     drop();
     await alert({ title: "No Certificate", message: "Add your certificate, its password and provisioning profile in Settings > Signing.", buttons: ["OK"] });
-    (await import("../screens/signing.js")).rememberInstall({ name, run: () => signAndInstall({ url, name, onInstalled, bring, bundleId, version, bytes }) }); // F177
+    // install.js imports this module: loaded when the retry runs, not statically
+    (await import("../screens/signing.js")).rememberInstall({ name, run: async () => (await import("./install.js")).signAndInstall({ url, name, onInstalled, bring, bundleId, version, bytes }) }); // F177
     go(["signing"]);
     return false;
   }

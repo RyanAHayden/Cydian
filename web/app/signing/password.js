@@ -15,9 +15,13 @@
 export const PASSWORD_EVENT = "ifizbox:password";
 export const needsConfirm = (id) => Boolean(id?.p12 && id?.profile && id.passwordOk !== true && id.passwordOk !== false);
 import { browserSigning } from "./common.js";
-import { loadIdentity, saveIdentity } from "./identity.js";
-import { runInWorker } from "./browser.js";
+import { runInWorker } from "./common.js";
 import { buffer } from "./early.js";
+
+// identity.js imports this module (a save asks for confirmSoon), so its store is reached lazily from here.
+const identityModule = () => import("./identity.js");
+const loadIdentity = async () => (await identityModule()).loadIdentity();
+const saveIdentity = async (patch) => (await identityModule()).saveIdentity(patch);
 
 const bytesOf = (b) => (b instanceof Uint8Array ? b : new Uint8Array(b ?? []));
 const sameBytes = (a, b) => {

@@ -62,6 +62,12 @@ clock, phone and apt in a folder); `main.m` only fills `struct auto_env` with th
   links, found in `/var/jb/var/lib/apt/lists/*_Packages`) never installs automatically: apt would 404 on it. It is
   logged and skipped (not a failure; it stays in the count and the badge), and the app's queue installs it (F131).
   A plan whose other upgrades would pull in such a package as a dependency waits for a person ("Update Failed").
+- **https only:** the install runs with `--allow-unauthenticated` (unsigned repos), so nothing installs
+  automatically from a plain-http source (`http://`, `tor+http://`): anyone on the network path could swap the
+  .deb. Each `*_Packages` list belongs to the source in `/var/jb/etc/apt` (`sources.list`, `sources.list.d/*.list`
+  and `*.sources`) whose apt list-file prefix matches it longest (http wins a tie); an upgrade any http list offers
+  at its version is logged and skipped, as a link is, and a dependency from one makes the plan wait for a person.
+  The app's Changes rows say so in place of the description, and a tap on Upgrade still installs them.
 - **Respring:** needed when a maintainer script says `finish:reload|restart` (Cydia's protocol, on stdout) or the
   package puts files where SpringBoard loads tweaks, preference bundles or themes from (its dpkg `.list`).
   Just Notify Me: the "2 Packages Updated" notification ends "Respring to finish." Respring When Locked: respring

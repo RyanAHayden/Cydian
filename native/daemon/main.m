@@ -402,6 +402,7 @@ int main(int argc, char *argv[]) {
             .cache_dir = IFIZBOX_PREFIX "/var/cache/apt/archives",
             .rollback_dir = IFIZBOX_PREFIX "/var/cache/ifizbox/rollback",
             .lists_dir = IFIZBOX_PREFIX "/var/lib/apt/lists",
+            .apt_dir = IFIZBOX_PREFIX "/etc/apt", /* B192: http sources aren't installed from automatically */
             .settings = e_settings, .held = e_held, .now = e_now, .net = e_net, .charging = e_charging,
             .locked = e_locked, .springboard_started = e_springboard_started, .busy = e_busy, .update = e_update,
             .simulate = e_simulate, .install = e_install, .respring = e_respring, .notify = e_notify, .say = e_say,

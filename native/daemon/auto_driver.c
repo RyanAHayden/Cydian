@@ -13,6 +13,8 @@
  *   auto_driver words <plan> <status|-> <id,id,...|-> <need>   title=, body=, failed=
  *   auto_driver state <plan> <id,...|-> <failed> <old state|-> <since>     auto_state's lines
  *   auto_driver linked <lists> <id=version>...          B16: the pairs offered with a full-URL Filename
+ *   auto_driver insecure <apt> <lists> <id=version>...  B192: the pairs offered from a plain-http source
+ *   auto_driver prefix <uri>                            B192: apt's lists file prefix and 1 if plain http
  *   auto_driver installs <plan>                         B16: id=version of each Inst line
  *   auto_driver url <filename>                          B16: 1 if it is a full URL
  *   auto_driver step <dir> [--force] [--no-update] [--dry-run]
@@ -29,6 +31,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 static char *slurp(const char *path) {
@@ -247,6 +250,28 @@ int main(int argc, char **argv) {
         for (int i = 0; i < n; i++)
             if (hit[i]) { printf("%s=%s\n", qi[i], qv[i]); seen++; }
         if (seen != k) return 3;
+    } else if (!strcmp(cmd, "insecure") && argc >= 4) {
+        /* auto_driver insecure <apt dir> <lists dir> <id=version>...   B192: the pairs from http sources */
+        static char pid[UPD_MAX][UPD_FIELD], pver[UPD_MAX][UPD_FIELD];
+        static const char *qi[UPD_MAX], *qv[UPD_MAX];
+        static unsigned char hit[UPD_MAX];
+        int n = 0;
+        for (int i = 4; i < argc && n < UPD_MAX; i++, n++) {
+            const char *eq = strchr(argv[i], '=');
+            if (!eq) return 2;
+            snprintf(pid[n], UPD_FIELD, "%.*s", (int)(eq - argv[i]), argv[i]);
+            snprintf(pver[n], UPD_FIELD, "%s", eq + 1);
+            qi[n] = pid[n]; qv[n] = pver[n];
+        }
+        int k = auto_insecure(argv[2], argv[3], qi, qv, n, hit), seen = 0;
+        for (int i = 0; i < n; i++)
+            if (hit[i]) { printf("%s=%s\n", qi[i], qv[i]); seen++; }
+        if (seen != k) return 3;
+    } else if (!strcmp(cmd, "prefix") && argc == 3) {
+        /* auto_driver prefix <uri>    B192: apt's lists file prefix, and 1 if the URI is plain http */
+        char out[1024];
+        if (!auto_list_prefix(argv[2], out, sizeof out)) return 3;
+        printf("%s %d\n", out, auto_plain_http(argv[2]));
     } else if (!strcmp(cmd, "installs") && argc == 3) {
         /* auto_driver installs <plan>    id=version per Inst line */
         static char pid[UPD_MAX][UPD_FIELD], pver[UPD_MAX][UPD_FIELD];
@@ -276,6 +301,10 @@ int main(int argc, char **argv) {
         strcpy(p[3], env.cache_dir); strcpy(p[4], env.rollback_dir); strcpy(p[5], env.lists_dir);
         env.state_path = p[0]; env.status_path = p[1]; env.info_dir = p[2]; env.cache_dir = p[3]; env.rollback_dir = p[4];
         env.lists_dir = p[5];
+        static char apt_dir[4096]; /* B192: <dir>/apt (sources.list.d/), when the test made one */
+        struct stat ast;
+        snprintf(apt_dir, sizeof apt_dir, "%s", path("apt"));
+        if (!stat(apt_dir, &ast)) env.apt_dir = apt_dir;
         return auto_step(&env, force, update, dry, &list, &list2);
     } else {
         fprintf(stderr, "usage: see auto_driver.c\n");

@@ -149,6 +149,20 @@ int auto_url_filename(const char *filename);
  * offers with a full-URL Filename: hit[i] = 1 for those. Returns how many. lists NULL or unreadable: none. */
 int auto_linked(const char *lists, const char *const *ids, const char *const *vers, int n, unsigned char *hit);
 
+/* B192: apt's lists file prefix for a source URI (apt's URItoFileName: scheme and user:password dropped, some
+ * characters %-quoted, '/' -> '_', always ending in '_'), into out. Returns 1 when it fit. */
+int auto_list_prefix(const char *uri, char *out, size_t size);
+
+/* B192: 1 if a source URI is plain http ("http://", or a "<x>+http://" transport such as tor+http), case aside. */
+int auto_plain_http(const char *uri);
+
+/* B192: which of the n id=version pairs some list in lists offers from a plain-http source: hit[i] = 1 for those.
+ * Each *_Packages file belongs to the source in apt_dir (<prefix>/etc/apt: sources.list, and sources.list.d's
+ * .list and .sources files) with the longest matching auto_list_prefix; equal ones count as http if any is. A list no source
+ * claims counts as not http. Returns how many. apt_dir or lists NULL or unreadable: none. */
+int auto_insecure(const char *apt_dir, const char *lists, const char *const *ids, const char *const *vers, int n,
+                  unsigned char *hit);
+
 /* B16: the packages an `apt-get -s` plan installs ("Inst <id>[:arch] [<from>] (<to> ..."), new ones too, into
  * ids/vers (each up to UPD_FIELD bytes, room for max). Returns how many. */
 int auto_plan_installs(const char *plan, char (*ids)[UPD_FIELD], char (*vers)[UPD_FIELD], int max);
@@ -181,6 +195,7 @@ struct auto_env {
     /* A notification (title, body) or, for AUTO_NOTE_BADGE, only the badge. badge: the upgrades left. */
     void (*notify)(void *ctx, int kind, int badge, const char *title, const char *body);
     void (*say)(void *ctx, const char *msg);
+    const char *apt_dir;      /* B192: <prefix>/etc/apt (which sources are http), NULL: not looked at */
 };
 
 /* One run (launchd starts it hourly): a pending respring, the check if due (Check for Updates, Use Cellular Data),

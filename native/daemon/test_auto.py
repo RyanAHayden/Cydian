@@ -355,6 +355,100 @@ class Linked(Base):
                          ["com.ex.tweak=1.2", "libfoo=2:3.2-1", "com.ex.held=2.0", "hookkit=1.0"])
 
 
+# B192: apt's sources, one-line and deb822 styles. repo.ex.com is http, secure.ex.com https; both offer libfoo.
+SOURCES_LIST = """\
+# a comment line
+deb [trusted=yes arch=iphoneos-arm64] http://repo.ex.com/ ./   # trailing comment
+deb-src https://src.ex.com/ ./
+"""
+DEB822 = """\
+Types: deb
+URIs: https://secure.ex.com/
+Suites: ./
+Components:
+
+Types: deb
+URIs: https://repo.ex.com/sub/
+ HTTPS://other.ex.com/a_b/
+Suites: ./
+
+Types: deb
+URIs: http://disabled.ex.com/
+Enabled: no
+Suites: ./
+"""
+HTTP_LIST = """\
+Package: com.ex.tweak
+Version: 1.2
+Filename: ./debs/com.ex.tweak_1.2.deb
+
+Package: hookkit
+Version: 1.0
+Filename: ./debs/hookkit.deb
+"""
+HTTPS_LIST = """\
+Package: libfoo
+Version: 2:3.2-1
+Filename: ./debs/libfoo.deb
+
+Package: com.ex.held
+Version: 2.0
+Filename: ./debs/held.deb
+"""
+SUB_LIST = """\
+Package: com.ex.sub
+Version: 1.0
+Filename: ./debs/sub.deb
+"""
+
+
+def put_apt(root, sources_list=SOURCES_LIST, deb822=DEB822):
+    """apt/ (sources.list.d with both styles) and lists/ under root, as the phone's /var/jb has them."""
+    os.makedirs(os.path.join(root, "apt", "sources.list.d"), exist_ok=True)
+    os.makedirs(os.path.join(root, "lists"), exist_ok=True)
+    for name, text in (("apt/sources.list.d/other.list", sources_list), ("apt/sources.list.d/ifizbox.sources", deb822),
+                       ("lists/repo.ex.com_._Packages", HTTP_LIST), ("lists/secure.ex.com_._Packages", HTTPS_LIST),
+                       ("lists/repo.ex.com_sub_._Packages", SUB_LIST), ("lists/disabled.ex.com_._Packages", SUB_LIST),
+                       ("lists/repo.ex.com_._Release", "Package: libfoo\nVersion: 2:3.2-1\n")):
+        with open(os.path.join(root, name), "w") as f:
+            f.write(text)
+
+
+class Insecure(Base):
+    """B192: automatic installs take packages from https sources only."""
+
+    def test_prefix(self):
+        for uri, want in (("http://repo.ex.com/", "repo.ex.com_ 1"), ("https://repo.ex.com", "repo.ex.com_ 0"),
+                          ("HTTP://a.b/c/d/", "a.b_c_d_ 1"), ("tor+http://x.onion/", "x.onion_ 1"),
+                          ("https://user:pw@h.ex:8080/a_b~/", "h.ex:8080_a%5fb%7e_ 0"), ("file:/var/repo", "_var_repo_ 0"),
+                          ("httpx://h/", "h_ 0"), ("ahttp://h/", "h_ 0")):
+            self.assertEqual(self.run_driver("prefix", uri).strip(), want, uri)
+
+    def test_insecure(self):
+        d = tempfile.mkdtemp(dir=self.tmp)
+        put_apt(d)
+        run = lambda *pairs: self.run_driver("insecure", os.path.join(d, "apt"), os.path.join(d, "lists"), *pairs).split()
+        # http's list, not https's; repo.ex.com/sub/ (https) beats repo.ex.com/ (http) as the longer prefix; a
+        # disabled http source and a deb-src line count for nothing.
+        self.assertEqual(run("com.ex.tweak=1.2", "libfoo=2:3.2-1", "com.ex.held=2.0", "hookkit=1.0", "hookkit=0.9",
+                             "com.ex.sub=1.0", "other=1"), ["com.ex.tweak=1.2", "hookkit=1.0"])
+        self.assertEqual(self.run_driver("insecure", os.path.join(d, "missing"), os.path.join(d, "lists"), "hookkit=1.0"), "")
+
+    def test_same_list_from_http_and_https_counts_as_http(self):
+        d = tempfile.mkdtemp(dir=self.tmp)
+        put_apt(d, sources_list="deb http://secure.ex.com/ ./\n")
+        out = self.run_driver("insecure", os.path.join(d, "apt"), os.path.join(d, "lists"), "libfoo=2:3.2-1").split()
+        self.assertEqual(out, ["libfoo=2:3.2-1"])
+
+    def test_sources_list_itself_is_read(self):
+        d = tempfile.mkdtemp(dir=self.tmp)
+        put_apt(d, sources_list="", deb822="")
+        with open(os.path.join(d, "apt", "sources.list"), "w") as f:
+            f.write("deb http://secure.ex.com/ ./\n")
+        out = self.run_driver("insecure", os.path.join(d, "apt"), os.path.join(d, "lists"), "libfoo=2:3.2-1").split()
+        self.assertEqual(out, ["libfoo=2:3.2-1"])
+
+
 class Runs(Base):
     """Whole hourly runs: the fake phone's facts, settings and apt in a folder, the calls printed."""
 
@@ -676,6 +770,41 @@ class Runs(Base):
         self.assertFalse([l for l in log if l.startswith("install")], log)
         self.assertIn("notify failed 3 Update Failed | libfoo couldn't be updated automatically.", log)
         self.assertIn("failed libfoo=2:3.2-1", self.get("state"))
+
+    def test_http_source_is_skipped_https_installs(self):
+        # B192: com.ex.tweak 1.2 comes from repo.ex.com over http: skipped, no failure; https's two install.
+        self.put("settings", "autoInstall=all\nautoInstallIdle=false\n")
+        put_apt(self.d)
+        self.put("plan.after", "Inst com.ex.tweak [1.0] (1.2 Example:1.0/stable [iphoneos-arm64])\n")
+        log = self.step()
+        self.assertTrue(any("com.ex.tweak 1.2 comes from an http source" in l for l in log), log)
+        log = self.calls(log)
+        self.assertIn("simulate libfoo com.ex.held", log)
+        self.assertIn("install libfoo com.ex.held", log)
+        self.assertNotIn("failed", self.get("state"))
+        self.assertIn("com.ex.tweak=1.2", self.get("state"))
+
+    def test_only_http_upgrades_install_nothing(self):
+        self.put("settings", "autoInstall=marked\nautoInstallIdle=false\nmarked=com.ex.tweak\n")
+        put_apt(self.d)
+        log = self.calls(self.step())
+        self.assertFalse([l for l in log if l.startswith(("install", "simulate ", "notify failed", "notify updated"))], log)
+        self.assertNotIn("failed", self.get("state"))
+
+    def test_http_dependency_waits_for_a_person(self):
+        self.put("settings", "autoInstall=marked\nautoInstallIdle=false\nmarked=libfoo\n")
+        put_apt(self.d)
+        self.put("plan.install", "Inst hookkit (1.0 R [iphoneos-arm64])\nInst libfoo [2:3.1-1] (2:3.2-1 R)\n")
+        log = self.step()
+        self.assertTrue(any("need hookkit 1.0, from an http source" in l for l in log), log)
+        log = self.calls(log)
+        self.assertFalse([l for l in log if l.startswith("install")], log)
+        self.assertIn("failed libfoo=2:3.2-1", self.get("state"))
+
+    def test_all_https_installs_everything(self):
+        self.put("settings", "autoInstall=all\nautoInstallIdle=false\n")
+        put_apt(self.d, sources_list="deb https://repo.ex.com/ ./\n")
+        self.assertIn("install com.ex.tweak libfoo com.ex.held", self.calls(self.step()))
 
     def test_no_lists_installs_as_before(self):
         self.put("settings", "autoInstall=all\nautoInstallIdle=false\n")

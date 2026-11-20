@@ -42,6 +42,7 @@ import { SELF_ID } from "../core/essential.js";
 import { showHUD } from "../nav/hud.js"; // F250: reloadSources from outside the tab
 import { appQueue } from "../app-queue.js"; // F255: the jailbreak app's Upgrade (N) queues app upgrades there
 import { onPageShow } from "../nav/pagestate.js"; // B169
+import { isInsecureSource } from "../core/sources.js"; // B192
 
 export const title = "Changes";
 
@@ -60,6 +61,7 @@ export function init(ctx) {
   // iFizBox's own source read (essential-ui.js readSelfInfo): its upgrade row and the badge count again.
   globalThis.addEventListener?.("ifizbox:self-info", () => { if (state.body) load(); else badge(); });
   settings.onChange((key) => { if (key === "holds" || key === "blockedPackages" || key === "resignReminder") { if (state.body) load(); else badge(); } });
+  settings.onChange((key) => { if ((key === "autoInstall" || key === "autoMarked") && state.body) load(); }); // B192
   // At launch, only with a status file: without one there are no upgrades, and no reason to load every source.
   // Without one (the site, the sideload app) the remembered apps count, and iFizBox itself in the app: badge at
   // launch whenever there is anything installed to follow.
@@ -322,7 +324,8 @@ function drawScope(current = state.scope ?? (state.data ? scopeOf(null, state.da
 // day. An installed package shows under its upgrade, not again under its day (Cydia's rule). `filter`: the search
 // field and scope (core/changes.js filterRows); upgrades are installed packages, so the scope never hides them.
 // F91: `resign` (core/signing.js needsResign rows) comes first, as "Needs Re-sign".
-export function itemsOf(groups, locale, upgrades = { available: [], ignored: [] }, { now = Date.now(), query = "", scope = "all", installed = new Set(), resign = [] } = {}) {
+// B192: `autoHttp` (autoHttpIds) are the available upgrades the daemon won't install by itself: their rows say why.
+export function itemsOf(groups, locale, upgrades = { available: [], ignored: [] }, { now = Date.now(), query = "", scope = "all", installed = new Set(), resign = [], autoHttp = null } = {}) {
   const items = [];
   const upgraded = new Set();
   for (const [header, all] of [["Needs Re-sign", resign ?? []], ["Available Upgrades", upgrades.available], ["Ignored Upgrades", upgrades.ignored]]) {
@@ -331,7 +334,8 @@ export function itemsOf(groups, locale, upgrades = { available: [], ignored: [] 
     if (!rows.length) continue;
     items.push({ header });
     for (const r of rows) {
-      items.push({ ...r, change: r.change === "resign" ? "resign" : "upgrade" });
+      const why = header === "Available Upgrades" && autoHttp?.has(r.id) ? { short: AUTO_HTTP_NOTE } : null;
+      items.push({ ...r, change: r.change === "resign" ? "resign" : "upgrade", ...why });
     }
   }
   for (const g of filterGroups(groups, { query, scope, installed })) {
@@ -368,9 +372,37 @@ async function vendorSoldNow(upgrades) {
   return vendorSoldIds(upgrades.available, sources).catch(() => new Set());
 }
 
+// B192: the jailbreak daemon installs automatically from https sources only (native/daemon/auto.c auto_insecure),
+// so an available upgrade it would pick (Install Updates Automatically: Everything, or Only Packages I Mark and
+// marked) from an http source says so in place of its description. Upgrade (N) and its page still install it.
+export const AUTO_HTTP_NOTE = "Not installed automatically: its source uses http, not https.";
+
+// -> the ids among `available` (catalog rows; `key`: their source) that the daemon skips for http. `sources`: the
+// backend's list ({ key, uri }); `autoInstall`: the setting ("off" | "marked" | "all"); `marked(id)`: Update
+// Automatically is on for it.
+export function autoHttpIds(available = [], sources = [], { autoInstall = "off", marked = () => false } = {}) {
+  const out = new Set();
+  if (autoInstall !== "marked" && autoInstall !== "all") return out;
+  const http = new Set((sources ?? []).filter((s) => s?.key != null && isInsecureSource(s)).map((s) => s.key));
+  for (const r of available ?? []) {
+    if (!r?.id || r.remembered || !http.has(r.key)) continue;
+    if (autoInstall === "all" || marked(r.id)) out.add(r.id);
+  }
+  return out;
+}
+
+// The ids above for this device's settings: jailbreak app only; none on failure.
+async function autoHttpNow(upgrades) {
+  if (!canUpgrade() || !settings.isShown?.("autoInstall")) return new Set();
+  const autoInstall = settings.get("autoInstall");
+  if (autoInstall !== "marked" && autoInstall !== "all") return new Set();
+  const sources = await Promise.resolve().then(() => getBackend().sources()).catch(() => []);
+  return autoHttpIds(upgrades?.available, sources, { autoInstall, marked: (id) => Boolean(settings.autoMarked?.has(id)) });
+}
+
 async function load() {
   const seq = ++state.seq;
-  let groups, upgrades, installed, resign, vendorSold;
+  let groups, upgrades, installed, resign, vendorSold, autoHttp;
   try {
     await catalog.ensure();
     [groups, upgrades, installed] = await Promise.all([catalog.changes(), catalog.upgrades(ignoredIds()), installedNow()]);
@@ -378,13 +410,14 @@ async function load() {
     upgrades = await withAppUpgrades(upgrades, ignoredIds()); // I3: the apps Install remembered (app-updates.js)
     resign = await resignNow(upgrades); // F91
     vendorSold = await vendorSoldNow(upgrades); // B19
+    autoHttp = await autoHttpNow(upgrades).catch(() => new Set()); // B192
   } catch (e) {
     if (seq === state.seq && state.note) { state.ph?.remove(); state.note.textContent = e.message; state.note.hidden = false; }
     return;
   }
   if (seq !== state.seq) return;
   badge(upgrades, resign);
-  state.data = { groups, upgrades, installed, resign, vendorSold };
+  state.data = { groups, upgrades, installed, resign, vendorSold, autoHttp };
   draw();
 }
 
@@ -392,13 +425,13 @@ async function load() {
 function draw() {
   const body = state.body;
   if (!body || !state.data) return;
-  const { groups, upgrades, installed, resign = [], vendorSold = null } = state.data;
+  const { groups, upgrades, installed, resign = [], vendorSold = null, autoHttp = null } = state.data;
   state.ph?.remove();
   state.ph = null;
   drawUpgradeButton(canUpgrade() ? jailbreakUpgradeCount(upgrades.available, vendorSold) : upgrades.available.length + resign.length); // B68: apt's and the apps'; F91: re-signs too
   const scope = scopeOf(state.scope, installed);
   drawScope(scope);
-  const items = itemsOf(groups, undefined, upgrades, { query: state.query, scope, installed, resign });
+  const items = itemsOf(groups, undefined, upgrades, { query: state.query, scope, installed, resign, autoHttp });
   state.note.hidden = items.length > 0;
   state.note.textContent = items.length ? "" : emptyText({ query: state.query, scope });
   if (!state.list) {

@@ -120,7 +120,7 @@ export function openProgress({ title = "Running", onCancel = null } = {}) {
   // nav/sheet.js's scaffold; Escape does nothing (the page closes through its own buttons, which know the run)
   const shell = showSheet({ title, body: [scroll, jump, foot], left: cancel, right: close, cls: "console progress-page",
     bodyCls: "progress-body", escape: false });
-  const { sheet, h1, left, right } = shell;
+  const { sheet, h1, left, right, content: body } = shell;
 
   // ---- auto-scroll ----
   const follow = createFollow();

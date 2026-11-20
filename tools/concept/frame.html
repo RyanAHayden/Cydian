@@ -163,11 +163,22 @@ select { font: inherit; color: var(--ink); background: var(--panel); border: 1px
     return (beforeData = d);
   }
   function deviceOf() { return meta.devices.filter(function (d) { return d.id === state.device; })[0]; }
-  function tone() { return state.theme.split(":")[0]; }
+  // A Theme value: "tone:theme" in the default era (iOS 6: "light:classic"), "era:tone:theme" in another
+  // ("ios7:light:white"); the eras come from core/settings.js (build.py styles()).
+  var eraDefault = (meta.palettes.styles || []).filter(function (s) { return s.default; })[0];
+  function themeParts(v) {
+    var t = String(v || "").split(":");
+    if (t.length === 2) t.unshift(eraDefault ? eraDefault.value : "ios6");
+    return { era: t[0], tone: t[1], palette: t[2] };
+  }
+  function tone() { return themeParts(state.theme).tone; }
   function seeds() {
-    var t = state.theme.split(":");
-    var s = { "ifizbox.appearance": t[0], "ifizbox.firstVisit": "later" };
-    s[t[0] === "dark" ? "ifizbox.darkTheme" : "ifizbox.lightTheme"] = t[1];
+    var t = themeParts(state.theme);
+    // as the app stores Theme's picks: the era at ifizbox.style (theme-boot.js puts it on html data-style), the
+    // tone at ifizbox.appearance, and in an era that uses the theme lists, the tone's pick
+    var s = { "ifizbox.style": t.era, "ifizbox.appearance": t.tone, "ifizbox.firstVisit": "later" };
+    var era = (meta.palettes.styles || []).filter(function (x) { return x.value === t.era; })[0];
+    if (!era || !era.own) s[t.tone === "dark" ? "ifizbox.darkTheme" : "ifizbox.lightTheme"] = t.palette;
     return s;
   }
   function storeKey() { return state.version + "|" + state.mode; }
@@ -238,7 +249,8 @@ select { font: inherit; color: var(--ink); background: var(--panel); border: 1px
   function paintBars() {
     var d = deviceOf(), site = state.mode === "site", dark = tone() === "dark";
     $("strip").style.background = stripColor;
-    var darkText = site && lum(stripColor) > 0.6;
+    // dark glyphs over a light bar: Safari's strip on the site, the app's own bar in the apps (iOS 7's White)
+    var darkText = lum(stripColor) > 0.6;
     $("sb").classList.toggle("dark-text", darkText);
     $("safari").classList.toggle("dark", dark);
     // over the app's black tab bar the bar is light; over Safari's light bar, dark
@@ -318,15 +330,22 @@ select { font: inherit; color: var(--ink); background: var(--panel); border: 1px
     // undelivered notifications". load() swaps in a new iframe in this same task, so the old app never sees the size.
     load();
   });
-  [["light", "Light", meta.palettes.lightTheme], ["dark", "Dark", meta.palettes.darkTheme]].forEach(function (g) {
-    var og = document.createElement("optgroup");
-    og.label = g[1];
-    g[2].forEach(function (p) {
-      var o = document.createElement("option");
-      o.value = g[0] + ":" + p.value; o.textContent = g[1] + " · " + p.label;
-      og.appendChild(o);
+  // One group per era and tone (Theme > Style's eras, the default first): iOS 6's Light and Dark lists, then each
+  // other era's own themes. With one era, the groups are plain Light and Dark.
+  var eras = meta.palettes.styles && meta.palettes.styles.length ? meta.palettes.styles
+    : [{ value: "ios6", label: "", default: true, themes: { light: meta.palettes.lightTheme, dark: meta.palettes.darkTheme } }];
+  eras.forEach(function (era) {
+    [["light", "Light"], ["dark", "Dark"]].forEach(function (g) {
+      var og = document.createElement("optgroup");
+      og.label = (eras.length > 1 ? era.label + " · " : "") + g[1];
+      (era.themes[g[0]] || []).forEach(function (p) {
+        var o = document.createElement("option");
+        o.value = (era.default ? "" : era.value + ":") + g[0] + ":" + p.value;
+        o.textContent = (eras.length > 1 && !era.default ? era.label + " · " : "") + g[1] + " · " + p.label;
+        og.appendChild(o);
+      });
+      $("theme").appendChild(og);
     });
-    $("theme").appendChild(og);
   });
   $("theme").value = state.theme;
   if ($("theme").value !== state.theme) { state.theme = "light:" + meta.palettes.lightTheme[0].value; $("theme").value = state.theme; }

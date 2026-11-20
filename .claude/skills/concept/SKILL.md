@@ -47,13 +47,19 @@ The controls outside the phone are plain page UI; leave them as the tool draws t
 
    `--before main` (the default) adds the before/after toggle against main; `--mode jailbreak|sideload|site` and
    `--device iphone-se|iphone-14|iphone-16|iphone-17-pro-max|ipad-mini` pick what it opens on (light Classic theme
-   by default; every palette is in the Theme menu). The build fails loudly if a module can't be bundled or an import
+   by default; every palette is in the Theme menu). The Theme menu also lists the eras of Theme > Style (iOS 6, the
+   default, with its Light and Dark lists; then each other era with its own themes, e.g. iOS 7 · Light · White),
+   read from `core/settings.js` (the style setting's options and `STYLE_PALETTES`), so an era added to the app
+   shows up with no change to the tool. The build fails loudly if a module can't be bundled or an import
    names something that isn't exported.
 4. Check it in headless Chromium (needs `chromium`; about a minute):
 
        python3 tools/concept/build.py ... --standalone -o "$SCRATCH/check.html"
        node tools/concept/check.mjs "$SCRATCH/check.html" --modes jailbreak,sideload,site --route '#/sources' --shots "$SCRATCH/shots"
 
+   `--themes` takes the Theme menu's values: `light:classic,dark:gunmetal` (the default) for iOS 6, and
+   `<era>:<tone>:<theme>` for another era (`ios7:light:white,ios7:dark:oled`); it checks the app's `data-style`,
+   `data-theme` and `data-palette` match. A concept that touches an era's CSS (`ios7.css`) checks that era too.
    It runs under a CSP like the Artifact viewer's and fails on any error, CSP refusal or request, window error
    events included (ResizeObserver's loop warning is one). At each device and theme it also drags a list by mouse
    on `--drag-route` (default `#/home/credits`, a page long enough to scroll on every device; `none` skips it): the
@@ -73,7 +79,9 @@ The controls outside the phone are plain page UI; leave them as the tool draws t
 - `tools/concept/shell.js` runs first in the phone's iframe (a srcdoc): a fake `ifizboxNative` in the jailbroken
   and Lite modes (native/bridge.js's shape, `data-shell="app"` as App.swift sets it), the site's `/api/fetch`
   in Website mode, both answered from `tools/concept/sample.py`'s sample sources (repo fixtures; an unknown source
-  answers a made-up empty one); an in-memory localStorage seeded with the theme; images as data: URIs; safe areas
+  answers a made-up empty one); an in-memory localStorage seeded with the theme as the app stores Theme's picks
+  (`ifizbox.style` for the era, which theme-boot.js puts on `html[data-style]`, `ifizbox.appearance` for the tone,
+  and `ifizbox.lightTheme`/`darkTheme` in an era that uses those lists); images as data: URIs; safe areas
   per device (`env(safe-area-inset-*)` becomes `var(--sa-*)` at build time); an iPhone or iPad user agent.
 - The mouse is a finger inside the phone (`tools/concept/touch.js`, after shell.js), as in Chromium's device mode:
   the app gets pointer events with `pointerType: "touch"` and touch events, never the mouse, so its touch code

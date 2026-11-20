@@ -78,6 +78,32 @@ class ConceptPage(unittest.TestCase):
         self.assertEqual({p["value"] for p in self.meta["palettes"]["lightTheme"]}, set(re.findall(r'"(\w+)"', lights)))
         self.assertEqual(self.meta["palettes"]["lightTheme"][0]["value"], "classic")
 
+    @unittest.skipUnless(NODE, "needs node")
+    def test_lists_the_eras_of_core_settings(self):
+        # the Theme menu's eras are Theme > Style's, read from core/settings.js as the app runs it (STYLES,
+        # STYLE_DEFAULT, STYLE_PALETTES): an era added there shows up here with no change to the tool
+        code = self.meta["runtime"] + "\n" + "\n".join(self.after["modules"][p] for p in sorted(self.after["modules"]))
+        out = run_vm(code, ["core/settings.js"])
+        self.assertEqual(out["failed"], {})
+        s = out["values"]["core/settings.js"]
+        eras = self.meta["palettes"]["styles"]
+        self.assertEqual(sorted(e["value"] for e in eras), sorted(s["STYLES"]))
+        self.assertEqual(eras[0]["value"], s["STYLE_DEFAULT"])  # the default first
+        self.assertEqual([e["value"] for e in eras if e["default"]], [s["STYLE_DEFAULT"]])
+        lists = {"light": self.meta["palettes"]["lightTheme"], "dark": self.meta["palettes"]["darkTheme"]}
+        for e in eras:
+            own = s["STYLE_PALETTES"].get(e["value"])
+            self.assertEqual(e["own"], bool(own), e["value"])
+            if own:
+                self.assertEqual({t: [p["value"] for p in ps] for t, ps in e["themes"].items()},
+                                 {t: [own[t]] for t in ("light", "dark")}, e["value"])
+            else:
+                self.assertEqual(e["themes"], lists, e["value"])
+        # the frame seeds the era where the app reads it (theme-boot.js's ifizbox.style, core/settings.js STYLE_KEY)
+        self.assertEqual(s["STYLE_KEY"], "ifizbox.style")
+        self.assertIn('"ifizbox.style": t.era', self.page)
+        self.assertIn('localStorage.getItem("ifizbox.style")', (build.ROOT / "web/app/theme-boot.js").read_text())
+
     def test_has_the_controls(self):
         for el in ('id="theme"', 'id="device"', 'id="mode"', 'id="version"', 'id="app"'):
             self.assertIn(el, self.page)

@@ -5,7 +5,7 @@
 // the tab bar navigates, and nothing logged an error (exceptions, console.error, CSP refusals, any request at all
 // besides the page). Not in tools/check.sh: it needs Chromium.
 //
-//   node tools/concept/check.mjs PAGE.html [--devices iphone-se,iphone-17-pro-max] [--themes light:classic,dark:gunmetal]
+//   node tools/concept/check.mjs PAGE.html [--devices iphone-se,iphone-17-pro-max] [--themes light:classic,dark:gunmetal,ios7:light:white]
 //                                [--modes jailbreak,sideload,site] [--version after|before] [--shots DIR]
 //                                [--viewport 1280x900] [--tap '.tabbar a:nth-child(2)'] [--route '#/sources'] [--probe 'return …']
 //                                [--drag-route '#/home/credits' | none]
@@ -239,11 +239,15 @@ for (const mode of MODES) {
       await set("theme", theme); // reloads the app
       await ev(`document.getElementById("startpage").click()`); // from the concept's start page
       await sleep(300);
-      const name = `${mode}-${device}-${theme.replace(":", "-")}${VERSION === "before" ? "-before" : ""}`;
+      const name = `${mode}-${device}-${theme.replaceAll(":", "-")}${VERSION === "before" ? "-before" : ""}`;
       const up = await until(`return d.querySelector(".page") && !d.getElementById("boot")`, 15000);
       check(up, `${name}: the app came up`);
-      const t = await inApp(`return d.documentElement.getAttribute("data-theme") + ":" + d.documentElement.getAttribute("data-palette")`);
-      check(t === theme, `${name}: the app's theme is ${t}`);
+      // "tone:theme" is the default era's (frame.html themeParts), "era:tone:theme" another's: the app shows the era
+      // on html data-style as theme-boot.js and screens/settings.js put it there
+      const want = await ev(`(() => { const v = ${JSON.stringify(theme)}.split(":"), s = (meta => (meta.palettes.styles || []).find((x) => x.default))(JSON.parse(document.getElementById("concept-meta").textContent));
+        return (v.length === 2 ? (s ? s.value : "ios6") : v.shift()) + "/" + v.join(":"); })()`);
+      const t = await inApp(`const e = d.documentElement; return e.getAttribute("data-style") + "/" + e.getAttribute("data-theme") + ":" + e.getAttribute("data-palette")`);
+      check(t === want, `${name}: the app's style/theme is ${t}` + (t === want ? "" : ` (asked ${want})`));
       await sleep(1200);
       if (ROUTE) {
         await inApp(`w.location.hash = ${JSON.stringify(ROUTE)}`);

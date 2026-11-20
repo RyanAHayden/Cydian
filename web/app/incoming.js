@@ -28,28 +28,37 @@ import { parseAddLink } from "./core/handoff.js";
 import { parseOtherLink, otherLinksOn } from "./core/otherlinks.js";
 import { packageIdOf } from "./websign-gate.js";
 import { NAME } from "./brand.js";
+import { markHandoff } from "./handoffclock.js";
 
-export function startIncoming({ native = globalThis.ifizboxNative } = {}) {
+export function startIncoming({ native = globalThis.ifizboxNative, events = globalThis } = {}) {
   if (!native?.call) return;
   let busy = false;
+  let again = false; // B174: an "ifizbox:url" while a take ran: take once more after it
   const take = async () => {
-    if (busy) return;
+    if (busy) { again = true; return; }
     busy = true;
     try {
-      for (;;) {
-        let r = null;
-        try { r = await native.call("app.takeURL", {}); } catch { return; } // an older shell
-        if (!r?.url) return;
-        await handleIncoming(r.url, { native });
-      }
+      do {
+        again = false;
+        for (;;) {
+          let r = null;
+          // B174: a link the shell kept after this call's empty answer left (a cold launch's IPA, still being copied
+          // as the page started) comes with its own "ifizbox:url": `again` takes it, where it used to be dropped.
+          try { r = await native.call("app.takeURL", {}); } catch { return; } // an older shell
+          if (!r?.url) break;
+          markHandoff();
+          await handleIncoming(r.url, { native });
+          markHandoff(); // its page just opened: Return Home After leaves it there (handoffclock.js)
+        }
+      } while (again);
     } finally { busy = false; trail(); }
   };
   const trail = () => { takeOpenLog({ native }).catch(() => {}); };
-  addEventListener("ifizbox:openlog", trail);
-  addEventListener("ifizbox:url", take);
+  events.addEventListener("ifizbox:openlog", trail);
+  events.addEventListener("ifizbox:url", () => { markHandoff(); return take(); });
   const receiving = onReceiving();
-  addEventListener("ifizbox:receiving", (e) => receiving(e.detail));
-  take();
+  events.addEventListener("ifizbox:receiving", (e) => { markHandoff(); receiving(e.detail); });
+  return take();
 }
 
 // B166: the shell's trail of a hand-off (native/share/App/ShareBridge.swift OpenLog: every hop from iOS's scene

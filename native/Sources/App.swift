@@ -139,11 +139,33 @@ enum Incoming {
             .compactMap { ($0 as? UIWindowScene)?.windows.first?.rootViewController?.view as? WKWebView }.first
         guard let web, !web.isLoading, web.url != nil else {
             if tries > 0 { DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { notify(tries: tries - 1) } }
-            else { OpenLog.hop("Incoming: the page wasn't ready in 10 s; it takes the link when it starts") }
+            else {
+                // B174: the page may have started (and taken nothing) while the file was still being copied, so
+                // "it takes the link when it starts" can be never: keep asking, every second, while the link waits.
+                OpenLog.hop("Incoming: the page wasn't ready in 10 s; still trying while the link waits")
+                slowNotify(left: 120)
+            }
             return
         }
         web.callAsyncJavaScript("window.dispatchEvent(new Event('ifizbox:url'))", arguments: [:], in: nil, in: .page,
                                 completionHandler: nil)
+    }
+
+    // B174: after notify's 10 s: once a second until the page took the link (pending gone) or left more than 2 minutes.
+    private static func slowNotify(left: Int) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+            guard pending != nil else { return }
+            let web = UIApplication.shared.connectedScenes
+                .compactMap { ($0 as? UIWindowScene)?.windows.first?.rootViewController?.view as? WKWebView }.first
+            guard let web, !web.isLoading, web.url != nil else {
+                if left > 0 { slowNotify(left: left - 1) }
+                else { OpenLog.hop("Incoming: error: the page never took the link") }
+                return
+            }
+            OpenLog.hop("Incoming: the page is ready; telling it")
+            web.callAsyncJavaScript("window.dispatchEvent(new Event('ifizbox:url'))", arguments: [:], in: nil, in: .page,
+                                    completionHandler: nil)
+        }
     }
 
     // B163: a handed-over file being copied in (SharedInbox.keep): "ifizbox:receiving" on window with {name, progress}

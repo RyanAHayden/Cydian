@@ -45,6 +45,7 @@ import { NAME } from "./brand.js";
 import { takeInstallParam, askFromInstallLink, launchRefresh } from "./websign-gate.js";
 import { notIphonePage } from "./core/platform.js";
 import { showNotIphone } from "./screens/notiphone.js";
+import { handoffRecent } from "./handoffclock.js";
 
 // F266: a Mac, PC or Android phone gets the Not-an-iPhone page first, and the app only starts once it's left (Look
 // Around Anyway, or What Is …? onto the FAQ). Decided by user agent before anything is drawn, so an iPhone, an iPad
@@ -486,6 +487,8 @@ const OVERLAYS = ".alert-scrim, .action-scrim, .hud-scrim, .share-scrim, .sheet,
     const after = Number(settingsScreen.settings.get("returnHome")) * 60 * 1000;
     if (!hiddenAt || !after || Date.now() - hiddenAt < after) return;
     if (document.querySelector(OVERLAYS)) { hiddenAt = 0; return; }
+    // B174: nor when another app brought iFizBox forward with a file or link (an .ipa from Files): its page wins.
+    if (handoffRecent()) { hiddenAt = 0; return; }
     hiddenAt = 0;
     // Home's root at its top, not where it was scrolled (user 2026-11-18). go's hashchange is async: scroll after it.
     const toTop = () => { const b = stacks.top()?.page.body; if (b) b.scrollTop = 0; };

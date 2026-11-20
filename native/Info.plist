@@ -51,7 +51,13 @@
 			<key>CFBundleTypeName</key><string>iOS App</string>
 			<key>CFBundleTypeRole</key><string>Viewer</string>
 			<key>LSHandlerRank</key><string>Alternate</string>
-			<key>LSItemContentTypes</key><array><string>com.apple.itunes.ipa</string></array>
+			<key>LSItemContentTypes</key><array><string>com.ryha.ifizbox.ipa</string><string>com.apple.itunes.ipa</string></array>
+		</dict>
+		<dict>
+			<key>CFBundleTypeName</key><string>iOS App (TrollStore)</string>
+			<key>CFBundleTypeRole</key><string>Viewer</string>
+			<key>LSHandlerRank</key><string>Alternate</string>
+			<key>LSItemContentTypes</key><array><string>com.ryha.ifizbox.tipa</string></array>
 		</dict>
 		<dict>
 			<key>CFBundleTypeName</key><string>Debian package</string>
@@ -66,16 +72,29 @@
 			<key>CFBundleURLSchemes</key><array><string>ifizbox</string></array>
 		</dict>
 	</array>
-	<!-- iOS has no system type for .deb: declare it, as Sileo and Zebra do. .ipa too: iOS 15+ may not declare com.apple.itunes.ipa, and without it Safari's downloads and Files leave the app out of the share sheet (user 2026-11-18). -->
-	<key>UTImportedTypeDeclarations</key><array>
+	<!-- .ipa: iOS 15+ may not declare com.apple.itunes.ipa, and without a type Safari's downloads and Files leave the app
+	     out of the share sheet (user 2026-11-18). B174: iFizBox's own exported types, as Feather does, conforming to
+	     data, never public.zip-archive (typed as a zip, Files unzips an IPA on a tap). Info-sideload.plist repeats them. -->
+	<key>UTExportedTypeDeclarations</key><array>
 		<dict>
-			<key>UTTypeIdentifier</key><string>com.apple.itunes.ipa</string>
+			<key>UTTypeIdentifier</key><string>com.ryha.ifizbox.ipa</string>
 			<key>UTTypeDescription</key><string>iOS App</string>
-			<key>UTTypeConformsTo</key><array><string>public.data</string><string>public.zip-archive</string></array>
+			<key>UTTypeConformsTo</key><array><string>com.apple.itunes.ipa</string><string>public.data</string><string>public.content</string></array>
 			<key>UTTypeTagSpecification</key><dict>
-				<key>public.filename-extension</key><array><string>ipa</string><string>tipa</string></array>
+				<key>public.filename-extension</key><array><string>ipa</string></array>
 			</dict>
 		</dict>
+		<dict>
+			<key>UTTypeIdentifier</key><string>com.ryha.ifizbox.tipa</string>
+			<key>UTTypeDescription</key><string>iOS App (TrollStore)</string>
+			<key>UTTypeConformsTo</key><array><string>com.apple.itunes.ipa</string><string>public.data</string><string>public.content</string></array>
+			<key>UTTypeTagSpecification</key><dict>
+				<key>public.filename-extension</key><array><string>tipa</string></array>
+			</dict>
+		</dict>
+	</array>
+	<!-- iOS has no system type for .deb: declare it, as Sileo and Zebra do. -->
+	<key>UTImportedTypeDeclarations</key><array>
 		<dict>
 			<key>UTTypeIdentifier</key><string>org.debian.deb-archive</string>
 			<key>UTTypeDescription</key><string>Debian package</string>

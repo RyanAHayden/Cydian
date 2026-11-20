@@ -136,6 +136,35 @@ class Declared(unittest.TestCase):
         # sideload keeps F77's types
         self.assertLessEqual({"com.rsa.pkcs-12", "com.apple.mobileprovision"}, self.types(side))
 
+    def test_ipa_not_a_zip(self):
+        # B174: .ipa is typed as Feather types it (its own exported UTType, data, Owner), never as a zip: typed as
+        # public.zip-archive, Files unzipped an IPA on a tap instead of handing it over.
+        import mkipa
+        base = self.plist("Info.plist")
+        side = dict(base)
+        side.update(self.plist("Info-sideload.plist"))
+        self.assertEqual(mkipa.ipa_type_problems(side), [])
+        for name, info in (("jailbreak", base), ("sideload", side)):
+            with self.subTest(build=name):
+                exported = {t["UTTypeIdentifier"]: t for t in info["UTExportedTypeDeclarations"]}
+                ipa = exported["com.ryha.ifizbox.ipa"]
+                self.assertEqual(ipa["UTTypeTagSpecification"]["public.filename-extension"], ["ipa"])
+                self.assertIn("com.apple.itunes.ipa", ipa["UTTypeConformsTo"])
+                self.assertIn("public.data", ipa["UTTypeConformsTo"])
+                self.assertIn("tipa", exported["com.ryha.ifizbox.tipa"]["UTTypeTagSpecification"]["public.filename-extension"])
+                for t in info.get("UTExportedTypeDeclarations", []) + info.get("UTImportedTypeDeclarations", []):
+                    self.assertNotIn("public.zip-archive", t["UTTypeConformsTo"], t["UTTypeIdentifier"])
+                imported = {t["UTTypeIdentifier"] for t in info.get("UTImportedTypeDeclarations", [])}
+                self.assertNotIn("com.apple.itunes.ipa", imported)
+                self.assertIn("com.ryha.ifizbox.ipa", self.types(info))
+        # the check catches the old shape
+        old = dict(side)
+        old["UTExportedTypeDeclarations"] = []
+        old["UTImportedTypeDeclarations"] = [{"UTTypeIdentifier": "com.apple.itunes.ipa", "UTTypeConformsTo": ["public.data", "public.zip-archive"],
+                                              "UTTypeTagSpecification": {"public.filename-extension": ["ipa"]}}]
+        self.assertTrue(any("archive" in p for p in mkipa.ipa_type_problems(old)))
+        self.assertTrue(any("exports no UTType" in p for p in mkipa.ipa_type_problems(old)))
+
     def test_extension_plist(self):
         info = self.plist("share", "Info.plist")
         self.assertEqual(info["CFBundleIdentifier"], "com.ryha.ifizbox.share")
@@ -176,13 +205,34 @@ class Built(unittest.TestCase):
         if not os.path.exists(ipa) or os.path.getmtime(ipa) < os.path.getmtime(os.path.join(NATIVE, "Info-sideload.plist")):
             self.skipTest("no fresh native build (tools/check.sh builds it after the tests, where the toolchain is)")
         with zipfile.ZipFile(ipa) as z:
-            info = plistlib.loads(z.read("Payload/%s.app/Info.plist" % brand.NAME))
+            raw = z.read("Payload/%s.app/Info.plist" % brand.NAME)
+        info = plistlib.loads(raw)
+        # B174: the plist tool too (plutil where there is one, libplist's plistutil on Linux), as iOS's own parser
+        # is not plistlib: it must read the built file and give back the same .ipa type.
+        tool = shutil.which("plutil") or shutil.which("plistutil")
+        if tool:
+            import tempfile
+            with tempfile.TemporaryDirectory() as d:
+                src = os.path.join(d, "Info.plist")
+                with open(src, "wb") as f:
+                    f.write(raw)
+                out = os.path.join(d, "out.plist")
+                cmd = [tool, "-convert", "xml1", "-o", out, src] if tool.endswith("plutil") else [tool, "-i", src, "-o", out, "-f", "xml"]
+                subprocess.run(cmd, check=True, capture_output=True)
+                with open(out, "rb") as f:
+                    self.assertEqual(plistlib.load(f).get("UTExportedTypeDeclarations"), info.get("UTExportedTypeDeclarations"))
         ipa_types = [d for d in info["CFBundleDocumentTypes"] if "com.apple.itunes.ipa" in d["LSItemContentTypes"]]
         self.assertEqual(len(ipa_types), 1)
-        self.assertEqual(ipa_types[0]["CFBundleTypeRole"], "Viewer")
-        ut = {t["UTTypeIdentifier"]: t for t in info["UTImportedTypeDeclarations"]}["com.apple.itunes.ipa"]
+        self.assertEqual(ipa_types[0]["CFBundleTypeRole"], "Editor")  # as Feather's
+        self.assertEqual(ipa_types[0]["LSHandlerRank"], "Owner")
+        self.assertIn("com.ryha.ifizbox.ipa", ipa_types[0]["LSItemContentTypes"])
+        ut = {t["UTTypeIdentifier"]: t for t in info["UTExportedTypeDeclarations"]}["com.ryha.ifizbox.ipa"]
         self.assertIn("ipa", ut["UTTypeTagSpecification"]["public.filename-extension"])
         self.assertIn("public.data", ut["UTTypeConformsTo"])
+        self.assertNotIn("public.zip-archive", ut["UTTypeConformsTo"])
+        self.assertNotIn("com.apple.itunes.ipa", {t["UTTypeIdentifier"] for t in info.get("UTImportedTypeDeclarations", [])})
+        import mkipa
+        self.assertEqual(mkipa.ipa_type_problems(info), [])
         self.assertTrue(info["LSSupportsOpeningDocumentsInPlace"])
         scenes = info["UIApplicationSceneManifest"]["UISceneConfigurations"]["UIWindowSceneSessionRoleApplication"]
         self.assertEqual(scenes[0]["UISceneConfigurationName"], "Default")  # AppDelegate's configurationForConnecting

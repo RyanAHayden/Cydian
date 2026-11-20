@@ -931,7 +931,10 @@ html[data-theme="dark"] .store-segment:active:not(.selected) { background: var(-
    with a white emboss under it. The area is the list's own background (--plain: white in light, each dark theme's
    list colour), so the space a pull opens is one colour from the first point to past the trigger: a blue-grey area
    showed only once it switched on, over the scroller's white, and the pull flashed between the two (user
-   screenshots 2026-11-20). Past the trigger the arrow turns over (transform only). */
+   screenshots 2026-11-20). On a grouped page (Home, Settings) the list's background is the pinstripe, so there the
+   area is the same pinstripe (.pull-clip.grouped, set from the scroller by pullrefresh.js; linen's weave in
+   palettes.css): a white band over the pinstripes stood out (user screenshot 2026-11-20). Past the trigger the arrow
+   turns over (transform only). */
 .pull-clip {
   position: absolute; left: 0; right: 0; z-index: 1; overflow: hidden; visibility: hidden; pointer-events: none;
   -webkit-user-select: none; user-select: none;
@@ -940,6 +943,9 @@ html[data-theme="dark"] .store-segment:active:not(.selected) { background: var(-
 .pull-refresh {
   position: absolute; left: 0; right: 0; top: 0; height: 480px; transform: translateY(-480px);
   background: var(--plain); color: #777;
+}
+.pull-clip.grouped > .pull-refresh {
+  background: repeating-linear-gradient(90deg, var(--pin-dark) 0 2.5px, var(--pin-light) 2.5px 8px) var(--pin-light);
 }
 .pull-inner { position: absolute; left: 0; right: 0; bottom: 0; height: 60px; }
 .pull-arrow {

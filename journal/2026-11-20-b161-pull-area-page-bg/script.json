@@ -1,0 +1,1898 @@
+[
+{
+"wait": 2000
+},
+{
+"eval": "localStorage.setItem('ifizbox.firstVisit','later'); 'ok'"
+},
+{
+"nav": "#/home",
+"ms": 5000
+},
+{
+"eval": "document.documentElement.dataset.theme='light'; document.documentElement.dataset.palette='classic'; 'ok'"
+},
+{
+"wait": 500
+},
+{
+"touch": "start",
+"x": 200,
+"y": 250
+},
+{
+"touch": "move",
+"x": 200,
+"y": 262
+},
+{
+"touch": "move",
+"x": 200,
+"y": 274
+},
+{
+"touch": "move",
+"x": 200,
+"y": 286
+},
+{
+"touch": "move",
+"x": 200,
+"y": 298
+},
+{
+"touch": "move",
+"x": 200,
+"y": 305
+},
+{
+"wait": 400
+},
+{
+"eval": "(()=>{const a=document.querySelector('.pull-clip.on .pull-refresh'); if(!a) return 'no area';const s=getComputedStyle(a); return [a.parentNode.className, s.backgroundColor, s.backgroundImage.slice(0,90),a.querySelector('.pull-title').textContent]})()"
+},
+{
+"shot": "home-classic-under"
+},
+{
+"touch": "move",
+"x": 200,
+"y": 290
+},
+{
+"touch": "move",
+"x": 200,
+"y": 275
+},
+{
+"touch": "move",
+"x": 200,
+"y": 262
+},
+{
+"touch": "end",
+"x": 200,
+"y": 262,
+"ms": 1200
+},
+{
+"touch": "start",
+"x": 200,
+"y": 250
+},
+{
+"touch": "move",
+"x": 200,
+"y": 262
+},
+{
+"touch": "move",
+"x": 200,
+"y": 274
+},
+{
+"touch": "move",
+"x": 200,
+"y": 286
+},
+{
+"touch": "move",
+"x": 200,
+"y": 298
+},
+{
+"touch": "move",
+"x": 200,
+"y": 310
+},
+{
+"touch": "move",
+"x": 200,
+"y": 322
+},
+{
+"touch": "move",
+"x": 200,
+"y": 334
+},
+{
+"touch": "move",
+"x": 200,
+"y": 346
+},
+{
+"touch": "move",
+"x": 200,
+"y": 358
+},
+{
+"touch": "move",
+"x": 200,
+"y": 370
+},
+{
+"touch": "move",
+"x": 200,
+"y": 382
+},
+{
+"touch": "move",
+"x": 200,
+"y": 394
+},
+{
+"touch": "move",
+"x": 200,
+"y": 406
+},
+{
+"touch": "move",
+"x": 200,
+"y": 418
+},
+{
+"touch": "move",
+"x": 200,
+"y": 430
+},
+{
+"touch": "move",
+"x": 200,
+"y": 442
+},
+{
+"touch": "move",
+"x": 200,
+"y": 454
+},
+{
+"touch": "move",
+"x": 200,
+"y": 466
+},
+{
+"touch": "move",
+"x": 200,
+"y": 478
+},
+{
+"touch": "move",
+"x": 200,
+"y": 490
+},
+{
+"touch": "move",
+"x": 200,
+"y": 502
+},
+{
+"touch": "move",
+"x": 200,
+"y": 514
+},
+{
+"touch": "move",
+"x": 200,
+"y": 526
+},
+{
+"touch": "move",
+"x": 200,
+"y": 538
+},
+{
+"touch": "move",
+"x": 200,
+"y": 550
+},
+{
+"wait": 400
+},
+{
+"eval": "(()=>{const a=document.querySelector('.pull-clip.on .pull-refresh'); if(!a) return 'no area';const s=getComputedStyle(a); return [a.parentNode.className, s.backgroundColor, s.backgroundImage.slice(0,90),a.querySelector('.pull-title').textContent]})()"
+},
+{
+"shot": "home-classic-past"
+},
+{
+"touch": "move",
+"x": 200,
+"y": 535
+},
+{
+"touch": "move",
+"x": 200,
+"y": 520
+},
+{
+"touch": "move",
+"x": 200,
+"y": 505
+},
+{
+"touch": "move",
+"x": 200,
+"y": 490
+},
+{
+"touch": "move",
+"x": 200,
+"y": 475
+},
+{
+"touch": "move",
+"x": 200,
+"y": 460
+},
+{
+"touch": "move",
+"x": 200,
+"y": 445
+},
+{
+"touch": "move",
+"x": 200,
+"y": 430
+},
+{
+"touch": "move",
+"x": 200,
+"y": 415
+},
+{
+"touch": "move",
+"x": 200,
+"y": 400
+},
+{
+"touch": "move",
+"x": 200,
+"y": 385
+},
+{
+"touch": "move",
+"x": 200,
+"y": 370
+},
+{
+"touch": "move",
+"x": 200,
+"y": 355
+},
+{
+"touch": "move",
+"x": 200,
+"y": 340
+},
+{
+"touch": "move",
+"x": 200,
+"y": 325
+},
+{
+"touch": "move",
+"x": 200,
+"y": 310
+},
+{
+"touch": "move",
+"x": 200,
+"y": 295
+},
+{
+"touch": "move",
+"x": 200,
+"y": 280
+},
+{
+"touch": "move",
+"x": 200,
+"y": 265
+},
+{
+"touch": "move",
+"x": 200,
+"y": 262
+},
+{
+"touch": "end",
+"x": 200,
+"y": 262,
+"ms": 1200
+},
+{
+"nav": "#/sources",
+"ms": 5000
+},
+{
+"eval": "document.documentElement.dataset.theme='light'; document.documentElement.dataset.palette='classic'; 'ok'"
+},
+{
+"wait": 500
+},
+{
+"touch": "start",
+"x": 200,
+"y": 250
+},
+{
+"touch": "move",
+"x": 200,
+"y": 262
+},
+{
+"touch": "move",
+"x": 200,
+"y": 274
+},
+{
+"touch": "move",
+"x": 200,
+"y": 286
+},
+{
+"touch": "move",
+"x": 200,
+"y": 298
+},
+{
+"touch": "move",
+"x": 200,
+"y": 305
+},
+{
+"wait": 400
+},
+{
+"eval": "(()=>{const a=document.querySelector('.pull-clip.on .pull-refresh'); if(!a) return 'no area';const s=getComputedStyle(a); return [a.parentNode.className, s.backgroundColor, s.backgroundImage.slice(0,90),a.querySelector('.pull-title').textContent]})()"
+},
+{
+"shot": "sources-classic-under"
+},
+{
+"touch": "move",
+"x": 200,
+"y": 290
+},
+{
+"touch": "move",
+"x": 200,
+"y": 275
+},
+{
+"touch": "move",
+"x": 200,
+"y": 262
+},
+{
+"touch": "end",
+"x": 200,
+"y": 262,
+"ms": 1200
+},
+{
+"touch": "start",
+"x": 200,
+"y": 250
+},
+{
+"touch": "move",
+"x": 200,
+"y": 262
+},
+{
+"touch": "move",
+"x": 200,
+"y": 274
+},
+{
+"touch": "move",
+"x": 200,
+"y": 286
+},
+{
+"touch": "move",
+"x": 200,
+"y": 298
+},
+{
+"touch": "move",
+"x": 200,
+"y": 310
+},
+{
+"touch": "move",
+"x": 200,
+"y": 322
+},
+{
+"touch": "move",
+"x": 200,
+"y": 334
+},
+{
+"touch": "move",
+"x": 200,
+"y": 346
+},
+{
+"touch": "move",
+"x": 200,
+"y": 358
+},
+{
+"touch": "move",
+"x": 200,
+"y": 370
+},
+{
+"touch": "move",
+"x": 200,
+"y": 382
+},
+{
+"touch": "move",
+"x": 200,
+"y": 394
+},
+{
+"touch": "move",
+"x": 200,
+"y": 406
+},
+{
+"touch": "move",
+"x": 200,
+"y": 418
+},
+{
+"touch": "move",
+"x": 200,
+"y": 430
+},
+{
+"touch": "move",
+"x": 200,
+"y": 442
+},
+{
+"touch": "move",
+"x": 200,
+"y": 454
+},
+{
+"touch": "move",
+"x": 200,
+"y": 466
+},
+{
+"touch": "move",
+"x": 200,
+"y": 478
+},
+{
+"touch": "move",
+"x": 200,
+"y": 490
+},
+{
+"touch": "move",
+"x": 200,
+"y": 502
+},
+{
+"touch": "move",
+"x": 200,
+"y": 514
+},
+{
+"touch": "move",
+"x": 200,
+"y": 526
+},
+{
+"touch": "move",
+"x": 200,
+"y": 538
+},
+{
+"touch": "move",
+"x": 200,
+"y": 550
+},
+{
+"wait": 400
+},
+{
+"eval": "(()=>{const a=document.querySelector('.pull-clip.on .pull-refresh'); if(!a) return 'no area';const s=getComputedStyle(a); return [a.parentNode.className, s.backgroundColor, s.backgroundImage.slice(0,90),a.querySelector('.pull-title').textContent]})()"
+},
+{
+"shot": "sources-classic-past"
+},
+{
+"touch": "move",
+"x": 200,
+"y": 535
+},
+{
+"touch": "move",
+"x": 200,
+"y": 520
+},
+{
+"touch": "move",
+"x": 200,
+"y": 505
+},
+{
+"touch": "move",
+"x": 200,
+"y": 490
+},
+{
+"touch": "move",
+"x": 200,
+"y": 475
+},
+{
+"touch": "move",
+"x": 200,
+"y": 460
+},
+{
+"touch": "move",
+"x": 200,
+"y": 445
+},
+{
+"touch": "move",
+"x": 200,
+"y": 430
+},
+{
+"touch": "move",
+"x": 200,
+"y": 415
+},
+{
+"touch": "move",
+"x": 200,
+"y": 400
+},
+{
+"touch": "move",
+"x": 200,
+"y": 385
+},
+{
+"touch": "move",
+"x": 200,
+"y": 370
+},
+{
+"touch": "move",
+"x": 200,
+"y": 355
+},
+{
+"touch": "move",
+"x": 200,
+"y": 340
+},
+{
+"touch": "move",
+"x": 200,
+"y": 325
+},
+{
+"touch": "move",
+"x": 200,
+"y": 310
+},
+{
+"touch": "move",
+"x": 200,
+"y": 295
+},
+{
+"touch": "move",
+"x": 200,
+"y": 280
+},
+{
+"touch": "move",
+"x": 200,
+"y": 265
+},
+{
+"touch": "move",
+"x": 200,
+"y": 262
+},
+{
+"touch": "end",
+"x": 200,
+"y": 262,
+"ms": 1200
+},
+{
+"nav": "#/home",
+"ms": 5000
+},
+{
+"eval": "document.documentElement.dataset.theme='dark'; document.documentElement.dataset.palette='gunmetal'; 'ok'"
+},
+{
+"wait": 500
+},
+{
+"touch": "start",
+"x": 200,
+"y": 250
+},
+{
+"touch": "move",
+"x": 200,
+"y": 262
+},
+{
+"touch": "move",
+"x": 200,
+"y": 274
+},
+{
+"touch": "move",
+"x": 200,
+"y": 286
+},
+{
+"touch": "move",
+"x": 200,
+"y": 298
+},
+{
+"touch": "move",
+"x": 200,
+"y": 305
+},
+{
+"wait": 400
+},
+{
+"eval": "(()=>{const a=document.querySelector('.pull-clip.on .pull-refresh'); if(!a) return 'no area';const s=getComputedStyle(a); return [a.parentNode.className, s.backgroundColor, s.backgroundImage.slice(0,90),a.querySelector('.pull-title').textContent]})()"
+},
+{
+"shot": "home-gunmetal-under"
+},
+{
+"touch": "move",
+"x": 200,
+"y": 290
+},
+{
+"touch": "move",
+"x": 200,
+"y": 275
+},
+{
+"touch": "move",
+"x": 200,
+"y": 262
+},
+{
+"touch": "end",
+"x": 200,
+"y": 262,
+"ms": 1200
+},
+{
+"touch": "start",
+"x": 200,
+"y": 250
+},
+{
+"touch": "move",
+"x": 200,
+"y": 262
+},
+{
+"touch": "move",
+"x": 200,
+"y": 274
+},
+{
+"touch": "move",
+"x": 200,
+"y": 286
+},
+{
+"touch": "move",
+"x": 200,
+"y": 298
+},
+{
+"touch": "move",
+"x": 200,
+"y": 310
+},
+{
+"touch": "move",
+"x": 200,
+"y": 322
+},
+{
+"touch": "move",
+"x": 200,
+"y": 334
+},
+{
+"touch": "move",
+"x": 200,
+"y": 346
+},
+{
+"touch": "move",
+"x": 200,
+"y": 358
+},
+{
+"touch": "move",
+"x": 200,
+"y": 370
+},
+{
+"touch": "move",
+"x": 200,
+"y": 382
+},
+{
+"touch": "move",
+"x": 200,
+"y": 394
+},
+{
+"touch": "move",
+"x": 200,
+"y": 406
+},
+{
+"touch": "move",
+"x": 200,
+"y": 418
+},
+{
+"touch": "move",
+"x": 200,
+"y": 430
+},
+{
+"touch": "move",
+"x": 200,
+"y": 442
+},
+{
+"touch": "move",
+"x": 200,
+"y": 454
+},
+{
+"touch": "move",
+"x": 200,
+"y": 466
+},
+{
+"touch": "move",
+"x": 200,
+"y": 478
+},
+{
+"touch": "move",
+"x": 200,
+"y": 490
+},
+{
+"touch": "move",
+"x": 200,
+"y": 502
+},
+{
+"touch": "move",
+"x": 200,
+"y": 514
+},
+{
+"touch": "move",
+"x": 200,
+"y": 526
+},
+{
+"touch": "move",
+"x": 200,
+"y": 538
+},
+{
+"touch": "move",
+"x": 200,
+"y": 550
+},
+{
+"wait": 400
+},
+{
+"eval": "(()=>{const a=document.querySelector('.pull-clip.on .pull-refresh'); if(!a) return 'no area';const s=getComputedStyle(a); return [a.parentNode.className, s.backgroundColor, s.backgroundImage.slice(0,90),a.querySelector('.pull-title').textContent]})()"
+},
+{
+"shot": "home-gunmetal-past"
+},
+{
+"touch": "move",
+"x": 200,
+"y": 535
+},
+{
+"touch": "move",
+"x": 200,
+"y": 520
+},
+{
+"touch": "move",
+"x": 200,
+"y": 505
+},
+{
+"touch": "move",
+"x": 200,
+"y": 490
+},
+{
+"touch": "move",
+"x": 200,
+"y": 475
+},
+{
+"touch": "move",
+"x": 200,
+"y": 460
+},
+{
+"touch": "move",
+"x": 200,
+"y": 445
+},
+{
+"touch": "move",
+"x": 200,
+"y": 430
+},
+{
+"touch": "move",
+"x": 200,
+"y": 415
+},
+{
+"touch": "move",
+"x": 200,
+"y": 400
+},
+{
+"touch": "move",
+"x": 200,
+"y": 385
+},
+{
+"touch": "move",
+"x": 200,
+"y": 370
+},
+{
+"touch": "move",
+"x": 200,
+"y": 355
+},
+{
+"touch": "move",
+"x": 200,
+"y": 340
+},
+{
+"touch": "move",
+"x": 200,
+"y": 325
+},
+{
+"touch": "move",
+"x": 200,
+"y": 310
+},
+{
+"touch": "move",
+"x": 200,
+"y": 295
+},
+{
+"touch": "move",
+"x": 200,
+"y": 280
+},
+{
+"touch": "move",
+"x": 200,
+"y": 265
+},
+{
+"touch": "move",
+"x": 200,
+"y": 262
+},
+{
+"touch": "end",
+"x": 200,
+"y": 262,
+"ms": 1200
+},
+{
+"nav": "#/sources",
+"ms": 5000
+},
+{
+"eval": "document.documentElement.dataset.theme='dark'; document.documentElement.dataset.palette='gunmetal'; 'ok'"
+},
+{
+"wait": 500
+},
+{
+"touch": "start",
+"x": 200,
+"y": 250
+},
+{
+"touch": "move",
+"x": 200,
+"y": 262
+},
+{
+"touch": "move",
+"x": 200,
+"y": 274
+},
+{
+"touch": "move",
+"x": 200,
+"y": 286
+},
+{
+"touch": "move",
+"x": 200,
+"y": 298
+},
+{
+"touch": "move",
+"x": 200,
+"y": 305
+},
+{
+"wait": 400
+},
+{
+"eval": "(()=>{const a=document.querySelector('.pull-clip.on .pull-refresh'); if(!a) return 'no area';const s=getComputedStyle(a); return [a.parentNode.className, s.backgroundColor, s.backgroundImage.slice(0,90),a.querySelector('.pull-title').textContent]})()"
+},
+{
+"shot": "sources-gunmetal-under"
+},
+{
+"touch": "move",
+"x": 200,
+"y": 290
+},
+{
+"touch": "move",
+"x": 200,
+"y": 275
+},
+{
+"touch": "move",
+"x": 200,
+"y": 262
+},
+{
+"touch": "end",
+"x": 200,
+"y": 262,
+"ms": 1200
+},
+{
+"touch": "start",
+"x": 200,
+"y": 250
+},
+{
+"touch": "move",
+"x": 200,
+"y": 262
+},
+{
+"touch": "move",
+"x": 200,
+"y": 274
+},
+{
+"touch": "move",
+"x": 200,
+"y": 286
+},
+{
+"touch": "move",
+"x": 200,
+"y": 298
+},
+{
+"touch": "move",
+"x": 200,
+"y": 310
+},
+{
+"touch": "move",
+"x": 200,
+"y": 322
+},
+{
+"touch": "move",
+"x": 200,
+"y": 334
+},
+{
+"touch": "move",
+"x": 200,
+"y": 346
+},
+{
+"touch": "move",
+"x": 200,
+"y": 358
+},
+{
+"touch": "move",
+"x": 200,
+"y": 370
+},
+{
+"touch": "move",
+"x": 200,
+"y": 382
+},
+{
+"touch": "move",
+"x": 200,
+"y": 394
+},
+{
+"touch": "move",
+"x": 200,
+"y": 406
+},
+{
+"touch": "move",
+"x": 200,
+"y": 418
+},
+{
+"touch": "move",
+"x": 200,
+"y": 430
+},
+{
+"touch": "move",
+"x": 200,
+"y": 442
+},
+{
+"touch": "move",
+"x": 200,
+"y": 454
+},
+{
+"touch": "move",
+"x": 200,
+"y": 466
+},
+{
+"touch": "move",
+"x": 200,
+"y": 478
+},
+{
+"touch": "move",
+"x": 200,
+"y": 490
+},
+{
+"touch": "move",
+"x": 200,
+"y": 502
+},
+{
+"touch": "move",
+"x": 200,
+"y": 514
+},
+{
+"touch": "move",
+"x": 200,
+"y": 526
+},
+{
+"touch": "move",
+"x": 200,
+"y": 538
+},
+{
+"touch": "move",
+"x": 200,
+"y": 550
+},
+{
+"wait": 400
+},
+{
+"eval": "(()=>{const a=document.querySelector('.pull-clip.on .pull-refresh'); if(!a) return 'no area';const s=getComputedStyle(a); return [a.parentNode.className, s.backgroundColor, s.backgroundImage.slice(0,90),a.querySelector('.pull-title').textContent]})()"
+},
+{
+"shot": "sources-gunmetal-past"
+},
+{
+"touch": "move",
+"x": 200,
+"y": 535
+},
+{
+"touch": "move",
+"x": 200,
+"y": 520
+},
+{
+"touch": "move",
+"x": 200,
+"y": 505
+},
+{
+"touch": "move",
+"x": 200,
+"y": 490
+},
+{
+"touch": "move",
+"x": 200,
+"y": 475
+},
+{
+"touch": "move",
+"x": 200,
+"y": 460
+},
+{
+"touch": "move",
+"x": 200,
+"y": 445
+},
+{
+"touch": "move",
+"x": 200,
+"y": 430
+},
+{
+"touch": "move",
+"x": 200,
+"y": 415
+},
+{
+"touch": "move",
+"x": 200,
+"y": 400
+},
+{
+"touch": "move",
+"x": 200,
+"y": 385
+},
+{
+"touch": "move",
+"x": 200,
+"y": 370
+},
+{
+"touch": "move",
+"x": 200,
+"y": 355
+},
+{
+"touch": "move",
+"x": 200,
+"y": 340
+},
+{
+"touch": "move",
+"x": 200,
+"y": 325
+},
+{
+"touch": "move",
+"x": 200,
+"y": 310
+},
+{
+"touch": "move",
+"x": 200,
+"y": 295
+},
+{
+"touch": "move",
+"x": 200,
+"y": 280
+},
+{
+"touch": "move",
+"x": 200,
+"y": 265
+},
+{
+"touch": "move",
+"x": 200,
+"y": 262
+},
+{
+"touch": "end",
+"x": 200,
+"y": 262,
+"ms": 1200
+},
+{
+"nav": "#/home",
+"ms": 5000
+},
+{
+"eval": "document.documentElement.dataset.theme='dark'; document.documentElement.dataset.palette='linen'; 'ok'"
+},
+{
+"wait": 500
+},
+{
+"touch": "start",
+"x": 200,
+"y": 250
+},
+{
+"touch": "move",
+"x": 200,
+"y": 262
+},
+{
+"touch": "move",
+"x": 200,
+"y": 274
+},
+{
+"touch": "move",
+"x": 200,
+"y": 286
+},
+{
+"touch": "move",
+"x": 200,
+"y": 298
+},
+{
+"touch": "move",
+"x": 200,
+"y": 305
+},
+{
+"wait": 400
+},
+{
+"eval": "(()=>{const a=document.querySelector('.pull-clip.on .pull-refresh'); if(!a) return 'no area';const s=getComputedStyle(a); return [a.parentNode.className, s.backgroundColor, s.backgroundImage.slice(0,90),a.querySelector('.pull-title').textContent]})()"
+},
+{
+"shot": "home-linen-under"
+},
+{
+"touch": "move",
+"x": 200,
+"y": 290
+},
+{
+"touch": "move",
+"x": 200,
+"y": 275
+},
+{
+"touch": "move",
+"x": 200,
+"y": 262
+},
+{
+"touch": "end",
+"x": 200,
+"y": 262,
+"ms": 1200
+},
+{
+"touch": "start",
+"x": 200,
+"y": 250
+},
+{
+"touch": "move",
+"x": 200,
+"y": 262
+},
+{
+"touch": "move",
+"x": 200,
+"y": 274
+},
+{
+"touch": "move",
+"x": 200,
+"y": 286
+},
+{
+"touch": "move",
+"x": 200,
+"y": 298
+},
+{
+"touch": "move",
+"x": 200,
+"y": 310
+},
+{
+"touch": "move",
+"x": 200,
+"y": 322
+},
+{
+"touch": "move",
+"x": 200,
+"y": 334
+},
+{
+"touch": "move",
+"x": 200,
+"y": 346
+},
+{
+"touch": "move",
+"x": 200,
+"y": 358
+},
+{
+"touch": "move",
+"x": 200,
+"y": 370
+},
+{
+"touch": "move",
+"x": 200,
+"y": 382
+},
+{
+"touch": "move",
+"x": 200,
+"y": 394
+},
+{
+"touch": "move",
+"x": 200,
+"y": 406
+},
+{
+"touch": "move",
+"x": 200,
+"y": 418
+},
+{
+"touch": "move",
+"x": 200,
+"y": 430
+},
+{
+"touch": "move",
+"x": 200,
+"y": 442
+},
+{
+"touch": "move",
+"x": 200,
+"y": 454
+},
+{
+"touch": "move",
+"x": 200,
+"y": 466
+},
+{
+"touch": "move",
+"x": 200,
+"y": 478
+},
+{
+"touch": "move",
+"x": 200,
+"y": 490
+},
+{
+"touch": "move",
+"x": 200,
+"y": 502
+},
+{
+"touch": "move",
+"x": 200,
+"y": 514
+},
+{
+"touch": "move",
+"x": 200,
+"y": 526
+},
+{
+"touch": "move",
+"x": 200,
+"y": 538
+},
+{
+"touch": "move",
+"x": 200,
+"y": 550
+},
+{
+"wait": 400
+},
+{
+"eval": "(()=>{const a=document.querySelector('.pull-clip.on .pull-refresh'); if(!a) return 'no area';const s=getComputedStyle(a); return [a.parentNode.className, s.backgroundColor, s.backgroundImage.slice(0,90),a.querySelector('.pull-title').textContent]})()"
+},
+{
+"shot": "home-linen-past"
+},
+{
+"touch": "move",
+"x": 200,
+"y": 535
+},
+{
+"touch": "move",
+"x": 200,
+"y": 520
+},
+{
+"touch": "move",
+"x": 200,
+"y": 505
+},
+{
+"touch": "move",
+"x": 200,
+"y": 490
+},
+{
+"touch": "move",
+"x": 200,
+"y": 475
+},
+{
+"touch": "move",
+"x": 200,
+"y": 460
+},
+{
+"touch": "move",
+"x": 200,
+"y": 445
+},
+{
+"touch": "move",
+"x": 200,
+"y": 430
+},
+{
+"touch": "move",
+"x": 200,
+"y": 415
+},
+{
+"touch": "move",
+"x": 200,
+"y": 400
+},
+{
+"touch": "move",
+"x": 200,
+"y": 385
+},
+{
+"touch": "move",
+"x": 200,
+"y": 370
+},
+{
+"touch": "move",
+"x": 200,
+"y": 355
+},
+{
+"touch": "move",
+"x": 200,
+"y": 340
+},
+{
+"touch": "move",
+"x": 200,
+"y": 325
+},
+{
+"touch": "move",
+"x": 200,
+"y": 310
+},
+{
+"touch": "move",
+"x": 200,
+"y": 295
+},
+{
+"touch": "move",
+"x": 200,
+"y": 280
+},
+{
+"touch": "move",
+"x": 200,
+"y": 265
+},
+{
+"touch": "move",
+"x": 200,
+"y": 262
+},
+{
+"touch": "end",
+"x": 200,
+"y": 262,
+"ms": 1200
+},
+{
+"nav": "#/sources",
+"ms": 5000
+},
+{
+"eval": "document.documentElement.dataset.theme='dark'; document.documentElement.dataset.palette='linen'; 'ok'"
+},
+{
+"wait": 500
+},
+{
+"touch": "start",
+"x": 200,
+"y": 250
+},
+{
+"touch": "move",
+"x": 200,
+"y": 262
+},
+{
+"touch": "move",
+"x": 200,
+"y": 274
+},
+{
+"touch": "move",
+"x": 200,
+"y": 286
+},
+{
+"touch": "move",
+"x": 200,
+"y": 298
+},
+{
+"touch": "move",
+"x": 200,
+"y": 305
+},
+{
+"wait": 400
+},
+{
+"eval": "(()=>{const a=document.querySelector('.pull-clip.on .pull-refresh'); if(!a) return 'no area';const s=getComputedStyle(a); return [a.parentNode.className, s.backgroundColor, s.backgroundImage.slice(0,90),a.querySelector('.pull-title').textContent]})()"
+},
+{
+"shot": "sources-linen-under"
+},
+{
+"touch": "move",
+"x": 200,
+"y": 290
+},
+{
+"touch": "move",
+"x": 200,
+"y": 275
+},
+{
+"touch": "move",
+"x": 200,
+"y": 262
+},
+{
+"touch": "end",
+"x": 200,
+"y": 262,
+"ms": 1200
+},
+{
+"touch": "start",
+"x": 200,
+"y": 250
+},
+{
+"touch": "move",
+"x": 200,
+"y": 262
+},
+{
+"touch": "move",
+"x": 200,
+"y": 274
+},
+{
+"touch": "move",
+"x": 200,
+"y": 286
+},
+{
+"touch": "move",
+"x": 200,
+"y": 298
+},
+{
+"touch": "move",
+"x": 200,
+"y": 310
+},
+{
+"touch": "move",
+"x": 200,
+"y": 322
+},
+{
+"touch": "move",
+"x": 200,
+"y": 334
+},
+{
+"touch": "move",
+"x": 200,
+"y": 346
+},
+{
+"touch": "move",
+"x": 200,
+"y": 358
+},
+{
+"touch": "move",
+"x": 200,
+"y": 370
+},
+{
+"touch": "move",
+"x": 200,
+"y": 382
+},
+{
+"touch": "move",
+"x": 200,
+"y": 394
+},
+{
+"touch": "move",
+"x": 200,
+"y": 406
+},
+{
+"touch": "move",
+"x": 200,
+"y": 418
+},
+{
+"touch": "move",
+"x": 200,
+"y": 430
+},
+{
+"touch": "move",
+"x": 200,
+"y": 442
+},
+{
+"touch": "move",
+"x": 200,
+"y": 454
+},
+{
+"touch": "move",
+"x": 200,
+"y": 466
+},
+{
+"touch": "move",
+"x": 200,
+"y": 478
+},
+{
+"touch": "move",
+"x": 200,
+"y": 490
+},
+{
+"touch": "move",
+"x": 200,
+"y": 502
+},
+{
+"touch": "move",
+"x": 200,
+"y": 514
+},
+{
+"touch": "move",
+"x": 200,
+"y": 526
+},
+{
+"touch": "move",
+"x": 200,
+"y": 538
+},
+{
+"touch": "move",
+"x": 200,
+"y": 550
+},
+{
+"wait": 400
+},
+{
+"eval": "(()=>{const a=document.querySelector('.pull-clip.on .pull-refresh'); if(!a) return 'no area';const s=getComputedStyle(a); return [a.parentNode.className, s.backgroundColor, s.backgroundImage.slice(0,90),a.querySelector('.pull-title').textContent]})()"
+},
+{
+"shot": "sources-linen-past"
+},
+{
+"touch": "move",
+"x": 200,
+"y": 535
+},
+{
+"touch": "move",
+"x": 200,
+"y": 520
+},
+{
+"touch": "move",
+"x": 200,
+"y": 505
+},
+{
+"touch": "move",
+"x": 200,
+"y": 490
+},
+{
+"touch": "move",
+"x": 200,
+"y": 475
+},
+{
+"touch": "move",
+"x": 200,
+"y": 460
+},
+{
+"touch": "move",
+"x": 200,
+"y": 445
+},
+{
+"touch": "move",
+"x": 200,
+"y": 430
+},
+{
+"touch": "move",
+"x": 200,
+"y": 415
+},
+{
+"touch": "move",
+"x": 200,
+"y": 400
+},
+{
+"touch": "move",
+"x": 200,
+"y": 385
+},
+{
+"touch": "move",
+"x": 200,
+"y": 370
+},
+{
+"touch": "move",
+"x": 200,
+"y": 355
+},
+{
+"touch": "move",
+"x": 200,
+"y": 340
+},
+{
+"touch": "move",
+"x": 200,
+"y": 325
+},
+{
+"touch": "move",
+"x": 200,
+"y": 310
+},
+{
+"touch": "move",
+"x": 200,
+"y": 295
+},
+{
+"touch": "move",
+"x": 200,
+"y": 280
+},
+{
+"touch": "move",
+"x": 200,
+"y": 265
+},
+{
+"touch": "move",
+"x": 200,
+"y": 262
+},
+{
+"touch": "end",
+"x": 200,
+"y": 262,
+"ms": 1200
+}
+]

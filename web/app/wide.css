@@ -33,15 +33,11 @@
   .section-index { margin-right: max(2px, env(safe-area-inset-right), calc(var(--wide-gutter) + 2px)); }
 
   /* ---- Sheets (nav/sheet.js): the sheet's nav bar full width as the page's; its body (a .page-body, or the reviews
-     and console scrollers) in the column. The sheet's own ground is the pinstripes, plain under the column. ---- */
+     scroller) in the column. The sheet's own ground is the pinstripes, plain under the column. ---- */
   .sheet {
     background: linear-gradient(var(--plain), var(--plain)) 50% 0 / min(var(--wide-cap), 100%) 100% no-repeat, var(--wide-pin);
   }
   .review-sheet-scroll { padding-left: var(--wide-gutter); padding-right: var(--wide-gutter); }
-  .console-scroll {
-    padding-left: max(9px, env(safe-area-inset-left), calc(var(--wide-gutter) + 9px));
-    padding-right: max(9px, env(safe-area-inset-right), calc(var(--wide-gutter) + 9px));
-  }
 
   /* ---- Action sheets (nav/actionsheet.js): the panel as wide as the column, in the middle, over the dim ---- */
   .action-sheet { left: var(--wide-gutter); right: var(--wide-gutter); }

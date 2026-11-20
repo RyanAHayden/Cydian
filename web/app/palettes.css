@@ -796,21 +796,22 @@ html[data-theme="light"][data-palette="metal"] {
   --lt-red-pressed: linear-gradient(#b28b8e, #70272d);
 }
 
-/* The light palettes' chrome: ios6.css's nav bar, bar buttons and back arrow, with their colours from the --lt-*
-   tokens above (shapes, borders and shadows unchanged; the blue Done stays the kit's, as on iOS 6). Each new light
-   palette adds its name to this list. */
-html[data-theme="light"]:is([data-palette="sepia"], [data-palette="solarized"], [data-palette="legalpad"], [data-palette="metal"]) { background: var(--lt-ground); }
-html[data-theme="light"]:is([data-palette="sepia"], [data-palette="solarized"], [data-palette="legalpad"], [data-palette="metal"]) .navbar { background: var(--lt-nav-bar); }
-html[data-theme="light"]:is([data-palette="sepia"], [data-palette="solarized"], [data-palette="legalpad"], [data-palette="metal"]) .bar-button:not(.back):not(.done) {
-  border-color: var(--lt-btn-edge); border-top-color: var(--lt-btn-edge-top);
-  background: var(--lt-btn); background-origin: border-box;
-}
-html[data-theme="light"]:is([data-palette="sepia"], [data-palette="solarized"], [data-palette="legalpad"], [data-palette="metal"]) .bar-button:not(.back):not(.done):is(:active, .is-pressed) {
-  background: var(--lt-btn-pressed); background-origin: border-box;
-}
-html[data-theme="light"]:is([data-palette="sepia"], [data-palette="solarized"], [data-palette="legalpad"], [data-palette="metal"]) .bar-button.back { border-image-source: var(--lt-back); }
-html[data-theme="light"]:is([data-palette="sepia"], [data-palette="solarized"], [data-palette="legalpad"], [data-palette="metal"]) .bar-button.back:is(:active, .is-pressed) {
-  border-image-source: var(--lt-back-pressed);
+/* The light palettes' chrome: ios6.css's nav bar, bar buttons and back arrow read their look tokens (--nav-bar,
+   --bar-btn*, --bar-back*), and here they take the --lt-* colours above, so no rule of this file paints that chrome
+   and an era's own rules and tokens are never outranked by one (docs/eras.md). Shapes, borders and shadows stay
+   ios6.css's; a pressed button keeps its unpressed edges; the blue Done (sources.css) and the red button (ios6.css,
+   from the --lt-red* each block sets) are their own rules. html stays at two attributes, the weight of an era's
+   tone block (html[data-style][data-theme]), which is linked after this file and so wins. Each new light palette
+   adds its name to this list. */
+html[data-theme="light"]:is([data-palette="sepia"], [data-palette="solarized"], [data-palette="legalpad"], [data-palette="metal"]) {
+  background: var(--lt-ground);
+  --nav-bar: var(--lt-nav-bar);
+  --bar-btn: var(--lt-btn);
+  --bar-btn-edge: var(--lt-btn-edge); --bar-btn-edge-top: var(--lt-btn-edge-top);
+  --bar-btn-pressed: var(--lt-btn-pressed);
+  --bar-btn-pressed-edge: var(--lt-btn-edge); --bar-btn-pressed-edge-top: var(--lt-btn-edge-top);
+  --bar-back: var(--lt-back);
+  --bar-back-pressed: var(--lt-back-pressed);
 }
 /* packages.css's search bar, its scope bar and segments (as bar buttons), and its Cancel */
 html[data-theme="light"]:is([data-palette="sepia"], [data-palette="solarized"], [data-palette="legalpad"], [data-palette="metal"]) .search-bar {
@@ -846,17 +847,9 @@ html[data-theme="light"]:is([data-palette="sepia"], [data-palette="solarized"], 
 
 /* F218: the red bar button (ios6.css .bar-button.red, Confirm's Cancel). Palettes with a published red use it in the
    UIKit art's steps (light: top 46% toward white, edge 74%; dark: gloss 39% / 6% toward white over the flat red, edge
-   55%; pressed darker the same way); the others keep UIKit's red, as they keep the kit's blue Done. The light rule
-   beats the bar-button rule above; the dark palettes only set tokens, which ios6.css's dark rule reads. The tokens
-   sit at the end of each palette's block (Sepia sets UIKit's, since every light palette sets every --lt-*). */
-html[data-theme="light"]:is([data-palette="sepia"], [data-palette="solarized"], [data-palette="legalpad"], [data-palette="metal"]) .bar-button.red:not(.back):not(.done) {
-  border-color: var(--lt-red-edge); border-top-color: var(--lt-red-edge-top);
-  background: var(--lt-red); background-origin: border-box;
-}
-html[data-theme="light"]:is([data-palette="sepia"], [data-palette="solarized"], [data-palette="legalpad"], [data-palette="metal"]) .bar-button.red:not(.back):not(.done):is(:active, .is-pressed) {
-  border-color: var(--lt-red-pressed-edge); border-top-color: var(--lt-red-pressed-edge-top);
-  background: var(--lt-red-pressed); background-origin: border-box;
-}
+   55%; pressed darker the same way); the others keep UIKit's red, as they keep the kit's blue Done. Both tones only
+   set tokens (--lt-red* / --dk-red*), which ios6.css's red rules read. The tokens sit at the end of each palette's
+   block (Sepia sets UIKit's, since every light palette sets every --lt-*). */
 
 /* F325: Brushed Metal's silver bars take dark etched text (white emboss below) on the title and on the silver
    buttons; the blue Done and the red button keep their white text. */

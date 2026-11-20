@@ -87,9 +87,15 @@ the app supports iOS 15.0, so cascade layers are out.
   as `ios6.css`'s `html[data-theme="dark"]` block and comes later, so it wins in dark too.
 - **Dark** keeps `ios6.css`'s dark rules, which paint with `--dk-*` tokens (`--dk-nav-bar`, `--dk-tabbar`,
   `--dk-btn`, `--dk-back`, …): the era sets those in its dark block, plus the shared tokens (`--table`, `--head`, …).
-- **Palettes** set the same tokens from `html[data-theme][data-palette]`, which outranks an era's tone block, and
-  the light palettes still paint the nav bar and bar buttons with rules of their own. Until those move onto tokens an
-  era offers only its own themes (White and OLED Black) and must not run under another palette.
+- **Palettes** set the same tokens from `html[data-theme][data-palette]` (the light ones map their `--lt-*` colours
+  onto `--nav-bar`, `--bar-btn*` and `--bar-back*` in one `html[data-theme="light"]:is(…)` block), never heavier
+  than html plus two attributes: the weight of an era's tone block, which wins because it is linked later
+  (`palettes.test.js` holds both). So every token an era sets beats every palette, light or dark, and the era's dark
+  block needs no extra weight. The tokens it does not set would still come from the palette, half-painting it, so
+  **an era offers only its own themes** (White and OLED Black): the theme menu must hide the palettes while an era is
+  chosen, and the app set no `data-palette` under it (a saved palette waits for iOS 6). A few palette rules still paint chrome an era may restyle: the search bar, scope bar and Cancel, the
+  package header band and the App Store segmented control (`packages.css`'s and `ios6.css`'s have no tokens yet) and
+  Brushed Metal's etched text; with the palettes hidden they never meet an era.
 - **Order**: link `ios<N>.css` after `palettes.css`; `wide.css` is layout and can stay last.
 
 ## Hooks
@@ -143,7 +149,8 @@ Not yet clean, each queued as its own cleanup:
 - the rest of `ios6.css` (switch, plain tables and section header, button pair, HUD, menu, banner, share sheet,
   reload bar, segmented control, undo bar, pull to refresh, placeholders);
 - the other stylesheets (`packages.css`; `sources.css`, `home.css`, `settings.css`; the small ones);
-- the light palettes' chrome rules in `palettes.css`;
+- the light palettes' search, scope bar and segmented-control rules in `palettes.css` (they move onto tokens with
+  those components);
 - the art the overlays in `nav/` draw from JS (HUD, spinner, share sheet, lock, placeholders);
 - inline SVG icons drawn from JS, to come from a per-style icon map;
 - the three nav hooks above.

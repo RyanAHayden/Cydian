@@ -73,6 +73,38 @@ test("text stays readable: body text 7:1, subtitles, headers, details and links 
   }
 });
 
+// C49: eras (docs/eras.md) restyle the chrome through ios6.css's look tokens, so the light palettes set those tokens
+// rather than paint the nav bar and bar buttons with rules an era rule could not outrank. Brushed Metal's etched
+// text is the one rule left on them (its dark text skips Done and the red button, which a token cannot).
+const rules = [...palettes.replace(/\/\*[\s\S]*?\*\//g, "").matchAll(/([^{}]+)\{([^}]*)\}/g)].map((m) => ({ sel: m[1].trim(), body: m[2] }));
+
+test("no palette rule paints the nav bar, bar buttons or back arrow: they ride ios6.css's tokens", () => {
+  for (const { sel } of rules) {
+    if (sel.startsWith('html[data-theme="light"][data-palette="metal"]')) continue;
+    assert.doesNotMatch(sel, /\.navbar|\.bar-button/, sel);
+  }
+  const map = rules.find((r) => /^html\[data-theme="light"\]:is\([^)]*\)$/.test(r.sel));
+  assert.ok(map, "the light palettes' token block");
+  const set = tokens(map.body);
+  for (const k of ["--nav-bar", "--bar-btn", "--bar-btn-edge", "--bar-btn-edge-top", "--bar-btn-pressed",
+    "--bar-btn-pressed-edge", "--bar-btn-pressed-edge-top", "--bar-back", "--bar-back-pressed"]) {
+    assert.match(ios6, new RegExp(`var\\(${k}\\)`), `ios6.css reads ${k}`);
+    assert.match(set.get(k) ?? "", /^var\(--lt-[\w-]+\)$/, `${k} from an --lt-* token`);
+  }
+});
+
+test("token blocks weigh no more than html plus two attributes, so an era's tone block linked later wins", () => {
+  const blocks = rules.flatMap((r) => r.sel.split(/,(?![^(]*\))/).map((s) => s.trim())).filter((s) => /^html[\[:]/.test(s) && !/\s/.test(s.replace(/:is\([^)]*\)/g, "")));
+  assert.ok(blocks.length >= NEW_DARK.length + NEW_LIGHT.length, blocks.length);
+  for (const s of blocks) {
+    const attrs = (s.replace(/:is\([^)]*\)/g, "[is]").match(/\[[^\]]+\]/g) ?? []).length;
+    assert.ok(attrs <= 2, `${s}: ${attrs} attributes`);
+  }
+  const html = read("./index.html");
+  for (const era of [...html.matchAll(/href="(ios(?!6)\d+\.css)"/g)].map((m) => m[1]))
+    assert.ok(html.indexOf(`href="${era}"`) > html.indexOf('href="palettes.css"'), `${era} after palettes.css`);
+});
+
 test("index.html loads palettes.css after the sheets it overrides", () => {
   const html = read("./index.html");
   const at = (f) => html.indexOf(`href="${f}"`);

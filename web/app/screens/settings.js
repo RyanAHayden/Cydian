@@ -162,7 +162,7 @@ function draw({ el, route }) {
   else if (first === "signing" && second === HELP) drawSigningHelp(el); // F134
   else if (opensMerged([first, second], merged())) drawSigning(el); // F271: Installation & Signing
   else if (opensSigningSub([first, second], merged())) drawSigningSub(el, second); // F284
-  else if (first === INSTALLATION && settings.isShown("installRoute")) drawInstallation(el, second, { store: settings }); // sideload
+  else if (first === INSTALLATION && settings.isShown("installRoute")) drawInstallation(el, second, { store: settings, server: () => serverSections(el, { footer: true }) }); // sideload
   else if (second) el.replaceChildren(listPage(second));
   else if (first === "signing") drawSigning(el);
   else if (first && settings.pageOf(first)) el.replaceChildren(groupPage(first));
@@ -1235,15 +1235,19 @@ async function deviceSigningState(el) {
   return { id, status, failure, kept: statusReady(status) ? status.identity : null };
 }
 
-const serverGroup = (el) => {
+const serverGroup = (el) => grouped(serverSections(el));
+// F300: the same rows as sections, for Install Apps With's page (screens/installroute.js drawInstallation `server`)
+// with the Signing Server chosen.
+export const serverSections = (el, { footer = false } = {}) => {
   const server = getServer();
-  return grouped([{ header: "Signing Server", rows: [
+  return [{ header: "Signing Server", ...(footer ? { footer: SERVER_FOOTER } : {}), rows: [
     { ...serverRow({ server, fallback: defaultServer(), ask: () => askServer(el) }), icon: rowIcon("server") },
     { label: "Check Server", onClick: () => checkServer(), icon: rowIcon("checkServer") },
     // Nothing depends on our own server: anyone can run their own, free (worker/README.md's Deploy to Cloudflare).
     { label: "Run Your Own", subtitle: "Free on Cloudflare, about a minute", chevron: true, icon: rowIcon("runYourOwn"),
-      onClick: () => window.open(RUN_YOUR_OWN, "_blank", "noopener") }] }]);
+      onClick: () => window.open(RUN_YOUR_OWN, "_blank", "noopener") }] }];
 };
+const SERVER_FOOTER = `Hands iOS the install manifests when apps don't install straight onto this iPhone, and holds ${NAME}'s own updates.`;
 
 // F237: under Keep Bundle IDs, what the profile can't do with the ID kept (wildcard, development, no Push), or the
 // old way's warning while it's off, with the guide's row. Nothing for an Ad Hoc profile with Push.
@@ -1294,8 +1298,7 @@ function drawMain(el) {
   if (!m || m.el.parentNode !== el) {
     m = mainPage({
       store: settings,
-      links: { with: installLink("with"), iphone: installLink("iphone"), certificate: signingLink("certificate"), server: signingLink("server"),
-        apps: signingLink("apps"), help: signingLink(HELP) },
+      links: { with: installLink("with"), certificate: signingLink("certificate"), apps: signingLink("apps"), help: signingLink(HELP) },
       signing: async () => {
         const { id, status, failure, kept } = await deviceSigningState(el);
         if (!failure && typeof CustomEvent === "function") globalThis.dispatchEvent?.(new CustomEvent("ifizbox:signing-status", { detail: kept })); // F244

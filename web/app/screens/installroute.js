@@ -2,8 +2,11 @@
 // This iPhone, and the This iPhone route's pages (core/installroute.js holds the rules and texts):
 //   installation       the merged page (screens/settings.js draws it from mainPage below: F284's status cell and
 //                      rows, built once and filled in place)
-//   installation/with  Install Apps With: the choice
-//   installation/iphone This iPhone: Pairing, Developer Mode, the VPN, Open LocalDevVPN, Connect With, Tailscale
+//   installation/with  Install Apps With (F300): the choice (This iPhone / Signing Server, a checkmark), and under it
+//                      the chosen route's groups sliding in: This iPhone's (below) or the Signing Server's (Server,
+//                      Check Server, Run Your Own: screens/settings.js passes them as `server`)
+//   installation/iphone This iPhone: Pairing, the VPN, Open LocalDevVPN (none of the three LocalDevVPN rows when
+//                      Tailscale is the way in), Connect With, Tailscale
 //   installation/pair  Pairing, one page that runs by itself (core setupState): one sentence on what it gives,
 //                      drawn at once with a spinner while it checks, then the VPN: which way is decided from the VPN
 //                      apps installed (core vpnRoute: LocalDevVPN's Open, Tailscale's Sign In and Open, a choice when
@@ -23,15 +26,15 @@ import { vpnRoute, connectAlert, LOCALDEVVPN_STORE, TAILSCALE_URL } from "../cor
 import { ROUTE_KEY, ROUTE_OPTIONS, VPNS, VPN_POLL, vpnList, vpnOn, IPHONE_INTRO, setupState, PAIR_GUIDE, pairEvent, pairFooter, pairFromNative, pinText, PAIR_STEPS, verifyFailure,
   CONNECT_OPTIONS, connectFooter, tailscaleFooter, tailscaleTestResult } from "../core/installroute.js";
 import { ringStyle, vpnWaitText } from "../core/installroute.js";
-import { developerModeInfo, canReadDeveloperMode } from "../core/installroute.js";
+import { tailscaleRoute } from "../core/installroute.js";
 import { leaveQuestion, LEAVE } from "../core/installroute.js";
-import { tailscaleVPNOn, installStatus, CHECKING, STATUS_ACTIONS, serverDetail } from "../core/installroute.js";
+import { tailscaleVPNOn, installStatus, CHECKING, STATUS_ACTIONS } from "../core/installroute.js";
 import { NAME } from "../brand.js";
 import { showHUD } from "../nav/hud.js";
 
 export const PAGE = "installation";
-// F284: Installation & Signing's main page links to Install Apps With (`with`, the choice) and This iPhone (`iphone`:
-// Pairing, Developer Mode, the VPN, Connect With and Tailscale); This iPhone's Pairing row opens the setup (`pair`).
+// F300: Installation & Signing's main page links to Install Apps With (`with`: the choice and the chosen route's
+// groups); `iphone` still opens This iPhone's groups alone. The Pairing row opens the setup (`pair`).
 export const SUB_TITLES = { pair: "Pairing", iphone: "This iPhone", with: "Install Apps With" };
 const VPN = VPNS[0];
 
@@ -85,45 +88,49 @@ export function vpnDetail(st) {
 let signingIn = null;
 let signInVisit = null; // B143: the pair page's visit that started it (leaving that page stops it), null from the main page
 
-// The main page's groups (pure, for tests): the choice and, with This iPhone chosen, its state, Connect With and
-// Tailscale. `st.tailscale` is tailscale.status's answer (idevice.status carries it).
-// `devMode`: idevice.developerMode's `on` (core developerModeInfo): a Developer Mode row under Pairing once paired,
-// and the steps in the footer when it's off.
+// Install Apps With's groups (pure, for tests): the choice and, under it, the chosen route's groups. This iPhone: its
+// state, Connect With and Tailscale; Signing Server: `server()`'s groups (Server, Check Server, Run Your Own).
+// `st.tailscale` is tailscale.status's answer (idevice.status carries it).
 // B133: `reading`: idevice.status hasn't answered yet: Pairing and the VPN say Checking…, Pairing with the spinner.
-// `devModeReading`: idevice.developerMode is being asked: its row says Checking… with the spinner.
-export function installationGroups(choice, st, { pick = () => {}, openVPN = () => {}, connect = () => {}, signIn = () => {}, test = () => {}, signOut = () => {}, busy = null, devMode = null,
-  reading = false, devModeReading = false, connectPick = null } = {}) {
+// F300: `picking`: the choice was just tapped: its row is checked at once and spins until idevice.status answers.
+// `connectBusy`: a Connect With pick whose tailscale.setConnect hasn't answered: checked at once, with the spinner (and
+// `connectPick` keeps it checked and spinning while the status read after it runs). `hint`: the last idevice.status
+// read, so that while the page reads again the LocalDevVPN rows don't come and go (Tailscale the way in, or not).
+// F300: no Developer Mode row (an app can't open without it; an install it stops says so in its alert).
+export function installationGroups(choice, st, { pick = () => {}, openVPN = () => {}, connect = () => {}, signIn = () => {}, test = () => {}, signOut = () => {}, busy = null,
+  reading = false, connectPick = null, picking = false, connectBusy = null, hint = null, server = () => [] } = {}) {
   const groups = [{
     header: "Install Apps With",
-    rows: ROUTE_OPTIONS.map((o) => ({ label: o.label, subtitle: o.subtitle, cls: "route-row", checked: o.value === choice, onClick: () => pick(o.value) })),
+    rows: ROUTE_OPTIONS.map((o) => ({ label: o.label, subtitle: o.subtitle, cls: "route-row", checked: o.value === choice, onClick: () => pick(o.value),
+      ...(picking && o.value === choice ? { spin: true } : {}) })),
     footer: choice === "iphone"
       ? `Signed apps go straight to iOS through ${vpnList()}. When it's off, installs use the Signing Server.`
       : "The Signing Server hands iOS each app's install link.",
   }];
-  if (choice === "iphone") {
-    const dm = st?.paired ? developerModeInfo(devMode) : null;
-    const dmRow = dm ? [dm.row] : st?.paired && devModeReading ? [{ label: "Developer Mode", detail: "Checking…", spin: true }] : [];
-    const vpnNote = `${VPN} must be on while apps install, or Tailscale (below).`;
+  if (choice !== "iphone") return [...groups, ...(server() ?? [])];
+  {
+    const ts = st?.tailscale ?? null;
+    // B167: while idevice.status (tailscale.status with it) hasn't answered, Tailscale's state is unknown, not signed
+    // out: its row says Checking… with the spinner (one row, as Sign In is), and Connect With keeps the pick just made.
+    const tsUnknown = reading || !st;
+    const now = connectBusy ?? ts?.connect ?? (tsUnknown && (connectPick ?? hint?.tailscale?.connect)) ?? "auto";
+    const spinning = connectBusy ?? (tsUnknown ? connectPick : null);
+    const viaTs = tailscaleRoute(tsUnknown ? hint : st, now); // F300: no LocalDevVPN rows then
     groups.push({
       header: "This iPhone",
       rows: [
         reading ? { label: "Pairing", detail: "Checking…", href: route("pair"), spin: true }
           : { label: "Pairing", detail: st?.paired ? "Paired" : "Not Paired", href: route("pair") },
-        ...dmRow,
-        { label: VPN, detail: reading ? "Checking…" : vpnDetail(st) },
-        { label: `Open ${VPN}`, cls: "sign-import", onClick: openVPN },
+        ...(viaTs ? [] : [
+          { label: VPN, detail: reading ? "Checking…" : vpnDetail(st) },
+          { label: `Open ${VPN}`, cls: "sign-import", onClick: openVPN },
+        ]),
       ],
-      footer: dm?.footer ? `${dm.footer} ${vpnNote}` : vpnNote,
-      ...(dm?.warn ? { warn: true } : {}),
+      ...(viaTs ? {} : { footer: `${VPN} must be on while apps install, or Tailscale (below).` }),
     });
-    const ts = st?.tailscale ?? null;
-    // B167: while idevice.status (tailscale.status with it) hasn't answered, Tailscale's state is unknown, not signed
-    // out: its row says Checking… with the spinner (one row, as Sign In is), and Connect With keeps the pick just made.
-    const tsUnknown = reading || !st;
-    const now = ts?.connect ?? (tsUnknown && connectPick) ?? "auto";
     groups.push({
       header: "Connect With",
-      rows: CONNECT_OPTIONS.map((o) => ({ label: o.label, checked: o.value === now, onClick: () => connect(o.value) })),
+      rows: CONNECT_OPTIONS.map((o) => ({ label: o.label, checked: o.value === now, onClick: () => connect(o.value), ...(o.value === spinning ? { spin: true } : {}) })),
       footer: connectFooter(now),
     });
     const rows = busy
@@ -139,10 +146,11 @@ export function installationGroups(choice, st, { pick = () => {}, openVPN = () =
   return groups;
 }
 
-export async function drawInstallation(el, sub, { store, native = globalThis.ifizboxNative, alert = showAlert } = {}) {
-  const redraw = () => drawInstallation(el, sub, { store, native, alert });
+// `server`: the Signing Server's groups for Install Apps With's page (screens/settings.js serverSections).
+export async function drawInstallation(el, sub, { store, native = globalThis.ifizboxNative, alert = showAlert, server = () => [] } = {}) {
+  const redraw = () => drawInstallation(el, sub, { store, native, alert, server });
   if (sub === "pair") return drawPair(el, { store, native, alert, redraw });
-  return paintInstallation(el, { store, native, alert, redraw, sub: SUB_TITLES[sub] ? sub : null });
+  return paintInstallation(el, { store, native, alert, redraw, server, sub: SUB_TITLES[sub] ? sub : null });
 }
 
 // F271: the choice and This iPhone's groups as a box of their own, for the top of Settings > Installation & Signing
@@ -155,28 +163,43 @@ export function installationBlock({ store, native = globalThis.ifizboxNative, al
   return box;
 }
 
-// B120: tapping This iPhone acts at once: it is checked when the status already read says paired, and otherwise the
-// pair page opens straight away (it draws with a spinner, and checks This iPhone itself once it finds a pairing),
-// instead of waiting on idevice.status with nothing on screen.
-export function pickRoute(v, known, { set, open }) {
-  if (v !== "iphone") return set(v);
-  if (known?.paired) return set("iphone");
-  return open("pair");
+// F300: a tap on Install Apps With's choice is checked at once, whatever the pairing (this page shows Pairing right
+// under it, and Installation & Signing's status says Pair This iPhone until it's paired); nothing waits on a call.
+export function pickRoute(v, { set }) {
+  return set(v === "iphone" ? "iphone" : "server");
 }
 
-// F284: `sub` "with" draws only the Install Apps With group, "iphone" only This iPhone's groups (whatever the choice).
-export const subGroups = (sections, sub) => (sub === "with" ? sections.slice(0, 1) : sub === "iphone" ? sections.slice(1) : sections);
+// F284: `sub` "iphone" draws only This iPhone's groups (whatever the choice); F300: "with" draws them all (the choice
+// and the chosen route's groups).
+export const subGroups = (sections, sub) => (sub === "iphone" ? sections.slice(1) : sections);
 
-async function paintInstallation(el, { store, native, alert, redraw, sub = null }) {
+let picked = null; // F300: the choice just tapped, until idevice.status answers on the page it redrew
+let connectBusy = null; // F300: the Connect With pick whose tailscale.setConnect hasn't answered
+let lastStatus = null; // F300: the last idevice.status the page read (installationGroups' `hint`)
+const painting = new WeakMap(); // page element → its latest paintInstallation (an older one stops painting)
+
+async function paintInstallation(el, { store, native, alert, redraw, server = () => [], sub = null }) {
   const choice = sub === "iphone" ? "iphone" : store.get(ROUTE_KEY);
-  let known = null; // idevice.status once read, for the tap above
-  let devMode = null; // idevice.developerMode's `on`, once read
-  const paint = (st, { reading = false, devModeReading = false } = {}) => {
+  const me = {};
+  painting.set(el, me);
+  const mine = () => painting.get(el) === me;
+  let known = null; // idevice.status once read
+  const paint = (st, { reading = false } = {}) => {
+    if (!mine()) return;
     const sections = installationGroups(choice, st, {
-      devMode, reading, devModeReading, connectPick,
-      pick: (v) => pickRoute(v, known, { set: (r) => store.set(ROUTE_KEY, r), open: goTo }),
+      reading, connectPick, connectBusy, hint: lastStatus, server, picking: reading && picked === choice,
+      // the store's set redraws Settings' pages (this one too); a store that doesn't, redraws it here
+      pick: (v) => { if (v === choice && !picked) return; picked = v; pickRoute(v, { set: (r) => store.set(ROUTE_KEY, r) }); if (mine()) redraw(); },
       openVPN: () => openVPN(native, alert),
-      connect: async (v) => { await busy("Switching", () => call(native, "tailscale.setConnect", { value: v }).catch(() => {})); connectPick = v; redraw(); },
+      // F300: checked at once with the spinner in its row (no HUD), until setConnect and then idevice.status answer
+      connect: async (v) => {
+        if (connectBusy) return;
+        connectBusy = v;
+        connectPick = v;
+        paint(known, { reading: !known });
+        try { await call(native, "tailscale.setConnect", { value: v }).catch(() => {}); } finally { connectBusy = null; }
+        redraw();
+      },
       signIn: () => tailscaleSignIn(native, alert, redraw),
       test: () => tailscaleTest(native, alert),
       signOut: async () => {
@@ -192,20 +215,46 @@ async function paintInstallation(el, { store, native, alert, redraw, sub = null 
     const shown = subGroups(sections, sub);
     const frag = spinRows(warnFooters(shown), shown);
     for (const d of frag.querySelectorAll?.(".cell-detail") ?? []) if (d.textContent === "Another VPN") d.classList.add("install-red");
-    slideBelow(el, () => el.replaceChildren(frag));
+    slideLayout(el, () => el.replaceChildren(frag));
   };
   paint(null, { reading: true });
-  known = await status(native); // read for the Signing Server choice too, so a tap on This iPhone knows the pairing
+  known = await status(native); // read for the Signing Server choice too (the choice row's spinner waits on it)
+  if (!mine()) return;
+  if (known) lastStatus = known;
   connectPick = null; // the answer carries Connect With now
-  if (choice !== "iphone" || sub === "with") return;
-  const dmAsk = canReadDeveloperMode(known);
-  paint(known, { devModeReading: dmAsk });
-  if (!dmAsk) return;
-  devMode = await readDeveloperMode(native);
-  if (el.isConnected !== false) paint(known); // the read row goes, with or without an answer
+  const wasPicked = picked === choice;
+  if (wasPicked) picked = null;
+  if (choice !== "iphone" && !wasPicked) return; // nothing on the page waited on the answer
+  paint(known);
 }
 
 let connectPick = null; // B167: the Connect With pick just made, until idevice.status answers with it
+
+// F300: a repaint of a page's groups slides: a group that stays starts where it was and slides to its new place, a
+// group that comes in fades in from a little above, and what's under the box slides as slideBelow does (FLIP, by
+// transform and opacity only). Groups are matched by their header, or their first row's label.
+export function slideLayout(box, change) {
+  if (!box?.isConnected || !box.getBoundingClientRect) return slideBelow(box, change);
+  const keys = () => {
+    const seen = new Map();
+    return [...box.children].map((g) => {
+      const k = g.querySelector?.(".group-header")?.textContent || g.querySelector?.(".cell-label")?.textContent || g.className || "";
+      const n = (seen.get(k) ?? 0) + 1;
+      seen.set(k, n);
+      return [`${k}#${n}`, g];
+    });
+  };
+  const before = new Map(keys().map(([k, g]) => [k, g.getBoundingClientRect().top]));
+  slideBelow(box, change);
+  if (!before.size) return;
+  const ease = { duration: 300, easing: "cubic-bezier(.25,.1,.25,1)" };
+  for (const [k, g] of keys()) {
+    if (!g.animate) continue;
+    if (!before.has(k)) { g.animate([{ opacity: 0, transform: "translateY(-12px)" }, { opacity: 1, transform: "none" }], ease); continue; }
+    const d = before.get(k) - g.getBoundingClientRect().top;
+    if (Math.abs(d) >= 0.5) g.animate([{ transform: `translateY(${d}px)` }, { transform: "none" }], ease);
+  }
+}
 
 // B167: a repaint that makes the box taller or shorter (Checking… giving way to Tailscale's three signed-in rows, a
 // footer's new length) doesn't make what's under it jump: everything below starts where it was and slides to its
@@ -221,11 +270,6 @@ export function slideBelow(box, change) {
       s.animate?.([{ transform: `translateY(${d}px)` }, { transform: "none" }], { duration: 300, easing: "cubic-bezier(.25,.1,.25,1)" });
     }
   }
-}
-
-// Developer Mode through the pairing: true/false, or null when it couldn't be read (an older shell, no answer).
-export async function readDeveloperMode(native) {
-  try { const r = await call(native, "idevice.developerMode"); return typeof r?.on === "boolean" ? r.on : null; } catch { return null; }
 }
 
 // grouped() with the footers of groups marked `warn` in red (ios6.css .sign-warning, as Settings > Signing's).
@@ -280,13 +324,22 @@ async function openVPN(native, alert) {
 // never add or remove rows or change footers; only a tap changes the layout (by opening another page).
 //   (top)         the status cell (core installStatus: two lines, always two lines tall) and one action row whose
 //                 label changes (Check Connection, Open LocalDevVPN, Start Pairing, Sign In to Tailscale…)
-//   Installation  Install Apps With > (installation/with), This iPhone > (installation/iphone): Paired / Not Paired
-//   Signing       Certificate > (days left), Signing Server > (This iPhone while installs go here, else its host),
-//                 Signed Apps > (count)
+//   Installation  Install Apps With > (installation/with: the choice and its route's groups), its detail the route
+//                 and, for This iPhone, the pairing: "This iPhone · Paired" (F300: one row for This iPhone and the
+//                 Signing Server)
+//   Signing       Certificate > (days left), Signed Apps > (count)
 //   How Signing Works >
 // `links` holds the hrefs, `signing()` resolves {certificate: {text, red}}, `apps()` the Signed Apps count (text),
 // `checkServer` is Settings' Check Server and `host()` the Signing Server's host.
-export const MAIN_ROWS = ["status", "action", "with", "iphone", "certificate", "server", "apps", "help"];
+export const MAIN_ROWS = ["status", "action", "with", "certificate", "apps", "help"];
+
+// F300: Install Apps With's detail on the main page: the route, and This iPhone's pairing once idevice.status said
+// (`st` undefined: not answered yet; null: it failed).
+export function withDetail(choice, st) {
+  if (choice !== "iphone") return "Signing Server";
+  if (!st) return "This iPhone";
+  return `This iPhone · ${st.paired ? "Paired" : "Not Paired"}`;
+}
 
 function slotOf(node, waitText = null) {
   const value = el("span", "slot-value");
@@ -311,9 +364,8 @@ export function mainPage({ store, native = globalThis.ifizboxNative, alert = sho
   };
   const sections = [
     { rows: [{ label: "", subtitle: " ", cls: "install-status" }, { label: STATUS_ACTIONS.check, cls: "install-action", onClick: act }] },
-    { header: "Installation", rows: [{ label: "Install Apps With", detail: "", href: links.with }, { label: "This iPhone", detail: "", href: links.iphone }] },
-    { header: "Signing", rows: [{ label: "Certificate", detail: "", href: links.certificate }, { label: "Signing Server", detail: "", href: links.server },
-      { label: "Signed Apps", detail: "", href: links.apps }] },
+    { header: "Installation", rows: [{ label: "Install Apps With", detail: "", href: links.with }] },
+    { header: "Signing", rows: [{ label: "Certificate", detail: "", href: links.certificate }, { label: "Signed Apps", detail: "", href: links.apps }] },
     { rows: [{ label: "How Signing Works", href: links.help }] },
   ];
   box.append(grouped(sections));
@@ -329,7 +381,7 @@ export function mainPage({ store, native = globalThis.ifizboxNative, alert = sho
   actionCell.classList.add("is-dim");
   actionCell.setAttribute("aria-disabled", "true");
   const slots = {};
-  ["with", "iphone", "certificate", "server", "apps"].forEach((k, i) => { slots[k] = slotOf(cells[i + 2].querySelector(".cell-detail")); });
+  ["with", "certificate", "apps"].forEach((k, i) => { slots[k] = slotOf(cells[i + 2].querySelector(".cell-detail")); });
 
   let known; // idevice.status once read
   const paintStatus = (s) => {
@@ -349,19 +401,17 @@ export function mainPage({ store, native = globalThis.ifizboxNative, alert = sho
     const n = ++asked;
     const choice = store.get(ROUTE_KEY);
     const h = host();
-    slots.with.set(ROUTE_OPTIONS.find((o) => o.value === choice)?.label ?? "");
-    if (choice !== "iphone") { paintStatus(installStatus(choice, undefined, { host: h })); slots.server.set(h); }
-    else if (lastChoice && lastChoice !== choice) { paintStatus(CHECKING); title.wait(); subtitle.wait(); slots.server.wait(); } // just picked
+    if (choice !== "iphone") { paintStatus(installStatus(choice, undefined, { host: h })); slots.with.set(withDetail(choice)); }
+    else if (lastChoice && lastChoice !== choice) { paintStatus(CHECKING); title.wait(); subtitle.wait(); slots.with.wait(); } // just picked
     lastChoice = choice;
     const reads = [
       status(native).then((st) => {
         if (n < statusShown) return;
         statusShown = n;
         known = st;
-        const s = installStatus(store.get(ROUTE_KEY), st, { host: h });
-        paintStatus(s);
-        slots.iphone.set(st ? (st.paired ? "Paired" : "Not Paired") : "Unknown");
-        slots.server.set(serverDetail(s, h));
+        const c = store.get(ROUTE_KEY);
+        paintStatus(installStatus(c, st, { host: h }));
+        slots.with.set(withDetail(c, st));
       }),
       Promise.resolve().then(signing).catch(() => null).then((v) => {
         if (n < signingShown) return;

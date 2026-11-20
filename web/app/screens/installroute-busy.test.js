@@ -79,26 +79,20 @@ test("busy: the HUD only once the call has taken the delay, and it goes when the
   assert.deepEqual(log, ["Forgetting Pairing", "hide"]);
 });
 
-test("the main page: Pairing spins Checking… while idevice.status answers, then Developer Mode while it's read", async () => {
-  const st = later(), dm = later();
-  const native = bridge({ "idevice.status": () => st.p, "idevice.developerMode": () => dm.p });
+test("the main page: Pairing spins Checking… while idevice.status answers; no Developer Mode row (F300)", async () => {
+  const st = later();
+  const native = bridge({ "idevice.status": () => st.p });
   const box = make("div");
   const done = drawInstallation(box, null, { store: store("iphone"), native });
   assert.ok(spins(box, "Pairing"));
   assert.equal(withClass(cellOf(box, "Pairing"), "cell-detail")[0].textContent, "Checking…");
   assert.match(box.textContent, /LocalDevVPNChecking…/);
   st.answer(PAIRED_ON);
-  await flush();
-  assert.ok(!spins(box, "Pairing"));
-  assert.ok(spins(box, "Developer Mode"), labels(box).join(", "));
-  dm.answer({ on: true });
   await done;
-  assert.ok(!spins(box, "Developer Mode"));
+  assert.ok(!spins(box, "Pairing"));
+  assert.ok(!labels(box).includes("Developer Mode"), labels(box).join(", "));
+  assert.deepEqual(native.calls, ["idevice.status"], "Developer Mode isn't asked");
   assert.equal(withClass(box, "loading-spinner").length, 0, "nothing spins once everything answered");
-  // no answer: the row goes rather than spinning on
-  const box2 = make("div");
-  await drawInstallation(box2, null, { store: store("iphone"), native: bridge({ "idevice.status": PAIRED_ON, "idevice.developerMode": new Error("no") }) });
-  assert.ok(!labels(box2).includes("Developer Mode"));
 });
 
 test("Tailscale signing in: the row spins with its step", () => {

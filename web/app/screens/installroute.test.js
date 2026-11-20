@@ -5,12 +5,12 @@ import assert from "node:assert/strict";
 import { installationGroups, vpnDetail, SUB_TITLES, setupGroups } from "./installroute.js";
 import { IPHONE_INTRO } from "../core/installroute.js";
 
-test("Install Apps With: Signing Server and This iPhone, the chosen one checked, a point per subtitle line", () => {
+test("Install Apps With: This iPhone and Signing Server, the chosen one checked, a point per subtitle line", () => {
   const [g, more] = installationGroups("server", null);
   assert.equal(g.header, "Install Apps With");
-  assert.deepEqual(g.rows.map((r) => [r.label, r.checked]), [["Signing Server", true], ["This iPhone", false]]);
-  assert.deepEqual(g.rows[0].subtitle.split("\n"), ["Default", "Uses ifizbox.com"]);
-  assert.deepEqual(g.rows[1].subtitle.split("\n"), ["LocalDevVPN or Tailscale", "No server, no install popup", "Updates itself"]);
+  assert.deepEqual(g.rows.map((r) => [r.label, r.checked]), [["This iPhone", false], ["Signing Server", true]]);
+  assert.deepEqual(g.rows[1].subtitle.split("\n"), ["Default", "Uses ifizbox.com"]);
+  assert.deepEqual(g.rows[0].subtitle.split("\n"), ["LocalDevVPN or Tailscale", "No server, no install popup", "Updates itself"]);
   assert.ok(g.rows.every((r) => r.cls === "route-row"));
   assert.equal(more, undefined);
 });
@@ -21,7 +21,7 @@ test("This iPhone chosen: Pairing and the VPN's state, and a tap picks", () => {
   assert.equal(gs.length, 4);
   assert.deepEqual(gs[1].rows.map((r) => [r.label, r.detail]), [["Pairing", "Paired"], ["LocalDevVPN", "Another VPN"], ["Open LocalDevVPN", undefined]]);
   assert.match(gs[1].rows[0].href, /installation\/pair$/);
-  gs[0].rows[0].onClick();
+  gs[0].rows[1].onClick();
   assert.deepEqual(picked, ["server"]);
   assert.equal(vpnDetail({ localDevVPN: true }), "On");
   assert.equal(vpnDetail(null), "Unknown");

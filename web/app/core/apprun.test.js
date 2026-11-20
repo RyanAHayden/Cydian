@@ -555,3 +555,36 @@ test("B151: iFizBox itself and a record-only re-sign get the plain words without
   }
   assert.ok(lines.filter((l) => l.kind === "error").every((l) => /^[^:]+: the App Store holds .*Cancel the App Store's download/.test(l.text)));
 });
+
+// B153: a retry after the run ended is a new pass (onStart(pass)); a retry while the run still goes is not, and the
+// own-bundle-ID retry's line comes after its pass begins (so the page's clean log opens with it).
+test("B153: each start of an idle run is a new pass, told before its first line", async () => {
+  const ph = phone();
+  const events = [];
+  const rows = appRows([...jobs("a"), { id: "com.atebits.Tweetie2", name: "X", mode: "install", url: "https://x/x.ipa" }]);
+  const run = createAppRun({ rows, sign: ph.sign, install: ph.install, discard: ph.discard,
+    onStart: (n) => events.push(`pass ${n}`), onLog: (l) => events.push(l.text) });
+  const end = run.start();
+  assert.deepEqual(events, ["pass 1"]);
+  await flush();
+  ph.pending.sign.get("a").reject(new Error("a broke"));
+  await flush();
+  assert.equal(run.retry("a"), end); // still running: the same pass
+  assert.equal(run.pass, 1);
+  await flush();
+  ph.pending.sign.get("a").reject(new Error("a broke again"));
+  ph.pending.sign.get("com.atebits.Tweetie2").reject(new Error(IX46));
+  await end;
+  events.length = 0;
+  const again = run.ownIdRetry("com.atebits.Tweetie2");
+  assert.ok(again);
+  assert.deepEqual(events, ["pass 2", "Installing X with its own bundle ID"]);
+  assert.equal(run.pass, 2);
+  run.stop("com.atebits.Tweetie2");
+  await again;
+  events.length = 0;
+  const third = run.retryAll();
+  assert.equal(events[0], "pass 3");
+  run.cancel();
+  await third;
+});

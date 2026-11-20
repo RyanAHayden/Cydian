@@ -19,7 +19,8 @@
 //     and the bottom status.
 //   Top right, as F234's: the red Cancel while it runs (every app not finished is abandoned; then the app Confirm
 //     again with what finished cleared and the footer "Stopped. N installed and cleared from the queue."), Retry All
-//     after failures (Close at the top left), Done when clean.
+//     after failures (Close at the top left), Done when clean. A pass that starts after the run ended (Retry All, a
+//     row's retry, Try Again) empties the Log first: the last pass's lines belong to it only (B153).
 //   The bottom: the status and the bar while it runs, then Return to iFizBox. When iFizBox's own IPA went to iOS
 //     (B123, followSelf): locked on "Waiting for iOS" while the shell waits for iOS to download it, "Closing iFizBox"
 //     once the shell closes, Try Again (the row Failed) when iOS never took it, and an honest "close it from the app
@@ -238,6 +239,7 @@ export async function runAppRun(jobs, deps) {
       tick();
     },
     onLog: ({ id, kind, text }) => line(kind, text, id),
+    onStart: (pass) => { if (pass > 1) clearLog(page); }, // B153: a new pass on this page starts with a clean log
   });
   const isInstalled = deps.isInstalled ?? lanes.isInstalled;
   const handoff = followHandoff(run, rows, { isInstalled, answered: (r, onPhone) => recordIf(r, onPhone),
@@ -377,6 +379,16 @@ export async function runAppRun(jobs, deps) {
   for (const r of rows) draw(r);
   const p = run.start();
   return drive(p).then(() => first, () => first);
+}
+
+// B153: the page's log emptied for a new pass (Retry All, a failed row's tap, Try Again, the own-bundle-ID retry after
+// the run ended): the lines still waiting for a frame go out first, then every line goes, so none of the last pass's
+// ("Downloading X", "X: Cancelled", "1 failed") show under the new one. A page with its own clear() uses that.
+export function clearLog(page) {
+  if (!page) return;
+  if (typeof page.clear === "function") { page.clear(); return; }
+  page.flush?.();
+  page.out?.replaceChildren?.();
 }
 
 // B111: a run of one app that installd installed on This iPhone (row.here, not iFizBox itself) ends with Open <app>

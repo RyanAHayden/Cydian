@@ -106,7 +106,8 @@ Then put that `https://` address in **Settings > Installation & Signing > Signin
 |---|---|
 | `GET /sign/status` | `{ok, ttl, worker: true}` |
 | `GET /sign/manifest?bundleid=&version=&title=&port=&path=` | the manifest for `http://127.0.0.1:<port>/<path>` |
-| `POST /sign/host?bundleid=&version=&title=` (body: the IPA) | `{itms, manifest, expiresIn}` |
+| `POST /sign/host?bundleid=&version=&title=` (body: the IPA, up to 95 MB) | `{itms, manifest, expiresIn}` |
+| `POST /sign/host?bundleid=&version=&title=&size=` (no body) | `{token, partSize, parts}`: then `PUT /sign/host/<token>/<i>` each 20 MB part and `POST /sign/host/<token>/done` → `{itms, manifest, expiresIn}` (the app sends it so; KV holds 25 MB a value) |
 | `GET /sign/host/<token>/manifest.plist`, `/app.ipa` | what that link fetches (each looks again for a few seconds before a 404, as KV is eventually consistent) |
 | `GET /sign/host/<token>/status` | `{manifest, started, finished}`: what iOS has fetched; the app closes for iOS to install over it only once `finished` |
 | `GET /apple/status` | `{"on":true}` with `APPLE_RELAY` on, else a 404 |

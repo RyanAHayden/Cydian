@@ -1,5 +1,5 @@
 // F312: per-address limits on the routes anyone can use to make this server fetch or hold bytes: the fetch proxy
-// (/api/fetch), iFizBox's own update host (POST /sign/host, up to 25 MB held TTL seconds) and the website's signed
+// (/api/fetch), iFizBox's own update host (POST /sign/host, an IPA held TTL seconds; its parts aren't counted again) and the website's signed
 // uploads (POST /sign/upload, up to MAX_UPLOAD_MB held TTL seconds; its parts belong to that one upload and aren't
 // counted again). The same pattern as /api/account (src/account.js): Cloudflare's Rate Limiting binding counts
 // across isolates (FETCH_RATE_LIMIT, HOST_RATE_LIMIT, UPLOAD_RATE_LIMIT in wrangler.toml's [[ratelimits]]); without

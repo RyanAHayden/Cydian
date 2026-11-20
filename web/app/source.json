@@ -19,6 +19,14 @@
       "category": "utilities",
       "versions": [
         {
+          "version": "0.17.3",
+          "date": "2026-11-20T23:04:23Z",
+          "localizedDescription": "Fixes installs and updates stuck on a blank Running page.\nIn the sideload app every install, update and re-sign run stopped on \"Preparing\" with no buttons. If 0.17.1 or 0.17.2 hangs updating itself, install this version from ifizbox.com in Safari.\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.17.3",
+          "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.17.3/iFizBox.ipa",
+          "size": 28499056,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "0.17.2",
           "date": "2026-11-20T22:31:21Z",
           "localizedDescription": "Fixes popup menus (Modify and others) whose buttons did nothing.\nAction sheets in 0.17.1 stayed on screen with dead buttons after a tap, and a second tap stacked another one. Also includes everything merged since 0.17.1.\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.17.2",

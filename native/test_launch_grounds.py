@@ -1,11 +1,23 @@
 """F214: the shell's launch grounds (native/Sources/App.swift Launch) match web/app/palettes.css, and the shell
-knows every palette Settings offers (web/app/core/settings.js), so no theme falls back to another one's ground."""
+knows every palette Settings offers (web/app/core/settings.js), so no theme falls back to another one's ground.
+
+B203: the launch screen per theme. native/launch/make.py's THEMES draws each theme's bars and ground as the CSS does,
+launch/themes/ is what make.py writes, every Settings palette has a set, and the lists of files the bundle checks,
+the helper copies (native/helper/launch.h) and the shell compares (native/Sources/Launch.swift) are the same."""
 import os
 import re
+import struct
+import sys
+import tempfile
+import shutil
 import unittest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
+sys.path.insert(0, HERE)
+sys.path.insert(0, os.path.join(HERE, "launch"))
+import launch_check  # noqa: E402
+import make  # noqa: E402
 
 
 def read(*p):
@@ -18,6 +30,15 @@ def css_pins(css, tone, name):
     assert block, name
     pins = dict(re.findall(r"--pin-(dark|light): #([0-9a-f]{6});", block.group(1)))
     return pins["dark"], pins["light"], block.group(1)
+
+
+def settings_palettes():
+    settings = read("web", "app", "core", "settings.js")
+    out = []
+    for key in ["lightTheme", "darkTheme"]:
+        block = re.search(r'key: "%s".*?options: \[(.*?)\}\],' % key, settings, re.S).group(1)
+        out += re.findall(r'value: "([a-z]+)"', block)
+    return out
 
 
 class LaunchGrounds(unittest.TestCase):
@@ -50,6 +71,177 @@ class LaunchGrounds(unittest.TestCase):
             self.assertGreater(len(values), 1)
             for v in values[1:]:  # the first is the default the switch falls back to
                 self.assertIn('case "%s": return %s' % (v, v), self.swift, v)
+
+
+# B203: each theme's CSS, as make.THEMES must draw it.
+def hex6(s):
+    s = s.strip().lstrip("#")
+    return "".join(c * 2 for c in s) if len(s) == 3 else s
+
+
+def colour(s):
+    """'#abc' / '#aabbcc' / 'rgba(255,255,255,.16)' -> ('rrggbb', alpha)."""
+    s = s.strip()
+    m = re.fullmatch(r"rgba\((\d+),\s*(\d+),\s*(\d+),\s*([\d.]+)\)", s)
+    if m:
+        return "%02x%02x%02x" % tuple(int(m.group(i)) for i in (1, 2, 3)), float(m.group(4))
+    return hex6(s), 1
+
+
+def gradient(args):
+    """'#333336, #151517 50%, #070708 51%, #000' -> make.stops(...)."""
+    parts = [p.strip() for p in re.split(r",(?![^(]*\))", args)]
+    out = []
+    for i, p in enumerate(parts):
+        m = re.fullmatch(r"(.*?)(?:\s+([\d.]+)%)?", p)
+        pos = float(m.group(2)) / 100 if m.group(2) else (0 if i == 0 else 1)
+        out.append((pos, hex6(m.group(1))))
+    if out[-1][0] < 1:  # CSS holds the last colour to the end
+        out.append((1, out[-1][1]))
+    return make.stops(*out)
+
+
+def layers(value):
+    """A background's layers, split on the top-level commas."""
+    value = re.sub(r"/\*.*?\*/", "", value)
+    out, depth, cur = [], 0, ""
+    for ch in value:
+        depth += ch == "("
+        depth -= ch == ")"
+        if ch == "," and depth == 0:
+            out.append(cur.strip())
+            cur = ""
+        else:
+            cur += ch
+    return out + [cur.strip()]
+
+
+def inner(layer):
+    return re.match(r"linear-gradient\((.*)\)", layer.split(") ")[0] + ")").group(1)
+
+
+class LaunchThemes(unittest.TestCase):
+    def setUp(self):
+        self.ios6 = read("web", "app", "ios6.css")
+        self.pal = read("web", "app", "palettes.css")
+
+    def block(self, css, selector):
+        m = re.search(r"(?m)^" + re.escape(selector) + r" \{(.*?)\n\}", css, re.S)
+        self.assertIsNotNone(m, selector)
+        return m.group(1)
+
+    def var(self, block, name):
+        m = re.search(r"--%s:(.*?);" % name, block, re.S)
+        self.assertIsNotNone(m, name)
+        return " ".join(m.group(1).split())
+
+    def css_theme(self, key):
+        """What the CSS says the theme's frame is, in make.THEMES's terms."""
+        light_nav = self.block(self.ios6, ".navbar")
+        light_nav = re.search(r"background:(.*?);", light_nav, re.S).group(1)
+        light_tab = re.search(r"background:(.*?);", self.block(self.ios6, ".tabbar"), re.S).group(1)
+        if key == "classic":
+            root = self.block(self.ios6, ":root")
+            pins = (hex6(self.var(root, "pin-dark")), hex6(self.var(root, "pin-light")))
+            nav, tab, shadow = light_nav, light_tab, 0.18
+        elif key in ("sepia", "solarized"):
+            b = self.block(self.pal, 'html[data-theme="light"][data-palette="%s"]' % key)
+            pins = (hex6(self.var(b, "pin-dark")), hex6(self.var(b, "pin-light")))
+            nav, tab, shadow = self.var(b, "lt-nav-bar"), light_tab, 0.18
+        else:
+            sel = 'html[data-theme="dark"]' + ('' if key == "oled" else '[data-palette="%s"]' % key)
+            b = self.block(self.ios6 if key in ("oled", "gunmetal") else self.pal, sel)
+            pins = (hex6(self.var(b, "pin-dark")), hex6(self.var(b, "pin-light")))
+            if key == "linen":  # the weave (its ground): its base colour, a stripe can't draw the weave
+                pins = (hex6(self.var(b, "dk-ground")),) * 2
+            nav, tab = self.var(b, "dk-nav-bar"), self.var(b, "dk-tabbar")
+            sh = self.var(b, "dk-nav-shadow")
+            shadow = 0 if sh == "none" else float(re.search(r"rgba\(0,\s*0,\s*0,\s*([\d.]+)\)", sh).group(1))
+        n = layers(nav)
+        line = inner(n[0]).split(",")[0]
+        hi = re.match(r"linear-gradient\((rgba\([^)]*\)|#[0-9a-f]+)", n[1]).group(1)
+        out = dict(pins=pins, nav_line=hex6(line), nav_hi=colour(hi), nav_gloss=gradient(inner(n[2])),
+                   nav_shadow=shadow)
+        t = layers(tab)
+        if "rgba(0,0,0,.7)" in t[0].replace(" ", ""):  # the light theme's tab bar, as the storyboard draws it
+            out.update(tab_line=colour(re.match(r"linear-gradient\((rgba\([^)]*\))", t[1]).group(1)),
+                       tab_gloss=gradient(inner(t[2])), tab_base=hex6(t[3]))
+        else:
+            base = hex6(t[-1])
+            out.update(tab_line=(hex6(inner(t[0]).split(",")[0]), 1), tab_base=base,
+                       tab_gloss=gradient(inner(t[1])) if len(t) == 3 else make.stops((0, base), (1, base)))
+        return out
+
+    def test_themes_match_the_css(self):
+        for key in make.THEMES:
+            want = self.css_theme(key)
+            have = {k: (tuple(v) if isinstance(v, list) else v) for k, v in make.THEMES[key].items()}
+            have["nav_hi"] = (have["nav_hi"][0], float(have["nav_hi"][1]))
+            have["tab_line"] = (have["tab_line"][0], float(have["tab_line"][1]))
+            want["nav_hi"] = (want["nav_hi"][0], float(want["nav_hi"][1]))
+            want["tab_line"] = (want["tab_line"][0], float(want["tab_line"][1]))
+            self.assertEqual(have, want, key)
+
+    def test_every_settings_palette_has_a_launch_theme(self):
+        self.assertEqual(sorted(settings_palettes()), sorted(make.THEMES))
+        self.assertEqual(sorted(launch_check.THEME_KEYS), sorted(make.THEMES))
+        swift = read("native", "Sources", "Launch.swift")
+        # a palette with no set gets nothing, not another theme's frame
+        self.assertIn('fileExists(atPath: dir(k) + "/" + viewNib) ? k : nil', swift)
+
+    def test_tab_shadow_is_every_theme_own(self):
+        """make.py draws LaunchTabShadow at 18 % for every theme: no theme's CSS redraws .tabbar::before."""
+        css = self.ios6 + self.pal
+        rules = re.findall(r"(?m)^([^{}\n]*\.tabbar::before[^{]*)\{([^}]*)\}", css)
+        self.assertEqual(len(rules), 1, rules)
+        self.assertIn("rgba(0,0,0,.18)", rules[0][1].replace(" ", ""))
+
+    def test_themes_dir_is_what_make_writes(self):
+        """native/launch/themes/ is make.py's output (rerun native/launch/make.py)."""
+        tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp)
+        make.main(tmp)
+        have, want = {}, {}
+        for top, d in ((os.path.join(HERE, "launch", "themes"), have), (os.path.join(tmp, "themes"), want)):
+            for root, _, names in os.walk(top):
+                for name in names:
+                    with open(os.path.join(root, name), "rb") as f:
+                        d[os.path.relpath(os.path.join(root, name), top)] = f.read()
+        self.assertEqual(sorted(have), sorted(want))
+        for k in want:
+            self.assertEqual(have[k], want[k], k)
+
+    def test_classic_is_the_bundle_own(self):
+        """Classic's set is the top-level launch files byte for byte, so storyboard.sources stays true."""
+        for rel, data in make.theme_files("classic").items():
+            with open(os.path.join(HERE, "launch", rel), "rb") as f:
+                self.assertEqual(f.read(), data, rel)
+
+    def test_theme_nibs_carry_the_theme_colours(self):
+        for key, th in make.THEMES.items():
+            nib = make.theme_files(key)["LaunchScreen.storyboardc/" + launch_check.VIEW_NIB]
+            got = [c for c, _ in make.nib_colors(nib)]
+            for _, want in make.nib_slots(key):
+                self.assertTrue(any(all(abs(a - b) < 1e-3 for a, b in zip(c, want)) for c in got), (key, want))
+
+    def test_under_splashboard_cap(self):
+        """SplashBoard refuses a launch screen over 25,000,000 bytes (w x h x 4, summed): every theme stays far under."""
+        for key in make.THEMES:
+            total = 0
+            for name, data in make.images(key).items():
+                w, h = struct.unpack(">II", data[16:24])
+                total += w * h * 4
+            self.assertLess(total, 1_000_000, key)
+
+    def test_file_lists_agree(self):
+        want = ["%s%s.png" % (i, s) for i in launch_check.IMAGES for s in ("@2x", "@3x")]
+        want.append("LaunchScreen.storyboardc/" + launch_check.VIEW_NIB)
+        swift = read("native", "Sources", "Launch.swift")
+        names = re.search(r"static let files: \[String\] = \[(.*?)\]", swift, re.S).group(1)
+        self.assertEqual(sorted(re.findall(r'"(\w+)"', names)), sorted(launch_check.IMAGES))
+        self.assertIn('"LaunchScreen.storyboardc/%s"' % launch_check.VIEW_NIB, swift)
+        self.assertEqual(make.VIEW_NIB, launch_check.VIEW_NIB)
+        self.assertEqual(sorted(make.images()), sorted(w for w in want if w.endswith(".png")))
 
 
 if __name__ == "__main__":

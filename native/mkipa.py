@@ -33,7 +33,10 @@ def merge_plist(base, overlay, out):
     with open(base, "rb") as f:
         info = plistlib.load(f)
     with open(overlay, "rb") as f:
-        info.update(plistlib.load(f))
+        extra = plistlib.load(f)
+    for key in extra.pop("IFIZBOX_REMOVE_KEYS", []):  # B203: base keys the IPA drops (its launch storyboard)
+        info.pop(key, None)
+    info.update(extra)
     with open(out, "wb") as f:
         plistlib.dump(info, f, sort_keys=True)
 
@@ -161,7 +164,7 @@ def check(path):
     # B179: the icon at every size, loose and in Assets.car (carfile.py).
     problems += carfile.icon_problems(info, {n: d for n, (_, d) in files.items()}, APP, lite=True)
     # N10: the launch screen's keys and images (launch_check.py).
-    problems += launch_check.problems(info, {n: d for n, (_, d) in files.items()}, APP)
+    problems += launch_check.problems(info, {n: d for n, (_, d) in files.items()}, APP, lite=True)
 
     # The root helper and N5's upgrade daemon and its launchd job are the .deb's alone (T5).
     jailbreak_only = ("ifizbox-helper", "ifizbox-upgrades", "com.ryha.ifizbox.upgrades.plist")

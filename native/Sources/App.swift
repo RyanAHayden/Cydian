@@ -239,7 +239,9 @@ final class WebController: UIViewController, WKNavigationDelegate, WKUIDelegate 
     // the same bars, so the hand-over from iOS's splash shows no jump and no bare pinstripes in between. On the
     // window, not in the web view: a WKWebView's subviews get no safe area, so the bars came out 44 pt and 0 pt there.
     func showCover(in window: UIWindow) {
-        guard cover == nil, let c = Launch.cover() else { return }
+        // B203: in the theme the page last set (Splash.cover), never another theme's bars
+        guard cover == nil,
+              let c = Splash.cover(systemDark: UIScreen.main.traitCollection.userInterfaceStyle == .dark) else { return }
         c.frame = window.bounds
         c.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         window.addSubview(c)

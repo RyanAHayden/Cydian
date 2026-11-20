@@ -20,9 +20,10 @@ import { toBase64 } from "../core/signing.js";
 import { vpnRoute, connectAlert, LOCALDEVVPN_STORE, TAILSCALE_URL } from "../core/installroute.js";
 import { ROUTE_KEY, ROUTE_OPTIONS, VPNS, VPN_POLL, vpnList, vpnOn, IPHONE_INTRO, setupState, PAIR_GUIDE, pairEvent, pairFooter, pairFromNative, pinText, PAIR_STEPS, verifyFailure,
   CONNECT_OPTIONS, connectFooter, tailscaleFooter, tailscaleTestResult } from "../core/installroute.js";
-import { ringStyle } from "../core/installroute.js";
+import { ringStyle, vpnWaitText } from "../core/installroute.js";
 import { developerModeInfo, canReadDeveloperMode } from "../core/installroute.js";
 import { NAME } from "../brand.js";
+import { showHUD } from "../nav/hud.js";
 
 export const PAGE = "installation";
 export const SUB_TITLES = { pair: "This iPhone" };
@@ -32,6 +33,39 @@ const route = (sub) => format(settingsRoute(sub ? [PAGE, sub] : [PAGE]));
 const goTo = (sub) => { location.hash = route(sub).replace(/^#/, ""); };
 const call = (native, m, p = {}, ev) => native?.call ? native.call(m, p, ev) : Promise.reject(new Error(`This needs the ${NAME} app.`));
 async function status(native) { try { return await call(native, "idevice.status"); } catch { return null; } }
+
+// B133: every step that waits on the phone, the network or the pairing shows iOS 6's activity indicator and what it
+// does. A one-off action (Check Connection, Forget Pairing, Test Connection, Sign Out, a Connect With pick, importing
+// a pairing file, opening another app) runs under the HUD (nav/hud.js: the large white spinner and a label, which
+// also eats taps so it isn't started twice); it shows only once the call has taken `delay` ms, so a quick answer
+// doesn't flash it. Waits inside a page (status being read, the code coming, the iPhone connecting, the VPN coming
+// on, Tailscale signing in) draw the grey spinner in place: a row's `spin` or a group's `spinner` line.
+export const hudHooks = { show: (text) => { try { return showHUD(text); } catch { return () => {}; } }, delay: 250 };
+export async function busy(label, work) {
+  let hide = null;
+  const t = setTimeout(() => { hide = hudHooks.show(label); }, hudHooks.delay);
+  try { return await work(); } finally { clearTimeout(t); hide?.(); }
+}
+
+// grouped() rows marked `spin` get the grey spinner at their right end (packages.css .loading-spinner; the cell's
+// flex gap spaces it).
+function spinRows(frag, sections) {
+  const groups = [...frag.children];
+  sections.forEach((s, i) => {
+    const ul = [...(groups[i]?.children ?? [])].find((c) => c.classList?.contains("table"));
+    if (!ul) return;
+    (s.rows ?? []).forEach((r, j) => {
+      if (!r?.spin) return;
+      const inner = ul.children[j]?.children?.[0];
+      if (!inner) return;
+      const sp = el("span", "loading-spinner");
+      sp.setAttribute("aria-hidden", "true");
+      inner.append(sp);
+      inner.setAttribute("aria-busy", "true");
+    });
+  });
+  return frag;
+}
 
 // The VPN row's detail from idevice.status.
 export function vpnDetail(st) {
@@ -47,7 +81,10 @@ let signingIn = null;
 // Tailscale. `st.tailscale` is tailscale.status's answer (idevice.status carries it).
 // `devMode`: idevice.developerMode's `on` (core developerModeInfo): a Developer Mode row under Pairing once paired,
 // and the steps in the footer when it's off.
-export function installationGroups(choice, st, { pick = () => {}, openVPN = () => {}, connect = () => {}, signIn = () => {}, test = () => {}, signOut = () => {}, busy = null, devMode = null } = {}) {
+// B133: `reading`: idevice.status hasn't answered yet: Pairing and the VPN say Checking…, Pairing with the spinner.
+// `devModeReading`: idevice.developerMode is being asked: its row says Checking… with the spinner.
+export function installationGroups(choice, st, { pick = () => {}, openVPN = () => {}, connect = () => {}, signIn = () => {}, test = () => {}, signOut = () => {}, busy = null, devMode = null,
+  reading = false, devModeReading = false } = {}) {
   const groups = [{
     header: "Install Apps With",
     rows: ROUTE_OPTIONS.map((o) => ({ label: o.label, subtitle: o.subtitle, cls: "route-row", checked: o.value === choice, onClick: () => pick(o.value) })),
@@ -57,13 +94,15 @@ export function installationGroups(choice, st, { pick = () => {}, openVPN = () =
   }];
   if (choice === "iphone") {
     const dm = st?.paired ? developerModeInfo(devMode) : null;
+    const dmRow = dm ? [dm.row] : st?.paired && devModeReading ? [{ label: "Developer Mode", detail: "Checking…", spin: true }] : [];
     const vpnNote = `${VPN} must be on while apps install, or Tailscale (below).`;
     groups.push({
       header: "This iPhone",
       rows: [
-        { label: "Pairing", detail: st?.paired ? "Paired" : "Not Paired", href: route("pair") },
-        ...(dm ? [dm.row] : []),
-        { label: VPN, detail: vpnDetail(st) },
+        reading ? { label: "Pairing", detail: "Checking…", href: route("pair"), spin: true }
+          : { label: "Pairing", detail: st?.paired ? "Paired" : "Not Paired", href: route("pair") },
+        ...dmRow,
+        { label: VPN, detail: reading ? "Checking…" : vpnDetail(st) },
         { label: `Open ${VPN}`, cls: "sign-import", onClick: openVPN },
       ],
       footer: dm?.footer ? `${dm.footer} ${vpnNote}` : vpnNote,
@@ -77,7 +116,7 @@ export function installationGroups(choice, st, { pick = () => {}, openVPN = () =
       footer: connectFooter(now),
     });
     const rows = busy
-      ? [{ label: "Signing In…", detail: busy }]
+      ? [{ label: "Signing In…", detail: busy, spin: true }]
       : ts?.signedIn
         ? [{ label: "Device", detail: ts.name || NAME },
           { label: "Test Connection", cls: "sign-import", onClick: test },
@@ -117,28 +156,34 @@ async function paintInstallation(el, { store, native, alert, redraw }) {
   const choice = store.get(ROUTE_KEY);
   let known = null; // idevice.status once read, for the tap above
   let devMode = null; // idevice.developerMode's `on`, once read
-  const paint = (st) => el.replaceChildren(warnFooters(installationGroups(choice, st, {
-    devMode,
-    pick: (v) => pickRoute(v, known, { set: (r) => store.set(ROUTE_KEY, r), open: goTo }),
-    openVPN: () => openVPN(native, alert),
-    connect: async (v) => { await call(native, "tailscale.setConnect", { value: v }).catch(() => {}); redraw(); },
-    signIn: () => tailscaleSignIn(native, alert, redraw),
-    test: () => tailscaleTest(native, alert),
-    signOut: async () => {
-      const { index } = await alert({ title: "Sign Out of Tailscale?", message: `${NAME} leaves your tailnet. Installs use LocalDevVPN until you sign in again.`, buttons: ["Cancel", "Sign Out"], cancel: 0 });
-      if (index !== 1) return;
-      await call(native, "tailscale.signOut").catch((e) => alert({ title: "Couldn't Sign Out", message: e?.message || "No answer.", buttons: ["OK"] }));
-      redraw();
-    },
-    busy: signingIn,
-  })));
-  paint(null);
+  const paint = (st, { reading = false, devModeReading = false } = {}) => {
+    const sections = installationGroups(choice, st, {
+      devMode, reading, devModeReading,
+      pick: (v) => pickRoute(v, known, { set: (r) => store.set(ROUTE_KEY, r), open: goTo }),
+      openVPN: () => openVPN(native, alert),
+      connect: async (v) => { await busy("Switching", () => call(native, "tailscale.setConnect", { value: v }).catch(() => {})); redraw(); },
+      signIn: () => tailscaleSignIn(native, alert, redraw),
+      test: () => tailscaleTest(native, alert),
+      signOut: async () => {
+        const { index } = await alert({ title: "Sign Out of Tailscale?", message: `${NAME} leaves your tailnet. Installs use LocalDevVPN until you sign in again.`, buttons: ["Cancel", "Sign Out"], cancel: 0 });
+        if (index !== 1) return;
+        let err = null;
+        await busy("Signing Out", () => call(native, "tailscale.signOut").catch((e) => { err = e; }));
+        if (err) alert({ title: "Couldn't Sign Out", message: err?.message || "No answer.", buttons: ["OK"] });
+        redraw();
+      },
+      busy: signingIn,
+    });
+    el.replaceChildren(spinRows(warnFooters(sections), sections));
+  };
+  paint(null, { reading: true });
   known = await status(native); // read for the Signing Server choice too, so a tap on This iPhone knows the pairing
   if (choice !== "iphone") return;
-  paint(known);
-  if (!canReadDeveloperMode(known)) return;
+  const dmAsk = canReadDeveloperMode(known);
+  paint(known, { devModeReading: dmAsk });
+  if (!dmAsk) return;
   devMode = await readDeveloperMode(native);
-  if (devMode != null && el.isConnected !== false) paint(known);
+  if (el.isConnected !== false) paint(known); // the read row goes, with or without an answer
 }
 
 // Developer Mode through the pairing: true/false, or null when it couldn't be read (an older shell, no answer).
@@ -176,7 +221,7 @@ async function tailscaleSignIn(native, alert, redraw, done = `${NAME} is on your
 
 async function tailscaleTest(native, alert) {
   let r;
-  try { r = await call(native, "tailscale.test"); } catch (e) { r = { ok: false, code: "error", detail: e?.message }; }
+  try { r = await busy("Testing Connection", () => call(native, "tailscale.test")); } catch (e) { r = { ok: false, code: "error", detail: e?.message }; }
   const why = tailscaleTestResult(r);
   if (!why.copy) return alert({ title: why.title, message: why.message, buttons: ["OK"] });
   const { index } = await alert({ title: why.title, message: why.message, buttons: ["OK", "Copy Rule"], cancel: 0 });
@@ -185,7 +230,7 @@ async function tailscaleTest(native, alert) {
 
 async function openVPN(native, alert) {
   let r = null;
-  try { r = await call(native, "idevice.openLocalDevVPN"); } catch { /* below */ }
+  try { r = await busy(`Opening ${VPN}`, () => call(native, "idevice.openLocalDevVPN")); } catch { /* below */ }
   if (!r?.opened) await alert({ title: `${VPN} Isn't Installed`, message: `Get ${VPN} from the App Store, open it and turn it on.`, buttons: ["OK"] });
 }
 
@@ -211,12 +256,19 @@ export function setupGroups(state, st, p, { openVPN = () => {}, retry = () => {}
   }
   if (state === "file") return [intro, { header: "Pair This iPhone", footer: PAIR_STEPS.file.map((s, i) => `${i + 1}. ${s}`).join(" ") }];
   if (state === "checking") return [intro, { spinner: "Checking…" }];
-  if (state === "connect") return [intro, ...connectGroups(vpn, st, { openVPN, choose, signIn, openTailscale, install, busy })];
+  if (state === "connect") {
+    // B133: while the page polls for the VPN (its way known and nothing left to tap but the app), say so with a spinner
+    const waitFor = vpn === "localdevvpn" ? VPN : vpn === "tailscale" && st?.tailscale?.signedIn && !busy ? "Tailscale" : null;
+    return [intro, ...connectGroups(vpn, st, { openVPN, choose, signIn, openTailscale, install, busy }), ...(waitFor ? [{ spinner: vpnWaitText(waitFor) }] : [])];
+  }
   const conn = { rows: [{ label: VPN, detail: "On" }] };
   const line = failed && !p ? `Pairing stopped.` : p ? pairFooter(p) : "Starting…";
+  // B133: while idevice.pair runs, the code's place spins until the code comes, and the step line spins with it
+  // (waiting for the iPhone to connect, pairing) unless a try failed (then it waits on a tap on the iPhone).
+  const waiting = Boolean(p && !p.error);
   return [intro, conn,
-    { header: "Pairing Code", pin: true },
-    { header: "Where to Type It", guide: true, footer: line },
+    p && !p.pin ? { header: "Pairing Code", spinner: "Getting the Code…" } : { header: "Pairing Code", pin: true },
+    { header: "Where to Type It", guide: true, ...(waiting ? { spinner: line } : { footer: line }) },
     ...(failed && !p ? [{ rows: [{ label: "Try Again", cls: "sign-import", onClick: retry }] }] : [])];
 }
 
@@ -237,7 +289,7 @@ export function connectGroups(vpn, st, { openVPN = () => {}, choose = () => {}, 
   if (vpn === "tailscale") {
     const ts = st?.tailscale ?? null;
     const rows = busy
-      ? [{ label: "Signing In…", detail: busy }]
+      ? [{ label: "Signing In…", detail: busy, spin: true }]
       : ts?.signedIn ? [{ label: "Tailscale", detail: ts.address ? "On" : "Off" }] : [{ label: "Sign In", cls: "sign-import", onClick: signIn }];
     rows.push({ label: "Open Tailscale", cls: "sign-import", onClick: openTailscale });
     return [{
@@ -259,15 +311,16 @@ export function connectGroups(vpn, st, { openVPN = () => {}, choose = () => {}, 
 }
 
 // setupGroups' sections as DOM: the code after the `pin` group, the steps after the `guide` group's header, and the
-// grey spinner with its line in the `spinner` group (packages.css .loading).
+// grey spinner with its line in the `spinner` group (packages.css .loading; settings.css .pair-wait when it sits in a
+// group with a header), and the spinner on rows marked `spin`.
 export function pairSections(sections) {
-  const frag = grouped(sections);
+  const frag = spinRows(grouped(sections), sections);
   const groups = [...frag.children];
   sections.forEach((s, i) => {
     if (s.pin) groups[i].append(el("p", "pair-code", pinText(pairing?.pin) || "––– –––"));
     if (s.guide) groups[i].querySelector(".group-header").after(pairGuide());
     if (s.spinner) {
-      const wait = el("div", "loading");
+      const wait = el("div", s.header ? "loading pair-wait" : "loading");
       wait.setAttribute("aria-busy", "true");
       wait.append(el("span", "loading-spinner"), el("span", null, s.spinner));
       groups[i].append(wait);
@@ -279,7 +332,7 @@ export function pairSections(sections) {
 // Opens another app or its App Store page; says so when iOS couldn't.
 async function openApp(native, alert, url, name) {
   let opened = false;
-  try { opened = (await call(native, "app.openURL", { url }))?.opened === true; } catch { /* below */ }
+  try { opened = (await busy(`Opening ${name}`, () => call(native, "app.openURL", { url })))?.opened === true; } catch { /* below */ }
   if (!opened) await alert({ title: `Couldn't Open ${name}`, message: name === "Tailscale" ? "Get the Tailscale app from the App Store, sign in and turn it on." : "Try again.", buttons: ["OK"] });
 }
 
@@ -375,15 +428,21 @@ async function drawPair(box, { store, native, alert, redraw }) {
     }
   };
 
+  // B133: after an action that changes what the page is, it draws as Checking (the spinner) while it reads again,
+  // instead of leaving the old page up with nothing moving.
+  const recheck = () => { if (visit === v && !pairing) box.replaceChildren(); return redraw(); };
   const sections = setupGroups(state, st, pairing, {
     failed: v.failed,
     openVPN: () => openVPN(native, alert),
     retry: start,
-    check: () => check(native, alert, redraw, store),
-    forget: async () => { await call(native, "idevice.forget").catch(() => {}); store.set(ROUTE_KEY, "server"); v.started = false; redraw(); },
+    check: () => check(native, alert, recheck, store),
+    forget: async () => {
+      await busy("Forgetting Pairing", () => call(native, "idevice.forget").catch(() => {}));
+      store.set(ROUTE_KEY, "server"); v.started = false; recheck();
+    },
     vpn,
     busy: signingIn,
-    choose: async (value) => { await call(native, "tailscale.setConnect", { value }).catch(() => {}); redraw(); },
+    choose: async (value) => { await busy("Switching", () => call(native, "tailscale.setConnect", { value }).catch(() => {})); recheck(); },
     signIn: async () => { await useTailscale(); tailscaleSignIn(native, alert, redraw, `${NAME} is on your tailnet. Turn on the Tailscale app's VPN to pair.`); },
     openTailscale: async () => { await useTailscale(); openApp(native, alert, TAILSCALE_URL, "Tailscale"); },
     install: () => openApp(native, alert, LOCALDEVVPN_STORE, "App Store"),
@@ -397,9 +456,10 @@ async function drawPair(box, { store, native, alert, redraw }) {
       input.value = "";
       if (!f) return;
       try {
-        await call(native, "idevice.import", { data: toBase64(new Uint8Array(await f.arrayBuffer())) });
+        const data = toBase64(new Uint8Array(await f.arrayBuffer()));
+        await busy("Importing", () => call(native, "idevice.import", { data }));
         store.set(ROUTE_KEY, "iphone");
-        redraw();
+        recheck();
       } catch (e) {
         alert({ title: "Not a Pairing File", message: e?.message || "That file isn't a pairing for this iPhone.", buttons: ["OK"] });
       }
@@ -424,13 +484,13 @@ async function drawPair(box, { store, native, alert, redraw }) {
 
 async function check(native, alert, redraw, store) {
   try {
-    await call(native, "idevice.verify");
+    await busy("Checking Connection", () => call(native, "idevice.verify"));
     store.set(ROUTE_KEY, "iphone");
     await alert({ title: "Connected", message: `${NAME} reached this iPhone. Apps install here now.`, buttons: ["OK"] });
   } catch (e) {
     const why = verifyFailure(e);
     if (!why.again) return alert({ title: why.title, message: why.message, buttons: ["OK"] });
     const { index } = await alert({ title: why.title, message: why.message, buttons: ["Cancel", "Pair Again"], cancel: 0 });
-    if (index === 1) { await call(native, "idevice.forget").catch(() => {}); if (visit) visit.started = false; redraw(); }
+    if (index === 1) { await busy("Forgetting Pairing", () => call(native, "idevice.forget").catch(() => {})); if (visit) visit.started = false; redraw(); }
   }
 }

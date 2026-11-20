@@ -416,6 +416,18 @@ with the bundle ID, and keys the app's data by the bundle ID:
   it, and with an Ad Hoc profile whose App ID has Push it can get its own notifications.
 - **Off** (the old way, asked first: `OLD_WAY_ALERT`): the app becomes a copy under the profile's ID; its
   notifications won't work and sign-in, iCloud or shared data tied to its ID may not.
+
+Notifications:
+
+- An app signed with Keep Bundle IDs on and a profile that has Push (`aps-environment`) gets its own server's
+  notifications, whoever signed it. iOS registers the app for push under the bundle ID in its Info.plist, and the
+  app's server sends to that ID with its own key, so the signing team doesn't matter.
+- One explicit App ID with Push in an Ad Hoc profile covers every app's notifications. A signing service's `.p12`
+  and Push profile work as well as your own account's. One App ID per app is not needed for push: it only keeps
+  apps' keychains and App Groups apart.
+- Wildcard profiles never get Push (Apple doesn't allow it on a wildcard App ID). Development profiles get
+  sandbox push only, which apps' own servers don't send to.
+- A renamed copy (Keep Bundle IDs off) has a bundle ID the app's server doesn't know, so it gets no notifications.
 - What is sent: the page adds `keepBundleId: false` to `signing.install`, `signing.prepare` and `signing.inspect`
   (and the website's worker job) only while it's off (`core/keepid.js withKeep`); absent means on. Custom Install
   always sends its switch. Records and My IPAs Sign Options saved before the setting existed have no
@@ -429,15 +441,16 @@ with the bundle ID, and keys the app's data by the bundle ID:
 - iFizBox's own IPA keeps its ID only when the running iFizBox has it (`SignOptions.keeps`); on the website it is
   always signed the old way (the website can't see under which ID an earlier one went in).
 - Warnings (`core/keepid.js profileNotes`, under the switch and in Custom Install): a wildcard profile (Apple gives
-  it no Push), a development one (sandbox push only), an App ID without Push, and one App ID per app (two apps on
-  one share their keychain). Custom Install also warns when the original (same ID, not signed by iFizBox:
+  it no Push), a development one (sandbox push only), an App ID without Push, and an explicit App ID's shared
+  keychain (apps signed with one App ID share their keychain; their notifications are not affected). Custom Install also warns when the original (same ID, not signed by iFizBox:
   `apps.isInstalled`, `signing.installed`) is on the phone: iOS refuses to put a signed app over the App Store copy,
   which must be deleted first. None of these falls back to the old way: every profile kind installs with the ID kept.
   A plain Install (`signAndInstall`, when the app's bundle ID is known) asks the same before it signs
   (`signing-client.js originalWarning`): Install (remembered per app in `ifizbox.originalWarned`, so it asks once),
   Install a Copy (this time the old way, beside the original) or Cancel. My IPAs' Sign Options says it under its switch.
 - The guide: Home > User Guides > Notifications for Signed Apps (`screens/guides.js`, route `guides/keep-bundle-id`),
-  linked from those warnings: an explicit App ID with Push, the iPhones' UDIDs, an Ad Hoc profile, import it.
+  linked from those warnings: an explicit App ID with Push (one for every app), the iPhones' UDIDs, an Ad Hoc
+  profile, import it. With a signing service's `.p12` and Push profile, only the last two steps apply.
 
 ### Is this iPhone in the profile?
 

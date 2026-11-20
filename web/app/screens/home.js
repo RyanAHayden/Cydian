@@ -830,9 +830,14 @@ function renderCredits(body) {
       header: "Software",
       rows: [{ label: "ElleKit", subtitle: "Évelyne Bélanger\nTweak injection, BSD-3-Clause", chevron: true,
         cls: "thanks-row", icon: { text: "E", color: "#7a8a99" },
-        onClick: () => window.open("https://github.com/tealbathingsuit/ellekit", "_blank", "noopener") }],
+        onClick: () => window.open("https://github.com/tealbathingsuit/ellekit", "_blank", "noopener") },
+      // F305: Canister's package search and repo index (Search's Other Sources, Find More Sources, the piracy list)
+      { label: "Canister", subtitle: "Aarnav Tale\nPackage search and repo index", chevron: true, cls: "thanks-row canister-credit",
+        icon: { text: "C", color: "#7a8a99" }, onClick: () => window.open("https://canister.me/", "_blank", "noopener") }],
       footer: `${NAME} adds ElleKit's libellekit.dylib to a signed app when a tweak you inject needs CydiaSubstrate `
-        + "and you added none. ElleKit is © 2022 Évelyne Bélanger, under the BSD 3-Clause licence.",
+        + "and you added none. ElleKit is © 2022 Évelyne Bélanger, under the BSD 3-Clause licence. "
+        + "Search's Other Sources, Find More Sources, the piracy list and the Known Safe · Canister label come from "
+        + "Canister (canister.me).",
     },
   ])));
   globalThis.ifizboxNative?.call?.("app.info", {}).then((i) => {

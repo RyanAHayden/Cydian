@@ -36,10 +36,10 @@ test("live results map to rows with their source", () => {
   const z = rows.find((r) => r.id === "me.aspenuwu.zinnia");
   assert.deepEqual(z, {
     id: "me.aspenuwu.zinnia", name: "Zinnia", description: z.description, author: z.author, version: "1.1.5",
-    section: "Tweaks", price: null, paid: false, icon: "https://img.chariz.cloud/icon/zinnia/icon@3x.png",
+    section: "Tweaks", tag: "", price: null, paid: false, icon: "https://img.chariz.cloud/icon/zinnia/icon@3x.png",
     depiction: z.depiction, arch: "iphoneos-arm", archOk: true,
     repo: { uri: "https://repo.chariz.com/", name: "Chariz", slug: "chariz", flat: true, dist: "./", components: [],
-      added: false, key: "deb:https://repo.chariz.com/:./" },
+      added: false, key: "deb:https://repo.chariz.com/:./", tier: 1, bootstrap: false },
   });
   assert.ok(!/</.test(z.author), "no e-mail in the author");
   const bb = rows.find((r) => r.repo.slug === "bigboss");

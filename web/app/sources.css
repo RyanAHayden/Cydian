@@ -170,3 +170,14 @@
 .safety-banner { display: block; margin: 10px 10px 0; padding: 8px 10px; border: 1px solid #d9a3a0; border-radius: 9px;
   background: #fff3f2; color: #3a1a19; font-size: 13px; line-height: 1.35; }
 .safety-banner-title { display: block; color: #c0392b; font-size: 14px; margin-bottom: 2px; }
+
+/* F305: Find More Sources (screens/findmore.js). The Sources list's last row: a grey "+" icon. Find More's rows are
+   Recommended's (.rec-row, .rec-get); Add turns green at once, with the small spinner while the repo is added. */
+.find-more-row .cell-icon { background: linear-gradient(#e9edf2, #c9d0da); background-origin: border-box; color: #385487; font-weight: bold; }
+.rec-get.find-add.adding, .rec-get.find-add.added { border-color: #3a9b39; color: #3a9b39; background: #fff; }
+.find-add .find-spinner { display: inline-block; width: 12px; height: 12px; margin: 0 4px 0 -4px; vertical-align: -2px; }
+.find-directory .cell-inner { padding-right: 36px; }
+.find-external { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); color: #7f7f7f; font-size: 14px; }
+.find-credit a { color: inherit; text-decoration: underline; }
+.find-warn .cell-detail { color: #a86a10; }
+.find-label .cell-detail .trust-word { color: inherit; }

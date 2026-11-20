@@ -17,6 +17,7 @@ import { compatFilterOn } from "../device.js";
 import { settings, createSwitch } from "./settings.js";
 import { SECTION_GROUPS, searchable } from "../core/catalog.js";
 import { displayName, sourcesFor } from "../core/sources.js";
+import { tweakSourcesOn } from "../core/sources.js"; // F305
 import { loadNew, onLanded, onSettled, isLoading } from "./sources.js";
 import { orderSources, loadOrder } from "../core/sourcelist.js";
 import { getBackend } from "../backend.js";
@@ -223,7 +224,8 @@ export function render(body, route, ctx) {
     const seq = ++state.seq;
     if (!again) {
       // One character searches here; Canister needs two (core/canister.js askable()).
-      others.search(searchable(q) && settings.deviceType() !== "none" ? q : ""); // jailbreak packages only
+      // jailbreak packages only; F305: and the sideload app's tweaks for its apps (extras.js keeps injectable ones)
+      others.search(searchable(q) && (settings.deviceType() !== "none" || tweakSourcesOn(settings.deviceType(), detectMode())) ? q : "");
       recs.search(searchable(q) ? q : "");
       drawRecent();
       if (searchable(q)) follow.load(); // B75: anything added since opening loads too

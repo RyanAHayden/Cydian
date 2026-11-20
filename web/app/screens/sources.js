@@ -35,6 +35,7 @@ import { showBanner } from "../nav/banner.js";
 import { failedBanner, FAILED_BANNER_MS } from "../core/aptupdate.js";
 import { refreshRows, tabBadge, coalesce, ROW } from "../core/refreshrows.js";
 import { labelSource, toggleTrust, trustMenuLabel } from "./safety.js"; // F291
+import { findMoreOn, findMoreRow, labelCanister } from "./findmore.js"; // F305
 
 export const title = "Sources";
 
@@ -543,12 +544,16 @@ function draw() {
       href: format({ tab: "sources", path: [s.key] }),
     };
   };
+  // F305: Find More Sources (Canister's repos) as the last row of Tweak Sources, or of Individual Sources where the
+  // device is jailbroken; not while searching.
+  const tweakGroupOn = tweakSourcesOn(settings.deviceType(), detectMode());
+  const find = !searching && findMoreOn() ? [findMoreRow()] : [];
   const ul = plain([...(top.length ? [{ rows: top }] : []), {
     header: searching ? `${list.length} of ${shown.length}` : "Individual Sources",
-    rows: list.map(sourceRow),
-  }, ...(tweakShown.length ? [{
+    rows: [...list.map(sourceRow), ...(tweakGroupOn ? [] : find)],
+  }, ...(tweakShown.length || (tweakGroupOn && find.length) ? [{
     header: searching ? `Tweak Sources: ${tweakList.length} of ${tweakShown.length}` : TWEAK_SOURCES,
-    rows: tweakList.map(sourceRow),
+    rows: [...tweakList.map(sourceRow), ...(tweakGroupOn ? find : [])],
   }] : [])]);
   const cells = ul.querySelectorAll(":scope > .cell");
   if (top.length) {
@@ -587,6 +592,7 @@ function decorate(li, source, backend) {
   li.querySelector(".cell-icon").append(sourceIconImage(source.key, sourceIcons(source), backend));
   li.dataset.url = source.uri; // Copy URL (hold the row)
   labelSource(li, source); // F291: Known Safe / Trusted / Unknown under its name
+  labelCanister(li, source); // F305: an Unknown APT repo Canister ranks Tier 1 (or a bootstrap one): Known Safe · Canister
   // F72: iFizBox's own source is built in: a lock after its name, and no Delete (a swipe arms nothing).
   if (isBuiltin(source)) {
     li.dataset.builtin = "1";

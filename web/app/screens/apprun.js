@@ -37,6 +37,7 @@ import { openProgress, openOn, RETURN_LABEL, CLOSING_LABEL, WAITING_LABEL, TRY_A
 import { fitFileNames } from "../core/midtrunc.js";
 import { appRows, createAppRun, rowStatus, summaryLine, runStatus, runPercent, ended, isSelf, DIDNT_DOWNLOAD, barOf } from "../core/apprun.js";
 import { recordWhen } from "../core/apprun.js"; // B136
+import { apps as appStore, undoRecord } from "../core/installed.js"; // B170
 import { SELF_UPDATE_LINES, SELF_UPDATE_FAILED, HERE_CLOSING_LINE } from "../signing-client.js";
 
 // The phone's side of a run, from signing-client.js (prepareOnDevice, openPrepared, discardPrepared). Each attempt of a
@@ -129,6 +130,10 @@ export function helperLanes({ backend, install, needs, native } = {}) {
 // B156: a "no" can come while iOS is still installing (the icon still loading on the home screen), and nothing asked
 // again, so the app was never recorded. A row iOS said no to is asked again every `retryMs`, `tries` times, while
 // iFizBox is in front; stop() ends it.
+// B170: no answer (null: the user's Cancel on iOS's own prompt looks like this) is asked again the same way and on each
+// return to the front (which starts the tries over); it never counts as installed. A row that was "Sent to iOS" stays
+// asked after iOS confirmed it: a later false turns it "Sent to iOS" again (run.unconfirm) and answered(row, false)
+// lets the page undo its record.
 export function followHandoff(run, rows, { isInstalled, doc = globalThis.document, answered = () => {}, retryMs = 5000, tries = 12,
   later = (f, ms) => { const t = setTimeout(f, ms); t?.unref?.(); return t; }, clear = (t) => clearTimeout(t) } = {}) {
   const hidden = () => doc?.visibilityState === "hidden";
@@ -136,6 +141,7 @@ export function followHandoff(run, rows, { isInstalled, doc = globalThis.documen
   let timer = null;
   let left = tries;
   let stopped = false;
+  const handed = new Set(); // B170: ids of rows that ended "Sent to iOS" in this run
   const again = () => {
     if (stopped || timer || left <= 0) return;
     left--;
@@ -143,22 +149,28 @@ export function followHandoff(run, rows, { isInstalled, doc = globalThis.documen
   };
   const check = async () => {
     if (!isInstalled || asking || hidden()) return;
-    const sent = rows.filter((r) => r.state === "installed" && r.unsure && r.mode !== "resign" && r.bundleId && !isSelf(r));
+    for (const r of rows) if (r.state === "installed" && r.unsure) handed.add(r.id);
+    const sent = rows.filter((r) => r.state === "installed" && handed.has(r.id) && r.mode !== "resign" && r.bundleId && !isSelf(r));
     if (!sent.length) return;
     asking = true;
     let answer = {};
     try { answer = (await isInstalled(sent.map((r) => r.bundleId))) ?? {}; } catch { /* unknown: they stay sent */ }
     asking = false;
-    let no = false;
+    let open = false;
     for (const r of sent) {
-      const v = answer[r.bundleId];
+      const v = typeof answer[r.bundleId] === "boolean" ? answer[r.bundleId] : null;
       if (v === true) run.confirm(r.id);
-      if (v === false) no = true;
-      try { answered(r, typeof v === "boolean" ? v : null); } catch { /* the page's bug isn't the check's */ }
+      if (v === false && !r.unsure) run.unconfirm?.(r.id); // B170: iOS no longer has it
+      if (v !== true) open = true;
+      try { answered(r, v); } catch { /* the page's bug isn't the check's */ }
     }
-    if (no) again(); // B156
+    if (open) again(); // B156; B170: an unknown is asked again too
   };
-  const onVisibility = () => { if (hidden()) run.away(); else check(); };
+  const onVisibility = () => {
+    if (hidden()) { run.away(); return; }
+    left = tries; // B170: each return to the front asks again from the start
+    check();
+  };
   doc?.addEventListener?.("visibilitychange", onVisibility);
   return { check, stop: () => {
     stopped = true;
@@ -238,13 +250,33 @@ export async function runAppRun(jobs, deps) {
   const cleared = new Set();
   // B136: Installed's record of an app is written once iOS confirmed it (recordWhen), not when a row ends "Sent to
   // iOS": an install iOS never fetched (B128) left the app recorded, and its Search row's swipe did nothing.
-  const recorded = new Set();
-  const recordIf = (r, onPhone) => {
-    // no isInstalled at all (helperLanes, tests): iOS can't be asked, the row counts as sent (null)
-    if (recorded.has(r.id) || recordWhen(r, onPhone === undefined && !isInstalled ? null : onPhone) !== "now") return;
-    recorded.add(r.id);
-    Promise.resolve().then(() => record(r.job)).catch(() => {}); // no store: Installed won't list it
+  // B170: a row the user cancelled, or one iOS never confirmed (no answer included), is never recorded. Each record
+  // keeps the record it replaced, so iOS reporting the app missing later puts that one back (undoRecord).
+  const store = deps.store ?? appStore;
+  const recordOf = async (id) => {
+    try { return (await (await store()).all()).find((x) => x.id === id) ?? null; } catch { return null; }
   };
+  const recorded = new Map(); // row id -> a promise for { before, wrote } (Installed's record of the app around it)
+  const recordIf = (r, onPhone) => {
+    if (recorded.has(r.id) || recordWhen(r, onPhone) !== "now") return;
+    const id = r.job?.id ?? r.id;
+    recorded.set(r.id, Promise.resolve().then(async () => {
+      const before = await recordOf(id);
+      try { await record(r.job); } catch { /* no store: Installed won't list it */ }
+      return { before, wrote: await recordOf(id) };
+    }));
+  };
+  const unrecord = (r) => {
+    const p = recorded.get(r.id);
+    if (!p) return;
+    recorded.delete(r.id);
+    p.then(async ({ before, wrote }) => {
+      if (!wrote || (before && wrote.date === before.date)) return; // nothing was written (a re-sign, iFizBox)
+      await (deps.unrecord ? deps.unrecord(r.job, before, wrote) : undoRecord(await store(), wrote.id, before, wrote));
+      line("step", `${r.name || r.id} is no longer recorded as installed`, r.id);
+    }).catch(() => {});
+  };
+  const answered = (r, onPhone) => { if (onPhone === false) unrecord(r); else recordIf(r, onPhone); };
   let sentSelf = false;
   const run = createAppRun({
     rows,
@@ -271,7 +303,7 @@ export async function runAppRun(jobs, deps) {
     onStart: (pass) => { if (pass > 1) clearLog(page); }, // B153: a new pass on this page starts with a clean log
   });
   const isInstalled = deps.isInstalled ?? lanes.isInstalled;
-  const handoff = followHandoff(run, rows, { isInstalled, answered: (r, onPhone) => recordIf(r, onPhone),
+  const handoff = followHandoff(run, rows, { isInstalled, answered,
     ...(deps.doc ? { doc: deps.doc } : {}) });
   page.onClose?.(() => handoff.stop());
   let tickQueued = false;

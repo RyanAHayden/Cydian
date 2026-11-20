@@ -32,6 +32,7 @@
 //                 iOS didn't download (dismissed) goes back to iOS's prompt without signing again (hooks.again)
 //     .away()     B76: iFizBox went to the background while a row was with iOS: that row is handed off to iOS
 //     .confirm(id) B76: iOS has an app whose row ended "Sent to iOS" (apps.isInstalled on the way back): Installed
+//     .unconfirm(id) B170: iOS later says it doesn't have that app: the row is "Sent to iOS" again
 //     .reprompt(id) B85: the "Tap Install on the iOS prompt" row's tap: reprompt(row), logged -> a promise for true | false
 //     .notTaken(id, why) B123: an ended run's "Sent to iOS" row that iOS never took turns Failed (why) -> true | false
 //     .ownIdRetry(id) B151: a row the App Store's install coordinator blocked (IX Code 46: row.busy, coordinatorBusy)
@@ -72,14 +73,15 @@ import { isNewer } from "./selfupdate.js"; // B159: staleSelf
 
 // B136: an install that failed must not leave the app recorded as installed (Installed's record decides the Search
 // row's swipe: a recorded, up-to-date app has none). recordWhen(row, onPhone) says when a row's app goes into that
-// record: "now" for an install iOS confirmed (and for rows iOS can't be asked about: re-signs, removes, iFizBox
-// itself, rows with no bundle ID, and an `onPhone` of null: apps.isInstalled had no answer); "wait" for a "Sent to
-// iOS" row iOS hasn't confirmed (onPhone undefined: not asked yet, or false: iOS doesn't have it, which is how an
-// install looks that iOS never fetched, B128's ECONNREFUSED); "never" for a row that didn't end installed.
+// record: "now" for an install iOS confirmed (and for rows that change no install record: re-signs, removes, iFizBox
+// itself); "wait" for a "Sent to iOS" row iOS hasn't confirmed: onPhone undefined (not asked yet), false (iOS doesn't
+// have it: an install iOS never fetched, B128's ECONNREFUSED, or one still going) or null (B170: apps.isInstalled had no
+// answer; the user's Cancel on iOS's own prompt looks exactly like that), and a sent row with no bundle ID to ask
+// about; "never" for a row that didn't end installed (failed, or cancelled by the red Cancel or its stop).
 export function recordWhen(row, onPhone) {
   if (row?.state !== "installed") return "never";
-  if (!row.unsure || row.mode === "resign" || row.mode === "remove" || !row.bundleId || isSelf(row)) return "now";
-  if (onPhone === true || onPhone === null) return "now";
+  if (!row.unsure || row.mode === "resign" || row.mode === "remove" || isSelf(row)) return "now";
+  if (row.bundleId && onPhone === true) return "now";
   return "wait";
 }
 
@@ -418,6 +420,15 @@ export function createAppRun({ rows, sign, install, discard = () => {}, reprompt
       if (!r || r.state !== "installed" || !r.unsure) return false;
       set(r, { unsure: false });
       if (r.mode !== "resign") log(r, "step", `Installed ${label(r)}`);
+      return true;
+    },
+    // B170: iOS says it doesn't have an app whose row was confirmed after "Sent to iOS" (apps.isInstalled false on a
+    // later check): the row reads "Sent to iOS" again (its record is undone by the page) -> true | false
+    unconfirm(id) {
+      const r = rows.find((x) => x.id === id);
+      if (!r || r.state !== "installed" || r.unsure || r.mode !== "install" || helperRow(r)) return false;
+      set(r, { unsure: true });
+      log(r, "step", `iOS doesn't have ${label(r)} now`);
       return true;
     },
     async reprompt(id) {

@@ -91,6 +91,7 @@ export function findUpgrades(installed, candidateOf, holds = [], { dpkgHolds = t
 //   appRecord(app, now)                 -> { id, name, version, key, source, sourceName, icon, date }
 //   recordInstall(store, app, now)      -> the record, put in the store (one per app id: a reinstall replaces it)
 //   removeInstall(store, id)
+//   undoRecord(store, id, before, wrote) B170: an IPA run's record undone (iOS reported the app missing): `before` back
 //   appRows(records)                    -> newest first (then by name)
 //   appUpgrades(rows, candidateOf)      -> each row with `upgrade`: the candidate's version when it is newer, else null
 //   openAppStore({ indexedDB, name })   -> Promise of { all, put, remove }; memoryAppStore() is the same in memory
@@ -120,6 +121,22 @@ export async function recordInstall(store, app, now = Date.now()) {
 export async function removeInstall(store, id) {
   await store.remove(id);
   for (const f of appListeners) f();
+}
+
+// B170: undo a record an IPA run wrote for an app iOS then reported missing: the record that stood before it (`before`,
+// an upgrade's older version or a Mark as Installed) goes back, else the app's record goes. A record changed since
+// (`wrote`: the one the run wrote, by its date) is left alone: something newer recorded the app.
+export async function undoRecord(store, id, before = null, wrote = null) {
+  if (!id) return false;
+  if (wrote) {
+    let now = null;
+    try { now = (await store.all()).find((r) => r.id === id) ?? null; } catch { /* no list: undo anyway */ }
+    if (now && now.date !== wrote.date) return false;
+  }
+  if (before?.id === id) await store.put(before);
+  else await store.remove(id);
+  for (const f of appListeners) f();
+  return true;
 }
 
 export function appRows(records) {

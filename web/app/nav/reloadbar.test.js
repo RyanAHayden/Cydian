@@ -130,7 +130,8 @@ test("F150: Cancel hides the bar and calls onCancel once; showing another bar re
 });
 
 test("F150/F204: nothing blocks input or moves: a 44 pt strip on the tab bar, no pointer-events trick, no push", () => {
-  const css = readFileSync(new URL("../ios6.css", import.meta.url), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+  // C45: the strip's layout is style.css's, ios6.css paints it
+  const css = ["../style.css", "../ios6.css"].map((f) => readFileSync(new URL(f, import.meta.url), "utf8")).join("\n").replace(/\/\*[\s\S]*?\*\//g, "");
   const rules = [...css.matchAll(/([^{}]+)\{([^}]*)\}/g)].map(([, sel, decl]) => ({ sel: sel.trim(), decl }));
   const bar = rules.find((r) => r.sel === ".reload-bar");
   assert.ok(bar, ".reload-bar missing");

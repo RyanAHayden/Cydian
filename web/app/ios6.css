@@ -341,38 +341,43 @@ html[data-theme="dark"] .bar-button.red:not(.back):not(.done):is(:active, .is-pr
    the 4S's UIPreferencesDeleteButtonNormal (...Pressed, ...Dark, ...DarkPressed), 88px@2x: a 1pt translucent black
    edge drawn over the page (so background-clip: padding-box, with the gradient sized to the border-box like the
    bar buttons: background-origin: border-box), a gloss split at row 43 of 88 and a 1pt white emboss under it. */
-.button-pair { position: relative; display: flex; gap: 9px; margin-top: 10px; } /* relative: holds the hidden file input */
-.button-pair > .pair-button { flex: 1 1 0; min-width: 0; }
+/* ==== look-only { ==== two buttons in one row under a grouped table */
+:root {
+  --pair-delete-text: #fff; --pair-delete-emboss: 0 -1px 0 rgba(0,0,0,.45);
+  --pair-delete-edge: rgba(0,0,0,.6); --pair-delete-edge-bottom: rgba(0,0,0,.62);
+  --pair-delete-shadow: 0 1px 0 rgba(255,255,255,.75); --pair-delete-shadow-dark: 0 1px 0 rgba(255,255,255,.15);
+  --pair-delete: linear-gradient(#efc8c8 2.3%, #e89e9f 3.4%, #e08283 8%, #d9696b 19.3%, #d35254 28.4%, #ce3e3f 37.5%,
+    #ca2b2d 48.3%, #c50b0d 50%, #c81d1f 68%, #c51f21 75%, #bc191b 85%, #af0a0c 94.9%, #b72022 96%);
+  --pair-delete-pressed: linear-gradient(#dec7c8 2.3%, #c99d9d 3.4%, #b88080 8%, #aa6768 19.3%, #9c4f50 28.4%, #913a3b 37.5%,
+    #872829 48.3%, #760708 50%, #821a1b 68%, #851c1d 75%, #891819 85%, #89090a 94.9%, #951f1f 96%);
+}
 .cell-inner.pair-button { /* .cell-inner (below) would otherwise take its border and background away */
-  box-sizing: border-box; height: 44px; min-height: 44px; padding: 0 6px; justify-content: center; text-align: center;
-  font: inherit; font-size: 15px; font-weight: bold; line-height: 18px; color: var(--text); cursor: pointer;
-  touch-action: manipulation; overflow: hidden;
+  text-align: center; font: inherit; font-size: 15px; font-weight: bold; line-height: 18px; color: var(--text);
   background: var(--table); border: 1px solid var(--table-edge); border-radius: 9.5px;
   box-shadow: inset 0 .5px .5px var(--table-inset);
 }
 .cell-inner.pair-button:is(:active, .is-pressed) { background: var(--select); background-origin: border-box; color: #fff; }
 .pair-button.delete-button {
-  color: #fff; text-shadow: 0 -1px 0 rgba(0,0,0,.45);
-  border: 1px solid rgba(0,0,0,.6); border-bottom-color: rgba(0,0,0,.62); border-radius: 8px;
-  background: linear-gradient(#efc8c8 2.3%, #e89e9f 3.4%, #e08283 8%, #d9696b 19.3%, #d35254 28.4%, #ce3e3f 37.5%,
-    #ca2b2d 48.3%, #c50b0d 50%, #c81d1f 68%, #c51f21 75%, #bc191b 85%, #af0a0c 94.9%, #b72022 96%);
+  color: var(--pair-delete-text); text-shadow: var(--pair-delete-emboss);
+  border: 1px solid var(--pair-delete-edge); border-bottom-color: var(--pair-delete-edge-bottom); border-radius: 8px;
+  background: var(--pair-delete);
   background-origin: border-box; background-clip: padding-box;
-  box-shadow: 0 1px 0 rgba(255,255,255,.75);
+  box-shadow: var(--pair-delete-shadow);
 }
 .pair-button.delete-button:is(:active, .is-pressed) {
-  background: linear-gradient(#dec7c8 2.3%, #c99d9d 3.4%, #b88080 8%, #aa6768 19.3%, #9c4f50 28.4%, #913a3b 37.5%,
-    #872829 48.3%, #760708 50%, #821a1b 68%, #851c1d 75%, #891819 85%, #89090a 94.9%, #951f1f 96%);
+  background: var(--pair-delete-pressed);
   background-origin: border-box; background-clip: padding-box;
 }
 html[data-theme="dark"] .pair-button.delete-button {
   background: var(--dk-delete);
   background-origin: border-box; background-clip: padding-box;
-  box-shadow: 0 1px 0 rgba(255,255,255,.15);
+  box-shadow: var(--pair-delete-shadow-dark);
 }
 html[data-theme="dark"] .pair-button.delete-button:is(:active, .is-pressed) {
   background: var(--dk-delete-pressed);
   background-origin: border-box; background-clip: padding-box;
 }
+/* ==== } look-only ==== */
 
 /* ==== look-only { ==== */
 /* ---- Tab bar: "Tab bar" ---- */
@@ -449,96 +454,75 @@ html[data-theme="dark"] .pair-button.delete-button:is(:active, .is-pressed) {
 /* Only app.js's .is-pressed, not :active: iOS keeps :active on a held row after the touch turns into a scroll. */
 .cell-inner.is-pressed { background: var(--select); color: #fff; }
 .cell-inner.is-pressed * { color: #fff; }
-.cell-inner.chevron.is-pressed::after {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 17.5 26.4'%3E%3Cpath fill='%23fff' d='M.07 4.23 9.12 13.27 0 22.26 4.12 26.38 17.47 13.03 4.43 0Z'/%3E%3C/svg%3E");
-}
+.cell-inner.chevron.is-pressed::after { background-image: var(--chevron-pressed); }
 /* ==== } look-only ==== */
 
 /* "switch (on)" / "switch (off)": 77 x 27, a pill with the kit's edge gradient (on #819fb9 to #255985, off #ccc to
    #878787), track #007fe9 or #ededed with an inner shadow, ON in white or OFF in grey, and the 27px handle
    (#fbfbfb to #cfcfcf, black edge at 49%) that slides across by transform. Same in both themes, as the kit's. */
-.cell-inner.has-switch { padding-right: 9px; }
-/* B164: a bare label before a switch takes the row's room, so the switch sits at the right edge as in Settings. */
-.cell-inner.has-switch > .cell-label { flex: 1; min-width: 0; }
+/* ==== look-only { ==== switch */
 /* On/off switch. Size from the Teehan+Lax kit ("switch (off|on)"): 77x27 track, 27pt knob over the outline, 50pt of
-   travel. Colours sampled off the 4S's Settings > Wi-Fi (ref/4s/screens/hints-wifi.png): each track is a flat colour
-   down to just under the middle, then a lighter gloss band; the edge is dark blue when on, grey when off.
-   Everything rides on --x (0 off, 50px on; settings.js sets it while dragging): the knob, the blue fill that ends at
-   the knob's centre, and both labels move together, so ON and OFF behave the same when tapped or dragged. */
-.switch {
-  --x: 0px;
-  position: relative; flex: none; width: 77px; height: 27px; padding: 0; border: 0; background: none; cursor: pointer;
-  touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent;
+   travel (sized in style.css). Colours sampled off the 4S's Settings > Wi-Fi (ref/4s/screens/hints-wifi.png): each
+   track is a flat colour down to just under the middle, then a lighter gloss band; the edge is dark blue when on, grey
+   when off. Everything rides on --x (0 off, 50px on; settings.js sets it while dragging): the knob, the blue fill that
+   ends at the knob's centre, and both labels move together, so ON and OFF behave the same when tapped or dragged. */
+:root {
+  --sw-edge: #b4b4b4; --sw-edge-on: #306591;
+  --sw-track: linear-gradient(#dbdbdb, #eee 16%, #eee 48%, #fafafa 48%, #fefefe);
+  --sw-on: linear-gradient(#0065bb, #0079df 8%, #007fea 16%, #007fea 48%, #218fec 48%, #74b3e9);
+  --sw-on-label: "ON"; --sw-on-text: #fff; --sw-on-emboss: 0 -1px 0 rgba(0,0,0,.35);
+  --sw-off-label: "OFF"; --sw-off-text: #808080;
+  --sw-knob: linear-gradient(#d1d1d1, #fdfdfd); --sw-knob-held: linear-gradient(#bcbcbc, #e6e6e6);
+  --sw-knob-edge: #747474; --sw-knob-edge-bottom: #9b9b9b;
+  --sw-track-shadow-dark: inset 0 1px 3px rgba(0,0,0,.8); /* the dark themes' sunken track */
 }
+.switch { --x: 0px; border: 0; background: none; }
 .switch[aria-checked="true"] { --x: 50px; }
 .sw-track {
-  position: absolute; inset: 0; border: 1px solid #b4b4b4; border-radius: 13.5px; overflow: hidden; pointer-events: none;
-  background: linear-gradient(#dbdbdb, #eee 16%, #eee 48%, #fafafa 48%, #fefefe);
-  font-size: 16px; font-weight: bold; line-height: 25px; text-align: left;
+  border: 1px solid var(--sw-edge); border-radius: 13.5px;
+  background: var(--sw-track); font-size: 16px; font-weight: bold;
+  line-height: 25px; text-align: left;
 }
-.switch[aria-checked="true"] .sw-track { border-color: #306591; }
+.switch[aria-checked="true"] .sw-track { border-color: var(--sw-edge-on); }
 .sw-track::before { /* blue fill + ON, ending at the knob's centre (x + 13.5px) */
-  content: "ON"; position: absolute; top: 0; bottom: 0; left: 0; width: 77px; padding-left: 25.5px; box-sizing: border-box;
-  color: #fff; text-shadow: 0 -1px 0 rgba(0,0,0,.35);
-  background: linear-gradient(#0065bb, #0079df 8%, #007fea 16%, #007fea 48%, #218fec 48%, #74b3e9); transform: translateX(calc(var(--x) - 63.5px));
+  content: var(--sw-on-label); color: var(--sw-on-text); text-shadow: var(--sw-on-emboss);
+  background: var(--sw-on);
 }
-.sw-track::after { content: "OFF"; position: absolute; top: 0; right: 12px; color: #808080; transform: translateX(var(--x)); }
+.sw-track::after { content: var(--sw-off-label); color: var(--sw-off-text); }
 .sw-knob {
-  position: absolute; top: 0; left: 0; width: 27px; height: 27px; box-sizing: border-box; border-radius: 50%;
-  background: linear-gradient(#d1d1d1, #fdfdfd); border: 1px solid #747474; border-bottom-color: #9b9b9b;
-  transform: translateX(var(--x)); pointer-events: none;
+  border-radius: 50%; background: var(--sw-knob); border: 1px solid var(--sw-knob-edge);
+  border-bottom-color: var(--sw-knob-edge-bottom);
 }
-.sw-track::before, .sw-track::after, .sw-knob { transition: transform .2s ease; }
-.switch.is-held .sw-knob { background: linear-gradient(#bcbcbc, #e6e6e6); }
-.switch.is-dragging .sw-track::before, .switch.is-dragging .sw-track::after, .switch.is-dragging .sw-knob { transition: none; }
-html[data-theme="dark"] .sw-track { border-color: var(--dk-btn-edge); background: var(--dk-sw-track); box-shadow: inset 0 1px 3px rgba(0,0,0,.8); }
+.switch.is-held .sw-knob { background: var(--sw-knob-held); }
+html[data-theme="dark"] .sw-track { border-color: var(--dk-btn-edge); background: var(--dk-sw-track); box-shadow: var(--sw-track-shadow-dark); }
 html[data-theme="dark"] .sw-track::after { color: var(--dk-sw-off); }
 html[data-theme="dark"] .sw-track::before { background: var(--dk-sw-on); }
 html[data-theme="dark"] .sw-knob { background: var(--dk-sw-knob); border-color: var(--dk-btn-edge); }
 html[data-theme="dark"] .switch.is-held .sw-knob { background: var(--dk-sw-knob-held); }
-@media (prefers-reduced-motion: reduce) { .sw-track::before, .sw-track::after, .sw-knob { transition: none; } }
+/* ==== } look-only ==== */
 
 /* ---- Plain tables: "Scroll pane" ---- */
+/* ==== look-only { ==== Plain tables */
+:root { --section-head-text: #fff; --section-head-emboss: 0 1px 0 rgba(0,0,0,.42); } /* --category: the bar's gradient */
 .page-body.plain { background: var(--plain); }
 .table.plain { background: var(--plain); }
 .plain .cell { border-bottom: 1px solid var(--keyline); } /* "keyline" */
-.plain .cell-inner { padding-top: 4px; padding-bottom: 4px; }
 .plain .cell-label { font-size: 20px; line-height: 24px; }
 .section-header { /* "category bar": 23px, the kit's gradient at 90%, 18px bold white, dark emboss; sticks */
-  position: sticky; top: 0; z-index: 1; height: 23px; padding: 0 12px;
-  font-size: 18px; font-weight: bold; line-height: 23px; color: #fff; text-shadow: 0 1px 0 rgba(0,0,0,.42);
+  font-size: 18px; font-weight: bold; line-height: 23px; color: var(--section-head-text); text-shadow: var(--section-head-emboss);
   background: var(--category);
-  overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
 }
+/* ==== } look-only ==== */
 
 /* ---- "Reloading Data" HUD: our own box, in the kit's terms: black at 75% like its translucent bars, 10px
    corners, a 36px white spinner (the kit's "White Large"), bold white label with the kit's -1px text emboss. ---- */
-.hud-scrim { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; padding: 16px; }
+/* ==== look-only { ==== the Reloading Data HUD */
+:root { --hud: rgba(0,0,0,.75); --hud-text: #fff; --hud-emboss: 0 -1px 0 rgba(0,0,0,.5); }
 .hud {
-  width: 180px; padding: 28px 12px 22px; border-radius: 10px;
-  display: flex; flex-direction: column; align-items: center; gap: 14px;
-  background: rgba(0,0,0,.75); color: #fff; text-align: center; text-shadow: 0 -1px 0 rgba(0,0,0,.5);
-  font-size: 24px; font-weight: bold; line-height: 28px;
+  border-radius: 10px; background: var(--hud); color: var(--hud-text); text-align: center;
+  text-shadow: var(--hud-emboss); font-size: 24px; font-weight: bold; line-height: 28px;
 }
-.hud-spinner { width: 37px; height: 37px; background: var(--spinner-large) center / 37px no-repeat; animation: hud-spin .96s linear infinite; }
-.hud-check { width: 36px; height: 36px; }
-/* F166: the spinners turn a spoke at a time by holding each 30-degree turn for 1/12 of the cycle, with linear timing.
-   Not steps(12): WebKit on iOS 15 (Safari and the app's WKWebView alike) hands the transform animation to Core
-   Animation and a steps() timing function there leaves it standing still (journal/2026-11-18-f166-spinners). */
-@keyframes hud-spin {
-  0%, 8.332% { transform: rotate(0deg); }
-  8.333%, 16.666% { transform: rotate(30deg); }
-  16.667%, 24.999% { transform: rotate(60deg); }
-  25.000%, 33.332% { transform: rotate(90deg); }
-  33.333%, 41.666% { transform: rotate(120deg); }
-  41.667%, 49.999% { transform: rotate(150deg); }
-  50.000%, 58.332% { transform: rotate(180deg); }
-  58.333%, 66.666% { transform: rotate(210deg); }
-  66.667%, 74.999% { transform: rotate(240deg); }
-  75.000%, 83.332% { transform: rotate(270deg); }
-  83.333%, 91.666% { transform: rotate(300deg); }
-  91.667%, 100% { transform: rotate(330deg); }
-}
+.hud-spinner { background: var(--spinner-large) center / 37px no-repeat; }
 /* iOS 6's UIActivityIndicatorView styles (nav/spinner.js draws them; spinner.test.js keeps the two the same). */
 :root {
   --spinner-white: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cg stroke='%23fff' stroke-width='2' stroke-linecap='round'%3E%3Cline x1='10' y1='1' x2='10' y2='4' opacity='0.271'/%3E%3Cline x1='10' y1='1' x2='10' y2='4' transform='rotate(30 10 10)' opacity='0.271'/%3E%3Cline x1='10' y1='1' x2='10' y2='4' transform='rotate(60 10 10)' opacity='0.271'/%3E%3Cline x1='10' y1='1' x2='10' y2='4' transform='rotate(90 10 10)' opacity='0.271'/%3E%3Cline x1='10' y1='1' x2='10' y2='4' transform='rotate(120 10 10)' opacity='0.369'/%3E%3Cline x1='10' y1='1' x2='10' y2='4' transform='rotate(150 10 10)' opacity='0.463'/%3E%3Cline x1='10' y1='1' x2='10' y2='4' transform='rotate(180 10 10)' opacity='0.561'/%3E%3Cline x1='10' y1='1' x2='10' y2='4' transform='rotate(210 10 10)' opacity='0.659'/%3E%3Cline x1='10' y1='1' x2='10' y2='4' transform='rotate(240 10 10)' opacity='0.753'/%3E%3Cline x1='10' y1='1' x2='10' y2='4' transform='rotate(270 10 10)' opacity='0.851'/%3E%3Cline x1='10' y1='1' x2='10' y2='4' transform='rotate(300 10 10)' opacity='0.271'/%3E%3Cline x1='10' y1='1' x2='10' y2='4' transform='rotate(330 10 10)' opacity='0.271'/%3E%3C/g%3E%3C/svg%3E");
@@ -547,129 +531,112 @@ html[data-theme="dark"] .switch.is-held .sw-knob { background: var(--dk-sw-knob-
 }
 /* No dark iOS 6: on the dark theme the grey (black at 38%) spinner would vanish, so lists take the white one. */
 :root[data-theme="dark"] { --spinner-gray: var(--spinner-white); }
+/* ==== } look-only ==== */
 
+/* ==== look-only { ==== the empty-state note */
 .empty { color: var(--head); text-shadow: var(--emboss); font-size: 17px; }
-
-@media (prefers-reduced-motion: reduce) { .hud-spinner { animation-duration: 3s; } }
-
-/* Zoom (Settings > Appearance > Allow Zoom, off by default): iOS ignores user-scalable=no, so app.js also stops
-   the pinch gesture itself. */
-html.no-zoom, html.no-zoom body { touch-action: pan-x pan-y; }
-
-/* No grey tap flash anywhere: controls have their own pressed looks. */
-* { -webkit-tap-highlight-color: transparent; }
+/* ==== } look-only ==== */
 
 /* ---- Scroll indicator (nav/scroller.js): UIKit's UIScrollerIndicatorDefault, 5pt black at 50% with a 1pt 15% white
-   ring, fully rounded; wider while held. The native indicator is hidden: it isn't iOS 6's. ---- */
-.page-body { scrollbar-width: none; }
-.page-body::-webkit-scrollbar { display: none; }
-/* B31: the other scrollers it follows (Search's results and Filter panel, an action sheet's list) too. On iOS 15 this
-   is what hides the native one: WebKit then turns off the indicators of the pane's own UIScrollView. */
-[data-scroller] { scrollbar-width: none; }
-[data-scroller]::-webkit-scrollbar { display: none; }
+   ring, fully rounded; wider while held. The native indicator is hidden (style.css): it isn't iOS 6's. ---- */
+/* ==== look-only { ==== Scroll indicator */
+:root { --scroll-thumb: rgba(0,0,0,.5); --scroll-thumb-ring: 0 0 0 1px rgba(255,255,255,.15); }
 .scroll-indicator {
-  position: fixed; top: 0; right: 2px; z-index: 6; width: 5px; border-radius: 3px;
-  background: rgba(0,0,0,.5); box-shadow: 0 0 0 1px rgba(255,255,255,.15);
-  opacity: 0; transition: opacity .3s, scale .1s; pointer-events: none; touch-action: none; will-change: transform;
+  border-radius: 3px; background: var(--scroll-thumb); box-shadow: var(--scroll-thumb-ring); opacity: 0;
 }
 .scroll-indicator.on { opacity: 1; } /* never takes touches: a hold on it grabs (nav/scroller.js) */
-.bar-touch, .bar-touch * { -webkit-user-select: none !important; user-select: none !important; -webkit-touch-callout: none !important; }
-/* Grabbed, it widens from 5 to 7px about the same centre (was width 7, right 1): `scale`, since 120 Hz animates no width,
-   and apart from the translateY nav/scroller.js writes into `transform`. */
-.scroll-indicator.grab { scale: 1.4 1; }
+/* ==== } look-only ==== */
 
-/* Short pages still rubber-band like iOS: a scroller only bounces when it can scroll, so every page is at least
-   1px taller than its box. A zero-width float does it without changing any element's size (stretching the first
-   child pushed Search's results off the screen). */
-.page-body::before { content: ""; float: left; width: 1px; margin-right: -1px; height: calc(100% + 1px); }
+/* ==== look-only { ==== the rubber-band spacer (style.css: a zero-width float that lets short pages bounce) */
+.page-body::before { content: ""; }
+/* ==== } look-only ==== */
 
 /* What's behind the page (Safari samples it for its top bar, and it shows in overscroll): the nav bar's colour for each
    theme, so switching theme repaints the top too. */
+/* ==== look-only { ==== What's behind the page */
 html { background: #bdcbdc; }
 html[data-theme="dark"] { background: var(--dk-ground); }
+/* ==== } look-only ==== */
 
 /* UIMenuController (nav/menu.js): a black glossy callout with an arrow, white bold items split by hairlines. */
-.menu { position: fixed; z-index: 40; filter: drop-shadow(0 2px 4px rgba(0,0,0,.45)); }
+/* ==== look-only { ==== UIMenuController */
+:root {
+  --menu-drop: drop-shadow(0 2px 4px rgba(0,0,0,.45));
+  --menu: linear-gradient(rgba(255,255,255,.28), rgba(255,255,255,.08) 50%, transparent 51%) , linear-gradient(#3c3c3c, #0d0d0d);
+  --menu-edge: #000; --menu-shine: inset 0 1px 0 rgba(255,255,255,.35);
+  --menu-text: #fff; --menu-emboss: 0 -1px 0 rgba(0,0,0,.8);
+  --menu-divider: rgba(0,0,0,.9); --menu-divider-hi: inset 1px 0 0 rgba(255,255,255,.18);
+  --menu-pressed: linear-gradient(#4a8cf0, #1d5fd9);
+  --menu-arrow: #0d0d0d; --menu-arrow-below: #3c3c3c; /* the bar's bottom and top colours */
+}
+.menu { filter: var(--menu-drop); }
 .menu-items {
-  display: flex; height: 38px; border-radius: 7px; overflow: hidden; border: 1px solid #000;
-  background: linear-gradient(rgba(255,255,255,.28), rgba(255,255,255,.08) 50%, transparent 51%) , linear-gradient(#3c3c3c, #0d0d0d);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.35);
+  border-radius: 7px; border: 1px solid var(--menu-edge);
+  background: var(--menu);
+  box-shadow: var(--menu-shine);
 }
 .menu-item {
-  padding: 0 12px; border: 0; margin: 0; background: none; cursor: pointer; font: inherit; font-size: 14px; font-weight: bold;
-  line-height: 36px; color: #fff; text-shadow: 0 -1px 0 rgba(0,0,0,.8); white-space: nowrap;
+  border: 0; background: none; font: inherit; font-size: 14px; font-weight: bold; line-height: 36px; color: var(--menu-text);
+  text-shadow: var(--menu-emboss);
 }
-.menu-item + .menu-item { border-left: 1px solid rgba(0,0,0,.9); box-shadow: inset 1px 0 0 rgba(255,255,255,.18); }
-.menu-item:active { background: linear-gradient(#4a8cf0, #1d5fd9); }
-.menu-arrow {
-  position: absolute; top: 100%; width: 0; height: 0; margin: -1px 0 0 -10px;
-  border: 10px solid transparent; border-bottom: 0; border-top-color: #0d0d0d;
-}
-.menu.below .menu-arrow { top: auto; bottom: 100%; margin: 0 0 -1px -10px; border: 10px solid transparent; border-top: 0; border-bottom-color: #3c3c3c; }
+.menu-item + .menu-item { border-left: 1px solid var(--menu-divider); box-shadow: var(--menu-divider-hi); }
+.menu-item:active { background: var(--menu-pressed); }
+.menu-arrow { border: 10px solid transparent; border-bottom: 0; border-top-color: var(--menu-arrow); }
+.menu.below .menu-arrow { border: 10px solid transparent; border-top: 0; border-bottom-color: var(--menu-arrow-below); }
 /* F272: the queue's hint over the Installed tab (nav/queuehint.js), iOS 6's callout bar as the 4S draws it
    (Shared@2x UICalloutBarMiddle + UICalloutBarArrowBottom, sampled): 38px tall with a 1px #333 edge and 6px corners,
    a half-pixel #bcbcbc line under the top edge, a grey gloss (#8c8c8c to #545454) over the top half, a hard step to
    #3b3b3b fading to #161616 below; the arrow a 22px-wide, 11px-deep right-angled tip, #141414 to #080808 with a
    half-pixel #333 edge, laid over the bar's bottom edge. The soft shadow under both is UICalloutBarShadow*. */
-.queue-hint { position: fixed; z-index: 15; pointer-events: none; filter: drop-shadow(0 2px 2px rgba(0,0,0,.55)); }
+:root {
+  --callout-drop: drop-shadow(0 2px 2px rgba(0,0,0,.55));
+  --callout-edge: #333;
+  --callout: linear-gradient(#333 0 1px, #bcbcbc 1px 1.5px, #9f9f9f 1.5px 2px, #8c8c8c 2px, #545454 19px, #3b3b3b 19px, #161616 37px, #333 37px);
+  --callout-text: #fff; --callout-emboss: 0 -1px 0 rgba(0,0,0,.8);
+  --callout-arrow: linear-gradient(#141414, #080808);
+  --chevron-pressed: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 17.5 26.4'%3E%3Cpath fill='%23fff' d='M.07 4.23 9.12 13.27 0 22.26 4.12 26.38 17.47 13.03 4.43 0Z'/%3E%3C/svg%3E"); /* the chevron on a selected row */
+}
+.queue-hint { filter: var(--callout-drop); }
 .queue-hint-text {
-  display: block; height: 38px; box-sizing: border-box; padding: 0 12px; border: 1px solid #333; border-radius: 6px;
-  background: linear-gradient(#333 0 1px, #bcbcbc 1px 1.5px, #9f9f9f 1.5px 2px, #8c8c8c 2px, #545454 19px, #3b3b3b 19px, #161616 37px, #333 37px);
-  background-origin: border-box;
-  font-size: 14px; font-weight: bold; line-height: 36px; color: #fff; text-shadow: 0 -1px 0 rgba(0,0,0,.8); white-space: nowrap;
+  border: 1px solid var(--callout-edge); border-radius: 6px;
+  background: var(--callout);
+  background-origin: border-box; font-size: 14px; font-weight: bold; line-height: 36px; color: var(--callout-text);
+  text-shadow: var(--callout-emboss);
 }
-.queue-hint-arrow {
-  position: absolute; top: calc(100% - 1px); width: 22px; height: 11px; margin-left: -11px;
-  background: #333; clip-path: polygon(0 0, 100% 0, 50% 100%);
-}
-.queue-hint-arrow::before {
-  content: ""; position: absolute; inset: 0; background: linear-gradient(#141414, #080808);
-  clip-path: polygon(.7px 0, calc(100% - .7px) 0, 50% calc(100% - .7px));
-}
+.queue-hint-arrow { background: var(--callout-edge); }
+.queue-hint-arrow::before { content: ""; background: var(--callout-arrow); }
 .cell.is-held > .cell-inner, .cell.is-held > .cell-inner * { background-color: transparent; color: #fff; }
 .cell.is-held > .cell-inner { background: var(--select); }
 /* F192: a held package row (browse.js) keeps the blue selection under its callout; its icon keeps its own colours. */
 .pkg-row.is-held > .cell-inner { background: var(--select); }
 .pkg-row.is-held > .cell-inner .pkg-text, .pkg-row.is-held > .cell-inner .pkg-text * { color: #fff; } /* over queue.css's Queued for */
-.pkg-row.is-held > .cell-inner::after {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 17.5 26.4'%3E%3Cpath fill='%23fff' d='M.07 4.23 9.12 13.27 0 22.26 4.12 26.38 17.47 13.03 4.43 0Z'/%3E%3C/svg%3E");
-}
+.pkg-row.is-held > .cell-inner::after { background-image: var(--chevron-pressed); }
+/* ==== } look-only ==== */
 
 /* Settings > Signing (screens/settings.js certificateBlock). Choose buttons: a <label> over a hidden file input, drawn
    as iOS 6's white round button (iTunesStoreUI GradientButtonBackground), going blue while held. */
-.visually-hidden { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; pointer-events: none; }
-.sign-files .cell { position: relative; }
-.sign-row { gap: 10px; padding-right: 78px; }
-.sign-row .cell-label { flex: none; }
-.sign-value {
-  flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; text-align: right;
-  font-size: 17px; color: var(--detail-blue, #385487);
+/* ==== look-only { ==== Settings > Signing */
+:root {
+  --field-caret: #426bf2; --field-ring: inset 0 0 0 2px #426bf2; --field-active: #fff; /* a field while it waits */
+  --pw-right: #3b9a2f; --pw-wrong: #b5322c;
 }
+.visually-hidden { opacity: 0; }
+.sign-value { text-align: right; font-size: 17px; color: var(--detail-blue, #385487); }
 .sign-value.is-empty { color: var(--subtitle); }
-input.sign-value { border: 0; padding: 0; margin: 0; background: none; font: inherit; font-size: 17px; -webkit-user-select: text; user-select: text; outline: none; }
+input.sign-value { border: 0; background: none; font: inherit; font-size: 17px; outline: none; }
 /* F149: the Password row is a field iOS 6's way: no box, its text left after the label in the field blue-grey, a grey
    "Required" hint, a blue caret. */
-input.sign-field { text-align: left; color: var(--field-text); caret-color: #426bf2; cursor: text; }
+input.sign-field { text-align: left; color: var(--field-text); caret-color: var(--field-caret); }
 input.sign-field::placeholder { color: var(--field-hint); opacity: 1; }
 /* B20: Settings > Signing's Server row reads as a field too: its host in the field blue-grey, the default's in the hint grey. */
 .cell.server-field .cell-detail { color: var(--field-text); }
 .cell.server-field-default .cell-detail { color: var(--field-hint); }
-.sign-browse { position: absolute; right: 9px; top: 50%; transform: translateY(-50%); min-width: 0; display: inline-block; }
-/* B164: a row that holds its own button (My IPAs' Sign Options Icon row): the button is a flex item at the row's right
-   edge, the value right-aligned before it, no room kept for an absolute button. */
-.sign-row.has-browse { padding-right: 9px; }
-.sign-row.has-browse > .sign-browse { position: static; transform: none; flex: none; }
 /* F248: the Password group under the certificate's files (settings.js passwordBlock): a full-width secure field after
    a state glyph, "Read From a .txt File" as a centred bold blue button row, the state in the footer. While it waits
    the field's row is white with a 2px blue ring drawn inside it (no glow), its top corners the table's. */
-.sign-password { margin-top: 23px; }
-.sign-password > .table { margin: 0 10px; }
-.signing-page .sign-password > .table { margin: 0; }
-.walk-body .sign-files .sign-password > .group-header { display: block; }
-.sign-pw-row { gap: 9px; cursor: text; }
 .sign-pw-glyph {
-  flex: none; width: 20px; height: 20px; background-color: var(--field-text);
-  -webkit-mask: var(--pw-mask) center / contain no-repeat; mask: var(--pw-mask) center / contain no-repeat;
+  background-color: var(--field-text); -webkit-mask: var(--pw-mask) center / contain no-repeat;
+  mask: var(--pw-mask) center / contain no-repeat;
 }
 .sign-pw-glyph.pw-lock, .sign-pw-glyph.pw-kept {
   --pw-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M6.5 9V6.5a3.5 3.5 0 0 1 7 0V9' fill='none' stroke='%23000' stroke-width='2'/%3E%3Crect x='4' y='9' width='12' height='9' rx='1.5'/%3E%3C/svg%3E");
@@ -677,43 +644,46 @@ input.sign-field::placeholder { color: var(--field-hint); opacity: 1; }
 .sign-pw-glyph.pw-kept { background-color: var(--field-hint); }
 .sign-pw-glyph.pw-right {
   --pw-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M4 10.5l4 4 8-9' fill='none' stroke='%23000' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-  background-color: #3b9a2f;
+  background-color: var(--pw-right);
 }
 .sign-pw-glyph.pw-wrong {
   --pw-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M5 5l10 10M15 5L5 15' fill='none' stroke='%23000' stroke-width='2.6' stroke-linecap='round'/%3E%3C/svg%3E");
-  background-color: #b5322c;
+  background-color: var(--pw-wrong);
 }
-input.sign-pw-input { flex: 1; text-align: left; }
-input.sign-pw-input:read-only { cursor: default; }
-.sign-pw-cell[data-state="waiting"] > .cell-inner { background: #fff; box-shadow: inset 0 0 0 2px #426bf2; border-radius: 8.5px 8.5px 0 0; }
+input.sign-pw-input { text-align: left; }
+.sign-pw-cell[data-state="waiting"] > .cell-inner { background: var(--field-active); box-shadow: var(--field-ring); border-radius: 8.5px 8.5px 0 0; }
 html[data-theme="dark"] .sign-pw-cell[data-state="waiting"] > .cell-inner { background: var(--plain); }
-.sign-pw-txt { justify-content: center; font: bold 17px "Helvetica Neue", Helvetica, sans-serif; color: var(--detail); cursor: pointer; text-align: center; }
-.sign-pw-txt-cell[hidden] { display: none; } /* B94: once the password is right or not needed */
-.sign-pw-status .sign-pw-wrong { color: #b5322c; text-shadow: none; }
+.sign-pw-txt { font: bold 17px "Helvetica Neue", Helvetica, sans-serif; color: var(--detail); text-align: center; }
+.sign-pw-status .sign-pw-wrong { color: var(--pw-wrong); text-shadow: none; }
 html[data-theme="dark"] .sign-pw-status .sign-pw-wrong { color: var(--dk-pw-red); }
 html[data-theme="dark"] .sign-pw-glyph.pw-wrong { background-color: var(--dk-pw-red); }
 html[data-theme="dark"] .sign-pw-glyph.pw-right { background-color: var(--dk-pw-green); }
+/* ==== } look-only ==== */
 
 /* iOS 6's notification banner (nav/banner.js): black glossy strip, the app's icon, a bold white title over a lighter
    line. F204: it sits right under the nav bar (top = --nav-h, the safe area + 44 pt) and below it in z-order (the
    nav bar is 3, the screens 1), so it slides out from behind the nav bar over the top of the page and never covers
    the nav bar or the status bar; nothing moves. Inside a sheet (banner.js puts it in the top one) the same numbers
    hold in the sheet's own stacking context: under its nav bar, over its body. */
+/* ==== look-only { ==== iOS 6's notification banner */
+:root {
+  --banner: linear-gradient(rgba(255,255,255,.14), rgba(255,255,255,.04) 50%, transparent 51%), linear-gradient(#262626, #000);
+  --banner-shadow: 0 1px 0 rgba(255,255,255,.12) inset, 0 2px 6px rgba(0,0,0,.5); --banner-edge: #000;
+  --banner-icon-shadow: 0 1px 2px rgba(0,0,0,.6);
+  --banner-emboss: 0 -1px 0 rgba(0,0,0,.9); --banner-title: #fff; --banner-text: #c8c8c8;
+  --banner-timer: rgba(255,255,255,.45);
+}
 .banner {
-  position: fixed; z-index: 2; top: var(--nav-h); left: 0; right: 0; display: flex; align-items: center; gap: 9px;
-  padding: 6px 12px 7px; cursor: pointer; touch-action: none; will-change: transform;
-  background: linear-gradient(rgba(255,255,255,.14), rgba(255,255,255,.04) 50%, transparent 51%), linear-gradient(#262626, #000);
-  box-shadow: 0 1px 0 rgba(255,255,255,.12) inset, 0 2px 6px rgba(0,0,0,.5); border-bottom: 1px solid #000;
+  background: var(--banner);
+  box-shadow: var(--banner-shadow); border-bottom: 1px solid var(--banner-edge);
 }
-.banner-icon { flex: none; width: 29px; height: 29px; border-radius: 6px; box-shadow: 0 1px 2px rgba(0,0,0,.6); }
-.banner-text { min-width: 0; display: flex; flex-direction: column; line-height: 1.2; text-shadow: 0 -1px 0 rgba(0,0,0,.9); }
-.banner-text strong { font-size: 15px; color: #fff; }
-.banner-text span { font-size: 14px; color: #c8c8c8; } /* wraps */
+.banner-icon { border-radius: 6px; box-shadow: var(--banner-icon-shadow); }
+.banner-text { line-height: 1.2; text-shadow: var(--banner-emboss); }
+.banner-text strong { font-size: 15px; color: var(--banner-title); }
+.banner-text span { font-size: 14px; color: var(--banner-text); } /* wraps */
 /* F204: the timer, a 2 pt line along the banner's bottom that runs out (banner.js scales it from 1 to 0). */
-.banner-timer {
-  position: absolute; left: 0; right: 0; bottom: 0; height: 2px; pointer-events: none;
-  background: rgba(255,255,255,.45); transform-origin: left center; will-change: transform;
-}
+.banner-timer { background: var(--banner-timer); }
+/* ==== } look-only ==== */
 
 /* ---- F76: the iOS 6 share sheet (nav/sharesheet.js), from the Teehan+Lax kit's "Share" layer (sheet.svg x 131-771,
    y 2104-2938, halved to points): Rectangle 7 dims the screen (black .4); the panel is black at .7 that lightens to
@@ -722,91 +692,92 @@ html[data-theme="dark"] .sign-pw-glyph.pw-right { background-color: var(--dk-pw-
    bold 12 pt #fafafa on a black shadow 1 pt down, 14.5 pt lines. "Button (Large Black Semi)": a 45 pt black edge
    (#0d0d0d .6, radius 12.5) 20.5 pt in from the sides, the button 3 pt inside it (#5d5d5d -> black at 72% -> #29292b,
    sampled), a faint white stroke, Cancel bold 19 pt. 21.5 pt under it. Only transform/opacity animate. ---- */
-.share-scrim { position: fixed; inset: 0; z-index: 30; }
-.share-dim { position: absolute; inset: 0; background: rgba(0,0,0,.4); }
-.share-sheet {
-  position: absolute; left: 0; right: 0; bottom: 0; padding: 36px 0 calc(21.5px + var(--safe-bottom));
-  background:
+/* ==== look-only { ==== the iOS 6 share sheet */
+:root {
+  --share-dim: rgba(0,0,0,.4);
+  --share-sheet:
     linear-gradient(rgba(29,32,35,.7), rgba(29,32,35,.7)) top / 100% 1px no-repeat,
     linear-gradient(rgba(255,255,255,.45), rgba(255,255,255,.45)) 0 1px / 100% 1px no-repeat,
     linear-gradient(rgba(150,150,150,.7), rgba(0,0,0,.7) 42px);
-  box-shadow: 0 -2.5px 2.5px rgba(0,0,0,.15);
-  will-change: transform;
-}
-.share-pages {
-  display: flex; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; overscroll-behavior: contain;
-  scrollbar-width: none; -webkit-overflow-scrolling: touch;
-}
-.share-pages::-webkit-scrollbar { display: none; }
-.share-grid {
-  flex: 0 0 100%; box-sizing: border-box; scroll-snap-align: start; padding: 0 10px;
-  display: grid; grid-template-columns: repeat(3, 1fr); grid-auto-rows: 101px; align-content: start;
-}
-.share-item {
-  display: flex; flex-direction: column; align-items: center; margin: 0; padding: 0; border: 0; background: none;
-  font: inherit; color: inherit; cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
-}
-.share-icon {
-  position: relative; flex: none; width: 57px; height: 57px; border-radius: 10px; overflow: hidden;
-  display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 1px rgba(0,0,0,.5);
-}
-/* System activities (Copy, the QR code): UIActivityBlank redrawn, a light rim around dark perforated metal, the
-   glyph white on top, UIActivityShine's gloss over the upper half. */
-.share-icon.system { background: linear-gradient(#f6f6f6, #e5e5e6 12%, #d6d6d7 60%, #b3b4b4); background-origin: border-box; }
-.share-icon.system::before {
-  content: ""; position: absolute; inset: 3px; border-radius: 7.5px;
-  background: radial-gradient(circle, rgba(0,0,0,.55) .9px, transparent 1.3px) 0 0 / 4px 4px,
+  --share-sheet-shadow: 0 -2.5px 2.5px rgba(0,0,0,.15);
+  --share-icon-shadow: 0 1px 1px rgba(0,0,0,.5);
+  --share-system: linear-gradient(#f6f6f6, #e5e5e6 12%, #d6d6d7 60%, #b3b4b4); /* UIActivityBlank's rim */
+  --share-system-metal:
+    radial-gradient(circle, rgba(0,0,0,.55) .9px, transparent 1.3px) 0 0 / 4px 4px,
     radial-gradient(circle, rgba(255,255,255,.1) .9px, transparent 1.3px) 0 1px / 4px 4px,
     linear-gradient(#5e5e5e, #3a3a3a 50%, #262626);
+  --share-system-glyph: #f4f4f4; --share-system-glyph-emboss: drop-shadow(0 -1px 0 rgba(0,0,0,.6));
+  --share-system-shine: linear-gradient(rgba(255,255,255,.22), rgba(255,255,255,.06));
+  --share-app-gloss: linear-gradient(rgba(255,255,255,.18), rgba(0,0,0,.12)); /* over the app's --share-tint */
+  --share-app-shine: linear-gradient(rgba(255,255,255,.5), rgba(255,255,255,.14));
+  --share-letter: #fff; --share-letter-emboss: 0 -1px 0 rgba(0,0,0,.35);
+  --share-pressed: brightness(.55);
+  --share-label: #fafafa; --share-label-emboss: 0 1px 0 rgba(0,0,0,.75);
+  --share-dot: rgba(255,255,255,.3); --share-dot-on: #fff;
+  --share-cancel-edge: rgba(13,13,13,.6); --share-cancel-shadow: 0 1px 0 rgba(255,255,255,.16);
+  --share-cancel-text: #fff; --share-cancel-emboss: 0 -1px 0 rgba(0,0,0,.4);
+  --share-cancel: linear-gradient(#5d5d5d, #464646 25%, #1d1e1e 50%, #0a0b0c 72%, #29292b);
+  --share-cancel-stroke: inset 0 0 0 1px rgba(255,255,255,.18), inset 0 1px 0 rgba(255,255,255,.1);
+  --share-cancel-pressed: linear-gradient(#3a3a3a, #232323 25%, #0c0c0c 60%, #000 80%, #141414);
 }
-.share-icon.system svg { position: relative; width: 36px; height: 36px; color: #f4f4f4; filter: drop-shadow(0 -1px 0 rgba(0,0,0,.6)); }
+.share-dim { background: var(--share-dim); }
+.share-sheet {
+  background: var(--share-sheet);
+  box-shadow: var(--share-sheet-shadow);
+}
+.share-item { border: 0; background: none; font: inherit; color: inherit; }
+.share-icon { border-radius: 10px; box-shadow: var(--share-icon-shadow); }
+/* System activities (Copy, the QR code): UIActivityBlank redrawn, a light rim around dark perforated metal, the
+   glyph white on top, UIActivityShine's gloss over the upper half. */
+.share-icon.system { background: var(--share-system); background-origin: border-box; }
+.share-icon.system::before {
+  content: ""; border-radius: 7.5px;
+  background: var(--share-system-metal);
+}
+.share-icon.system svg { color: var(--share-system-glyph); filter: var(--share-system-glyph-emboss); }
 .share-icon.system::after {
-  content: ""; position: absolute; inset: 3px 3px 50%; border-radius: 7.5px 7.5px 0 0;
-  background: linear-gradient(rgba(255,255,255,.22), rgba(255,255,255,.06));
+  content: ""; border-radius: 7.5px 7.5px 0 0;
+  background: var(--share-system-shine);
 }
 /* Apps: the app's initial on its colour (no copied icons), with an iOS 6 icon's gloss. */
-.share-icon.app { background: linear-gradient(rgba(255,255,255,.18), rgba(0,0,0,.12)), var(--share-tint, #5a6270); }
+.share-icon.app { background: var(--share-app-gloss), var(--share-tint, #5a6270); }
 .share-icon.app::after {
-  content: ""; position: absolute; left: -6px; right: -6px; top: -26px; height: 54px; border-radius: 50%;
-  background: linear-gradient(rgba(255,255,255,.5), rgba(255,255,255,.14));
+  content: ""; border-radius: 50%; background: var(--share-app-shine);
 }
 .share-icon.has-image { background: none; }
 .share-icon.has-image::after { content: none; } /* the app's own icon, as iOS 6 shows it: no gloss added */
-.share-image { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: inherit; }
+.share-image { border-radius: inherit; }
 .share-letter {
-  position: relative; font-size: 32px; font-weight: bold; line-height: 1; color: #fff;
-  text-shadow: 0 -1px 0 rgba(0,0,0,.35);
+  font-size: 32px; font-weight: bold; line-height: 1; color: var(--share-letter); text-shadow: var(--share-letter-emboss);
 }
-.share-item:active .share-icon { filter: brightness(.55); }
+.share-item:active .share-icon { filter: var(--share-pressed); }
 .share-label {
-  width: 96px; margin-top: 4px; font-size: 12px; font-weight: bold; line-height: 14.5px; letter-spacing: .12px;
-  color: #fafafa; text-shadow: 0 1px 0 rgba(0,0,0,.75); text-align: center;
-  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
+  font-size: 12px; font-weight: bold; line-height: 14.5px; letter-spacing: .12px; color: var(--share-label);
+  text-shadow: var(--share-label-emboss); text-align: center;
 }
 /* UIPageControl when there are more than nine. */
-.share-dots { display: flex; justify-content: center; gap: 10px; height: 16px; align-items: center; margin-top: -8px; }
-.share-dots span { width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,.3); }
-.share-dots span.on { background: #fff; }
+.share-dots span { border-radius: 50%; background: var(--share-dot); }
+.share-dots span.on { background: var(--share-dot-on); }
 .share-cancel {
-  position: relative; isolation: isolate; display: block; box-sizing: border-box;
-  width: calc(100% - 41px); max-width: 520px; height: 45px; margin: 9px auto 0; padding: 0;
-  border: 0; border-radius: 12.5px; background: rgba(13,13,13,.6); box-shadow: 0 1px 0 rgba(255,255,255,.16);
-  font: inherit; font-size: 19px; font-weight: bold; line-height: 45px; letter-spacing: .1px; color: #fff;
-  text-shadow: 0 -1px 0 rgba(0,0,0,.4); cursor: pointer; touch-action: manipulation;
+  border: 0; border-radius: 12.5px; background: var(--share-cancel-edge); box-shadow: var(--share-cancel-shadow);
+  font: inherit; font-size: 19px; font-weight: bold; line-height: 45px; letter-spacing: .1px; color: var(--share-cancel-text);
+  text-shadow: var(--share-cancel-emboss);
 }
 .share-cancel::before {
-  content: ""; position: absolute; inset: 3px; z-index: -1; border-radius: 9.5px;
-  background: linear-gradient(#5d5d5d, #464646 25%, #1d1e1e 50%, #0a0b0c 72%, #29292b);
-  box-shadow: inset 0 0 0 1px rgba(255,255,255,.18), inset 0 1px 0 rgba(255,255,255,.1);
+  content: ""; border-radius: 9.5px;
+  background: var(--share-cancel);
+  box-shadow: var(--share-cancel-stroke);
 }
 .share-cancel:focus { outline: none; } /* focused on open (Escape, VoiceOver); the phone draws no ring */
-.share-cancel:active::before { background: linear-gradient(#3a3a3a, #232323 25%, #0c0c0c 60%, #000 80%, #141414); }
+.share-cancel:active::before { background: var(--share-cancel-pressed); }
+/* ==== } look-only ==== */
 
 /* ==== look-only { ==== */
 /* The nav bar's Share button: UIBarButtonSystemItemAction, from the kit's "Action" bordered button (43 x 29 pt, sized in
    style.css; the tray and the arrow sweeping up out of it, white on a dark shadow 1 pt up). */
+:root { --bar-glyph-emboss: drop-shadow(0 -1px 0 rgba(0,0,0,.45)); } /* the bar button's text emboss, for a glyph */
 .bar-button.share-button::before {
-  filter: drop-shadow(0 -1px 0 rgba(0,0,0,.45));
+  filter: var(--bar-glyph-emboss);
   background: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjExNDQgODQzIDUwIDQwIj48ZyBmaWxsPSIjZmZmIj48cGF0aCBkPSJNMTE5MiA4NTggMTE3NiA4NDVWODUzSDExNzNDMTE2Ny4xMyA4NTMgMTE1NiA4NTcuNzUgMTE1NiA4NzEgMTE1NiA4NzEuMTkgMTE2MS41OCA4NjMgMTE3MyA4NjNIMTE3NlY4NzFaIi8+PHBhdGggZD0iTTExODAgODczVjg3N0gxMTUwVjg1N0gxMTU4TDExNjAgODUzSDExNDZMMTE0NS45NyA4ODEuMDEgMTE4NCA4ODFWODcwWiIvPjwvZz48L3N2Zz4=") center / 25px 20px no-repeat;
 }
 /* ==== } look-only ==== */
@@ -814,74 +785,70 @@ html[data-theme="dark"] .sign-pw-glyph.pw-right { background-color: var(--dk-pw-
 /* Sources' Add while iOS's Paste bubble waits (screens/sources.js): a green "Paste", unlike any held or Done look. */
 
 /* Cydia's Sources badge while sources refresh: the red badge holding a white spinner (4S screenshots). */
-.badge.spinning { position: absolute; width: 20px; padding: 0; }
+/* ==== look-only { ==== Cydia's Sources badge while sources refresh */
 .badge.spinning::after { /* the white spokes turn a step at a time, as Cydia's do */
-  content: ""; position: absolute; inset: 0; background: var(--spinner-white) center / 16px no-repeat; /* the 20 pt white spinner inside the 2 px ring */
-  animation: hud-spin .96s linear infinite;
+  content: "";
+  background: var(--spinner-white) center / 16px no-repeat; /* the 20 pt white spinner inside the 2 px ring */
 }
 /* A source row while it loads: a small grey spinner in place of its count and chevron (Cydia). */
-.source-row.is-loading .cell-count { display: none; }
 .source-row.is-loading .cell-inner::after { /* the chevron's place holds a small grey spinner while the source loads */
-  width: 20px; height: 20px; background: var(--spinner-gray) center / 20px no-repeat; animation: hud-spin .96s linear infinite;
+  background: var(--spinner-gray) center / 20px no-repeat;
 }
+/* ==== } look-only ==== */
 
 /* A bar button iOS left stuck in :active (Sources' Add after the Paste bubble): drawn as normal until touched again. */
 
 /* nav/ui.js placeholder(): grey bars that pulse where a loading page's content will be. */
-.ph-box, .ph-bar { display: block; background: #dcdfe3; animation: ph-pulse 1.2s ease-in-out infinite alternate; }
-.ph-icon { width: 29px; height: 29px; border-radius: 6px; flex: none; margin-right: 10px; }
-.ph-lines { display: flex; flex-direction: column; gap: 7px; flex: 1; min-width: 0; }
-.ph-bar { height: 13px; border-radius: 6px; }
-.ph-bar.ph-sub { height: 10px; }
-.ph-w30 { width: 30%; } .ph-w35 { width: 35%; } .ph-w40 { width: 40%; } .ph-w50 { width: 50%; } .ph-w60 { width: 60%; } .ph-w70 { width: 70%; }
-.ph-list .cell-inner { min-height: 58px; }
-.ph-page .ph-head { display: flex; gap: 12px; align-items: center; margin: 10px 9px; padding: 12px; border-radius: 8px; background: var(--table, #fff); border: 1px solid var(--table-edge, #a9abad); }
-.ph-icon-lg { width: 59px; height: 59px; border-radius: 12px; flex: none; }
+/* ==== look-only { ==== placeholders, and the banner's button */
+:root { --placeholder: #dcdfe3; }
+.ph-box, .ph-bar { background: var(--placeholder); }
+.ph-icon { border-radius: 6px; }
+.ph-bar { border-radius: 6px; }
+.ph-page .ph-head { border-radius: 8px; background: var(--table, #fff); border: 1px solid var(--table-edge, #a9abad); }
+.ph-icon-lg { border-radius: 12px; }
 html[data-theme="dark"] .ph-box, html[data-theme="dark"] .ph-bar { background: var(--dk-placeholder); }
-@keyframes ph-pulse { from { opacity: 1; } to { opacity: .45; } }
-@media (prefers-reduced-motion: reduce) { .ph-box, .ph-bar { animation: none; } }
-.banner .banner-action { flex: none; margin-left: auto; margin-right: 4px; align-self: center; height: 30px; line-height: 28px; padding: 0 12px; font-size: 13px; }
+.banner .banner-action { line-height: 28px; font-size: 13px; }
+/* ==== } look-only ==== */
 
 /* The website's locked tab bar (app.js lockTabs): only Home and Settings are open; the others are dimmed, as iOS 6
    dims a disabled tab item, with a small padlock over the icon. */
-.tab.tab-locked .tab-icon, .tab.tab-locked .tab-label { opacity: .35; }
-.tab.tab-locked { position: relative; }
-.tab.tab-locked::after {
-  content: ""; position: absolute; top: 5px; left: calc(50% + 9px); width: 10px; height: 12px; pointer-events: none;
-  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 15'%3E%3Cpath fill='%23c8ccd2' d='M3 6V4.2a3 3 0 0 1 6 0V6h.6c.8 0 1.4.6 1.4 1.4v5.2c0 .8-.6 1.4-1.4 1.4H2.4C1.6 14 1 13.4 1 12.6V7.4C1 6.6 1.6 6 2.4 6H3zm1.5 0h3V4.2a1.5 1.5 0 0 0-3 0V6z'/%3E%3C/svg%3E") center / contain no-repeat;
+/* ==== look-only { ==== The website's locked tab bar */
+.tab.tab-locked .tab-icon, .tab.tab-locked .tab-label { opacity: var(--tab-locked); }
+:root {
+  --tab-locked: .35;
+  --tab-lock: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 15'%3E%3Cpath fill='%23c8ccd2' d='M3 6V4.2a3 3 0 0 1 6 0V6h.6c.8 0 1.4.6 1.4 1.4v5.2c0 .8-.6 1.4-1.4 1.4H2.4C1.6 14 1 13.4 1 12.6V7.4C1 6.6 1.6 6 2.4 6H3zm1.5 0h3V4.2a1.5 1.5 0 0 0-3 0V6z'/%3E%3C/svg%3E");
 }
+.tab.tab-locked::after {
+  content: "";
+  background: var(--tab-lock) center / contain no-repeat;
+}
+/* ==== } look-only ==== */
 
 /* F150: the reload bar (nav/reloadbar.js), Cydia's: the kit's "Semi-transparent black bar" (#4c4c4c to black at 52%,
    a white-at-20% highlight on top, black-at-70% at the bottom) at .8, a 20 pt white spinner, a bold white status
    line and a blue Cancel. No scrim: only the strip takes touches. F204: it sits on top of the tab bar, below it in
    z-order (the tab bar is 3), and slides up from behind it, as the undo bar does. */
-.reload-bar {
-  position: fixed; z-index: 2; bottom: var(--tab-h); left: 0; right: 0; height: 44px; box-sizing: border-box;
-  display: flex; align-items: center; gap: 10px;
-  padding: 0 max(6px, env(safe-area-inset-right)) 0 max(12px, env(safe-area-inset-left));
-  background:
+/* ==== look-only { ==== the reload bar */
+:root {
+  --reload-bar:
     linear-gradient(rgba(0,0,0,.7), rgba(0,0,0,.7)) bottom / 100% 1px no-repeat,
     linear-gradient(rgba(255,255,255,.2), rgba(255,255,255,.2)) top / 100% 1px no-repeat,
     linear-gradient(rgba(76,76,76,.8), rgba(0,0,0,.8) 52%);
-  transition: translate .3s cubic-bezier(.25,.1,.25,1);
-  will-change: transform;
+  --reload-text: #fff; --reload-emboss: 0 -1px 0 rgba(0,0,0,.8);
 }
-.reload-spinner { flex: none; width: 20px; height: 20px; background: var(--spinner-white) center / 20px no-repeat; animation: hud-spin .96s linear infinite; }
-.reload-text {
-  flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
-  font-size: 14px; font-weight: bold; color: #fff; text-shadow: 0 -1px 0 rgba(0,0,0,.8);
-}
-.reload-bar .reload-cancel { flex: none; margin-left: auto; }
+.reload-bar { background: var(--reload-bar); }
+.reload-spinner { background: var(--spinner-white) center / 20px no-repeat; }
+.reload-text { font-size: 14px; font-weight: bold; color: var(--reload-text); text-shadow: var(--reload-emboss); }
 /* F204: nothing moves for it any more. The scrollers get 44 pt more room at their end while it shows (a block after
    their content, so the scroll position stays where it is), so the last row still scrolls clear of the strip. */
 html.has-reload :is(.page-body, .sheet-scroll, .search-results, .progress-scroll, .filter-drop-inner)::after {
-  content: ""; display: block; flex: none; clear: both; height: 44px;
+  content: "";
 }
 /* A reload runs in the background (pull to refresh, the launch refresh), so a sheet can open while it shows. As on
    iOS 6, a modal sheet (packages.css .sheet, z-index 25) covers everything under it, the strip included: the strip
    keeps its z-index 2 and no rule lifts it over a sheet, so it is hidden while the sheet is up and shows again,
    where it was, when the sheet slides away. */
-@media (prefers-reduced-motion: reduce) { .reload-spinner { animation-duration: 3s; } }
+/* ==== } look-only ==== */
 
 /* ---- F181: the package page's Details / Reviews / Related (nav/ui.js segmented, the one grey segmented control:
    depiction tabs, Reviews' toggle, Settings' Mode and the guides use it too): UISegmentedControl's
@@ -889,52 +856,56 @@ html.has-reload :is(.page-body, .sheet-scroll, .search-results, .progress-scroll
    (Shared@2x): a #9e9e9e edge, #fbfbfb -> #cccccc -> #bdbdbd unselected; selected the pressed blue, dark at the top
    (#22488c -> #2e5fb5), flat #407ee6, lighter to #6ea4f9 and a #487bcc foot, in a #093786 edge; the white emboss
    under it is the art's own bottom row. ---- */
-.store-segmented {
-  display: flex; height: 30px; margin: 10px 10px 0; border-radius: 5px; overflow: hidden;
-  border: 1px solid #9e9e9e; box-shadow: 0 1px 0 rgba(255,255,255,.28);
+/* ==== look-only { ==== the segmented control */
+:root {
+  --seg-edge: #9e9e9e; --seg-shadow: 0 1px 0 rgba(255,255,255,.28); --seg-divider: #aeaeae;
+  --seg-text: #4c566c; --seg-emboss: 0 1px 0 #fff;
+  --seg: linear-gradient(#fbfbfb, #fbfbfb 5%, #cccccc 90%, #bdbdbd);
+  --seg-pressed: linear-gradient(#e6e6e6, #c2c2c2 90%, #b3b3b3);
+  --seg-selected-text: #fff; --seg-selected-emboss: 0 -1px 0 rgba(0,0,0,.4); --seg-selected-edge: #093786;
+  --seg-selected: linear-gradient(#22488c, #2e5fb5 5%, #3d7adf 14%, #407ee6 23%, #407ee6 41%, #6ea4f9 88%, #487bcc 96%, #4a85d6);
 }
+.store-segmented { border-radius: 5px; border: 1px solid var(--seg-edge); box-shadow: var(--seg-shadow); }
 .store-segment {
-  flex: 1; min-width: 0; height: 100%; padding: 0 6px; border: 0; margin: 0; cursor: pointer; touch-action: manipulation;
-  font: bold 13px/28px "Helvetica Neue", Helvetica, Arial, sans-serif; color: #4c566c; text-shadow: 0 1px 0 #fff;
-  overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
-  background: linear-gradient(#fbfbfb, #fbfbfb 5%, #cccccc 90%, #bdbdbd); background-origin: border-box;
-}
-.store-segment + .store-segment { border-left: 1px solid #aeaeae; }
-.store-segment:active:not(.selected) { background: linear-gradient(#e6e6e6, #c2c2c2 90%, #b3b3b3); background-origin: border-box; }
-.store-segment.selected {
-  color: #fff; text-shadow: 0 -1px 0 rgba(0,0,0,.4);
-  background: linear-gradient(#22488c, #2e5fb5 5%, #3d7adf 14%, #407ee6 23%, #407ee6 41%, #6ea4f9 88%, #487bcc 96%, #4a85d6);
+  border: 0; font: bold 13px/28px "Helvetica Neue", Helvetica, Arial, sans-serif; color: var(--seg-text);
+  text-shadow: var(--seg-emboss); background: var(--seg);
   background-origin: border-box;
 }
-.store-segment.selected + .store-segment, .store-segment + .store-segment.selected { border-left-color: #093786; }
-.store-segmented:has(.store-segment.selected:first-child) { border-left-color: #093786; }
-.store-segmented:has(.store-segment.selected:last-child) { border-right-color: #093786; }
+.store-segment + .store-segment { border-left: 1px solid var(--seg-divider); }
+.store-segment:active:not(.selected) { background: var(--seg-pressed); background-origin: border-box; }
+.store-segment.selected {
+  color: var(--seg-selected-text); text-shadow: var(--seg-selected-emboss);
+  background: var(--seg-selected);
+  background-origin: border-box;
+}
+.store-segment.selected + .store-segment, .store-segment + .store-segment.selected { border-left-color: var(--seg-selected-edge); }
+.store-segmented:has(.store-segment.selected:first-child) { border-left-color: var(--seg-selected-edge); }
+.store-segmented:has(.store-segment.selected:last-child) { border-right-color: var(--seg-selected-edge); }
 html[data-theme="dark"] .store-segmented { border-color: var(--dk-btn-edge); box-shadow: 0 1px 0 var(--dk-ctl-hi); }
 html[data-theme="dark"] .store-segment:not(.selected) {
   color: var(--head); text-shadow: var(--emboss); background: var(--dk-seg); background-origin: border-box;
 }
 html[data-theme="dark"] .store-segment + .store-segment { border-left-color: var(--dk-btn-edge); }
 html[data-theme="dark"] .store-segment:active:not(.selected) { background: var(--dk-seg-pressed); background-origin: border-box; }
+/* ==== } look-only ==== */
 
 /* F193: the undo bar after a row's swipe (nav/undobar.js). The kit's "Semi-transparent black bar" (the keyboard
    toolbar: 44pt, black at 60% over #4c4c4c to #000 at 52%, a 20% white top highlight), docked above the tab bar and
    sliding up from behind it; the message on the left, the blue bar button (.bar-button.done) Undo on the right. */
-.undo-bar {
-  position: fixed; left: 0; right: 0; bottom: var(--tab-h); z-index: 2; height: 44px; box-sizing: border-box;
-  display: flex; align-items: center; gap: 10px;
-  padding: 0 max(6px, env(safe-area-inset-right)) 0 max(12px, env(safe-area-inset-left));
-  background:
+/* ==== look-only { ==== the undo bar after a row's swipe */
+:root {
+  --undo-bar:
     linear-gradient(rgba(255,255,255,.2), rgba(255,255,255,.2)) top / 100% 1px no-repeat,
     linear-gradient(rgba(76,76,76,.6), rgba(0,0,0,.6) 52%);
-  opacity: 0; transform: translate3d(0,100%,0); pointer-events: none;
-  transition: transform .3s cubic-bezier(.25,.1,.25,1), opacity .3s cubic-bezier(.25,.1,.25,1);
+  --undo-text: #fff; --undo-emboss: 0 -1px 0 rgba(0,0,0,.6);
 }
-.undo-bar.shown { opacity: 1; transform: none; pointer-events: auto; }
-.undo-bar-text {
-  flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  color: #fff; font-size: 14px; font-weight: bold; text-shadow: 0 -1px 0 rgba(0,0,0,.6);
+.undo-bar {
+  background: var(--undo-bar);
+  opacity: 0;
 }
-.undo-bar-button { flex: none; }
+.undo-bar.shown { opacity: 1; }
+.undo-bar-text { color: var(--undo-text); font-size: 14px; font-weight: bold; text-shadow: var(--undo-emboss); }
+/* ==== } look-only ==== */
 
 /* F270: pull to refresh (nav/pullrefresh.js), the classic Tweetie pull. An area attached to the top of the list
    (beside its scroller, over it, in a box clipped to where the list starts; moved by transform so its foot stays on
@@ -949,40 +920,22 @@ html[data-theme="dark"] .store-segment:active:not(.selected) { background: var(-
    area is the same pinstripe (.pull-clip.grouped, set from the scroller by pullrefresh.js; linen's weave in
    palettes.css): a white band over the pinstripes stood out (user screenshot 2026-11-20). Past the trigger the arrow
    turns over (transform only). */
-.pull-clip {
-  position: absolute; left: 0; right: 0; z-index: 1; overflow: hidden; visibility: hidden; pointer-events: none;
-  -webkit-user-select: none; user-select: none;
+/* ==== look-only { ==== pull to refresh */
+:root {
+  --pull-text: #777; --pull-emboss: 0 1px 0 rgba(255,255,255,.9); --pull-emboss-dark: 0 -1px 0 rgba(0,0,0,.8);
+  --pull-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='42' viewBox='0 0 22 42'%3E%3Cdefs%3E%3ClinearGradient id='g' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%239b9b9b' stop-opacity='.12'/%3E%3Cstop offset='1' stop-color='%239b9b9b'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath fill='url(%23g)' d='M5 1h12v4H5zM5 7h12v4H5zM5 13h12v4H5zM5 19h12v4H5zM5 25h12v4H5zM.5 29h21L11 42z'/%3E%3C/svg%3E");
 }
-.pull-clip.on { visibility: visible; }
-.pull-refresh {
-  position: absolute; left: 0; right: 0; top: 0; height: 480px; transform: translateY(-480px);
-  background: var(--plain); color: #777;
-  will-change: transform; /* B209: its own layer, so following the finger each frame repaints nothing */
-}
+.pull-refresh { background: var(--plain); color: var(--pull-text); }
 .pull-clip.grouped > .pull-refresh { background: var(--grouped-ground); } /* the grouped page's own ground */
-.pull-inner { position: absolute; left: 0; right: 0; bottom: 0; height: 60px; }
-.pull-arrow {
-  position: absolute; left: 33px; top: 9px; width: 22px; height: 42px;
-  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='42' viewBox='0 0 22 42'%3E%3Cdefs%3E%3ClinearGradient id='g' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%239b9b9b' stop-opacity='.12'/%3E%3Cstop offset='1' stop-color='%239b9b9b'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath fill='url(%23g)' d='M5 1h12v4H5zM5 7h12v4H5zM5 13h12v4H5zM5 19h12v4H5zM5 25h12v4H5zM.5 29h21L11 42z'/%3E%3C/svg%3E") center / 22px 42px no-repeat;
-  transition: transform .2s cubic-bezier(.25,.1,.25,1);
-}
-.pull-refresh.armed .pull-arrow { transform: rotate(180deg); }
+.pull-arrow { background: var(--pull-arrow) center / 22px 42px no-repeat; }
 /* While a refresh runs (pullrefresh.js; the list itself springs straight back, nothing is held open) the hidden area
    shows iOS 6's grey spinner in place of the arrow (UIActivityIndicatorViewStyleGray, 20pt, centred where the arrow
    was; white on dark themes through --spinner-gray) and the title reads "Refreshing...": a pull during the refresh
    reveals it. The arrow turns back without animating while hidden. */
-.pull-spinner {
-  position: absolute; left: 34px; top: 20px; width: 20px; height: 20px; visibility: hidden;
-  background: var(--spinner-gray) center / 20px no-repeat;
-}
-.pull-refresh.refreshing .pull-spinner { visibility: visible; animation: hud-spin .96s linear infinite; }
-.pull-refresh.refreshing .pull-arrow { visibility: hidden; transition: transform 0s; }
-.pull-text {
-  position: absolute; left: 80px; right: 10px; top: 13px; display: flex; flex-direction: column; gap: 3px;
-  white-space: nowrap; overflow: hidden; text-shadow: 0 1px 0 rgba(255,255,255,.9);
-}
+.pull-spinner { background: var(--spinner-gray) center / 20px no-repeat; }
+.pull-text { text-shadow: var(--pull-emboss); }
 .pull-title { font-size: 14px; font-weight: bold; line-height: 17px; }
 .pull-time { font-size: 12px; line-height: 15px; }
 html[data-theme="dark"] .pull-refresh { color: var(--dk-index); }
-html[data-theme="dark"] .pull-text { text-shadow: 0 -1px 0 rgba(0,0,0,.8); }
-@media (prefers-reduced-motion: reduce) { .pull-arrow { transition: none; } .pull-spinner { animation-duration: 3s; } }
+html[data-theme="dark"] .pull-text { text-shadow: var(--pull-emboss-dark); }
+/* ==== } look-only ==== */

@@ -163,7 +163,8 @@ test("the DOM side: spinner markup, nothing held open, refreshEnd ends it throug
   assert.match(js, /<span class="pull-spinner"><\/span>/);
   assert.doesNotMatch(js, /holdOpen|setHold|bounceHold|MutationObserver/);
   assert.match(js, /refreshEnd\(result, \{ busy, onEnd: \(\) => \{ stopWatch = null; tracker\.done\(\); \} \}\)/);
-  const css = readFileSync(new URL("../ios6.css", import.meta.url), "utf8");
+  const css = readFileSync(new URL("../ios6.css", import.meta.url), "utf8")
+    + readFileSync(new URL("../style.css", import.meta.url), "utf8"); // C45: ios6.css paints it, style.css lays it out
   assert.match(css, /\.pull-spinner \{[^}]*background: var\(--spinner-gray\) center \/ 20px no-repeat;/);
   assert.match(css, /\.pull-refresh\.refreshing \.pull-spinner \{ visibility: visible; animation: hud-spin/);
   assert.match(css, /\.pull-refresh\.refreshing \.pull-arrow \{ visibility: hidden;/);
@@ -252,8 +253,9 @@ test("the pull is drawn with transform and opacity only, its listeners passive",
   const js = readFileSync(new URL("./pullrefresh.js", import.meta.url), "utf8");
   for (const m of js.matchAll(/addEventListener\("(touch\w+|scroll)", [^)]*?\{ passive: (\w+) \}/g)) assert.equal(m[2], "true", m[1]);
   assert.doesNotMatch(js, /\.style\.(top|height|marginTop|paddingTop) = [^;]*pull/);
-  const css = readFileSync(new URL("../ios6.css", import.meta.url), "utf8");
+  const css = readFileSync(new URL("../style.css", import.meta.url), "utf8"); // C45: the pull's layout and motion
   const block = css.slice(css.indexOf(".pull-refresh {"), css.indexOf("@media (prefers-reduced-motion: reduce) { .pull-arrow"));
+  assert.ok(css.indexOf(".pull-refresh {") > 0 && /transition:/.test(block), "the pull's rules and their transitions");
   for (const t of block.matchAll(/transition: ([^;]+);/g)) assert.match(t[1], /^(transform|opacity) /);
 });
 

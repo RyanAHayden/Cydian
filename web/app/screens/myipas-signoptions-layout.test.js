@@ -7,7 +7,8 @@ import { readFileSync } from "node:fs";
 import { iconCell } from "./myipas.js";
 import { withDocument } from "../fakes.test-helper.js";
 
-const css = readFileSync(new URL("../ios6.css", import.meta.url), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+// C45: these rows' layout is style.css's, ios6.css paints them
+const css = ["../style.css", "../ios6.css"].map((f) => readFileSync(new URL(f, import.meta.url), "utf8")).join("\n").replace(/\/\*[\s\S]*?\*\//g, "");
 const rules = [...css.matchAll(/([^{}]+)\{([^}]*)\}/g)].map(([, sel, decl]) => ({ sel: sel.trim(), decl }));
 const decl = (sel) => rules.filter((r) => r.sel.split(",").map((s) => s.trim()).includes(sel)).map((r) => r.decl).join(";");
 

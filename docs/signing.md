@@ -169,8 +169,9 @@ certificate is imported: the key makes profiles, not certificates, so the `.p12`
 - **Add API Key**: the `AuthKey_<Key ID>.p8` downloaded from App Store Connect > Users and Access > Integrations (the
   Key ID is read from the file name, or asked when the name doesn't hold it), then the Issuer ID. One pick takes the
   `.p8` with a `.txt` holding the Issuer ID, or the `.zip` they came in (`core/certfiles.js sortKeyFiles`); without a
-  `.txt` the Issuer ID field fills in from the clipboard when it holds a UUID (the app reads it through the shell; the
-  website only where the browser has granted clipboard reading, else the field's Paste button). The Issuer ID isn't in
+  `.txt` the Issuer ID comes from the field's Paste button (the website also fills it in by itself from a copied UUID
+  where the browser has granted clipboard reading; the app never reads the clipboard unasked, which would show iOS's
+  Allow Paste). The Issuer ID isn't in
   the `.p8` and no Apple call returns it without it. The key is saved only once Apple accepts a token made from it. A
   key with the Admin or App Manager role. The group's footer links the **How to make an API key** guide (User Guides,
   `asc-key`: Users and Access > Integrations > App Store Connect API > Team Keys, the one-time download, the Issuer ID).

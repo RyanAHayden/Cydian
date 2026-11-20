@@ -53,6 +53,11 @@ final class Bridge: NSObject, WKScriptMessageHandlerWithReply {
         on("clipboard.read") { c in
             DispatchQueue.main.async { ClipboardRead.read(auto: c.params["auto"] as? Bool ?? false) { c.reply($0, nil) } }
         }
+        // B171: {url: Bool}, whether a URL was copied, without reading it (no Allow Paste): Sources' Add offers its
+        // Paste button only then, and reads (clipboard.read) only when that's tapped.
+        on("clipboard.peek") { c in
+            DispatchQueue.main.async { ClipboardRead.hasURL { c.reply(["url": $0], nil) } }
+        }
         SelfUpdate.register(self) // F72: app.openURL (below)
         Apt.register(self) // N3: apt's files, the network, ifizbox-helper, haptic.tap (Apt.swift)
         SourceIcon.register(self) // B58: net.icon, source icons' bytes (http ones past ATS), Icons.swift
@@ -296,6 +301,20 @@ enum ClipboardRead {
                 var url = false
                 if case .success(let found) = result { url = found.contains(web) }
                 done(url ? readNow(pb) : "")
+            }
+        }
+    }
+
+    // B171: whether the clipboard holds a URL (a URL item, or text iOS calls a probable web URL), never reading it:
+    // hasURLs, hasStrings and detectPatterns show no Allow Paste in either build. On the main queue; `done` too.
+    static func hasURL(done: @escaping (Bool) -> Void) {
+        let pb = UIPasteboard.general
+        if pb.hasURLs { return done(true) }
+        guard pb.hasStrings else { return done(false) }
+        let web: PartialKeyPath<UIPasteboard.DetectedValues> = \.probableWebURL
+        pb.detectPatterns(for: [web]) { result in
+            DispatchQueue.main.async {
+                if case .success(let found) = result { done(found.contains(web)) } else { done(false) }
             }
         }
     }

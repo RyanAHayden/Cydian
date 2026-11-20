@@ -1,9 +1,11 @@
-// F105: Sources' Add in the app (screens/sources.js addFromClipboard with a native bridge): Enter APT URL opens at
-// once, inside the tap, then takes the copied source URL from UIPasteboard (clipboard.read); no URL, a refused read
-// or text already typed leave the field alone. Never the website's navigator.clipboard, never the blue Type state.
+// Sources' Add in the app (screens/sources.js addFromClipboard with a native bridge): Enter APT URL opens at once,
+// inside the tap (F105). B171: Add never reads the clipboard (no iOS Allow Paste): it asks clipboard.peek whether a
+// URL was copied and shows the alert's Paste button only then; the read happens when Paste is tapped (nav/alert.js).
+// Never the website's navigator.clipboard, never the blue Type state.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { addFromClipboard, nav } from "./sources.js";
+import { nativeHasUrl } from "../nav/menu.js";
 
 function fakeButton() {
   const parent = { removed: 0, insertBefore() {} };
@@ -15,42 +17,48 @@ function fakeButton() {
   };
 }
 
-// A bridge answering clipboard.read with `answer` (a function, so it can throw), and an `open` that builds the
-// alert's field the way showAlert does, synchronously, before its first await.
-async function run(answer, { typeFirst = null } = {}) {
-  const field = { value: "", isConnected: true, listeners: {}, addEventListener(t, f) { (this.listeners[t] ??= []).push(f); } };
+// A bridge answering clipboard.peek with `answer` (a function, so it can throw), and an `open` that builds the
+// alert's field and Paste button the way showAlert does, synchronously, before its first await.
+async function run(answer) {
+  const field = { value: "", isConnected: true, addEventListener() {} };
+  const attrs = {};
+  const paste = { style: {}, setAttribute: (k, v) => { attrs[k] = v; }, removeAttribute: (k) => { delete attrs[k]; } };
   const saved = { document: globalThis.document, navigator: Object.getOwnPropertyDescriptor(globalThis, "navigator") };
   let readText = 0;
   Object.defineProperty(globalThis, "navigator", { configurable: true, value: { clipboard: { readText: async () => { readText++; return "https://web.test/"; } } } });
   let opened = 0;
-  globalThis.document = { querySelectorAll: (sel) => (sel === ".alert-field" && opened ? [field] : []) };
+  globalThis.document = { querySelectorAll: (sel) => (!opened ? [] : sel === ".alert-field" ? [field] : sel === ".alert-paste" ? [paste] : []) };
   const calls = [];
+  let hiddenDuringPeek = null;
   const native = {
-    call: async (method) => {
-      calls.push(method);
-      if (typeFirst != null) { field.value = typeFirst; for (const f of field.listeners.input ?? []) f(); }
+    call: async (method, params) => {
+      calls.push([method, params]);
+      hiddenDuringPeek = paste.style.opacity === "0" && paste.style.pointerEvents === "none" && attrs["aria-hidden"] === "true";
       return answer();
     },
   };
   const button = fakeButton();
-  let openedBeforeRead = null;
-  const open = (ctx, prefill) => { opened++; openedBeforeRead = calls.length === 0; assert.equal(prefill, null); field.value = "https://"; return Promise.resolve("shown"); };
+  let openedBeforePeek = null;
+  const open = (ctx, prefill) => { opened++; openedBeforePeek = calls.length === 0; assert.equal(prefill, null); field.value = "https://"; return Promise.resolve("shown"); };
   try {
     const r = await addFromClipboard({}, button, { native, open });
-    return { r, field, calls, readText, opened, openedBeforeRead, button };
+    const shown = paste.style.opacity === "" && paste.style.pointerEvents === "" && !("aria-hidden" in attrs);
+    return { r, field, calls, readText, opened, openedBeforePeek, hiddenDuringPeek, shown, button };
   } finally {
     globalThis.document = saved.document;
     if (saved.navigator) Object.defineProperty(globalThis, "navigator", saved.navigator);
   }
 }
 
-test("F105: a copied source URL: the alert opens first (inside the tap), then its field takes the URL", async () => {
-  const { r, field, calls, readText, opened, openedBeforeRead, button } = await run(() => "  https://repo.test/ ");
+test("B171: a copied URL: the alert opens first (inside the tap), Paste shows, nothing is read", async () => {
+  const { r, field, calls, readText, opened, openedBeforePeek, hiddenDuringPeek, shown, button } = await run(() => ({ url: true }));
   assert.equal(r, "shown");
   assert.equal(opened, 1);
-  assert.equal(openedBeforeRead, true, "the alert opens before the bridge round trip");
-  assert.deepEqual(calls, ["clipboard.read"]);
-  assert.equal(field.value, "https://repo.test/");
+  assert.equal(openedBeforePeek, true, "the alert opens before the bridge round trip");
+  assert.deepEqual(calls, [["clipboard.peek", {}]], "only the no-prompt peek: no clipboard.read on Add");
+  assert.equal(hiddenDuringPeek, true, "Paste waits, hidden, while the peek is out");
+  assert.equal(shown, true, "then Paste is offered");
+  assert.equal(field.value, "https://", "the field isn't filled until Paste is tapped");
   assert.equal(readText, 0, "no navigator.clipboard: no WebKit Paste bubble");
   assert.equal(button.textContent, "Add");
   assert.equal(button.classList.contains("done"), false, "no blue Type left over");
@@ -58,41 +66,30 @@ test("F105: a copied source URL: the alert opens first (inside the tap), then it
   assert.equal(button.parentNode.removed, 1, "re-inserted to leave WebKit's :active chain");
 });
 
-test("F105: a bare host is made a URL; text with no URL leaves https:// to type after", async () => {
-  assert.equal((await run(() => "repo.test")).field.value, "https://repo.test/");
-  const none = await run(() => "hello there");
+test("B171: no URL copied: no Paste offered, the field stays https:// to type in", async () => {
+  const none = await run(() => ({ url: false }));
+  assert.equal(none.shown, false);
   assert.equal(none.field.value, "https://");
   assert.equal(none.opened, 1);
-  assert.equal((await run(() => null)).field.value, "https://", "empty clipboard");
+  assert.deepEqual(none.calls.map((c) => c[0]), ["clipboard.peek"]);
 });
 
-test("F105: a refused read (Allow Paste denied, no clipboard.read) opens the empty alert, no bubble", async () => {
-  const r = await run(() => { throw new Error("unknown method clipboard.read"); });
-  assert.equal(r.opened, 1);
-  assert.equal(r.field.value, "https://");
-  assert.equal(r.readText, 0);
+test("B171: a shell without clipboard.peek (or an odd answer) keeps Paste, and still reads nothing", async () => {
+  for (const answer of [() => { throw new Error("unknown method clipboard.peek"); }, () => null, () => "https://x.test/"]) {
+    const r = await run(answer);
+    assert.equal(r.shown, true);
+    assert.equal(r.field.value, "https://");
+    assert.equal(r.readText, 0);
+    assert.deepEqual(r.calls.map((c) => c[0]), ["clipboard.peek"]);
+  }
 });
 
-test("F105: what the user started typing before the read answered is kept", async () => {
-  const r = await run(() => "https://repo.test/", { typeFirst: "https://mine.test" });
-  assert.equal(r.field.value, "https://mine.test");
-});
-
-// F146: the app's Add asks the bridge with {auto: true} (the sideload build reads only a copied URL, once per copy;
-// the jailbreak build without asking), and has no Type switch: no onPress on the button in the app.
-test("F146: the app's Add reads with auto, a URL fills the field, none leaves https://", async () => {
-  const seen = [];
-  const field = { value: "", isConnected: true, addEventListener() {} };
-  const saved = globalThis.document;
-  globalThis.document = { querySelectorAll: (sel) => (sel === ".alert-field" ? [field] : []) };
-  try {
-    for (const [answer, want] of [["https://ipa.test/apps.json", "https://ipa.test/apps.json"], ["", "https://"]]) {
-      const native = { call: async (method, params) => { seen.push([method, params]); return answer; } };
-      await addFromClipboard({}, fakeButton(), { native, open: () => { field.value = "https://"; } });
-      assert.equal(field.value, want);
-    }
-  } finally { globalThis.document = saved; }
-  assert.deepEqual(seen, [["clipboard.read", { auto: true }], ["clipboard.read", { auto: true }]]);
+test("B171: nativeHasUrl: true/false from the shell, null on the website or an older shell", async () => {
+  assert.equal(await nativeHasUrl({ call: async (m) => (m === "clipboard.peek" ? { url: true } : null) }), true);
+  assert.equal(await nativeHasUrl({ call: async () => ({ url: false }) }), false);
+  assert.equal(await nativeHasUrl({ call: async () => { throw new Error("unknown method"); } }), null);
+  assert.equal(await nativeHasUrl({ call: async () => "" }), null);
+  assert.equal(await nativeHasUrl(undefined), null);
 });
 
 test("Sources' Add has no Type switch anywhere; the website's opens the alert and reads no clipboard", async () => {

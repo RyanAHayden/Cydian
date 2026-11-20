@@ -5,11 +5,10 @@
 // device and comes through the backend (core/sources.js sourceCalls), so the app runs this file unchanged.
 // Above the sources, Cydia's "All Sources" row; a source (or All Sources) opens its Sections, and everything
 // below that is screens/browse.js.
-import { cleanSourceUrl } from "../core/sources.js";
 import { plain, collapse, note } from "../nav/ui.js";
 import * as browse from "./browse.js";
 import { showAlert } from "../nav/alert.js";
-import { showMenu, longPress, copyText, nativePaste } from "../nav/menu.js";
+import { showMenu, longPress, copyText, nativeHasUrl } from "../nav/menu.js";
 import { format } from "../router.js";
 import { getBackend } from "../backend.js";
 import { displayName, sourceIcons, sourceSubtitle, sourcesFor, sourceFilter, loadNeverLoaded } from "../core/sources.js";
@@ -70,9 +69,9 @@ function reset(button) {
   parent.insertBefore(button, next);
 }
 
-// Add opens the Enter APT URL alert inside the tap. The website reads no clipboard on its own: the alert's Paste
-// button asks Safari (nav/alert.js), so there is no Paste bubble on Add and no blue Type state. The app reads
-// UIPasteboard on Add (addFromPasteboard, below).
+// Add opens the Enter APT URL alert inside the tap. Neither build reads the clipboard on its own: the alert's Paste
+// button reads it when tapped (nav/alert.js), so there is no Paste bubble or Allow Paste on Add and no blue Type
+// state. The app shows that Paste only when a URL was copied (addFromPasteboard, below).
 // `native` and `open` are for tests (screens/addsource.test.js): the bridge, and manage.addSource.
 export async function addFromClipboard(ctx, button, { native = globalThis.ifizboxNative, open = manage.addSource } = {}) {
   if (native) return addFromPasteboard(ctx, button, native, open);
@@ -80,25 +79,32 @@ export async function addFromClipboard(ctx, button, { native = globalThis.ifizbo
   return open(ctx, null);
 }
 
-// The app (F105): UIPasteboard, no Paste bubble, so no Type. Enter APT URL opens inside the tap, the field "https://"
-// with the keyboard up, and takes the copied source URL when the bridge answers. Opened after that round trip (as
-// ffaf27e did) the alert came outside the tap: WKWebView raised no keyboard and the button kept its pressed look.
-// No URL copied, or the read refused (iOS's Allow Paste denied, no clipboard.read): the field stays to type in. Never
-// navigator.clipboard here: after an await it would bring back WebKit's bubble without Type.
+// The app (F105): no Paste bubble, so no Type. Enter APT URL opens inside the tap, the field "https://" with the
+// keyboard up. Opened after a bridge round trip (as ffaf27e did) the alert came outside the tap: WKWebView raised no
+// keyboard and the button kept its pressed look.
+// B171: Add never reads the clipboard: a read of another app's copy shows iOS's Allow Paste and held the alert up.
+// The bridge only says whether a URL was copied (clipboard.peek: hasURLs/detectPatterns, no prompt); the alert's
+// Paste button fades in when one was, and the text is read only when the user taps it (nav/alert.js). No URL copied:
+// no Paste offered (the field's own edit menu still pastes). A shell without clipboard.peek keeps Paste showing.
+// Never navigator.clipboard here: after an await it would bring back WebKit's bubble without Type.
 async function addFromPasteboard(ctx, button, native, open) {
   button.textContent = "Add";
   button.classList.remove("done");
   reset(button);
   const shown = open(ctx, null); // showAlert builds the alert before its first await
-  const field = [...document.querySelectorAll(".alert-field")].pop();
-  const start = field?.value;
-  let typed = false;
-  field?.addEventListener("input", () => { typed = true; }, { once: true });
-  // F146: `auto`: not a tap on Paste, so the sideload build reads only a copied URL, asks iOS once per copy and
-  // never again after a refusal (Bridge.swift clipboard.read); the jailbreak build reads without asking.
-  const url = cleanSourceUrl((await nativePaste(native, { auto: true })) ?? "");
-  // Only an untouched field still on screen: never over what the user started typing.
-  if (url && field?.isConnected && !typed && field.value === start) field.value = url;
+  const paste = [...(document.querySelectorAll(".alert-paste") ?? [])].pop();
+  if (paste?.style) {
+    paste.style.opacity = "0"; // its room stays kept, so nothing in the alert moves when it shows
+    paste.style.pointerEvents = "none";
+    paste.setAttribute?.("aria-hidden", "true");
+  }
+  const url = await nativeHasUrl(native);
+  if (paste?.style && url !== false) {
+    paste.style.transition = "opacity 0.2s";
+    paste.style.opacity = "";
+    paste.style.pointerEvents = "";
+    paste.removeAttribute?.("aria-hidden");
+  }
   return shown;
 }
 
@@ -111,7 +117,7 @@ export function nav(route, ctx) {
     title: "Sources", style: "plain",
     left: { label: "Refresh", onClick: () => refresh(ctx) },
     right: [
-      // Add: the Enter APT URL alert at once; the app fills it from UIPasteboard, the website through its Paste button.
+      // Add: the Enter APT URL alert at once; its Paste button fills it (in the app, offered only for a copied URL).
       { label: "Add", onClick: (e) => addFromClipboard(ctx, e.currentTarget) },
       { label: "Manage", onClick: () => ctx.go({ tab: "sources", path: [manage.SEGMENT] }) },
     ],

@@ -39,7 +39,7 @@ test("the This iPhone option names the VPN apps from one list: LocalDevVPN and T
   const o = ROUTE_OPTIONS.find((x) => x.value === "iphone");
   assert.equal(o.subtitle.split("\n")[0], "LocalDevVPN or Tailscale");
   assert.equal(vpnList(["LocalDevVPN", "Tailscale"]), "LocalDevVPN or Tailscale");
-  assert.equal(ROUTE_OPTIONS[0].label, "Signing Server");
+  assert.deepEqual(ROUTE_OPTIONS.map((x) => x.label), ["This iPhone", "Signing Server"]); // F300: This iPhone first
   const d = SETTINGS.find((x) => x.key === "installRoute");
   assert.equal(d.default, "server");
   assert.deepEqual(d.modes, ["sideload"]);

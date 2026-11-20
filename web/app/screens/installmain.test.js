@@ -17,13 +17,16 @@ test("the Signing rows open their own pages, only in the sideload build", () => 
   assert.equal(opensSigningSub(["signing"]), false);
 });
 
-test("Install Apps With's page holds the choice; This iPhone's holds its groups whatever the choice", () => {
+test("F300: Install Apps With's page holds the choice and the chosen route's groups; This iPhone's holds its own", () => {
   const all = installationGroups("iphone", { paired: "rp", localDevVPN: true });
-  assert.deepEqual(subGroups(all, "with").map((g) => g.header), ["Install Apps With"]);
+  assert.deepEqual(subGroups(all, "with").map((g) => g.header), ["Install Apps With", "This iPhone", "Connect With", "Tailscale"]);
   assert.deepEqual(subGroups(all, "iphone").map((g) => g.header), ["This iPhone", "Connect With", "Tailscale"]);
   assert.equal(subGroups(all, null), all);
+  const server = installationGroups("server", null, { server: () => [{ header: "Signing Server", rows: [{ label: "Server" }, { label: "Check Server" }, { label: "Run Your Own" }] }] });
+  assert.deepEqual(subGroups(server, "with").map((g) => g.header), ["Install Apps With", "Signing Server"]);
+  assert.deepEqual(server[1].rows.map((r) => r.label), ["Server", "Check Server", "Run Your Own"]);
 });
 
-test("the main page's rows are fixed: status, its action, two Installation rows, three Signing rows, How Signing Works", () => {
-  assert.deepEqual(MAIN_ROWS, ["status", "action", "with", "iphone", "certificate", "server", "apps", "help"]);
+test("F300: the main page's rows are fixed: status, its action, one Installation row, two Signing rows, How Signing Works", () => {
+  assert.deepEqual(MAIN_ROWS, ["status", "action", "with", "certificate", "apps", "help"]);
 });

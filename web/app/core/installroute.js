@@ -14,9 +14,10 @@ export const VPNS = ["LocalDevVPN", "Tailscale"];
 export const vpnList = (vpns = VPNS) => vpns.length < 2 ? vpns.join("") : `${vpns.slice(0, -1).join(", ")} or ${vpns.at(-1)}`;
 
 // Subtitles: one short point per line (the rows wrap them, settings.css .route-row).
+// F300: This iPhone first, then the Signing Server (still the default).
 export const ROUTE_OPTIONS = [
-  { value: "server", label: "Signing Server", subtitle: `Default\nUses ${DOMAIN}` },
   { value: "iphone", label: "This iPhone", subtitle: `${vpnList()}\nNo server, no install popup\nUpdates itself` },
+  { value: "server", label: "Signing Server", subtitle: `Default\nUses ${DOMAIN}` },
 ];
 
 // This iPhone's page says what it gives in one sentence under its title. Installs through installation_proxy never
@@ -91,7 +92,7 @@ export const STATUS_ACTIONS = {
   check: "Check Connection", checkServer: "Check Server", openVPN: `Open ${VPNS[0]}`, pair: "Start Pairing",
   signIn: "Sign In to Tailscale", openTailscale: "Open Tailscale", useTailscale: "Use Tailscale",
 };
-export const CHECKING = { state: "checking", title: "Checking…", subtitle: "Pairing, Developer Mode and the VPN.", action: "check", tone: "wait", local: false };
+export const CHECKING = { state: "checking", title: "Checking…", subtitle: "Pairing and the VPN.", action: "check", tone: "wait", local: false };
 export function installStatus(choice, st, { host = DOMAIN } = {}) {
   if (choice !== "iphone") return { state: "server", title: "Ready to Install", subtitle: `Through the Signing Server, ${host}.`, action: "checkServer", tone: "ok", local: false };
   if (st === undefined) return CHECKING;
@@ -221,22 +222,27 @@ export function setupState(status, pairing = null) {
 // tailscale.use: its VPN on and signed in, or Connect With: Tailscale).
 export function vpnOn(status) { return Boolean(status?.localDevVPN || status?.tailscale?.use); }
 
-// ---- Developer Mode, read for real through the pairing (idevice.developerMode: lockdown's DeveloperModeStatus)
-// iOS asks for it for every kind of profile (the user's iOS 27 test: Ad Hoc too), so it shows whatever the profile.
-// `on`: true, false, or null/undefined (not read: not paired, the VPN off, iOS too old to have it, or the read
-// failed), which shows nothing. On: the row only. Off: the row and the steps.
+// ---- Developer Mode (F300: no row of its own: an app this route installs can't open without it, iFizBox included)
+// An install that fails because Developer Mode is off says so in its alert (core/signing.js deviceError).
 export const DEV_MODE_STEPS = "Open Settings > Privacy & Security > Developer Mode, turn it on and tap Restart. "
   + "After the restart, unlock the iPhone and tap Turn On.";
-export function developerModeInfo(on) {
-  if (on === true) return { row: { label: "Developer Mode", detail: "On" }, footer: "" };
-  if (on === false) {
-    return { row: { label: "Developer Mode", detail: "Off" }, warn: true,
-      footer: `iOS won't open the apps you sign until Developer Mode is on. ${DEV_MODE_STEPS}` };
-  }
-  return null;
+// The failure's alert ({title, message}), or null when the error isn't about Developer Mode: the shell's code
+// "developer_mode", or installd's words naming it (DeveloperMode, Developer Mode).
+export function developerModeFailure(err) {
+  const words = `${err?.code ?? ""} ${err?.message ?? (typeof err === "string" ? err : "")}`;
+  if (!/developer[ _]?mode/i.test(words)) return null;
+  return { title: "Turn On Developer Mode", message: `iOS won't install or open the apps you sign until Developer Mode is on. ${DEV_MODE_STEPS}` };
 }
-// Whether to ask: only with a pairing and a way to reach iOS (lockdown needs the VPN or Tailscale).
-export const canReadDeveloperMode = (status) => Boolean(status?.paired) && vpnOn(status);
+
+// F300: Tailscale is the way in (Connect With: Tailscale, or Automatic with iFizBox signed in and the Tailscale app's
+// VPN on, the shell's tailscale.use): This iPhone's group then has no LocalDevVPN row, Open LocalDevVPN or its footer.
+// `connect` is Connect With as shown (a pick may be ahead of `st`).
+export function tailscaleRoute(st, connect = st?.tailscale?.connect ?? "auto") {
+  if (connect === "tailscale") return true;
+  if (connect !== "auto") return false;
+  const ts = st?.tailscale;
+  return Boolean(ts?.use || (ts?.signedIn && tailscaleVPNOn(st)));
+}
 
 // ---- Which VPN app to pair and install through, decided before sending anyone to an app
 

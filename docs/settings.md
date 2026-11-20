@@ -68,24 +68,29 @@ rows or change footers. Top to bottom:
   LocalDevVPN, or Open Tailscale when the user set up Tailscale (Connect With: Tailscale, or signed in to it);
   Pair This iPhone with Start Pairing; Sign In to Tailscale when Tailscale's VPN is on and the app isn't signed in.
   Tailscale's own VPN is never a conflict. With Signing Server chosen: Ready to Install through the server, Check Server.
-- **Installation**: Install Apps With › (`installation/with`, the choice) and This iPhone › (`installation/iphone`,
-  Paired / Not Paired).
+- **Installation**: one row, Install Apps With › (`installation/with`), its detail the route and, for This iPhone,
+  the pairing: "This iPhone · Paired", "This iPhone · Not Paired" or "Signing Server".
 - **Signing**: Certificate › (`signing/certificate`, days left: the Certificate, Files, Provisioning Profile,
-  Apple Developer Account and options groups, and Share Your Certificate), Signing Server › (`signing/server`: This
-  iPhone while installs go straight here, the server's host when they fall back to it; Server, Check Server, Run
-  Your Own), Signed Apps › (`signing/apps`, the count: Certificate Status and the list).
+  Apple Developer Account and options groups, and Share Your Certificate), Signed Apps › (`signing/apps`, the
+  count: Certificate Status and the list).
 - How Signing Works › (`signing/help`).
 
 The pages under it:
 
-- **Install Apps With**: Signing Server (the manifest and iOS's Install prompt) or This iPhone (installd over
-  LocalDevVPN or Tailscale, docs/sideload.md), each subtitle a short point per line, wrapped. This iPhone's says
-  LocalDevVPN or Tailscale / No server, no install popup / Updates itself: installs through installation_proxy
-  never show iOS's install prompt. Picking This iPhone before it is
-  paired opens This iPhone's page.
-- **This iPhone**: **Pairing** (Paired / Not Paired, opens `installation/pair`), **LocalDevVPN** (On, Off or
-  Another VPN) and **Open LocalDevVPN**, then **Connect With** (Automatic, LocalDevVPN, Tailscale) and **Tailscale**
-  (Sign In, or the device with Test Connection and Sign Out), always there.
+- **Install Apps With**: This iPhone (installd over LocalDevVPN or Tailscale, docs/sideload.md) or Signing Server
+  (the manifest and iOS's Install prompt, the default), with a checkmark, each subtitle a short point per line,
+  wrapped. This iPhone's says LocalDevVPN or Tailscale / No server, no install popup / Updates itself: installs
+  through installation_proxy never show iOS's install prompt. Under the choice, the chosen route's groups slide in:
+  This iPhone's (below), or the Signing Server's (Server, Check Server, Run Your Own). A tap moves the checkmark at
+  once, whether or not the iPhone is paired, and the row shows the grey spinner until `idevice.status` answers.
+- **This iPhone** (also `installation/iphone` on its own): **Pairing** (Paired / Not Paired, opens
+  `installation/pair`), **LocalDevVPN** (On, Off or Another VPN) and **Open LocalDevVPN** with the "LocalDevVPN must
+  be on" footer, none of which shows when Tailscale is the way in (Connect With: Tailscale, or Automatic with the
+  app signed in to Tailscale and its VPN on); then **Connect With** (Automatic, LocalDevVPN, Tailscale: a tap moves
+  the checkmark at once and spins that row until `tailscale.setConnect` and the status read after it answer, no
+  HUD) and **Tailscale** (Sign In, or the device with Test Connection and Sign Out). No Developer Mode row: an
+  install it stops explains it in its alert. Groups that come, go or change size slide (FLIP, transform and opacity
+  only: `slideLayout`).
 - **Pairing** (`installation/pair`), one page that runs by itself: a sentence on what it gives, the LocalDevVPN
   check (Turn On LocalDevVPN alert when it's off, rechecked when the app comes back), then on iOS 27 pairing starts
   on its own: the 6-digit code and where to type it, a line and a ringed Settings screenshot a step; before iOS 27,

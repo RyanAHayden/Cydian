@@ -18,6 +18,8 @@ import { showAlert } from "../nav/alert.js";
 import { showActionSheet } from "../nav/actionsheet.js";
 import { openIpaStore, memoryIpaStore } from "../core/myipas.js";
 import { prepareTweaks, tweakProblem, tweakKind, TWEAK_ACCEPT, ELLEKIT, checkElleKit, needsElleKit, withElleKit } from "../core/tweaks.js";
+import { inspectTweakDeb, targetsApp, worksInText, TWEAK_LIMIT, UnpackError } from "../core/tweaks.js"; // F302
+import { detectMode } from "../core/settings.js"; // F302
 
 const DB = "ifizbox-tweaks";
 let storeP = null;
@@ -95,7 +97,9 @@ function style() {
   document.head.append(link);
 }
 
-export function tweaksGroup({ bundleId = "", store = tweakStore, alert = showAlert, sheet = showActionSheet, onChange = () => {} } = {}) {
+// `sources` (F302): whether "Add Tweak from a Source…" shows (a bool or () => bool); the sideload app by default.
+export function tweaksGroup({ bundleId = "", store = tweakStore, alert = showAlert, sheet = showActionSheet, onChange = () => {},
+  sources = () => detectMode() === "sideload" } = {}) {
   style();
   let items = [];
   const g = el("div", "group ss-tweaks");
@@ -150,9 +154,26 @@ export function tweaksGroup({ bundleId = "", store = tweakStore, alert = showAle
     }
     const li = el("li", "cell");
     const add = Object.assign(el("label", "cell-inner ss-tweak-add"), { htmlFor: input.id });
-    add.append(el("span", "cell-label", items.length ? "Add Another Tweak…" : "Add Tweak…"));
+    const word = items.length ? "Add Another Tweak" : "Add Tweak";
+    // F302: in the sideload app a tweak also comes from a Tweak Source, beside Files
+    const fromSources = typeof sources === "function" ? sources() : Boolean(sources);
+    add.append(el("span", "cell-label", fromSources ? `${word} from Files…` : `${word}…`));
     li.append(add, input);
     ul.append(li);
+    if (fromSources) {
+      const sli = el("li", "cell");
+      const sb = el("button", "cell-inner ss-tweak-add ss-tweak-source");
+      sb.type = "button";
+      sb.append(el("span", "cell-label", `${word} from a Source…`));
+      sb.addEventListener("click", () => pickSourceTweak({ bundleId, alert, onPick: (one) => {
+        const at = items.findIndex((x) => x.name === one.name);
+        items = at >= 0 ? items.map((x, j) => (j === at ? one : x)) : [...items, one];
+        draw();
+        onChange(items);
+      } }));
+      sli.append(sb);
+      ul.append(sli);
+    }
     let why = null, bundles = false;
     try { bundles = Boolean(items.length) && needsElleKit(prepareTweaks(items)); } catch (e) { why = String(e?.message ?? e); }
     foot.textContent = why ? `${why}` : bundles ? WITH_ELLEKIT : FOOTER;
@@ -168,4 +189,258 @@ export function tweaksGroup({ bundleId = "", store = tweakStore, alert = showAle
     save: () => saveTweaks(bundleId, items, { store }).catch(() => {}),
     prepared: async () => preparedItems(items),
   };
+}
+
+// ---- F302: tweaks from APT sources (the sideload build's Tweak Sources) -------------------------------------------
+//
+//   await tweakInfo(stanza, { fetchDeb })   core/tweaks.js inspectTweakDeb of the package's .deb, cached per package and
+//                                           version on this device (INFO_KEY); the .deb itself is kept for the session
+//   cachedTweakInfo(stanza)                 the cached check, or null when the .deb wasn't read yet
+//   await tweakDeb(stanza, { fetchDeb })    the .deb's bytes (the session's copy, else fetched)
+//   await addDebTo(bundleId, stanza, data)  puts the .deb in that app's kept tweaks (the next sign injects it)
+//   await signableApps()                    [{ bundleId, name, from }] My IPAs and the apps signed here
+//   await addToApp(stanza, { … })           the package page's Add to App…: checks the .deb (HUD), then an action sheet
+//                                           of the apps its filter names; the rest listed as not targeted
+//   worksInGroup(stanza)                    the package page's group: "Works In" and Add to App…, filled once checked
+
+export const INFO_KEY = "ifizbox.tweakInfo";
+const INFO_MAX = 400;
+const debKey = (st) => `${st?.package ?? ""}@${st?.version ?? ""}`;
+const debName = (st) => `${st.package}_${st.version ?? "0"}.deb`;
+const debs = new Map(); // debKey -> Uint8Array, this session only (a few at most)
+
+function infoStore(storage = globalThis.localStorage) {
+  let map = {};
+  try { map = JSON.parse(storage?.getItem(INFO_KEY) ?? "{}") ?? {}; } catch { map = {}; }
+  return {
+    get: (k) => (map && typeof map[k] === "object" ? map[k] : null),
+    set(k, v) {
+      map[k] = v;
+      const keys = Object.keys(map);
+      for (const old of keys.slice(0, Math.max(0, keys.length - INFO_MAX))) delete map[old];
+      try { storage?.setItem(INFO_KEY, JSON.stringify(map)); } catch { /* private mode: kept for this page only */ }
+    },
+  };
+}
+
+export function cachedTweakInfo(st, { storage } = {}) { return st?.package ? infoStore(storage).get(debKey(st)) : null; }
+
+async function defaultFetchDeb(url) {
+  const { getBackend } = await import("../backend.js");
+  const r = await getBackend().fetch(url);
+  if (!r.ok) throw new Error(`The source answered HTTP ${r.status}.`);
+  return new Uint8Array(await r.arrayBuffer());
+}
+
+export async function tweakDeb(st, { fetchDeb = defaultFetchDeb } = {}) {
+  const k = debKey(st);
+  if (debs.has(k)) return debs.get(k);
+  if (!st?.debUrl) throw new Error("This package has no .deb to download.");
+  if (/(^|,)\s*cydia::commercial\s*(,|$)/.test(st.tag ?? "")) throw new Error("A paid tweak: its source only hands the .deb to a buyer's jailbroken phone.");
+  let data;
+  try { data = await fetchDeb(st.debUrl); } catch (e) { throw new Error(`The .deb couldn't be downloaded. ${e?.message ?? ""}`.trim()); }
+  if (data.length > TWEAK_LIMIT) throw new Error("This tweak is too big to go into an app (64 MB at most).");
+  debs.set(k, data);
+  for (const old of [...debs.keys()].slice(0, Math.max(0, debs.size - 4))) debs.delete(old);
+  return data;
+}
+
+export async function tweakInfo(st, { fetchDeb = defaultFetchDeb, storage } = {}) {
+  const store = infoStore(storage);
+  const hit = store.get(debKey(st));
+  if (hit) return hit;
+  let info;
+  try { info = inspectTweakDeb(await tweakDeb(st, { fetchDeb })); } catch (e) {
+    if (e instanceof UnpackError) info = { ok: false, why: String(e.message), bundles: [], anyApp: false };
+    else throw e; // a failed download is asked again next time
+  }
+  const kept = { ok: info.ok, why: info.why ?? null, bundles: info.bundles ?? [], anyApp: Boolean(info.anyApp) };
+  store.set(debKey(st), kept);
+  return kept;
+}
+
+export async function addDebTo(bundleId, st, data, { store = tweakStore } = {}) {
+  const name = debName(st);
+  const prefix = `${st.package}_`;
+  const items = (await savedTweaks(bundleId, { store })).filter((x) => !x.name.startsWith(prefix)); // another version goes
+  items.push({ name, data });
+  await saveTweaks(bundleId, items, { store });
+  return items;
+}
+
+export async function signableApps({ library = null, records = null } = {}) {
+  const out = new Map();
+  try {
+    const list = library ? await library() : (await (await import("../signing-client.js")).libraryCall("list"))?.ipas ?? [];
+    for (const e of list) if (e?.bundleId && !out.has(e.bundleId)) out.set(e.bundleId, { bundleId: e.bundleId, name: e.options?.name || e.name || e.bundleId, from: "My IPAs" });
+  } catch { /* no library (the website): the signed apps only */ }
+  try {
+    const recs = records ? await records() : await (await (await import("../core/installed.js")).apps()).all();
+    for (const r of recs ?? []) if (r?.id && !r.self && !out.has(r.id)) out.set(r.id, { bundleId: r.id, name: r.name || r.id, from: "Signed" });
+  } catch { /* none remembered */ }
+  return [...out.values()].sort((a, b) => a.name.localeCompare(b.name));
+}
+
+const knownNames = (apps) => Object.fromEntries(apps.map((a) => [a.bundleId, a.name]));
+
+// Which of `apps` take the tweak: { made: [app], not: [app] }.
+export function splitApps(info, apps) {
+  const made = [], not = [];
+  for (const a of apps) (targetsApp(info, a.bundleId) ? made : not).push(a);
+  return { made, not };
+}
+
+export async function addToApp(st, { alert = showAlert, sheet = showActionSheet, hud = null, apps = signableApps, fetchDeb, storage, store = tweakStore } = {}) {
+  const name = st.name || st.package;
+  const hide = hud ? hud("Checking Tweak") : (await import("../nav/hud.js")).showHUD("Checking Tweak");
+  let info, list, data;
+  try {
+    [info, list] = await Promise.all([tweakInfo(st, { fetchDeb, storage }), apps()]);
+    if (info.ok) data = await tweakDeb(st, { fetchDeb });
+  } catch (e) {
+    hide();
+    await alert({ title: "Can't Add This Tweak", message: String(e?.message ?? e), buttons: ["OK"] });
+    return null;
+  }
+  hide();
+  if (!info.ok) {
+    await alert({ title: "Can't Take This Tweak", message: info.why || "It can't go into an app.", buttons: ["OK"] });
+    return null;
+  }
+  const { made, not } = splitApps(info, list);
+  const works = worksInText(info, knownNames(list));
+  if (!made.length) {
+    await alert({ title: "No App for This Tweak", message: `${name} works in ${works ?? "apps you don't have"}. `
+      + "Add that app's IPA to Install IPAs (or sign it here) first.", buttons: ["OK"] });
+    return null;
+  }
+  const notLine = not.length ? `\nNot targeted: ${not.map((a) => a.name).join(", ")}` : "";
+  const i = await sheet({ title: `Add ${name} to…${notLine}`, buttons: made.map((a) => a.name) });
+  if (!(i >= 0 && made[i])) return null;
+  const app = made[i];
+  await addDebTo(app.bundleId, st, data, { store });
+  await alert({ title: "Tweak Added", message: `${name} goes into ${app.name} the next time it's signed. `
+    + `Its Sign Options list it under Inject Tweaks${needsHookLib(st) ? `, with ${ELLEKIT.name}` : ""}.`, buttons: ["OK"] });
+  return app;
+}
+
+const needsHookLib = (st) => /(mobilesubstrate|cydia-substrate|ellekit)/i.test(`${st?.depends ?? ""} ${st?.["pre-depends"] ?? ""}`);
+
+// The package page's group (the sideload build, an injectable tweak): a spinner row while the .deb is read on first
+// open, then "Works In: <apps>" and Add to App…, or why it can't go into an app.
+export function worksInGroup(st, { onAdd = () => addToApp(st), apps = signableApps, fetchDeb, storage } = {}) {
+  style();
+  const g = el("div", "group tweak-works");
+  g.append(el("h2", "group-header", "Add to an App"));
+  const ul = el("ul", "table grouped");
+  const foot = el("p", "group-footer", "Tweaks from a source go into an app you sign here, with ElleKit when they need it.");
+  g.append(ul, foot);
+  const spin = el("li", "cell tweak-checking");
+  const inner = el("div", "cell-inner");
+  inner.append(el("span", "loading-spinner"), el("span", "cell-label", "Checking the Tweak…"));
+  spin.append(inner);
+  ul.append(spin);
+  const row = (label, detail, onClick) => {
+    const li = el("li", "cell");
+    const b = el(onClick ? "button" : "div", "cell-inner");
+    if (onClick) { b.type = "button"; b.classList.add("chevron"); b.addEventListener("click", onClick); }
+    const t = el("span", "cell-text");
+    t.append(el("span", "cell-label", label));
+    b.append(t);
+    if (detail != null) b.append(el("span", "cell-detail", detail));
+    li.append(b);
+    return li;
+  };
+  const ready = Promise.all([tweakInfo(st, { fetchDeb, storage }), apps().catch(() => [])]).then(([info, list]) => {
+    if (!info.ok) {
+      ul.replaceChildren(row("Can't Go into an App"));
+      foot.textContent = info.why || "";
+      foot.classList.add("ss-tweak-problem");
+      return info;
+    }
+    const works = worksInText(info, knownNames(list)) ?? "—";
+    const { made } = splitApps(info, list);
+    ul.replaceChildren(row("Works In", works), row("Add to App…", made.length ? String(made.length) : null, () => onAdd()));
+    foot.textContent = made.length ? `Made for ${made.map((a) => a.name).join(", ")}.` : "None of your apps is one it's made for yet.";
+    return info;
+  }, (e) => {
+    ul.replaceChildren(row("Add to App…", null, () => onAdd()));
+    foot.textContent = String(e?.message ?? e);
+    return null;
+  });
+  return { el: g, ready };
+}
+
+// "From a Source…" in Inject Tweaks: the Tweak Sources' tweaks in a sheet, those whose checked filter names this app
+// first ("Made for This App"), then the rest; a tap checks the .deb and adds it. `list()` -> [stanza-ish rows with
+// package, name, version, debUrl, section] (the catalog's, by default).
+export async function sourceTweakRows({ catalogMod = null } = {}) {
+  const [{ catalog }, { getBackend }, { tweakSourcesFor }, { settings }, { detectMode }] = await Promise.all([
+    catalogMod ? Promise.resolve(catalogMod) : import("../catalog.js"), import("../backend.js"), import("../core/sources.js"),
+    import("./settings.js"), import("../core/settings.js")]);
+  await catalog.ensure();
+  const keys = tweakSourcesFor(await getBackend().sources(), settings.deviceType(), detectMode()).map((s) => s.key);
+  const byId = new Map();
+  for (const k of keys) for (const r of await catalog.list(k).catch(() => [])) if (!byId.has(r.id)) byId.set(r.id, { ...r, key: k });
+  return [...byId.values()];
+}
+
+export function pickSourceTweak({ bundleId, onPick, rows = sourceTweakRows, pkg = async (r) => (await (await import("../catalog.js")).catalog.package(r.id, r.key))?.stanza,
+  alert = showAlert, storage } = {}) {
+  const body = el("div", "tweak-pick");
+  const loading = el("div", "loading");
+  loading.append(el("span", "loading-spinner"), el("span", null, "Loading Tweaks"));
+  body.append(loading);
+  let close = () => {};
+  import("../nav/sheet.js").then(({ showSheet }) => { close = showSheet({ title: "Tweak Sources", body }); });
+  rows().then((list) => {
+    const made = [], rest = [];
+    for (const r of list) {
+      const info = cachedTweakInfo({ package: r.id, version: r.version }, { storage });
+      if (info && !info.ok) continue;
+      (info && targetsApp(info, bundleId) ? made : rest).push(r);
+    }
+    const ul = (items) => {
+      const u = el("ul", "table grouped");
+      for (const r of items) {
+        const li = el("li", "cell");
+        const b = el("button", "cell-inner ss-tweak chevron");
+        b.type = "button";
+        const t = el("span", "cell-text");
+        t.append(el("span", "cell-label", r.name || r.id), el("span", "cell-subtitle", [r.version, r.short].filter(Boolean).join(" · ")));
+        b.append(t);
+        b.addEventListener("click", async () => {
+          const st = await pkg(r).catch(() => null);
+          if (!st) return;
+          const hide = (await import("../nav/hud.js")).showHUD("Checking Tweak");
+          try {
+            const info = await tweakInfo(st, { storage });
+            if (!info.ok) { hide(); await alert({ title: "Can't Take This Tweak", message: info.why || "", buttons: ["OK"] }); return; }
+            const data = await tweakDeb(st);
+            hide();
+            if (bundleId && !targetsApp(info, bundleId)) {
+              const i = await alert({ title: "Not Made for This App", message: `${st.name || st.package} works in ${worksInText(info) ?? "other apps"}.`,
+                buttons: ["Cancel", "Add Anyway"] });
+              if (i !== 1) return;
+            }
+            onPick({ name: debName(st), data });
+            close();
+          } catch (e) {
+            hide();
+            await alert({ title: "Can't Add This Tweak", message: String(e?.message ?? e), buttons: ["OK"] });
+          }
+        });
+        li.append(b);
+        u.append(li);
+      }
+      return u;
+    };
+    const groups = [];
+    if (made.length) { const g = el("div", "group"); g.append(el("h2", "group-header", "Made for This App"), ul(made)); groups.push(g); }
+    if (rest.length) { const g = el("div", "group"); g.append(el("h2", "group-header", made.length ? "Other Tweaks" : "Tweaks"), ul(rest)); groups.push(g); }
+    const foot = el("p", "group-footer", list.length ? "Checked when you tap one: a tweak whose filter names this app goes in as it is."
+      : "No tweaks yet. Add a source under Tweak Sources (Sources tab), then Refresh.");
+    body.replaceChildren(...groups, foot);
+  }, (e) => { body.replaceChildren(el("p", "group-footer", String(e?.message ?? e))); });
+  return { close: () => close() };
 }

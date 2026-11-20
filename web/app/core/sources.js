@@ -97,6 +97,11 @@ async function loadDefaultList(file, from, { remote = null, bundled = readBundle
 
 // opts: { remote: (url) => Promise<text>, bundled: (file) => Promise<text>, timeout: ms }.
 export const loadTweakSources = (opts) => loadDefaultList(TWEAK_SOURCES_FILE, tweakSourcesFrom, opts);
+
+// F302: the Tweak Sources the sideload build starts with: tweak-sources.json's entries marked "inject": true (repos
+// carrying tweaks that go into an app: Havoc, Chariz, BigBoss), as tweakSourcesFrom records.
+export const injectSourcesFrom = (list) => tweakSourcesFrom(Array.isArray(list) ? list.filter((s) => s?.inject === true) : []);
+export const loadInjectSources = (opts) => loadDefaultList(TWEAK_SOURCES_FILE, injectSourcesFrom, opts);
 export const loadAppSources = (opts) => loadDefaultList(APP_SOURCES_FILE, appSourcesFrom, opts);
 
 // URLs -> their parsed hrefs (host lower-cased, a bare host gets its "/"), first of each kept, in order.
@@ -544,9 +549,19 @@ export function sourcesFor(list, type) {
 // F41: which sources Refresh fetches for a device type, as a refreshSources `filter`: Not Jailbroken ("none")
 // keeps AltStore-style sources only (what sourcesFor shows), so nobody's hidden APT Packages go through the
 // site's proxy; a jailbroken type refreshes everything (null: no filter).
-export function sourceFilter(type) {
-  if (type !== "none") return null;
+// F302: `tweaks` (the sideload app, whose APT sources are Tweak Sources): everything is refreshed.
+export function sourceFilter(type, { tweaks = false } = {}) {
+  if (type !== "none" || tweaks) return null;
   return (s) => String(s?.key ?? "").startsWith("alt:");
+}
+
+// F302: the sideload app shows APT sources again, in their own "Tweak Sources" group on the Sources tab, for the
+// tweaks it can inject into an app. True there (mode "sideload", a phone without a jailbreak) and nowhere else.
+export const tweakSourcesOn = (type, mode) => type === "none" && mode === "sideload";
+// The APT sources of `list` as Tweak Sources (in the order given), or [] where there are none.
+export function tweakSourcesFor(list, type, mode) {
+  if (!tweakSourcesOn(type, mode)) return [];
+  return (Array.isArray(list) ? list : []).filter((s) => s?.key && !String(s.key).startsWith("alt:"));
 }
 
 // F43: the sources a first visit loads by itself: AltStore sources (the F28 defaults are seeded as bare URLs) that

@@ -62,7 +62,9 @@ test("the data files: APT repos with name/uri/dist/components; app sources with 
   const tweaks = raw(TWEAK_SOURCES_FILE);
   assert.ok(tweaks.length > 0);
   for (const s of tweaks) {
-    assert.deepEqual(Object.keys(s).sort(), ["components", "dist", "name", "uri"]);
+    // F302: "inject": true marks a Tweak Source the sideload build starts with
+    assert.deepEqual(Object.keys(s).filter((k) => k !== "inject").sort(), ["components", "dist", "name", "uri"]);
+    if ("inject" in s) assert.equal(s.inject, true);
     assert.match(s.uri, /^https?:\/\/.+\/$/);
     assert.ok(Array.isArray(s.components));
   }

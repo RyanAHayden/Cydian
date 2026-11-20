@@ -18,10 +18,13 @@
 //     before zsign signs, the app's in Swift (native/sign/Tweaks.swift) on the same rules.
 //   tweakParams(prepared) -> { files: [{ path, data: base64 }], inject, names }   for signing.install / library.options
 //   loadCommands(bin), dylibsOf(bin)   reading a Mach-O's load commands (the tests' otool -L)
+//   F302 (APT tweaks in the sideload build): injectableFromFields, countInjectable, inspectTweakDeb, filterBundles,
+//   targetsApp, worksInText: see the section at the end of the file.
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { readAr, readTar, readZip, decompress, UnpackError } from "./unpack.js";
 import { sha256Hex } from "./sha256.js";
+import { parseControl, parseRelations } from "./apt.js"; // F302
 
 export { UnpackError };
 export const TWEAK_ACCEPT = ".dylib,.deb,.zip,.framework";
@@ -392,4 +395,289 @@ export function tweakKind(name) {
   if (n.endsWith(".deb")) return "Package (.deb)";
   if (n.endsWith(".dylib")) return "Dynamic Library";
   return "Framework (.zip)";
+}
+
+// ---- F302: APT tweaks in the sideload build ----------------------------------------------------------------------
+// The sideload app reads APT repos again, for tweaks it can inject into an app only. Two passes:
+//
+//   injectableFromFields(stanza) -> { ok, why }   the Packages fields alone (Architecture, Section, Tag, Depends):
+//     iphoneos-arm64 or iphoneos-arm, no theme/app/daemon/CLI/jailbreak-utility section or purpose, and every Depends
+//     group satisfiable by a hook library we provide or can drop (HOOK_DEPS: substrate/ElleKit -> the bundled
+//     ElleKit, PreferenceLoader, firmware, cy+ feature names). Anything depending on another package is left out.
+//   countInjectable(packagesText) -> n               the Sources tab's count for a Tweak Source
+//   inspectTweakDeb(debBytes) -> { ok, why, dylibs, bundles, executables, anyApp, systemOnly }   the real check, on
+//     first open of a package page: a .dylib under Library/MobileSubstrate/DynamicLibraries (rootless: var/jb/…) or
+//     usr/lib/TweakInject with its filter .plist, no Applications/, LaunchDaemons, CLI tools or themes. Cached per
+//     package and version by the UI (screens/tweaks.js tweakInfo).
+//   filterBundles(plistBytes) -> { bundles, executables }   a filter plist's Filter.Bundles / Executables (XML,
+//     OpenStep text or binary plist)
+//   targetsApp(info, bundleId) -> bool               whether a checked tweak's filter names that app (or every app)
+//   appNameOf(bundleId, known) -> name               "Works in" names: the user's own apps first, then KNOWN_APPS
+
+export const TWEAK_ARCHES = new Set(["iphoneos-arm64", "iphoneos-arm"]);
+// Depends a sideloaded app can do without: the hooking library (we bundle ElleKit), PreferenceLoader (its settings
+// pane can't show up outside Settings, the tweak still runs), and the firmware / cy+ feature pseudo-packages.
+export const HOOK_DEPS = new Set(["mobilesubstrate", "cydia-substrate", "ellekit", "com.ex.substitute", "substitute",
+  "libhooker", "org.coolstar.libhooker", "preferenceloader", "firmware"]);
+const OK_DEP = (name) => HOOK_DEPS.has(name.toLowerCase()) || /^cy\+/.test(name) || /^firmware$/i.test(name);
+const THEME_DEPS = new Set(["winterboard", "snowboard", "com.anemonetheming.anemone", "anemone", "com.saurik.winterboard"]);
+// Sections that are never an injectable tweak (lower case, matched as a word inside the section name).
+const BAD_SECTION = /\b(themes?|theming|wallpapers?|ringtones?|fonts?|applications?|apps|terminal|development|developer|system|repositories|repo|jailbreak|utilities|networking|packaging|data_storage|keyboards?|widgets?|addons?|carrier|soundboard|sounds?|icons?|skins?|ebooks?|games?)\b/;
+const BAD_PURPOSE = new Set(["purpose::uikit", "purpose::console", "purpose::library", "purpose::daemon", "role::developer"]);
+
+export function injectableFromFields(st) {
+  const no = (why) => ({ ok: false, why });
+  if (!st || !st.package) return no("not a package");
+  if (!TWEAK_ARCHES.has(String(st.architecture ?? "").trim())) return no("not for iPhone (Architecture)");
+  const section = String(st.section ?? "").toLowerCase().replace(/[_-]+/g, " ");
+  if (BAD_SECTION.test(section)) return no(`not a tweak (${st.section})`);
+  const tags = String(st.tag ?? "").split(",").map((t) => t.trim().toLowerCase()).filter(Boolean);
+  if (tags.some((t) => BAD_PURPOSE.has(t))) return no("not a tweak (purpose)");
+  const rels = [...parseRelations(st["pre-depends"]), ...parseRelations(st.depends)];
+  for (const group of rels) {
+    if (group.some((r) => THEME_DEPS.has(r.name.toLowerCase()))) return no("a theme");
+    if (!group.some((r) => OK_DEP(r.name))) return no(`needs ${group.map((r) => r.name).join(" or ")}`);
+  }
+  return { ok: true, why: null };
+}
+
+// Injectable tweaks in a Packages text (any arch the filter keeps), each package counted once.
+export function countInjectable(text) {
+  const ids = new Set();
+  for (const st of parseControl(text)) if (injectableFromFields(st).ok) ids.add(st.package);
+  return ids.size;
+}
+
+// Bundle IDs that mean "every app": a tweak filtered on UIKit or Foundation loads into anything.
+const ANY_APP = new Set(["com.apple.uikit", "com.apple.foundation", "com.apple.corefoundation"]);
+const isSystem = (id) => /^com\.apple\./i.test(id) && !ANY_APP.has(id.toLowerCase());
+
+// The real check, on the .deb's bytes. Throws UnpackError when it isn't a readable .deb.
+export function inspectTweakDeb(data) {
+  const members = readAr(data instanceof Uint8Array ? data : new Uint8Array(data));
+  if (!members.some((m) => m.name === "debian-binary")) fail("This isn't a .deb (no debian-binary).");
+  const dataTar = members.find((m) => /^data\.tar(\.|$)/.test(m.name));
+  if (!dataTar) fail("This .deb has no data.tar.");
+  const entries = readTar(decompress(dataTar.name, dataTar.data, TWEAK_LIMIT));
+  const dylibs = [], plists = new Map(), bad = new Set();
+  for (const e of entries) {
+    if (e.type !== "file" && e.type !== "symlink") continue;
+    const p = clean(e.path);
+    let m;
+    if ((m = /^(?:Library\/MobileSubstrate\/DynamicLibraries|usr\/lib\/TweakInject)\/([^/]+)\.dylib$/.exec(p))) dylibs.push(m[1]);
+    else if ((m = /^(?:Library\/MobileSubstrate\/DynamicLibraries|usr\/lib\/TweakInject)\/([^/]+)\.plist$/.exec(p))) plists.set(m[1], e.data);
+    else if (/^Applications\//.test(p)) bad.add("an app");
+    else if (/^(System\/)?Library\/Launch(Daemons|Agents)\//.test(p)) bad.add("a daemon");
+    else if (/^(usr\/(local\/)?)?s?bin\//.test(p)) bad.add("command-line tools");
+    else if (/^Library\/Themes\//.test(p)) bad.add("a theme");
+  }
+  const bundles = new Set(), executables = new Set();
+  for (const d of dylibs) {
+    const f = plists.has(d) ? filterBundles(plists.get(d)) : { bundles: [], executables: [] };
+    f.bundles.forEach((b) => bundles.add(b));
+    f.executables.forEach((x) => executables.add(x));
+  }
+  const ids = [...bundles];
+  const anyApp = ids.some((b) => ANY_APP.has(b.toLowerCase()));
+  const apps = ids.filter((b) => !isSystem(b) && !ANY_APP.has(b.toLowerCase()));
+  const systemOnly = !anyApp && !apps.length;
+  let why = null;
+  if (!dylibs.length) why = "Nothing to inject: no .dylib in Library/MobileSubstrate/DynamicLibraries.";
+  else if (![...dylibs].some((d) => plists.has(d))) why = "Its .dylib has no filter .plist, so it doesn't say which app it's for.";
+  else if (bad.size) why = `It also installs ${[...bad].join(", ")}, which can't go into an app.`;
+  else if (systemOnly) why = "It's for iOS itself (SpringBoard or a system app), not an app you can sign.";
+  return { ok: !why, why, dylibs, bundles: apps, anyApp, systemOnly, executables: [...executables] };
+}
+
+export function targetsApp(info, bundleId) {
+  if (!info?.ok || !bundleId) return false;
+  return Boolean(info.anyApp) || (info.bundles ?? []).some((b) => b.toLowerCase() === String(bundleId).toLowerCase());
+}
+
+// Popular targets by bundle ID, for "Works in" before the user has the app.
+export const KNOWN_APPS = Object.freeze({
+  "com.atebits.Tweetie2": "X (Twitter)", "com.google.ios.youtube": "YouTube", "com.google.ios.youtubemusic": "YouTube Music",
+  "com.burbn.instagram": "Instagram", "com.zhiliaoapp.musically": "TikTok", "com.ss.iphone.ugc.Ame": "TikTok",
+  "com.spotify.client": "Spotify", "net.whatsapp.WhatsApp": "WhatsApp", "ph.telegra.Telegraph": "Telegram",
+  "com.reddit.Reddit": "Reddit", "com.toyopagroup.picaboo": "Snapchat", "com.facebook.Facebook": "Facebook",
+  "com.facebook.Messenger": "Messenger", "com.hammerandchisel.discord": "Discord", "com.netflix.Netflix": "Netflix",
+  "tv.twitch": "Twitch", "com.soundcloud.TouchApp": "SoundCloud", "com.apple.mobilesafari": "Safari",
+});
+
+export function appNameOf(bundleId, known = {}) {
+  const k = String(bundleId ?? "");
+  const lower = k.toLowerCase();
+  for (const [id, name] of Object.entries(known ?? {})) if (id.toLowerCase() === lower && name) return name;
+  for (const [id, name] of Object.entries(KNOWN_APPS)) if (id.toLowerCase() === lower) return name;
+  return k;
+}
+
+// "Works in" text for a checked tweak: "Any App", or the app names (the user's own first), or null.
+export function worksInText(info, known = {}) {
+  if (!info?.ok) return null;
+  if (info.anyApp) return "Any App";
+  const names = [...new Set((info.bundles ?? []).map((b) => appNameOf(b, known)))];
+  return names.length ? names.join(", ") : null;
+}
+
+// ---- filter plists --------------------------------------------------------------------------------------------
+
+// { bundles, executables } from a MobileSubstrate filter plist, whatever its format.
+export function filterBundles(bytes) {
+  const b = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes ?? []);
+  let root = null;
+  try {
+    if (b.length > 8 && new TextDecoder().decode(b.subarray(0, 6)) === "bplist") root = readBplist(b);
+    else root = readTextPlist(new TextDecoder().decode(b));
+  } catch { root = null; }
+  const filter = root && typeof root === "object" ? root.Filter ?? root.filter ?? null : null;
+  const list = (v) => (Array.isArray(v) ? v.filter((x) => typeof x === "string" && x) : []);
+  return { bundles: list(filter?.Bundles), executables: list(filter?.Executables) };
+}
+
+// XML plists and OpenStep text plists ({ Filter = { Bundles = ( "a", b ); }; }) to plain values.
+export function readTextPlist(text) {
+  const s = String(text ?? "").replace(/^﻿/, "").trim();
+  if (s.startsWith("<")) return readXmlPlist(s);
+  let i = 0;
+  const ws = () => {
+    for (;;) {
+      while (i < s.length && /\s/.test(s[i])) i++;
+      if (s.startsWith("//", i)) { while (i < s.length && s[i] !== "\n") i++; continue; }
+      if (s.startsWith("/*", i)) { const e = s.indexOf("*/", i + 2); i = e < 0 ? s.length : e + 2; continue; }
+      return;
+    }
+  };
+  const value = () => {
+    ws();
+    const c = s[i];
+    if (c === "{") {
+      i++;
+      const o = {};
+      for (;;) {
+        ws();
+        if (s[i] === "}") { i++; return o; }
+        const k = value();
+        ws();
+        if (s[i] !== "=") throw new Error("plist: = expected");
+        i++;
+        o[String(k)] = value();
+        ws();
+        if (s[i] === ";") i++;
+      }
+    }
+    if (c === "(") {
+      i++;
+      const a = [];
+      for (;;) {
+        ws();
+        if (s[i] === ")") { i++; return a; }
+        a.push(value());
+        ws();
+        if (s[i] === ",") i++;
+      }
+    }
+    if (c === '"') {
+      let out = "";
+      i++;
+      while (i < s.length && s[i] !== '"') { if (s[i] === "\\") i++; out += s[i++]; }
+      i++;
+      return out;
+    }
+    const m = /^[A-Za-z0-9_.$:\/+-]+/.exec(s.slice(i));
+    if (!m) throw new Error("plist: value expected");
+    i += m[0].length;
+    return m[0];
+  };
+  return value();
+}
+
+const xmlText = (t) => t.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, "&");
+
+function readXmlPlist(s) {
+  const tokens = [...s.replace(/<\?[^>]*\?>|<!DOCTYPE[^>]*>|<!--[\s\S]*?-->/g, "")
+    .matchAll(/<(\/?)(\w+)(?:\s[^>]*?)?\s*(\/?)>|([^<]+)/g)];
+  let i = 0;
+  const next = () => tokens[i++];
+  const skipText = () => { while (i < tokens.length && tokens[i][4] !== undefined && !tokens[i][4].trim()) i++; };
+  const value = () => {
+    skipText();
+    const t = next();
+    if (!t) throw new Error("plist: end");
+    const [, close, tag, self] = t;
+    if (close) throw new Error("plist: unexpected close");
+    if (self) return tag === "true" ? true : tag === "false" ? false : tag === "dict" ? {} : tag === "array" ? [] : "";
+    if (tag === "plist") { const v = value(); skipText(); next(); return v; }
+    if (tag === "dict") {
+      const o = {};
+      for (;;) {
+        skipText();
+        if (tokens[i]?.[1] && tokens[i][2] === "dict") { i++; return o; }
+        const k = next();
+        if (!k || k[2] !== "key") throw new Error("plist: key expected");
+        let key = "";
+        if (tokens[i]?.[4] !== undefined) key = xmlText(next()[4]);
+        next(); // </key>
+        o[key.trim()] = value();
+      }
+    }
+    if (tag === "array") {
+      const a = [];
+      for (;;) {
+        skipText();
+        if (tokens[i]?.[1] && tokens[i][2] === "array") { i++; return a; }
+        a.push(value());
+      }
+    }
+    let txt = "";
+    if (tokens[i]?.[4] !== undefined) txt = xmlText(next()[4]);
+    next(); // the close tag
+    if (tag === "integer" || tag === "real") return Number(txt);
+    return txt.trim();
+  };
+  return value();
+}
+
+// A binary plist (bplist00) to plain values: dicts, arrays, strings, numbers, booleans (what filter plists hold).
+export function readBplist(b) {
+  const dv = new DataView(b.buffer, b.byteOffset, b.byteLength);
+  const t = b.length - 32;
+  if (t < 8) throw new Error("bplist: too short");
+  const offSize = b[t + 6], refSize = b[t + 7];
+  const num = (o, n) => { let v = 0; for (let k = 0; k < n; k++) v = v * 256 + b[o + k]; return v; };
+  const count = num(t + 8, 8), top = num(t + 16, 8), table = num(t + 24, 8);
+  const offsetOf = (ref) => num(table + ref * offSize, offSize);
+  let depth = 0;
+  const obj = (ref) => {
+    if (ref >= count || ++depth > 64) throw new Error("bplist: bad object");
+    try {
+      let o = offsetOf(ref);
+      const m = b[o], hi = m >> 4, lo = m & 15;
+      const len = () => {
+        if (lo !== 15) return [lo, o + 1];
+        const n = 1 << (b[o + 1] & 15);
+        return [num(o + 2, n), o + 2 + n];
+      };
+      if (m === 0x08) return false;
+      if (m === 0x09) return true;
+      if (hi === 1) return num(o + 1, 1 << lo);
+      if (hi === 2) return lo === 3 ? dv.getFloat64(o + 1) : dv.getFloat32(o + 1);
+      if (hi === 5) { const [n, s] = len(); return new TextDecoder("latin1").decode(b.subarray(s, s + n)); }
+      if (hi === 6) {
+        const [n, s] = len();
+        let out = "";
+        for (let k = 0; k < n; k++) out += String.fromCharCode(dv.getUint16(s + k * 2));
+        return out;
+      }
+      if (hi === 0xa) { const [n, s] = len(); return Array.from({ length: n }, (_, k) => obj(num(s + k * refSize, refSize))); }
+      if (hi === 0xd) {
+        const [n, s] = len();
+        const out = {};
+        for (let k = 0; k < n; k++) out[String(obj(num(s + k * refSize, refSize)))] = obj(num(s + (n + k) * refSize, refSize));
+        return out;
+      }
+      return null;
+    } finally { depth--; }
+  };
+  return obj(top);
 }

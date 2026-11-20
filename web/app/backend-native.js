@@ -46,6 +46,8 @@
 import { freshUrl } from "./core/sources.js";
 import { BackendError } from "./backend-http.js";
 import { verifySource, refreshSource, openSourceStore, sortSources, loadTweakSources } from "./core/sources.js";
+import { sourceCalls, loadInjectSources } from "./core/sources.js"; // F302
+import { countInjectable } from "./core/tweaks.js"; // F302
 import { parseAptSources, listNamesFor } from "./core/aptsources.js";
 import { healthFields } from "./core/health.js";
 import { DEFAULT_ARCH, compareVersions } from "./core/apt.js";
@@ -211,11 +213,17 @@ export function createNativeBackend({ native = globalThis.ifizboxNative, sourceO
   // F49: the phone's kCFCoreFoundationVersionNumber (Bridge.swift app.info `cf`) adds Telesphoreo's ios/<cf> suite
   // to the dists Add Source tries, unless sourceOptions brings its own coreFoundation.
   const cf = sourceOptions.coreFoundation ? null : coreFoundationOf(call);
-  // F144: the sideload build keeps no APT sources: Add refuses them, and ones an older build stored are deleted.
+  // F302 (was F144's: no APT sources at all): the sideload build has no apt, so its APT sources are Tweak Sources kept
+  // on the device (core/sources.js sourceCalls in their own IndexedDB, Packages through the shell's net.packages),
+  // seeded with tweak-sources.json's "inject" repos and counted by their injectable tweaks (core/tweaks.js).
   const sideload = (sourceOptions.mode ?? detectMode()) === "sideload";
-  const opts = { ...sourceOptions, sort: sortSources, ...(cf ? { coreFoundation: cf.get } : {}),
-    ...(sideload ? { aptAllowed: false, dropApt: true } : {}) };
-  const sources = withAltSources(nativeSourceCalls(backend, call, sourceOptions), backend, opts);
+  const opts = { ...sourceOptions, sort: sortSources, ...(cf ? { coreFoundation: cf.get } : {}) };
+  const aptCalls = sideload
+    ? sourceCalls(backend, { indexedDB: sourceOptions.indexedDB, name: sourceOptions.tweakName ?? "ifizbox-tweak-sources",
+      tweakDefaults: sourceOptions.injectDefaults ?? (() => loadInjectSources({ remote: (url) => backend.text(url) })),
+      count: async (text) => countInjectable(text), arch: "iphoneos-arm" })
+    : nativeSourceCalls(backend, call, sourceOptions);
+  const sources = withAltSources(aptCalls, backend, opts);
   if (cf) {
     const add = sources.addSource;
     sources.addSource = async (input) => { await cf.ready(); return add(input); };

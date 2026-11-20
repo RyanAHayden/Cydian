@@ -72,6 +72,26 @@ async function packagesText(source, arch) {
   return { text: parts.join("\n\n"), root: layout.root };
 }
 
+// F302: a Tweak Source (the sideload build): rootless and rootful tweaks both go into an app, so a dist repo's index
+// is read for iphoneos-arm64 and iphoneos-arm (BigBoss has only the latter); a flat repo has one index for both.
+async function tweakPackagesText(source) {
+  const flat = String(source.dist || "./").endsWith("/");
+  const arches = flat ? ["iphoneos-arm64"] : ["iphoneos-arm64", "iphoneos-arm"];
+  const parts = [];
+  let root = null, firstError = null;
+  for (const a of arches) {
+    try {
+      const r = await packagesText(source, a);
+      root = r.root;
+      if (r.text) parts.push(r.text);
+    } catch (e) {
+      firstError ??= e;
+    }
+  }
+  if (!parts.length && firstError) throw firstError;
+  return { text: parts.join("\n\n"), root };
+}
+
 // ---- Changes (core/changes.js): every reload that loaded something files what it saw, under one `now`. ----
 let seenStore;            // Promise of the first-seen store, or of null where there is no IndexedDB
 const changeListeners = new Set();
@@ -107,7 +127,7 @@ async function altText(source) {
   return text;
 }
 
-async function loadSource(source, arch, sig) {
+async function loadSource(source, arch, sig, { tweaks = false } = {}) {
   if (isAltKey(source.key)) {
     // F16a: a source only its own app can read (an encrypted GBox one) has no apps to load: its page says why.
     if (source.unsupported) {
@@ -128,9 +148,9 @@ async function loadSource(source, arch, sig) {
   }
   try {
     // The last refresh found nothing for this arch (Telesphoreo's Release lists no arm64): nothing to fetch.
-    const empty = source.count === 0 && !source.error;
-    const { text, root } = empty ? { text: "", root: null } : await packagesText(source, arch);
-    const count = await getParser().catalog("load", [source.key, undefined, root, arch], text);
+    const empty = !tweaks && source.count === 0 && !source.error;
+    const { text, root } = empty ? { text: "", root: null } : tweaks ? await tweakPackagesText(source) : await packagesText(source, arch);
+    const count = await getParser().catalog("load", [source.key, undefined, root, arch, ...(tweaks ? [{ tweaks: true }] : [])], text);
     loaded.set(source.key, { sig, count, error: null });
   } catch (e) {
     // Keep what the worker had (if anything) and say why on the source's Sections page.
@@ -151,12 +171,15 @@ async function run() {
   let reloaded = false;
   // F37: a phone without a jailbreak sees AltStore sources only; APT ones aren't fetched until the type changes.
   const appsOnly = device?.device.jailbreak === "none";
+  // F302: except in the sideload app, where APT sources are Tweak Sources: their injectable tweaks only.
+  const tweakSources = appsOnly && detectMode() === "sideload";
   await Promise.all(sources.map((s) => {
-    if (appsOnly && !isAltKey(s.key)) return null;
-    const sig = signature(s, arch) + (isAltKey(s.key) ? `|${device?.device.ios ?? ""}` : "");
+    const tweaks = tweakSources && !isAltKey(s.key);
+    if (appsOnly && !isAltKey(s.key) && !tweaks) return null;
+    const sig = signature(s, arch) + (isAltKey(s.key) ? `|${device?.device.ios ?? ""}` : "") + (tweaks ? "|tweaks" : "");
     if (loaded.get(s.key)?.sig === sig) return null;
     reloaded = true;
-    return loadSource(s, arch, sig);
+    return loadSource(s, arch, sig, { tweaks });
   }));
   if (reloaded) await recordSeen();
   if (reloaded) fireLoaded();

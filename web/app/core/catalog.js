@@ -66,6 +66,7 @@ import { depIndex, explain, explainApt } from "./deps.js";
 import { withIpaInfo } from "./ipainfo.js";
 import { needsRestart } from "./queue.js";
 import { packageKind } from "./progress.js";
+import { injectableFromFields } from "./tweaks.js"; // F302
 
 export const ALL = "*";
 export const NO_SECTION = "(No Section)";
@@ -493,15 +494,27 @@ export function createCatalog() {
   let fitFilter = false;     // and whether rows that can't work on it are left out
   const fitting = new Map(); // key -> sorted rows that can work on the device (cache)
   let appsOnly = false;       // F37: the device isn't jailbroken: only AltStore sources (`alt:` keys) count
-  const counts = (key) => !appsOnly || isAltKey(key);
+  // F302: Tweak Sources in the sideload build: APT sources loaded with { tweaks: true } (injectable tweaks only) count
+  // on their own (their source page, a tweak's page) but stay out of All Sources, Search and Browse.
+  const tweakKeys = new Set();
+  const counts = (key) => !appsOnly || isAltKey(key) || tweakKeys.has(key);
+  const inAll = (key) => !appsOnly || isAltKey(key);
   const ipaInfo = new Map(); // F160: downloadURL -> what the IPA itself says (core/ipainfo.js), from the UI
   const judged = (st) => (st?.kind === "ipa" && st.downloadURL && ipaInfo.has(st.downloadURL) ? withIpaInfo(st, ipaInfo.get(st.downloadURL)) : st);
-  const judge = (e) => { e.row.compat = device ? compatCode(judged(e.stanza), device) : null; };
+  // F302: an injectable tweak goes into a signed app, so a phone without a jailbreak takes it.
+  const judge = (e) => { e.row.compat = device && !(e.stanza.injectable && device.jailbreak === "none") ? compatCode(judged(e.stanza), device) : null; };
 
-  function load(key, text, root, arch = DEFAULT_ARCH) {
+  // F302: `opts.tweaks`: a Tweak Source of the sideload build: only what core/tweaks.js injectableFromFields keeps,
+  // iphoneos-arm64 and iphoneos-arm alike, each stanza marked `injectable`.
+  function load(key, text, root, arch = DEFAULT_ARCH, opts = {}) {
     const byId = new Map();
+    const tweaks = Boolean(opts?.tweaks);
+    if (tweaks) tweakKeys.add(key); else tweakKeys.delete(key);
     for (const st of parseControl(text)) {
-      if (!st.package || !matchesArch(st, arch) || !isVisible(st)) continue;
+      if (tweaks) {
+        if (!st.package || !isVisible(st) || !injectableFromFields(st).ok) continue;
+        st.injectable = true;
+      } else if (!st.package || !matchesArch(st, arch) || !isVisible(st)) continue;
       const cur = byId.get(st.package);
       st.debUrl = root ? resolveFilename(root, st.filename) : null;
       // One source can list several versions of a package: the newest is the candidate, as in apt. The others
@@ -559,6 +572,7 @@ export function createCatalog() {
   }
 
   function remove(key) {
+    tweakKeys.delete(key); // F302
     altMeta.delete(key);
     sources.delete(key);
     merged = null;
@@ -624,7 +638,7 @@ export function createCatalog() {
     if (merged) return merged;
     merged = new Map();
     for (const [k, { byId }] of sources) {
-      if (!counts(k)) continue;
+      if (!inAll(k)) continue;
       for (const [id, e] of byId) {
         const cur = merged.get(id);
         if (!cur || compareVersions(cur.stanza.version, e.stanza.version) < 0) merged.set(id, e);

@@ -12,6 +12,12 @@
 // comes back. Browsers can't set User-Agent, so the page sends it as X-Relay-User-Agent. No CORS headers: only pages
 // on this origin can read the replies, and a cross-site page (Origin or Sec-Fetch-Site says so) gets 403.
 //
+// App Store Connect (own provisioning profiles, web/app/core/asc.js): api.appstoreconnect.apple.com sends no CORS
+// headers either (checked 2026-11-19: the preflight gets a bare 401), so the website's calls with the user's API key
+// come through here too. Only for that host: the Authorization header (the user's JWT) goes out, and DELETE (an old
+// profile, before its new one) is allowed. It stays on with APPLE_RELAY off: it's the paid-account route, not the
+// free Apple ID spike. The JWT is never logged or kept, like everything else here.
+//
 // Privacy: bodies carry SRP proofs, 2FA codes, the Xcode app token and developer-portal replies. Nothing here logs,
 // stores or caches a request or reply: they go straight through, and errors name only the host and path.
 const TIMEOUT_MS = 20000;
@@ -23,6 +29,7 @@ export const ANISETTE_HOSTS = ["ani.sidestore.io", "ani.sidestore.app", "ani.sid
   "new.ani.sidestore.io"];
 const ANISETTE_PATHS = [/^\/v3\/client_info$/, /^\/v3\/get_headers$/, /^\/$/];
 
+export const ASC_HOST = "api.appstoreconnect.apple.com";
 export const ALLOW = {
   "gsa.apple.com": [
     /^\/grandslam\/GsService2(\/(lookup|validate))?$/, // SRP init/complete, apptokens, the URL bag, 2FA validate
@@ -31,6 +38,7 @@ export const ALLOW = {
     /^\/auth\/verify\/(trusteddevice|phone|phone\/securitycode)$/, // 2FA: push to devices, SMS and its code
   ],
   "developerservices2.apple.com": [/^\/services\/QH65B2\/(ios\/)?[A-Za-z]+\.action$/],
+  [ASC_HOST]: [/^\/v1\/(devices|certificates|bundleIds|bundleIdCapabilities|profiles)(\/[A-Za-z0-9-]+(\/bundleIdCapabilities)?)?$/],
   ...Object.fromEntries(ANISETTE_HOSTS.map((h) => [h, ANISETTE_PATHS])),
 };
 const WS_PATH = /^\/v3\/provisioning_session$/;
@@ -90,7 +98,8 @@ export const STATUS_PATH = "/apple/status";
 
 export async function appleRelay(req, env = {}, { fetcher = fetch, timeout = TIMEOUT_MS } = {}) {
   const u = new URL(req.url);
-  if (!relayOn(env)) return fail("not_found", "The Apple relay is off on this server (APPLE_RELAY).", 404);
+  const asc = u.pathname.startsWith(`/apple/${ASC_HOST}/`);
+  if (!relayOn(env) && !asc) return fail("not_found", "The Apple relay is off on this server (APPLE_RELAY).", 404);
   if (crossSite(req, u)) return fail("cross_site", "This relay is only for this website's own pages.", 403);
   // F254: the website asks this before it offers Use a Free Apple ID (off: the 404 above).
   if (u.pathname === STATUS_PATH && req.method === "GET") {
@@ -105,15 +114,16 @@ export async function appleRelay(req, env = {}, { fetcher = fetch, timeout = TIM
     if (req.method !== "GET") return fail("bad_method", "A WebSocket starts with GET.", 405);
     return fetcher(target.href, { headers: { Upgrade: "websocket" } });
   }
-  if (!["GET", "POST", "PUT"].includes(req.method)) return fail("bad_method", "GET, POST or PUT only.", 405);
+  if (!["GET", "POST", "PUT", ...(asc ? ["DELETE"] : [])].includes(req.method)) return fail("bad_method", "GET, POST or PUT only.", 405);
 
   const headers = new Headers();
   for (const [k, v] of req.headers) if (PASS_HEADERS.has(k.toLowerCase())) headers.set(k, v);
+  if (asc && req.headers.get("Authorization")) headers.set("Authorization", req.headers.get("Authorization"));
   const ua = req.headers.get("X-Relay-User-Agent");
   if (ua) headers.set("User-Agent", ua);
 
   let body;
-  if (req.method !== "GET") {
+  if (req.method !== "GET" && req.method !== "DELETE") {
     if (Number(req.headers.get("Content-Length") || 0) > MAX_REQUEST) return fail("too_large", `Requests are capped at ${MAX_REQUEST} bytes.`, 413);
     body = await readCapped(req.body, MAX_REQUEST);
     if (!body) return fail("too_large", `Requests are capped at ${MAX_REQUEST} bytes.`, 413);

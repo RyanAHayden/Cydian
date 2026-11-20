@@ -291,6 +291,9 @@ Bugs and ideas: [GitHub issues](https://github.com/RyanAHayden/iFizBox/issues) o
   in the repository, not the kit.
 - [zsign](https://github.com/zhlynn/zsign) (MIT) and OpenSSL (Apache-2.0) in the website's signer, with their licences
   in `web/app/vendor/zsign/`.
+- [ElleKit](https://github.com/tealbathingsuit/ellekit) (BSD-3-Clause) by Évelyne Bélanger, bundled for tweak
+  injection: its `libellekit.dylib` goes into a signed app when an injected tweak needs CydiaSubstrate and none was
+  added. The package and its licence are in `web/app/vendor/ellekit/`.
 
 ## License
 

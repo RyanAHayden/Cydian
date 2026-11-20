@@ -132,7 +132,7 @@ function renderRoot(body, ctx) {
   body.replaceChildren(grouped([{ rows, footer: "Add, delete and reorder your sources, or move them to another phone "
     + "or package manager." }, { rows: [{ label: "Recommended", href: here("recommended"), cls: "rec-entry", icon: rowIcon("recommended") },
     // F305: Canister's repo index, where APT repos are kept (jailbroken, or the sideload app's Tweak Sources)
-    ...(findMore.findMoreOn() ? [{ label: "Find More Sources", href: findMore.findHref(), cls: "find-entry", icon: rowIcon("globe") }] : [])],
+    ...(findMore.findMoreOn() ? [{ label: "Find More Sources", href: findMore.findHref(), cls: "find-entry", icon: rowIcon("findMore") }] : [])],
     footer: jailbroken ? "Tweak repos that suit your jailbreak, and app sources."
       : findMore.findMoreOn() ? "App sources to add in one tap, and tweak repos from Canister." : "App sources to add in one tap." }]));
   // The badge: how many aren't added yet.

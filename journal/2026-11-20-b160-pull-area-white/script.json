@@ -1,0 +1,876 @@
+[
+{
+"wait": 2000
+},
+{
+"eval": "localStorage.setItem('ifizbox.firstVisit','later'); 'ok'"
+},
+{
+"nav": "#/sources",
+"ms": 5000
+},
+{
+"touch": "start",
+"x": 200,
+"y": 250
+},
+{
+"touch": "move",
+"x": 200,
+"y": 252
+},
+{
+"touch": "move",
+"x": 200,
+"y": 255
+},
+{
+"touch": "move",
+"x": 200,
+"y": 258
+},
+{
+"touch": "move",
+"x": 200,
+"y": 261
+},
+{
+"touch": "move",
+"x": 200,
+"y": 263
+},
+{
+"touch": "move",
+"x": 200,
+"y": 266
+},
+{
+"touch": "move",
+"x": 200,
+"y": 269
+},
+{
+"touch": "move",
+"x": 200,
+"y": 272
+},
+{
+"touch": "move",
+"x": 200,
+"y": 274
+},
+{
+"touch": "move",
+"x": 200,
+"y": 277
+},
+{
+"touch": "move",
+"x": 200,
+"y": 280
+},
+{
+"touch": "move",
+"x": 200,
+"y": 283
+},
+{
+"touch": "move",
+"x": 200,
+"y": 285
+},
+{
+"touch": "move",
+"x": 200,
+"y": 288
+},
+{
+"touch": "move",
+"x": 200,
+"y": 291
+},
+{
+"touch": "move",
+"x": 200,
+"y": 294
+},
+{
+"touch": "move",
+"x": 200,
+"y": 296
+},
+{
+"touch": "move",
+"x": 200,
+"y": 299
+},
+{
+"touch": "move",
+"x": 200,
+"y": 302
+},
+{
+"touch": "move",
+"x": 200,
+"y": 305
+},
+{
+"wait": 400
+},
+{
+"eval": "(()=>{const a=document.querySelector('.page.is-top ~ * .pull-clip.on .pull-refresh, .pull-clip.on .pull-refresh'); return a ? [getComputedStyle(a).backgroundColor, a.className, a.querySelector('.pull-title').textContent] : 'no area on'})()"
+},
+{
+"shot": "sources-light-under"
+},
+{
+"touch": "end",
+"x": 200,
+"y": 305,
+"ms": 1500
+},
+{
+"touch": "start",
+"x": 200,
+"y": 250
+},
+{
+"touch": "move",
+"x": 200,
+"y": 265
+},
+{
+"touch": "move",
+"x": 200,
+"y": 280
+},
+{
+"touch": "move",
+"x": 200,
+"y": 295
+},
+{
+"touch": "move",
+"x": 200,
+"y": 310
+},
+{
+"touch": "move",
+"x": 200,
+"y": 325
+},
+{
+"touch": "move",
+"x": 200,
+"y": 340
+},
+{
+"touch": "move",
+"x": 200,
+"y": 355
+},
+{
+"touch": "move",
+"x": 200,
+"y": 370
+},
+{
+"touch": "move",
+"x": 200,
+"y": 385
+},
+{
+"touch": "move",
+"x": 200,
+"y": 400
+},
+{
+"touch": "move",
+"x": 200,
+"y": 415
+},
+{
+"touch": "move",
+"x": 200,
+"y": 430
+},
+{
+"touch": "move",
+"x": 200,
+"y": 445
+},
+{
+"touch": "move",
+"x": 200,
+"y": 460
+},
+{
+"touch": "move",
+"x": 200,
+"y": 475
+},
+{
+"touch": "move",
+"x": 200,
+"y": 490
+},
+{
+"touch": "move",
+"x": 200,
+"y": 505
+},
+{
+"touch": "move",
+"x": 200,
+"y": 520
+},
+{
+"touch": "move",
+"x": 200,
+"y": 535
+},
+{
+"touch": "move",
+"x": 200,
+"y": 550
+},
+{
+"wait": 400
+},
+{
+"eval": "(()=>{const a=document.querySelector('.page.is-top ~ * .pull-clip.on .pull-refresh, .pull-clip.on .pull-refresh'); return a ? [getComputedStyle(a).backgroundColor, a.className, a.querySelector('.pull-title').textContent] : 'no area on'})()"
+},
+{
+"shot": "sources-light-past"
+},
+{
+"touch": "end",
+"x": 200,
+"y": 550,
+"ms": 1500
+},
+{
+"nav": "#/changes",
+"ms": 5000
+},
+{
+"touch": "start",
+"x": 200,
+"y": 250
+},
+{
+"touch": "move",
+"x": 200,
+"y": 265
+},
+{
+"touch": "move",
+"x": 200,
+"y": 280
+},
+{
+"touch": "move",
+"x": 200,
+"y": 295
+},
+{
+"touch": "move",
+"x": 200,
+"y": 310
+},
+{
+"touch": "move",
+"x": 200,
+"y": 325
+},
+{
+"touch": "move",
+"x": 200,
+"y": 340
+},
+{
+"touch": "move",
+"x": 200,
+"y": 355
+},
+{
+"touch": "move",
+"x": 200,
+"y": 370
+},
+{
+"touch": "move",
+"x": 200,
+"y": 385
+},
+{
+"touch": "move",
+"x": 200,
+"y": 400
+},
+{
+"touch": "move",
+"x": 200,
+"y": 415
+},
+{
+"touch": "move",
+"x": 200,
+"y": 430
+},
+{
+"touch": "move",
+"x": 200,
+"y": 445
+},
+{
+"touch": "move",
+"x": 200,
+"y": 460
+},
+{
+"touch": "move",
+"x": 200,
+"y": 475
+},
+{
+"touch": "move",
+"x": 200,
+"y": 490
+},
+{
+"touch": "move",
+"x": 200,
+"y": 505
+},
+{
+"touch": "move",
+"x": 200,
+"y": 520
+},
+{
+"touch": "move",
+"x": 200,
+"y": 535
+},
+{
+"touch": "move",
+"x": 200,
+"y": 550
+},
+{
+"wait": 400
+},
+{
+"eval": "(()=>{const a=document.querySelector('.page.is-top ~ * .pull-clip.on .pull-refresh, .pull-clip.on .pull-refresh'); return a ? [getComputedStyle(a).backgroundColor, a.className, a.querySelector('.pull-title').textContent] : 'no area on'})()"
+},
+{
+"shot": "changes-light-past"
+},
+{
+"touch": "end",
+"x": 200,
+"y": 550,
+"ms": 1500
+},
+{
+"nav": "#/home",
+"ms": 5000
+},
+{
+"touch": "start",
+"x": 200,
+"y": 250
+},
+{
+"touch": "move",
+"x": 200,
+"y": 265
+},
+{
+"touch": "move",
+"x": 200,
+"y": 280
+},
+{
+"touch": "move",
+"x": 200,
+"y": 295
+},
+{
+"touch": "move",
+"x": 200,
+"y": 310
+},
+{
+"touch": "move",
+"x": 200,
+"y": 325
+},
+{
+"touch": "move",
+"x": 200,
+"y": 340
+},
+{
+"touch": "move",
+"x": 200,
+"y": 355
+},
+{
+"touch": "move",
+"x": 200,
+"y": 370
+},
+{
+"touch": "move",
+"x": 200,
+"y": 385
+},
+{
+"touch": "move",
+"x": 200,
+"y": 400
+},
+{
+"touch": "move",
+"x": 200,
+"y": 415
+},
+{
+"touch": "move",
+"x": 200,
+"y": 430
+},
+{
+"touch": "move",
+"x": 200,
+"y": 445
+},
+{
+"touch": "move",
+"x": 200,
+"y": 460
+},
+{
+"touch": "move",
+"x": 200,
+"y": 475
+},
+{
+"touch": "move",
+"x": 200,
+"y": 490
+},
+{
+"touch": "move",
+"x": 200,
+"y": 505
+},
+{
+"touch": "move",
+"x": 200,
+"y": 520
+},
+{
+"touch": "move",
+"x": 200,
+"y": 535
+},
+{
+"touch": "move",
+"x": 200,
+"y": 550
+},
+{
+"wait": 400
+},
+{
+"eval": "(()=>{const a=document.querySelector('.page.is-top ~ * .pull-clip.on .pull-refresh, .pull-clip.on .pull-refresh'); return a ? [getComputedStyle(a).backgroundColor, a.className, a.querySelector('.pull-title').textContent] : 'no area on'})()"
+},
+{
+"shot": "home-light-past"
+},
+{
+"touch": "end",
+"x": 200,
+"y": 550,
+"ms": 1500
+},
+{
+"nav": "#/sources",
+"ms": 5000
+},
+{
+"eval": "document.documentElement.dataset.theme='dark'; document.documentElement.dataset.palette='gunmetal'; 'ok'"
+},
+{
+"wait": 500
+},
+{
+"touch": "start",
+"x": 200,
+"y": 250
+},
+{
+"touch": "move",
+"x": 200,
+"y": 252
+},
+{
+"touch": "move",
+"x": 200,
+"y": 255
+},
+{
+"touch": "move",
+"x": 200,
+"y": 258
+},
+{
+"touch": "move",
+"x": 200,
+"y": 261
+},
+{
+"touch": "move",
+"x": 200,
+"y": 263
+},
+{
+"touch": "move",
+"x": 200,
+"y": 266
+},
+{
+"touch": "move",
+"x": 200,
+"y": 269
+},
+{
+"touch": "move",
+"x": 200,
+"y": 272
+},
+{
+"touch": "move",
+"x": 200,
+"y": 274
+},
+{
+"touch": "move",
+"x": 200,
+"y": 277
+},
+{
+"touch": "move",
+"x": 200,
+"y": 280
+},
+{
+"touch": "move",
+"x": 200,
+"y": 283
+},
+{
+"touch": "move",
+"x": 200,
+"y": 285
+},
+{
+"touch": "move",
+"x": 200,
+"y": 288
+},
+{
+"touch": "move",
+"x": 200,
+"y": 291
+},
+{
+"touch": "move",
+"x": 200,
+"y": 294
+},
+{
+"touch": "move",
+"x": 200,
+"y": 296
+},
+{
+"touch": "move",
+"x": 200,
+"y": 299
+},
+{
+"touch": "move",
+"x": 200,
+"y": 302
+},
+{
+"touch": "move",
+"x": 200,
+"y": 305
+},
+{
+"wait": 400
+},
+{
+"eval": "(()=>{const a=document.querySelector('.page.is-top ~ * .pull-clip.on .pull-refresh, .pull-clip.on .pull-refresh'); return a ? [getComputedStyle(a).backgroundColor, a.className, a.querySelector('.pull-title').textContent] : 'no area on'})()"
+},
+{
+"shot": "sources-gunmetal-under"
+},
+{
+"touch": "end",
+"x": 200,
+"y": 305,
+"ms": 1500
+},
+{
+"touch": "start",
+"x": 200,
+"y": 250
+},
+{
+"touch": "move",
+"x": 200,
+"y": 265
+},
+{
+"touch": "move",
+"x": 200,
+"y": 280
+},
+{
+"touch": "move",
+"x": 200,
+"y": 295
+},
+{
+"touch": "move",
+"x": 200,
+"y": 310
+},
+{
+"touch": "move",
+"x": 200,
+"y": 325
+},
+{
+"touch": "move",
+"x": 200,
+"y": 340
+},
+{
+"touch": "move",
+"x": 200,
+"y": 355
+},
+{
+"touch": "move",
+"x": 200,
+"y": 370
+},
+{
+"touch": "move",
+"x": 200,
+"y": 385
+},
+{
+"touch": "move",
+"x": 200,
+"y": 400
+},
+{
+"touch": "move",
+"x": 200,
+"y": 415
+},
+{
+"touch": "move",
+"x": 200,
+"y": 430
+},
+{
+"touch": "move",
+"x": 200,
+"y": 445
+},
+{
+"touch": "move",
+"x": 200,
+"y": 460
+},
+{
+"touch": "move",
+"x": 200,
+"y": 475
+},
+{
+"touch": "move",
+"x": 200,
+"y": 490
+},
+{
+"touch": "move",
+"x": 200,
+"y": 505
+},
+{
+"touch": "move",
+"x": 200,
+"y": 520
+},
+{
+"touch": "move",
+"x": 200,
+"y": 535
+},
+{
+"touch": "move",
+"x": 200,
+"y": 550
+},
+{
+"wait": 400
+},
+{
+"eval": "(()=>{const a=document.querySelector('.page.is-top ~ * .pull-clip.on .pull-refresh, .pull-clip.on .pull-refresh'); return a ? [getComputedStyle(a).backgroundColor, a.className, a.querySelector('.pull-title').textContent] : 'no area on'})()"
+},
+{
+"shot": "sources-gunmetal-past"
+},
+{
+"touch": "end",
+"x": 200,
+"y": 550,
+"ms": 1500
+},
+{
+"eval": "document.documentElement.dataset.palette='dracula'; 'ok'"
+},
+{
+"wait": 500
+},
+{
+"touch": "start",
+"x": 200,
+"y": 250
+},
+{
+"touch": "move",
+"x": 200,
+"y": 265
+},
+{
+"touch": "move",
+"x": 200,
+"y": 280
+},
+{
+"touch": "move",
+"x": 200,
+"y": 295
+},
+{
+"touch": "move",
+"x": 200,
+"y": 310
+},
+{
+"touch": "move",
+"x": 200,
+"y": 325
+},
+{
+"touch": "move",
+"x": 200,
+"y": 340
+},
+{
+"touch": "move",
+"x": 200,
+"y": 355
+},
+{
+"touch": "move",
+"x": 200,
+"y": 370
+},
+{
+"touch": "move",
+"x": 200,
+"y": 385
+},
+{
+"touch": "move",
+"x": 200,
+"y": 400
+},
+{
+"touch": "move",
+"x": 200,
+"y": 415
+},
+{
+"touch": "move",
+"x": 200,
+"y": 430
+},
+{
+"touch": "move",
+"x": 200,
+"y": 445
+},
+{
+"touch": "move",
+"x": 200,
+"y": 460
+},
+{
+"touch": "move",
+"x": 200,
+"y": 475
+},
+{
+"touch": "move",
+"x": 200,
+"y": 490
+},
+{
+"touch": "move",
+"x": 200,
+"y": 505
+},
+{
+"touch": "move",
+"x": 200,
+"y": 520
+},
+{
+"touch": "move",
+"x": 200,
+"y": 535
+},
+{
+"touch": "move",
+"x": 200,
+"y": 550
+},
+{
+"wait": 400
+},
+{
+"eval": "(()=>{const a=document.querySelector('.page.is-top ~ * .pull-clip.on .pull-refresh, .pull-clip.on .pull-refresh'); return a ? [getComputedStyle(a).backgroundColor, a.className, a.querySelector('.pull-title').textContent] : 'no area on'})()"
+},
+{
+"shot": "sources-dracula-past"
+},
+{
+"touch": "end",
+"x": 200,
+"y": 550,
+"ms": 1500
+}
+]

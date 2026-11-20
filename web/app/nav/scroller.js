@@ -27,7 +27,9 @@ export function initScroller(screens) {
     // within its own box.
     const own = body && !body.classList.contains("page-body") ? body.getBoundingClientRect() : null;
     const top0 = own ? own.top : navbar ? navbar.getBoundingClientRect().bottom : screens.getBoundingClientRect().top;
-    const bottom0 = own ? own.bottom : tabbar ? tabbar.getBoundingClientRect().top : screens.getBoundingClientRect().bottom;
+    const barTop = tabbar ? tabbar.getBoundingClientRect().top : screens.getBoundingClientRect().bottom;
+    // B125: a pinned page's results scroller runs under the tab bar; its indicator still stops at the bar.
+    const bottom0 = own ? (tabbar && own.bottom > barTop ? barTop : own.bottom) : barTop;
     bars = { top: top0 + 3, track: bottom0 - top0 - 6 };
   };
   const measureBody = () => {

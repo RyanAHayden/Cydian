@@ -393,6 +393,14 @@ html[data-theme="dark"] .search-field::after { background-color: var(--dk-clear)
 .search-results { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior-y: contain; position: relative; }
 .page-body.search-root:has(> .search-results)::before { display: none; } /* the always-bounce spacer (ios6.css) belongs to the results now */
 .search-results::before { content: ""; float: left; width: 1px; margin-right: -1px; height: calc(100% + 1px); }
+/* B125: the results scroller runs to the bottom of the screen and scrolls under the tab bar, as every page body does;
+   the tab bar's room (and .page-body's 20px after the last row) is its own bottom padding. Left on the page body, that
+   padding ended the scroller a tab bar + 20px up, and the body's white showed as a strip over the last row. The end
+   room the reload strip and Manage's toolbar add (a ::after block) belongs to the results too, not to the flex column. */
+.page-body.search-root:has(> .search-results) { padding-bottom: 0; }
+.search-root > .search-results { padding-bottom: calc(var(--tab-h) + 20px); }
+.page-body.search-root:has(> .search-results)::after { display: none; }
+html.has-manage-toolbar .search-results::after { content: ""; display: block; clear: both; height: 44px; }
 
 /* F91: a signature's days left (Installed, Changes' Needs Re-sign, the app page's Signature row): the tab bar's red
    count badge (ios6.css .badge, its gloss and shadow) without the white ring, in green outside the re-sign window,

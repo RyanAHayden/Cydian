@@ -17,6 +17,7 @@
 
 import { el } from "./ui.js";
 import { EASE, DURATION } from "./motion.js";
+import { navItemOf } from "./navbar.js";
 
 const PER_PAGE = 9;
 
@@ -122,15 +123,6 @@ export function showShareSheet({ items = [], cancel = "Cancel", title = "Share" 
 // ---- the nav bar's Share button ---------------------------------------------------------------------------------
 
 const handlers = new WeakMap();
-
-// The nav item that goes with a page body: same index in its tab's stack (as browse.js setRightLabel finds it).
-function navItemOf(body) {
-  const page = body?.closest?.(".page");
-  const stack = page?.parentElement;
-  if (!stack) return null;
-  const i = [...stack.children].filter((c) => c.classList.contains("page")).indexOf(page);
-  return document.querySelectorAll(`.nav-stack[data-tab="${stack.dataset.tab}"] > .nav-item`)[i] ?? null;
-}
 
 // open: called on a tap; null hides the button. The button goes in front of the page's own right button (Edit,
 // Install), made on first use so no screen's nav() has to know about it.

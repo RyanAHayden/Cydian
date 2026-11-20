@@ -83,7 +83,11 @@ export function reviewText(r) {
 }
 
 export async function reviewAndImport(url, { native = globalThis.ifizboxNative, backend = getBackend(), store = settings,
-  alert = showAlert, hud = showHUD, banner = showBanner } = {}) {
+  alert = showAlert, hud = showHUD, banner = showBanner,
+  // B141: manage.js's onSourcesChanged listeners (loaded here, not imported: settings.js -> this -> manage.js ->
+  // settings.js would be a cycle at start-up). screens/sources.js loads the new sources under the reload bar and
+  // puts them in the catalog; an open Search runs its query again.
+  changed = async () => (await import("./manage.js")).sourcesChanged() } = {}) {
   const gunzip = native?.call
     ? async (bytes) => (await native.call("app.gunzip", { data: toBase64(bytes) })).text
     : null;
@@ -115,9 +119,12 @@ export async function reviewAndImport(url, { native = globalThis.ifizboxNative, 
     return "nothing";
   }
   // Sources on the Source Warning list (core/warnings.js) stay out, as Manage's import leaves them unticked.
+  let added = 0;
   for (const e of r.sources.filter((x) => !x.warning)) {
-    try { await backend.addSource(e.input); } catch (err) { failed.push(`${e.uri}: ${err?.message ?? err}`); }
+    try { await backend.addSource(e.input); added++; } catch (err) { failed.push(`${e.uri}: ${err?.message ?? err}`); }
   }
+  // B141: the new sources load now (the launch refresh ran before this import ended), not on the next Refresh.
+  if (added) { try { await changed(); } catch { /* the sources are in; Search and Refresh load them later */ } }
   for (const s of r.settings) { try { store.set(s.key, s.to); } catch { /* an option this build lacks */ } }
   for (const p of r.holds) { try { await store.holds.set(p, true); } catch { /* the helper refused */ } }
   for (const [id, v] of Object.entries(r.versions ?? {})) { try { store.ignoredVersions?.set(id, v); } catch { /* storage full */ } } // F281

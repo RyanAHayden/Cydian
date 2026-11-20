@@ -17,7 +17,7 @@ import { compatFilterOn } from "../device.js";
 import { settings, createSwitch } from "./settings.js";
 import { SECTION_GROUPS, searchable } from "../core/catalog.js";
 import { displayName, sourcesFor } from "../core/sources.js";
-import { loadNew, onLanded } from "./sources.js";
+import { loadNew, onLanded, onSettled, isLoading } from "./sources.js";
 import { orderSources, loadOrder } from "../core/sourcelist.js";
 import { getBackend } from "../backend.js";
 import { grouped, el, segments } from "../nav/ui.js";
@@ -69,18 +69,28 @@ export function sourceChoices(list, type, order = null) {
 // screens/sources.js starts the load) runs it at once too, so Recommended Sources drops the added source; and so does
 // any catalog load (catalog.onLoaded): Add Source opens the source's page, whose catalog.ensure() often reads the new
 // source before the reload bar's run gets to it, and that path never fires onLanded.
+// B141: each visit keeps its own `retry` set, so a source whose last fetch failed or that has no apps (first launch,
+// the network still coming up) loads once more per visit (core/sources.js retryFilter), not only never-loaded ones;
+// and a run ending (screens/sources.js onSettled) runs the query again, so "still loading" turns into the answer.
 export function followNewSources(ctx, rerun, alive = () => true,
-  { load = loadNew, landed = onLanded, changed = onSourcesChanged, loaded = catalog.onLoaded } = {}) {
+  { load = loadNew, landed = onLanded, changed = onSourcesChanged, loaded = catalog.onLoaded, settled = onSettled } = {}) {
   const offs = [];
   const off = () => { for (const f of offs.splice(0)) f?.(); };
   const listen = (subscribe) => offs.push(subscribe(() => { if (!alive()) { off(); return; } rerun(); }));
   listen(landed);
   listen(changed);
   listen(loaded);
-  const kick = async () => { try { return await load(ctx); } catch { return null; } };
+  listen(settled);
+  const retry = new Set();
+  const kick = async () => { try { return await load(ctx, { retry }); } catch { return null; } };
   kick();
   return { load: kick, off };
 }
+
+// B141: the note under an answered query: nothing when it found rows; while sources are still loading (the reload
+// bar's run) it says so rather than No Results, which comes once they have all answered.
+export const LOADING_NOTE = "Sources are still loading…";
+export const emptyNote = (count, loading) => (count ? "" : loading ? LOADING_NOTE : "No Results");
 
 // F100: the Recent table's rows (nav/ui.js grouped), one per query, a tap hands it to `pick`.
 export function recentRows(list, pick) {
@@ -235,7 +245,7 @@ export function render(body, route, ctx) {
     if (!again) results.scrollTop = 0;
     browse.rememberNames(rows);
     list.setItems(rows);
-    note.textContent = rows.length ? "" : "No Results";
+    note.textContent = emptyNote(rows.length, isLoading());
   }
   // B75: opening Search loads sources never loaded; each one landing runs a typed query again.
   // B98: Recommended Sources is asked again too, so a source just added leaves it once it is in the list.

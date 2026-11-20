@@ -1510,3 +1510,20 @@ export function confirmSoon(delay = 300) {
 // F121: Install's tap needs the profile at once (identityNow), so the website reads it as soon as this module loads.
 // F260: and has the signer check a password nobody checked yet (passwordOk unset), so Install's tap finds it true.
 if (browserSigning() && globalThis.indexedDB) loadIdentity().then((id) => { if (needsConfirm(id)) confirmSoon(0); }).catch(() => {});
+
+// B121: the certificate the saved .p12 holds, read in this browser (core/p12cert.js) and kept with the identity as
+// p12Cert { of (SHA-256 of the .p12, hex), serial, team }, so a profile listing several certificates (F276's from an
+// API key) doesn't stand in for it. Read again when the .p12 changes; null when it can't be opened here (wrong
+// password, a cipher or encoding p12cert doesn't read), and then callers fall back to the profile's serials.
+//   await identityCert(id)   -> { serial, team } | null
+export async function identityCert(id, { save = saveIdentity, read = null, subtle = globalThis.crypto?.subtle } = {}) {
+  if (!id?.p12) return null;
+  let of = null;
+  try { of = Array.from(new Uint8Array(await subtle.digest("SHA-256", bytesOf(id.p12))), (x) => x.toString(16).padStart(2, "0")).join(""); } catch { /* no WebCrypto */ }
+  if (of && id.p12Cert?.of === of && id.p12Cert.serial) return { serial: id.p12Cert.serial, team: id.p12Cert.team ?? null };
+  let leaf = null;
+  try { leaf = await (read ?? (await import("./core/p12cert.js")).p12Leaf)(id.p12, id.password ?? "", subtle); } catch { leaf = null; }
+  if (!leaf?.serial) return null;
+  if (of) await Promise.resolve(save({ p12Cert: { of, serial: leaf.serial, team: leaf.team ?? null } })).catch(() => {});
+  return { serial: leaf.serial, team: leaf.team ?? null };
+}

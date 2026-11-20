@@ -17,12 +17,13 @@
 // The sideload app then hands its shell what to follow while iFizBox isn't open (BackgroundCheck.swift):
 //   updates.watch { apps: [{ id, name, version, source }], known: ["<id> <version>"] } -> { scheduled }
 // `known` are the upgrades already counted on screen: the background check only notifies about ones beyond them.
-// iFizBox itself is followed through its own source (essential.js SELF_ALT_URL). Sent again only when it changes.
+// iFizBox itself is followed through its own source (essential.js SELF_ALT_URL), unless Settings > Updates >
+// <NAME> Updates is off (F285 withoutSelf). Sent again only when it changes.
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { catalog } from "./catalog.js";
 import { getBackend } from "./backend.js";
 import { apps } from "./core/installed.js";
-import { detectMode } from "./core/settings.js";
+import { detectMode, selfUpdateAlertsOn } from "./core/settings.js";
 import { SELF_ALT_URL } from "./core/essential.js";
 import { rememberedUpgrades, mergeUpgrades, watchList, upgradeKeys, altSourceOf, SELF_ID, splitIgnoredVersions,
   settleIgnoredVersions } from "./core/appupdates.js";
@@ -103,14 +104,28 @@ export async function withAppUpgrades(upgrades, holds = [], { mode = detectMode(
   if (mode === "sideload" && native?.call && !failed) {
     const skipped = merged.ignored.filter((r) => r.ignoredVersion);
     const ignored = [...new Set([...(holds ?? []), ...merged.ignored.filter((r) => !r.ignoredVersion).map((r) => r.id)])];
-    const watch = shellWatch(records, [...merged.available, ...skipped], { cands, ignored });
-    const json = JSON.stringify(watch);
-    if (json !== lastSent) {
-      lastSent = json;
-      Promise.resolve().then(() => native.call("updates.watch", watch)).catch(() => { lastSent = null; });
-      // F280: the push server (the signing server) follows the same list (core/push.js; does nothing while Push is off)
-      import("./signing-client.js").then((s) => syncPush({ native, watch, server: s.getServer() })).catch(() => {});
-    }
+    lastWatch = { native, watch: shellWatch(records, [...merged.available, ...skipped], { cands, ignored }) };
+    sendWatch();
   }
   return merged;
 }
+
+// F285: Settings > Updates > <NAME> Updates (core/settings.js selfUpdateAlerts) off: iFizBox's own entry leaves the
+// lists the background check and the push server follow, so only the user's apps alert; Changes still lists it.
+export function withoutSelf(watch, selfAlerts = selfUpdateAlertsOn()) {
+  return selfAlerts ? watch : { ...watch, apps: (watch?.apps ?? []).filter((a) => a?.id !== SELF_ID) };
+}
+let lastWatch = null; // the last full list, for selfAlertsChanged
+function sendWatch() {
+  if (!lastWatch) return;
+  const { native } = lastWatch;
+  const watch = withoutSelf(lastWatch.watch);
+  const json = JSON.stringify(watch);
+  if (json === lastSent) return;
+  lastSent = json;
+  Promise.resolve().then(() => native.call("updates.watch", watch)).catch(() => { lastSent = null; });
+  // F280: the push server (the signing server) follows the same list (core/push.js; does nothing while Push is off)
+  import("./signing-client.js").then((s) => syncPush({ native, watch, server: s.getServer() })).catch(() => {});
+}
+// The switch flipped: send the last list again, with or without iFizBox.
+export const selfAlertsChanged = () => sendWatch();

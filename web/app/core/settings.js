@@ -40,7 +40,7 @@ export const MODES = ["site", "jailbreak", "sideload"];
 // "upgrade-notifications": Upgrade Notifications, N5's daemon's "n Upgrades" in the jailbreak app (F65).
 // "auto-install", "rollback": N7's Automatic Installs rows, which F70 hands to the daemon (daemonPrefs below).
 export const FEATURES = new Set(["appearance", "sources", "holds", "compat", "device", "resign", "upgrade-notifications",
-  "auto-install", "rollback", "keep-id", "expiry-warning", "install-route"]); // "keep-id": Keep Bundle IDs (F237); "expiry-warning": F244
+  "auto-install", "rollback", "keep-id", "expiry-warning", "install-route", "self-alerts"]); // "keep-id": Keep Bundle IDs (F237); "expiry-warning": F244; "self-alerts": F285
 
 const BOTH = ["jailbreak", "sideload"];
 const ALL = ["site", ...BOTH];
@@ -189,6 +189,14 @@ export const SETTINGS = [
       : `Kept on this device, and synced by a ${NAME} Account.`,
   },
   {
+    // F285: the sideload app's alerts (background check, push) about iFizBox's own update. Off: app-updates.js leaves
+    // iFizBox out of updates.watch and the push registration; Changes still lists it. Drawn in the Update Alerts group
+    // (screens/settings.js notifySection), so its section is no SECTIONS group.
+    key: "selfUpdateAlerts", section: "alerts", kind: "toggle", feature: "self-alerts", modes: ["sideload"], default: true,
+    label: `${NAME} Updates`, options: onOff,
+    footer: `Off, only your apps' updates alert you; ${NAME}'s own update still shows in Changes.`,
+  },
+  {
     // F65: N5's background check (native/daemon/) posts "3 Upgrades". Off: `ifizbox-helper notifications off` writes
     // /var/jb/var/lib/ifizbox/upgrades.off and the daemon only updates the icon's count (daemon/quiet.h).
     key: "upgradeNotifications", section: "notifications", kind: "toggle", feature: "upgrade-notifications",
@@ -264,6 +272,10 @@ export const SETTINGS = [
 ];
 
 const PREFIX = "ifizbox.";
+// F285: selfUpdateAlerts as get() reads it, for app-updates.js, which has no settings store of its own.
+export function selfUpdateAlertsOn(storage = globalThis.localStorage) {
+  try { return storage?.getItem?.(PREFIX + "selfUpdateAlerts") !== "false"; } catch { return true; }
+}
 const HOLDS_KEY = PREFIX + "holds";
 const HIDDEN_SECTIONS_KEY = PREFIX + "hiddenSections";
 const AUTO_MARKED_KEY = PREFIX + "autoMarked";

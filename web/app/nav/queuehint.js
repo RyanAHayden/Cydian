@@ -4,12 +4,15 @@
 // Drawn as iOS 6's callout bar (UIMenuController's black glossy bar with its arrow; ios6.css .queue-hint), faded in
 // and out by opacity only. It never takes a touch.
 //
-// When it shows (nextHint, pure): the badge is up, the user has never held the tab (settings' queueHint, kept on the
-// device), and it has not shown yet in this queued run. A run starts when something is queued and ends when the queue
-// is empty again (Confirm run or Cancel); a closed Confirm sheet ("Continue Queuing") is still the same run.
+// When it shows (nextHint, pure): only on a tap of the Installed tab, never when something is queued (it would cover
+// the "added to queue" toast), and then only while the badge is up, the user has never held the tab (settings'
+// queueHint, kept on the device), and it has not shown yet in this queued run. A run starts when something is queued
+// and ends when the queue is empty again (Confirm run or Cancel); a closed Confirm sheet ("Continue Queuing") is still
+// the same run.
 //
 //   const hint = createQueueHint({ bar: tabbarEl, store: settings.queueHint });
-//   hint.update({ queued: true, badge: true, open: () => openConfirm() });  // on every badge change
+//   hint.update({ queued: true, badge: true, open: () => openConfirm() });  // on every badge change: never shows it
+//   // a click on the bar's Installed tab shows it (the hint listens on `bar` itself; tests call hint.tapped())
 import { longPress } from "./menu.js";
 
 export const HINT_TEXT = "Hold Installed to see the queue";
@@ -20,17 +23,19 @@ export const FADE_OUT_MS = 300;
 const ARROW_H = 10; // ios6.css .queue-hint-arrow's height
 const HOLDABLE = "hold-queue"; // the tab's class while a hold opens the queue (the badge is up)
 
-// The rules. `state` { shown } is what this run has done so far; `held` whether the tab was ever held.
+// The rules. `state` { shown } is what this run has done so far; `held` whether the tab was ever held; `tapped`
+// whether this is a tap on the Installed tab (a badge change alone never shows it).
 // -> { state, show }: show the hint now or not.
-export function nextHint(state, { queued = false, badge = false, held = false } = {}) {
+export function nextHint(state, { queued = false, badge = false, held = false, tapped = false } = {}) {
   const shown = queued ? Boolean(state?.shown) : false; // an empty queue ends the run
-  const show = Boolean(queued && badge && !held && !shown);
+  const show = Boolean(tapped && queued && badge && !held && !shown);
   return { state: { shown: shown || show }, show };
 }
 
 // `bar`: the tab bar element (its a.tab[data-tab=installed] gets the hold). `store`: { held(), markHeld() }.
 export function createQueueHint({ bar, store, doc = globalThis.document, win = globalThis, showMs = SHOW_MS } = {}) {
   let state = { shown: false };
+  let last = { queued: false, badge: false }; // the last update, for a tap
   let open = null; // what a hold opens, from the last update
   let toast = null, timer = 0;
   const tab = () => bar?.querySelector?.(`a.tab[data-tab="${HINT_TAB}"]`) ?? null;
@@ -40,6 +45,19 @@ export function createQueueHint({ bar, store, doc = globalThis.document, win = g
     hide();
     open?.();
   }, { doc });
+
+  // A tap on Installed (a hold's click is eaten before it gets here, menu.js swallowNextClick).
+  bar?.addEventListener?.("click", (e) => {
+    const a = e?.target?.closest?.("a.tab");
+    if (a && a === tab()) tapped();
+  });
+
+  function tapped() {
+    const next = nextHint(state, { ...last, held: Boolean(store?.held?.()), tapped: true });
+    state = next.state;
+    if (next.show) show();
+    return next.show;
+  }
 
   function show() {
     const t = tab();
@@ -89,16 +107,16 @@ export function createQueueHint({ bar, store, doc = globalThis.document, win = g
     a.finished.then(() => el.remove(), () => el.remove());
   }
 
-  // Every badge change. `open`: what a hold on the tab opens now.
+  // Every badge change: keeps the run's state and the hold, hides the hint when the badge goes; never shows it.
+  // `open`: what a hold on the tab opens now.
   function update({ queued = false, badge = false, open: o = null } = {}) {
     if (o) open = o;
+    last = { queued: Boolean(queued), badge: Boolean(badge) };
     tab()?.classList?.toggle(HOLDABLE, Boolean(badge && queued));
-    const next = nextHint(state, { queued, badge, held: Boolean(store?.held?.()) });
-    state = next.state;
-    if (next.show) show();
-    else if (!badge) hide();
-    return next.show;
+    state = nextHint(state, { queued, badge, held: Boolean(store?.held?.()) }).state;
+    if (!badge) hide();
+    return false;
   }
 
-  return { update, hide: () => hide(), get shown() { return state.shown; }, get toast() { return toast; } };
+  return { update, tapped, hide: () => hide(), get shown() { return state.shown; }, get toast() { return toast; } };
 }

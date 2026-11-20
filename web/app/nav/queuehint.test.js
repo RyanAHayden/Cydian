@@ -1,4 +1,4 @@
-// F272: the queue's hint shows while the Q'd badge is up, until the Installed tab has been held once (kept in Settings'
+// F272: the queue's hint shows on a tap of Installed while the Q'd badge is up (B130: never on queuing), until the Installed tab has been held once (kept in Settings'
 // storage), and at most once per queued run; a hold on the tab opens the queue only while the badge is up.
 import { test, mock } from "node:test";
 import assert from "node:assert/strict";
@@ -6,21 +6,25 @@ import { nextHint, createQueueHint, HINT_TEXT, SHOW_MS } from "./queuehint.js";
 import { HOLD_MS } from "./menu.js";
 import { createSettings } from "../core/settings.js";
 
-test("rules: shows with the badge up, never held, not yet shown this run", () => {
-  assert.deepEqual(nextHint({ shown: false }, { queued: true, badge: true, held: false }), { state: { shown: true }, show: true });
-  assert.equal(nextHint({ shown: true }, { queued: true, badge: true }).show, false, "once per run");
-  assert.equal(nextHint({ shown: false }, { queued: true, badge: true, held: true }).show, false, "held once: never again");
-  assert.equal(nextHint({ shown: false }, { queued: true, badge: false }).show, false, "no badge (Confirm open, a run going)");
-  assert.equal(nextHint({ shown: false }, { queued: false, badge: false }).show, false);
+test("rules: shows on a tap of Installed with the badge up, never held, not yet shown this run", () => {
+  const tapped = true;
+  assert.deepEqual(nextHint({ shown: false }, { queued: true, badge: true, held: false, tapped }), { state: { shown: true }, show: true });
+  assert.deepEqual(nextHint({ shown: false }, { queued: true, badge: true }), { state: { shown: false }, show: false },
+    "B130: queuing (the badge coming up) alone never shows it");
+  assert.equal(nextHint({ shown: true }, { queued: true, badge: true, tapped }).show, false, "once per run");
+  assert.equal(nextHint({ shown: false }, { queued: true, badge: true, held: true, tapped }).show, false, "held once: never again");
+  assert.equal(nextHint({ shown: false }, { queued: true, badge: false, tapped }).show, false, "no badge (Confirm open, a run going)");
+  assert.equal(nextHint({ shown: false }, { queued: false, badge: false, tapped }).show, false);
 });
 
 test("rules: the badge hiding (Confirm open) keeps the run; an empty queue ends it", () => {
-  let s = nextHint({ shown: false }, { queued: true, badge: true }).state;
+  const tapped = true;
+  let s = nextHint({ shown: false }, { queued: true, badge: true, tapped }).state;
   s = nextHint(s, { queued: true, badge: false }).state; // Confirm sheet up, then Continue Queuing
-  assert.equal(nextHint(s, { queued: true, badge: true }).show, false);
+  assert.equal(nextHint(s, { queued: true, badge: true, tapped }).show, false);
   s = nextHint(s, { queued: false, badge: false }).state; // run or Cancel emptied it
   assert.deepEqual(s, { shown: false });
-  assert.equal(nextHint(s, { queued: true, badge: true }).show, true, "the next queued run shows it again");
+  assert.equal(nextHint(s, { queued: true, badge: true, tapped }).show, true, "the next queued run shows it again");
 });
 
 function mem(init = {}) {
@@ -96,9 +100,40 @@ function setup({ held = false } = {}) {
   return { body, doc, bar, tab, hint, store, opened: [] };
 }
 
+test("B130: queuing never shows the hint (it would cover the 'added to queue' toast); a tap on Installed does", () => {
+  const t = setup();
+  assert.equal(t.hint.update({ queued: true, badge: true }), false);
+  assert.equal(t.hint.update({ queued: true, badge: true }), false, "a second queued item");
+  assert.equal(t.body.children.length, 0, "no hint after queue adds");
+  assert.equal(t.hint.toast, null);
+  dispatch(t.doc, t.tab, "click");
+  assert.ok(t.hint.toast, "tapping Installed shows it");
+  assert.equal(t.body.children.length, 1);
+  t.hint.hide();
+});
+
+test("a tap on another tab does not show the hint", () => {
+  const t = setup();
+  const other = node("tab");
+  t.bar.append(other);
+  t.hint.update({ queued: true, badge: true });
+  dispatch(t.doc, other, "click");
+  assert.equal(t.hint.toast, null);
+  assert.equal(t.body.children.length, 0);
+});
+
+test("a tap on Installed with nothing queued shows nothing", () => {
+  const t = setup();
+  dispatch(t.doc, t.tab, "click");
+  t.hint.update({ queued: false, badge: false });
+  dispatch(t.doc, t.tab, "click");
+  assert.equal(t.body.children.length, 0);
+});
+
 test("the hint shows once over the Installed tab, with its text and arrow, and not again this run", () => {
   const t = setup();
-  assert.equal(t.hint.update({ queued: true, badge: true }), true);
+  t.hint.update({ queued: true, badge: true });
+  assert.equal(t.hint.tapped(), true);
   const el = t.body.children[0];
   assert.ok(el.classList.contains("queue-hint"));
   assert.equal(el.children[0].textContent, HINT_TEXT);
@@ -108,6 +143,7 @@ test("the hint shows once over the Installed tab, with its text and arrow, and n
   assert.equal(el.style.left, "94px", "centred over the tab: 224 - 110");
   assert.equal(el.children[1].style.left, "130px", "arrow on the tab's middle");
   assert.equal(t.hint.update({ queued: true, badge: true }), false, "a route change redraws the badge: no second hint");
+  assert.equal(t.hint.tapped(), false, "a second tap this run: no second hint");
   assert.equal(t.body.children.length, 1);
   t.hint.hide();
 });
@@ -116,6 +152,7 @@ test("near the screen's edge the bubble stays 6px in and the arrow still points 
   const t = setup();
   t.tab.getBoundingClientRect = () => ({ left: 256, top: 431, width: 64, height: 49, bottom: 480 });
   t.hint.update({ queued: true, badge: true });
+  t.hint.tapped();
   const el = t.body.children[0];
   assert.equal(el.style.left, "94px", "320 - 220 - 6");
   assert.equal(el.children[1].style.left, "194px", "tab middle 288 - 94");
@@ -125,6 +162,8 @@ test("near the screen's edge the bubble stays 6px in and the arrow still points 
 test("the badge going (Confirm opened, a run started) fades the hint out", async () => {
   const t = setup();
   t.hint.update({ queued: true, badge: true });
+  t.hint.tapped();
+  assert.ok(t.hint.toast);
   t.hint.update({ queued: true, badge: false });
   assert.equal(t.hint.toast, null);
   await Promise.resolve();
@@ -143,6 +182,7 @@ test("it fades by itself after SHOW_MS", async () => {
     bar.querySelector = () => tab;
     const hint = createQueueHint({ bar, store: { held: () => false }, doc, win: { innerWidth: 320, innerHeight: 480 } });
     hint.update({ queued: true, badge: true });
+    hint.tapped();
     assert.ok(hint.toast);
     mock.timers.tick(SHOW_MS - 1);
     assert.ok(hint.toast);
@@ -155,7 +195,8 @@ test("it fades by itself after SHOW_MS", async () => {
 
 test("never shows once the tab was held", () => {
   const t = setup({ held: true });
-  assert.equal(t.hint.update({ queued: true, badge: true }), false);
+  t.hint.update({ queued: true, badge: true });
+  assert.equal(t.hint.tapped(), false);
   assert.equal(t.body.children.length, 0);
   assert.ok(t.tab.classList.contains("hold-queue"), "the hold still opens the queue");
 });
@@ -166,6 +207,7 @@ test("a hold on Installed with the badge up opens the queue, remembers it, hides
     const t = setup();
     let opened = 0;
     t.hint.update({ queued: true, badge: true, open: () => opened++ });
+    t.hint.tapped();
     assert.ok(t.hint.toast);
     dispatch(t.doc, t.tab, "pointerdown");
     mock.timers.tick(HOLD_MS);
@@ -174,9 +216,11 @@ test("a hold on Installed with the badge up opens the queue, remembers it, hides
     assert.equal(t.hint.toast, null);
     const click = dispatch(t.doc, t.tab, "click");
     assert.ok(click.defaultPrevented && click.stopped, "the lift does not switch tabs");
+    assert.equal(t.hint.toast, null, "the eaten lift is not a tap: no hint");
     // the next run: the hint stays away for good
     t.hint.update({ queued: false, badge: false });
-    assert.equal(t.hint.update({ queued: true, badge: true }), false);
+    t.hint.update({ queued: true, badge: true });
+    assert.equal(t.hint.tapped(), false);
   } finally {
     mock.timers.reset();
   }

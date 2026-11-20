@@ -9,6 +9,8 @@
 //   tailscale.setConnect  {value: "auto"|"localdevvpn"|"tailscale"} -> status (Settings > Installation's Connect With)
 //   tailscale.signIn      starts the node; emits [{step: "login"}] and opens the login page when it needs one,
 //                         [{step: "approval"}] when the tailnet wants it approved; replies status once it's in
+//   tailscale.signInCancel ends a running tailscale.signIn (it replies "canceled: ..."); the page asks it when it's left
+//                         while the sign-in starts or waits for approval
 //   tailscale.test        RemotePairing's handshake to this phone through the tailnet: {ok, code, detail, peer, ms}
 //   tailscale.signOut     logs the node out and deletes its state -> status
 import Darwin
@@ -165,7 +167,14 @@ enum TailscaleBridge {
                 return Tailscale.status()
             }
         }
-        b.on("tailscale.signIn") { c in IDeviceBridge.run(c) { try signIn(c) } }
+        b.on("tailscale.signIn") { c in
+            setCanceled(false) // here, not on the queue: a cancel sent while it waits there still counts
+            IDeviceBridge.run(c) { try signIn(c) }
+        }
+        b.on("tailscale.signInCancel") { c in
+            setCanceled(true)
+            Apt.reply(c, ["ok": true], nil)
+        }
         b.on("tailscale.test") { c in IDeviceBridge.run(c) { try test() } }
         b.on("tailscale.signOut") { c in
             IDeviceBridge.run(c) {
@@ -180,6 +189,11 @@ enum TailscaleBridge {
             }
         }
     }
+
+    private static let cancelLock = NSLock()
+    private static var signInCanceled = false
+    private static func setCanceled(_ v: Bool) { cancelLock.lock(); signInCanceled = v; cancelLock.unlock() }
+    private static var canceled: Bool { cancelLock.lock(); defer { cancelLock.unlock() }; return signInCanceled }
 
     private final class Sheet: NSObject, SFSafariViewControllerDelegate {
         var vc: SFSafariViewController?
@@ -202,6 +216,8 @@ enum TailscaleBridge {
             Tailscale.stop()
             DispatchQueue.main.async { sheet.vc?.dismiss(animated: true) }
         }
+        let stopped = IDevice.Failure(code: "canceled", text: "sign-in canceled: the page was left")
+        if canceled { throw stopped }
         var st = Tailscale.start()
         if let e = st["error"] as? String, !e.isEmpty { throw IDevice.Failure(code: "tailscale", text: e) }
         var shownURL = "", lastState = ""
@@ -214,6 +230,7 @@ enum TailscaleBridge {
                 Tailscale.log("signed in as \(st["name"] ?? "?")")
                 return Tailscale.status()
             }
+            if canceled { Tailscale.log("sign in: canceled by the page"); throw stopped }
             if state == "NeedsMachineAuth" { DispatchQueue.main.async { c.emit([["step": "approval"]]) } }
             if state == "NeedsLogin", let u = st["authURL"] as? String, !u.isEmpty, u != shownURL, let url = URL(string: u) {
                 shownURL = u

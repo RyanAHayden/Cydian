@@ -45,6 +45,7 @@ import { lockMark } from "../nav/lock.js";
 import { settings, createSwitch } from "./settings.js";
 import { NAME } from "../brand.js";
 import { rowIcon } from "../icons/rowicons.js";
+import { confirmUnknownSource, markTrusted, labelSource } from "./safety.js"; // F291
 
 export const SEGMENT = "manage";
 export const isManage = (route) => route.path[0] === SEGMENT;
@@ -331,9 +332,14 @@ export async function addSource(ctx, prefill = null) {
   const typed = cleanSourceUrl(value) || value.trim();
   const input = dist && typed === prefill.url ? { uri: prefill.url, dist: prefill.dist, components: prefill.components } : typed;
   if (!(await confirmWarning(input))) return;
+  // F291: a source not on the known-safe list: Unknown Source (Add & Trust / Add Source / Cancel)
+  const unknown = await confirmUnknownSource(input);
+  if (!unknown) return;
   let error = null;
   try {
-    if (!(await addSecure(input, { backend: getBackend(), showHUD: ctx.showHUD }))) return; // F220: Cancel
+    const saved = await addSecure(input, { backend: getBackend(), showHUD: ctx.showHUD });
+    if (!saved) return; // F220: Cancel
+    if (unknown.trust) markTrusted(saved.uri ? saved : input);
   } catch (e) {
     error = e;
   }
@@ -723,6 +729,7 @@ async function renderRecommended(body, ctx) {
     li.classList.add("source-row", "rec-row");
     li.dataset.key = r.key;
     recIcon(li, r);
+    labelSource(li, { uri: r.rec.url }); // F291: every Recommended source is Known Safe (core/safe-sources.js)
     li.append(getButton(r, async () => { if (await addRecommended(r, ctx)) renderRecommended(body, ctx); }));
   });
   body.replaceChildren(ul);

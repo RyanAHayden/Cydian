@@ -184,11 +184,21 @@ export async function serverStatus(server = getServer()) {
 const SELF_IPA = new RegExp(`^https://github\\.com/${GITHUB_REPO.replace(/[.]/g, "\\.")}/releases/(?:latest/)?download/(?:[^/]+/)?(?:${NAME}|${NAME}-[\\d.]+)\\.ipa$`, "i");
 export const isSelfIpa = (url) => SELF_IPA.test(String(url ?? ""));
 
+// F291: screens/safety.js installSafety for one app; a check that fails to load or throws never blocks an install.
+async function safetyFirst({ url, name, bundleId, version, source = null }) {
+  try {
+    const { installSafety } = await import("./screens/safety.js");
+    return await installSafety([{ id: bundleId || url, bundleId, name, version, url, source }]);
+  } catch { return true; }
+}
+
 // Signs `url` (an IPA) on the phone and installs it. Resolves true once iOS was asked to install; false after an
 // error, which it shows in an alert; false in the jailbreak app (its pages use the helper, so this is only a guard).
 // F93: on the website, signs it in the browser (signInBrowser); `bring` (Install iFizBox App) carries the certificate.
 // F257: `size` (the source's listed size) and `iconUrl` are the website's: an app over its cap opens the Too Big alert.
 export async function signAndInstall({ url, name = "", onInstalled = () => {}, bring = false, bundleId = null, version = "", bytes = null, size = null, iconUrl = null }) {
+  // F291: Known Malware refuses, a reported version asks, the exploitable-iOS alert once (screens/safety.js)
+  if (!isSelfIpa(url) && !(await safetyFirst({ url, name, bundleId, version }))) return false;
   if (browserSigning()) return signInBrowser({ url, name, onInstalled, bring, bundleId, version, bytes, size, iconUrl });
   if (!localSigning()) {
     await showAlert({ title: "Can't Install Here", message: `Apps are signed in the ${NAME} app. Open this one in ${NAME}, AltStore, SideStore or Feather.`, buttons: ["OK"] });

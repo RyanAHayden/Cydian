@@ -174,7 +174,7 @@ const resolved = (p) => Promise.resolve(p).catch(() => null);
 
 export async function reviewsTab(pane, { id, version = "", depiction = null, appStore = null, api, renderText = null, now = Date.now(),
   first = null, onRating = null, sheet = writeReviewSheet, confirm = confirmReport, confirmDelete = confirmDeleteReview, filter = null,
-  rateDelay = 1500, win = globalThis.window ?? null, doc = globalThis.document ?? null, build = false } = {}) {
+  rateDelay = 1500, win = globalThis.window ?? null, doc = globalThis.document ?? null, build = false, malicious = null } = {}) {
   // F206: the card's skeleton (the filled card's shape, "Loading Reviews…" in its last line), not a spinner, so the
   // tab doesn't jump when the reviews arrive.
   pane.replaceChildren(ratingsCard(null, { pending: true, build }));
@@ -302,6 +302,13 @@ export async function reviewsTab(pane, { id, version = "", depiction = null, app
     write.type = "button";
     write.addEventListener("click", async () => { await rating?.flush(); sheet({ initial: mine, version, onSend: post, onDelete: mine ? removeMine : null, confirmDelete }); });
     actions.append(write);
+    // F291: `malicious()` (an app page: screens/safety.js reportMalicious) beside Write a Review
+    if (typeof malicious === "function") {
+      const rep = el("button", "review-button review-malicious", "Report as Malicious");
+      rep.type = "button";
+      rep.addEventListener("click", () => malicious());
+      actions.append(rep);
+    }
     parts.push(actions);
     if (mine?.hidden) parts.push(el("p", "review-hidden-note", "Your review was hidden after other people reported it. Changing it shows it again."));
   }

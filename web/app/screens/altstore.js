@@ -51,6 +51,7 @@ import { showHUD } from "../nav/hud.js";
 import { showUndoBar } from "../nav/undobar.js"; // F242a
 import { APP_MODE_LABEL } from "../core/appqueue.js"; // F242a
 import { installedOnPhone } from "../core/appqueue.js"; // B136
+import { whereFromGroup, reportBanner, reports, reportMalicious } from "./safety.js"; // F291
 
 function img(url, cls) {
   const src = mediaUrl(url);
@@ -694,6 +695,7 @@ export function renderApp(body, route, pkg, source, { related = null } = {}) {
     // F182: reviews written here (screens/reviews.js). B82: This Build | App Store, never averaged; the App Store's
     // written reviews are asked for only when its view first opens.
     reviews: (pane) => reviewsTab(pane, { id: reviewId, version: v.version ?? "", build: true, appStore: appStoreTab(ratingReady, looked), first: oursFirst, api: reviewApi,
+      malicious: () => reportMalicious({ id: reviewId, version: v.version ?? "", name: app.name }), // F291
       onRating: (r) => { header.setRating(r); tiles.set("rating", ratingTile(r)); } }),
     related,
   });
@@ -841,6 +843,17 @@ export function renderApp(body, route, pkg, source, { related = null } = {}) {
     apps().then((store) => recordInstall(store, { id: app.bundleIdentifier, name: app.name, version: v.version, key: pkg.key,
       source: app.sourceUrl, sourceName: app.sourceName || (source ? displayName(source) : ""), icon: app.iconURL })).catch(() => {});
   };
+  // F291: Where It Comes From (the source's trust label, public source code, reports), right above Install; a version
+  // enough devices reported as malicious gets the red card at the top of Details.
+  const where = whereFromGroup({ source, sourceName: app.sourceName || (source ? displayName(source) : ""), sourceUrl: app.sourceUrl,
+    github: appGithub(app) });
+  details.append(where.node);
+  reports().summary(reviewId, v.version ?? "").then((s) => {
+    if (!body.isConnected) return;
+    where.setReports(s);
+    const card = reportBanner(s);
+    if (card) details.prepend(card);
+  }, () => {});
   const queued = detectMode() !== "jailbreak"; // the app queue (F80) and Custom Install (F84) aren't in the jailbreak build
   const { rows, options, gated } = installRows(v, app.sourceUrl, undefined, record, queued ? () => appPageAction(pkg, source) : null, app.name,
     { ...(queued ? { customize: (o) => appPageCustom(pkg, source, o) } : {}), appId: pkg.row?.id ?? st.package ?? app.bundleIdentifier,

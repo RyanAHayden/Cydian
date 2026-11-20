@@ -154,3 +154,19 @@
 .alert-button.green:active, .alert-button.green.is-pressed { background: linear-gradient(#4fae3c, #1e7a14 49%, #136a0a 50%, #1a7512); }
 .alert-button.red:active, .alert-button.red.is-pressed { background: linear-gradient(#bf4c4c, #9c1414 49%, #880909 50%, #941010); }
 .alert-button.red:disabled, .alert-button.green:disabled { opacity: .5; }
+
+/* F291: trust labels (screens/safety.js trustPill): a small glossy pill at the start of a source's subtitle and on an
+   app page's Source row; Unknown is the plain word, so a list of them doesn't look alarming. The red card is a
+   version enough devices reported as malicious. */
+.trust-pill { display: inline-block; font-size: 10.5px; font-weight: bold; line-height: 15px; color: #fff; border-radius: 8px;
+  padding: 0 6px; vertical-align: 1px; text-shadow: 0 -1px 0 rgba(0, 0, 0, .25);
+  background: linear-gradient(#5fbd5a, #3a9b39); background-origin: border-box; }
+.trust-pill-grey { background: linear-gradient(#a7aebb, #8a93a3); background-origin: border-box; }
+.trust-word { color: inherit; }
+.where-from .cell-detail .trust-pill { margin-left: 2px; }
+.where-code-public .cell-detail { color: #2f8a3a; }
+.where-code-hidden .cell-detail { color: #a86a10; }
+.where-reports-bad { color: #b0262a !important; }
+.safety-banner { display: block; margin: 10px 10px 0; padding: 8px 10px; border: 1px solid #d9a3a0; border-radius: 9px;
+  background: #fff3f2; color: #3a1a19; font-size: 13px; line-height: 1.35; }
+.safety-banner-title { display: block; color: #c0392b; font-size: 14px; margin-bottom: 2px; }

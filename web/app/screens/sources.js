@@ -27,6 +27,7 @@ import { reloadSteps } from "../core/reloadsteps.js";
 import { showBanner } from "../nav/banner.js";
 import { failedBanner, FAILED_BANNER_MS } from "../core/aptupdate.js";
 import { refreshRows, tabBadge, coalesce, ROW } from "../core/refreshrows.js";
+import { labelSource, toggleTrust, trustMenuLabel } from "./safety.js"; // F291
 
 export const title = "Sources";
 
@@ -569,6 +570,7 @@ function decorate(li, source, backend) {
   // avatar (F44, core/sources.js sourceIcons). B58: in the app, from the device's icon cache (source-icon.js).
   li.querySelector(".cell-icon").append(sourceIconImage(source.key, sourceIcons(source), backend));
   li.dataset.url = source.uri; // Copy URL (hold the row)
+  labelSource(li, source); // F291: Known Safe / Trusted / Unknown under its name
   // F72: iFizBox's own source is built in: a lock after its name, and no Delete (a swipe arms nothing).
   if (isBuiltin(source)) {
     li.dataset.builtin = "1";
@@ -605,7 +607,11 @@ function attachRowGestures(ul) {
     // F233: a failed row's tap retries it, so the menu opens its packages (the lists from before) instead
     const open = li.classList.contains("is-failed") && state.ctx?.go
       ? [{ label: "Open", onClick: () => state.ctx.go({ tab: "sources", path: [li.dataset.key] }) }] : [];
-    showMenu(li, [...open, { label: "Copy URL", onClick: () => copyText(li.dataset.url) }], { x: e.clientX });
+    // F291: Trust Source / Stop Trusting for a source not on the known-safe list
+    const src = byKey(li.dataset.key);
+    const trust = src && li.dataset.trust !== "safe"
+      ? [{ label: trustMenuLabel(src), onClick: () => { toggleTrust(src); draw(); } }] : [];
+    showMenu(li, [...open, { label: "Copy URL", onClick: () => copyText(li.dataset.url) }, ...trust], { x: e.clientX });
   });
   let start = null;   // the pointer that may become a swipe
   let swiped = false; // the click that ends a swipe opens nothing

@@ -614,7 +614,10 @@ async function recordApp(job) {
 }
 
 // The sideload app's first install with something missing opens the Signing walkthrough (F75) instead: nothing runs.
-async function readyToInstall() {
+// F291: first the safety nets (screens/safety.js installSafety: Known Malware, a reported version, the exploitable-iOS
+// alert once); nothing runs when they stop it.
+async function readyToInstall(jobs = []) {
+  if (!(await (await import("./safety.js")).installSafety(jobs))) return false;
   const sc = await import("../signing-client.js");
   return !(sc.localSigning() && await sc.firstInstallCheck());
 }
@@ -627,7 +630,7 @@ export async function runAppQueue(jobs, { queue = appQueue, install = installApp
   updateAppChrome();
   let done = 0;
   try {
-    if (!(await ready())) return 0;
+    if (!(await ready(jobs))) return 0;
     for (const j of runOrder(jobs)) {
       if (!queue.get(j.id)) continue; // cleared meanwhile
       let ok = false;
@@ -660,7 +663,7 @@ export async function runAppQueueRun(jobs, { queue = appQueue, record = recordAp
   appRunning = true;
   updateAppChrome();
   try {
-    if (!(await ready())) { appRunning = false; updateAppChrome(); return null; }
+    if (!(await ready(jobs))) { appRunning = false; updateAppChrome(); return null; }
     const sc = lanes ? null : await import("../signing-client.js");
     const { runAppRun, phoneLanes } = await import("./apprun.js");
     return await (run ?? runAppRun)(jobs.filter((j) => queue.get(j.id)), {
@@ -738,8 +741,10 @@ async function recordJbApp(job) {
 // reopens Confirm with what finished cleared). Stand-ins for tests: prepare (appSyncFirst), run (runAppRun), lanes,
 // record. -> runAppRun's first end, or null when it didn't start (a run is up, or AppSync's step stopped it).
 export async function runJailbreakApps(jobs, { queue = appQueue, prepare = appSyncFirst, run = null, lanes = null, record = recordJbApp,
-  after = null, finish = null } = {}) {
+  after = null, finish = null, safety = async (j) => (await import("./safety.js")).installSafety(j) } = {}) {
   if (appRunning || appPreparing || running) return null;
+  // F291: Known Malware and reported versions ask first here too (the jailbreak build skips the iOS-version alert)
+  try { if (!(await safety(jobs))) return null; } catch { /* the check failing never blocks an install */ }
   appPreparing = true;
   updateChrome();
   let ready;

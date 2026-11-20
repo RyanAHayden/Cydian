@@ -116,6 +116,14 @@ async function allowToday(db, ipKey, now, daily) {
   return true;
 }
 
+// F291: Report as Malicious (src/reports.js) counts against the same limits: true, or the reason it can't.
+export async function allowReviewWrite(env, db, ipKey, tokenKey, now = Date.now()) {
+  await schema(db);
+  if (!(await allowWrite(env, ipKey, tokenKey))) return "Too many reports from here. Try again in a minute.";
+  if (!(await allowToday(db, ipKey, now, Number(env.REVIEW_DAILY) || REVIEW_DAILY))) return "That's enough reports from here for today.";
+  return true;
+}
+
 function sameSecret(a, b) {
   const x = new TextEncoder().encode(String(a)), y = new TextEncoder().encode(String(b));
   let d = x.length ^ y.length;

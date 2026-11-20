@@ -480,9 +480,17 @@ Plus the arm64e fix-up, the user's edits and tweak injection (below).
   - every Mach-O among them has its load commands pointed at what is bundled (`@rpath/X.dylib`,
     `@rpath/Y.framework/Y`) and its own ID set to its `@rpath` name. CydiaSubstrate (`CydiaSubstrate.framework`,
     `libsubstrate.dylib`, and the ElleKit/libhooker names) points at the bundled `CydiaSubstrate.framework`, or
-    ElleKit's `libellekit.dylib` when only that is there. iFizBox doesn't carry ElleKit: a tweak that links
-    CydiaSubstrate with neither added is refused before signing ("… needs CydiaSubstrate … Add ElleKit's .deb"),
-    and the group's footer says so in red as soon as it's the case;
+    ElleKit's `libellekit.dylib` when only that is there. When a tweak links CydiaSubstrate and neither was added,
+    the bundled ElleKit goes in: `web/app/vendor/ellekit/ellekit_1.2_iphoneos-arm64.deb`, ElleKit 1.2 rootless as
+    https://ellekit.space serves it (SHA-256 `e21dc91b…3906dc`, 331444 bytes, pinned in `core/tweaks.js ELLEKIT`;
+    BSD-3-Clause, its `LICENSE` beside it; source and update steps in that folder's `README.md`). The page fetches
+    it next to itself (the site and the app both carry `web/app/vendor/`), checks size and SHA-256 in plain JS
+    (`core/sha256.js`: the app's web view has no `crypto.subtle`), and `withElleKit` prepares again with it first,
+    so only its `libellekit.dylib` lands in `Frameworks/` (ID `@rpath/libellekit.dylib`; its Swift runtime comes
+    from its own `/usr/lib/swift` rpath) and the tweak's CydiaSubstrate load command points there. The group's
+    footer says "ElleKit 1.2 goes in too" as soon as it's the case. The user's own ElleKit or CydiaSubstrate.framework
+    always wins. Only when the bundled file can't be loaded or isn't the pinned one is the sign refused, with words
+    saying to add ElleKit's .deb;
   - 64 MB of tweaks at most, unpacked.
 
   What the signer gets is `tweaks: {files: [{path, data}], inject: ["@rpath/…"], names}` (base64 data in the app's

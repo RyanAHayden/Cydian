@@ -10,12 +10,14 @@
 //   await g.prepared()                      core/tweaks.js prepareTweaks of the list, or null; throws with words
 //   await savedTweaks(bundleId)             [{ name, data }] kept for that app
 //   await preparedFor(bundleId)             the kept ones, prepared, or null (the website's Install)
+//   await preparedItems(items)              prepared, with the bundled ElleKit when a tweak needs CydiaSubstrate
+//   await loadElleKit()                     the bundled ElleKit .deb (vendor/ellekit), SHA-256 checked, kept once loaded
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { el } from "../nav/ui.js";
 import { showAlert } from "../nav/alert.js";
 import { showActionSheet } from "../nav/actionsheet.js";
 import { openIpaStore, memoryIpaStore } from "../core/myipas.js";
-import { prepareTweaks, tweakProblem, tweakKind, TWEAK_ACCEPT } from "../core/tweaks.js";
+import { prepareTweaks, tweakProblem, tweakKind, TWEAK_ACCEPT, ELLEKIT, checkElleKit, needsElleKit, withElleKit } from "../core/tweaks.js";
 
 const DB = "ifizbox-tweaks";
 let storeP = null;
@@ -39,19 +41,49 @@ export async function saveTweaks(bundleId, items, { store = tweakStore } = {}) {
 }
 
 // Prepared, or null for none; a problem (CydiaSubstrate missing, a bad file) throws an Error with words.
-export function prepareItems(items) {
+// `ellekit`: the checked bundled .deb (loadElleKit), or null to refuse a missing CydiaSubstrate.
+export function prepareItems(items, ellekit = null) {
   if (!items.length) return null;
-  const p = prepareTweaks(items);
+  const p = ellekit ? withElleKit(items, ellekit) : prepareTweaks(items);
   const why = tweakProblem(p);
   if (why) throw new Error(why);
   return p;
 }
 
-export async function preparedFor(bundleId, opts) { return prepareItems(await savedTweaks(bundleId, opts)); }
+// The bundled ElleKit, fetched next to the page (the site and the app both carry web/app/vendor) and checked against
+// its pinned SHA-256; a failed load is tried again next time.
+let elleKitP = null;
+export function loadElleKit({ fetch: get = globalThis.fetch } = {}) {
+  elleKitP ??= (async () => {
+    let data;
+    try {
+      const r = await get(new URL(`../${ELLEKIT.file}`, import.meta.url).href);
+      if (!r.ok) throw new Error(String(r.status));
+      data = new Uint8Array(await r.arrayBuffer());
+    } catch {
+      throw new Error(`The bundled ${ELLEKIT.name} couldn't be loaded. Add ElleKit's .deb to the tweaks yourself.`);
+    }
+    return checkElleKit(data);
+  })();
+  elleKitP.catch(() => { elleKitP = null; });
+  return elleKitP;
+}
+
+// Prepared, or null for none; when a tweak needs CydiaSubstrate and nobody added it, the bundled ElleKit goes in.
+export async function preparedItems(items, { ellekit = loadElleKit } = {}) {
+  if (!items.length) return null;
+  const p = prepareTweaks(items);
+  if (!needsElleKit(p)) return p;
+  return prepareItems(items, await ellekit());
+}
+
+export async function preparedFor(bundleId, opts) { return preparedItems(await savedTweaks(bundleId, opts), opts); }
 
 const sizeText = (n) => (n < 1024 * 1024 ? `${Math.max(1, Math.round(n / 1024))} KB` : `${(n / 1048576).toFixed(1)} MB`);
 const FOOTER = "Add .dylib, .deb or zipped .framework tweaks: they go into the app's Frameworks and load with it. "
-  + "A tweak that uses CydiaSubstrate needs ElleKit's .deb too. Kept for this app when it's signed again.";
+  + `A tweak that uses CydiaSubstrate gets ${ELLEKIT.name} too, unless you add your own. Kept for this app when it's signed again.`;
+const WITH_ELLEKIT = `${ELLEKIT.name} ${ELLEKIT.version} goes in too, for CydiaSubstrate (bundled; BSD licence). `
+  + "Add ElleKit's .deb to use another version.";
 
 let styled = false;
 function style() {
@@ -121,9 +153,9 @@ export function tweaksGroup({ bundleId = "", store = tweakStore, alert = showAle
     add.append(el("span", "cell-label", items.length ? "Add Another Tweak…" : "Add Tweak…"));
     li.append(add, input);
     ul.append(li);
-    let why = null;
-    try { prepareItems(items); } catch (e) { why = String(e?.message ?? e); }
-    foot.textContent = why ? `${why}` : FOOTER;
+    let why = null, bundles = false;
+    try { bundles = Boolean(items.length) && needsElleKit(prepareTweaks(items)); } catch (e) { why = String(e?.message ?? e); }
+    foot.textContent = why ? `${why}` : bundles ? WITH_ELLEKIT : FOOTER;
     foot.classList.toggle("ss-tweak-problem", Boolean(why));
   }
   draw();
@@ -134,6 +166,6 @@ export function tweaksGroup({ bundleId = "", store = tweakStore, alert = showAle
     ready,
     items: () => [...items],
     save: () => saveTweaks(bundleId, items, { store }).catch(() => {}),
-    prepared: async () => prepareItems(items),
+    prepared: async () => preparedItems(items),
   };
 }

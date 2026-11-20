@@ -801,11 +801,18 @@ export async function loadIpaCounts({ mode = myipas.listMode(), list = null, cal
   return counts;
 }
 
+// iFizBox's own row: its record's icon is a file shipped beside the page (core/installed.js selfRecord's
+// icons/icon-lite-glossy-76.png), which mediaUrl (remote images only) refuses. null for any other row or path.
+export function selfIconUrl(r) {
+  const s = String(r?.icon ?? "");
+  return r?.self && /^icons\/[\w.-]+\.(png|svg)$/.test(s) ? s : null;
+}
+
 // Delete controls as on the Sources tab (sources.css styles .source-row: the red minus, Delete, the swipe).
 function decorateApp(li, r) {
   li.classList.add("source-row", "installed-app");
   li.dataset.id = r.id;
-  const src = mediaUrl(r.icon);
+  const src = mediaUrl(r.icon) ?? selfIconUrl(r);
   if (src) {
     const img = new Image();
     img.alt = "";

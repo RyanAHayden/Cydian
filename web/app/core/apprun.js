@@ -34,6 +34,8 @@
 //     .confirm(id) B76: iOS has an app whose row ended "Sent to iOS" (apps.isInstalled on the way back): Installed
 //     .reprompt(id) B85: the "Tap Install on the iOS prompt" row's tap: reprompt(row), logged -> a promise for true | false
 //     .notTaken(id, why) B123: an ended run's "Sent to iOS" row that iOS never took turns Failed (why) -> true | false
+//     .ownIdRetry(id) B151: a row the App Store's install coordinator blocked (IX Code 46: row.busy, coordinatorBusy)
+//                 goes again with Keep Bundle IDs off for that app (its own bundle ID) -> the end promise | null
 //     .rows / .running / .stopping / .current (the row with iOS)
 //
 // B76: a stock phone can't watch iOS's install once iFizBox is in the background, so installed: false after a handoff
@@ -87,7 +89,7 @@ export function appRows(jobs = []) {
   return runOrder(jobs).map((j) => ({
     id: j.id, name: j.name || j.id, mode: j.mode || "install", job: j, size: Number(j.size) > 0 ? Number(j.size) : null,
     state: "waiting", phase: null, fraction: 0, error: null, token: null, bundleId: null, expires: null, unsure: false,
-    dismissed: false, again: false, here: false, local: false,
+    dismissed: false, again: false, here: false, local: false, busy: false,
   }));
 }
 
@@ -107,8 +109,47 @@ export const NOT_YOU = "stopped before it finished (not by Cancel)";
 const errorText = (e) => (e?.code === "cancelled" || /^cancel+ed$/i.test(String(e?.message ?? "").trim())
   ? NOT_YOU : e?.message || String(e));
 
+// B151: installd refuses an app whose bundle ID has an install coordinator someone else holds: "IXErrorDomain
+// Code=46 A coordinated app install already exists for <id> (creator App Store) but request by
+// mobile_installation_proxy had scope requirement ...". The App Store's (a download, update or placeholder that never
+// finished) outlives deleting the app and restarting the iPhone, and nothing installation_proxy or lockdown offers
+// lists or cancels it. A different bundle ID has no coordinator, so the row offers that (ownIdRetry): its tap
+// signs and installs the app again with Keep Bundle IDs off for this app only.
+export const coordinatorBusy = (text) => {
+  const s = String(text ?? "");
+  return /coordinated app install already exists/i.test(s) || /IXErrorDomain\b[\s\S]{0,40}\bCode[ =]*46\b/i.test(s);
+};
+export const BUSY_ROW = "the App Store holds this app's install. Tap to install it with its own bundle ID";
+export const BUSY_ROW_KEPT = "the App Store holds this app's install. Cancel its download, then Retry";
+// The coordinator's bundle ID, as installd names it ("... already exists for com.atebits.Tweetie2 (creator ...").
+export function busyBundleId(text) {
+  const m = /already exists for ([A-Za-z0-9.-]+)/.exec(String(text ?? ""));
+  return m ? m[1] : null;
+}
+// The Log's line under the app: what happened and both ways out.
+export function busyText(row, raw = "", { own = true } = {}) {
+  const id = busyBundleId(raw) || row?.bundleId || row?.id || "";
+  return `the App Store holds an install of ${id || "this app"} (a download or update that never finished), so iOS ` +
+    "won't take another app with that bundle ID; deleting the app or restarting the iPhone doesn't clear it. " +
+    (own ? "Tap the app's row to install it with its own bundle ID (Keep Bundle IDs off for this app), or cancel"
+      : "Cancel") + " the App Store's download (long-press its icon on the Home Screen, or in the App Store), then Retry.";
+}
+// Whether a row can go again under its own bundle ID: an install with an IPA (a link or My IPAs), not iFizBox
+// itself, not the jailbreak app's helper, not a re-sign of a recorded app, and not already off.
+export function ownIdOk(row) {
+  const j = row?.job;
+  if (!j || isSelf(row) || helperRow(row) || row.mode === "remove") return false;
+  if (!j.url && !j.library) return false;
+  return j.options?.edits?.keepBundleId !== false;
+}
+// The job with Keep Bundle IDs off for this app (signing-client.js prepareParams sends edits.keepBundleId).
+export function ownIdJob(job) {
+  const options = job?.options ?? {};
+  return { ...job, options: { ...options, edits: { ...(options.edits ?? {}), keepBundleId: false } } };
+}
+
 const label = (r) => r.name || r.id;
-const pct = (f) => Math.round((Number(f) || 0) * 100);
+const pct =(f) => Math.round((Number(f) || 0) * 100);
 
 // "Stopped at Signing 50%: nothing moved for 3 minutes." (B65's words, for one row)
 export function stallText(row, limit = APP_STALL) {
@@ -178,6 +219,13 @@ export function createAppRun({ rows, sign, install, discard = () => {}, reprompt
   const fail = (r, why) => {
     if (ended(r)) return;
     const text = String(why || "failed");
+    if (coordinatorBusy(text)) { // B151: our words, never installd's dump, as the row's line
+      const own = ownIdOk(r);
+      finishRow(r, "failed", { error: own ? BUSY_ROW : BUSY_ROW_KEPT, busy: own });
+      log(r, "error", `${label(r)}: ${busyText(r, text, { own })}`);
+      pump();
+      return;
+    }
     finishRow(r, "failed", { error: text });
     log(r, "error", `${label(r)}: ${text}`);
     pump();
@@ -264,7 +312,7 @@ export function createAppRun({ rows, sign, install, discard = () => {}, reprompt
   const retryPatch = (r) => {
     const back = r.state === "failed" && r.dismissed && Boolean(reprompt) && Boolean(r.bundleId) && !helperRow(r);
     return { state: back ? "signed" : "waiting", again: back, phase: null, fraction: back ? 1 : 0, error: null,
-      token: null, unsure: false, dismissed: false };
+      token: null, unsure: false, dismissed: false, busy: false };
   };
 
   function pump() {
@@ -362,6 +410,17 @@ export function createAppRun({ rows, sign, install, discard = () => {}, reprompt
       set(r, { state: "failed", unsure: false, dismissed: false, error: why, phase: null, fraction: 0 });
       log(r, "error", `${label(r)}: ${why}`);
       return true;
+    },
+    // B151: a row the App Store's install coordinator blocked (row.busy): signed and installed again from the start
+    // with Keep Bundle IDs off for this app only, so it gets its own bundle ID -> the run's end promise | null
+    ownIdRetry(id) {
+      const r = rows.find((x) => x.id === id);
+      if (!r || r.state !== "failed" || !ownIdOk(r)) return null;
+      r.job = ownIdJob(r.job);
+      set(r, { ...retryPatch(r), state: "waiting", again: false, fraction: 0, bundleId: null });
+      log(r, "step", `Installing ${label(r)} with its own bundle ID`);
+      if (running) { pump(); return endPromise; }
+      return start();
     },
     retryAll() {
       const again = rows.filter((r) => ["failed", "cancelled"].includes(r.state));

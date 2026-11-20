@@ -527,6 +527,24 @@ class Runs(Base):
         self.assertEqual(len(self.debs("libfoo")), 3)
         self.assertNotIn("libfoo_2%3a3.1-1_iphoneos-arm64.deb", self.debs("libfoo"))
 
+    def test_rollback_prune_ignores_dir_order(self):
+        # Two kept .debs with the same mtime (stashed in one run): the higher version stays, whichever order the
+        # folder lists them in. Creating them in both orders flips readdir's order on tmpfs and btrfs alike.
+        for first, second in (("3.1", "3.2"), ("3.2", "3.1")):
+            with self.subTest(created=(first, second)):
+                self.setUp()
+                self.put("settings", "autoInstall=marked\nautoInstallIdle=false\nmarked=libfoo\nkeepVersions=1\n")
+                os.makedirs(os.path.join(self.d, "rollback", "libfoo"))
+                for v in (first, second):
+                    p = self.put("rollback/libfoo/libfoo_2%%3a%s-1_iphoneos-arm64.deb" % v, v)
+                    os.utime(p, (NOW, NOW))
+                self.put("plan", "Inst libfoo [2:3.2-1] (2:3.3-1 R [iphoneos-arm64])\n")
+                self.put("download/libfoo_2%3a3.3-1_iphoneos-arm64.deb", "3.3")
+                self.facts(now=NOW + 23 * H)
+                self.step()
+                self.assertEqual(self.debs("libfoo"),
+                                 ["libfoo_2%3a3.2-1_iphoneos-arm64.deb", "libfoo_2%3a3.3-1_iphoneos-arm64.deb"])
+
     def test_rollback_none(self):
         self.put("settings", "autoInstall=all\nautoInstallIdle=false\nkeepVersions=0\n")
         self.put("cache/libfoo_2%3a3.1-1_iphoneos-arm64.deb", "old")

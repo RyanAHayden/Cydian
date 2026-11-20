@@ -13,7 +13,6 @@ import { fileURLToPath } from "node:url";
 const root = dirname(fileURLToPath(import.meta.url));
 
 const KNOWN = [
-  "core/altstore.js core/sources/ipa.js",
   "core/catalog.js core/installed.js",
   "signing/browser.js signing/device.js signing/early.js signing/identity.js signing/install.js signing/password.js " +
     "signing/prompt.js signing/queue.js signing/route.js signing/watch.js",

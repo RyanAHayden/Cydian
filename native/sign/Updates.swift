@@ -14,7 +14,8 @@
 //   UpdateCheck.badge(_:pageCount:pageKeys:) the icon badge: Changes' last count plus updates it didn't count (B47)
 //   UpdateCheck.Counts / without(_:_:) / handedOff(_:ids:version:) B124: the badge's parts once iFizBox has handed
 //                                 iOS its own update, without that update's row
-//   UpdateCheck.title(_:)       "1 Update" / "3 Updates" (app-updates.js updatesTitle)
+//   UpdateCheck.BadgeSync         B158: the icon badge set in order, the latest count only (Notifications.setIcon)
+//   UpdateCheck.title(_:)     "1 Update" / "3 Updates" (app-updates.js updatesTitle)
 //   UpdateCheck.body(_:)          "Delta 1.6" / "Delta 1.6 and UTM 4.5" / "Delta 1.6, UTM 4.5 and 2 more"
 //   DebVersion.compare(_:_:)         -1, 0, 1 by dpkg's rules, as web/app/core/apt.js compareVersions
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -173,6 +174,29 @@ enum UpdateCheck {
         watch.map { w in
             guard ids.contains(w.id), DebVersion.compare(version, w.version) > 0 else { return w }
             return Watched(id: w.id, name: w.name, version: version, source: w.source)
+        }
+    }
+
+    // B158: the icon badge's setter, in order. Every count the page sends (app.badge) and the shell's own
+    // (selfHandedOff, the background run) goes through one of these on the main thread: `want` as the count arrives,
+    // `start` once iOS's permission is known, `done` when iOS has set it. Only the latest count is set, and only
+    // one at a time: before, each app.badge waited on its own getNotificationSettings and set the badge from there,
+    // so a 0 sent first (the first launch after an update, a recount before iFizBox's own row was read) could land
+    // after the 1 that followed it and leave the icon bare while Changes showed 1.
+    struct BadgeSync: Equatable {
+        private(set) var wanted: Int?
+        private(set) var busy = false
+        mutating func want(_ n: Int) { wanted = max(0, n) }
+        // The count to set now, or nil: nothing new, or one is being set (`done` hands the next).
+        mutating func start() -> Int? {
+            guard !busy, let w = wanted else { return nil }
+            busy = true
+            wanted = nil
+            return w
+        }
+        mutating func done() -> Int? {
+            busy = false
+            return start()
         }
     }
 

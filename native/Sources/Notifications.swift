@@ -114,25 +114,56 @@ final class Notifications: NSObject, UNUserNotificationCenterDelegate {
             UserDefaults.standard.set(n, forKey: BackgroundCheck.pageCountKey) // B47: the background check's badge starts here
             UserDefaults.standard.removeObject(forKey: BackgroundCheck.foundKey) // B124: the page's count stands for all now
             DispatchQueue.main.async {
-                let center = UNUserNotificationCenter.current()
-                if n == 0 { center.removeDeliveredNotifications(withIdentifiers: [upgradesID]) }
-                let set = {
-                    if #available(iOS 16.0, *) {
-                        center.setBadgeCount(n) { e in c.reply(nil, e.map { "badge: \($0.localizedDescription)" }) }
-                    } else {
-                        UIApplication.shared.applicationIconBadgeNumber = n
-                        c.reply(nil, nil)
-                    }
-                }
-                // iOS shows an icon badge only with permission for badges: ask once, the first time there's a count.
-                center.getNotificationSettings { st in
-                    if n > 0 && st.authorizationStatus == .notDetermined {
-                        center.requestAuthorization(options: [.badge, .alert, .sound]) { _, _ in DispatchQueue.main.async(execute: set) }
-                    } else {
-                        DispatchQueue.main.async(execute: set)
-                    }
-                }
+                if n == 0 { UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: [upgradesID]) }
+                setIcon(n, ask: true) { e in c.reply(nil, e.map { "badge: \($0)" }) }
             }
+        }
+    }
+
+    // B158: every icon badge iFizBox sets goes through here (app.badge, BackgroundCheck's run and selfHandedOff), so
+    // the counts land in the order they were asked for: the latest wins (UpdateCheck.BadgeSync, tested on Linux).
+    // Main thread or not; `ask`: iOS shows an icon badge only with permission for badges, so ask once, the first time
+    // there's a count (only where iOS can show the alert: not from a background run). `replied` gets nil or iOS's
+    // error, on the main thread, once the latest count is set.
+    private static var badgeSync = UpdateCheck.BadgeSync() // main thread only
+    private static var badgeReplies = [(String?) -> Void]()
+    private static var lastIcon = 0 // the latest count asked for
+    static func setIcon(_ n: Int, ask: Bool = false, _ replied: ((String?) -> Void)? = nil) {
+        guard Thread.isMainThread else { return DispatchQueue.main.async { setIcon(n, ask: ask, replied) } }
+        badgeSync.want(n)
+        lastIcon = max(0, n)
+        if let replied { badgeReplies.append(replied) }
+        let center = UNUserNotificationCenter.current()
+        center.getNotificationSettings { st in
+            if ask && n > 0 && st.authorizationStatus == .notDetermined {
+                // a count set meanwhile (before the answer) didn't show: set the latest again now
+                center.requestAuthorization(options: [.badge, .alert, .sound]) { _, _ in
+                    DispatchQueue.main.async { badgeSync.want(lastIcon); pumpIcon() }
+                }
+            } else {
+                DispatchQueue.main.async(execute: pumpIcon)
+            }
+        }
+    }
+
+    private static func pumpIcon() {
+        if let n = badgeSync.start() { applyIcon(n) }
+    }
+
+    private static func applyIcon(_ n: Int) {
+        let finished: (String?) -> Void = { e in
+            DispatchQueue.main.async {
+                if let next = badgeSync.done() { return applyIcon(next) }
+                let rs = badgeReplies
+                badgeReplies = []
+                rs.forEach { $0(e) }
+            }
+        }
+        if #available(iOS 16.0, *) {
+            UNUserNotificationCenter.current().setBadgeCount(n) { e in finished(e?.localizedDescription) }
+        } else {
+            UIApplication.shared.applicationIconBadgeNumber = n
+            finished(nil)
         }
     }
 }

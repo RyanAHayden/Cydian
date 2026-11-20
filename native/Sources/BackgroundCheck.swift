@@ -114,8 +114,7 @@ enum BackgroundCheck {
         WidgetStore.save(count: n, names: []) // N8: the widget shows the same count
         let center = UNUserNotificationCenter.current()
         if n == 0 { center.removeDeliveredNotifications(withIdentifiers: [Notifications.upgradesID]) }
-        if #available(iOS 16.0, *) { center.setBadgeCount(n) }
-        else { DispatchQueue.main.async { UIApplication.shared.applicationIconBadgeNumber = n } }
+        Notifications.setIcon(n) // B158: in order with the page's app.badge
         return n
     }
 
@@ -188,8 +187,7 @@ enum BackgroundCheck {
                     UserDefaults.standard.set(found.map(\.key), forKey: BackgroundCheck.foundKey) // B124
                     UNUserNotificationCenter.current().getNotificationSettings { st in
                         guard st.badgeSetting == .enabled else { return }
-                        if #available(iOS 16.0, *) { UNUserNotificationCenter.current().setBadgeCount(badge) }
-                        else { DispatchQueue.main.async { UIApplication.shared.applicationIconBadgeNumber = badge } }
+                        Notifications.setIcon(badge) // B158: one setter, in order
                     }
                     let known = BackgroundCheck.loadKnown()
                     guard !UpdateCheck.fresh(found, known: known).isEmpty else { return finish(true) }

@@ -539,7 +539,8 @@ if (globalThis.ifizboxNative) {
     try { last = localStorage.getItem("ifizbox.lastVersion"); localStorage.setItem("ifizbox.lastVersion", v); } catch { return; }
     if (last && last !== v) {
       // The icon badge counted this very update: clear it; Changes sets it again with what's still waiting (user 2026-11-18).
-      Promise.resolve(globalThis.ifizboxNative.call("app.badge", { count: 0 })).catch(() => {});
+      // B158: through upgradeNotices, so a count Changes already took goes straight back on instead of staying 0.
+      upgradeNotices.updated();
     }
   }).catch(() => {});
   // Back in the foreground after a while: look again (an essential update can come out while iFizBox sits in the

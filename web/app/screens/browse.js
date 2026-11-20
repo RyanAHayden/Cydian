@@ -683,7 +683,7 @@ export function swipeMessage(action, name, prev = null, labels = MODE_LABEL) {
 }
 
 // The first-run hint plays once, for someone who has never queued anything (no flag, nothing queued, no console log
-// kept), on a phone that has a queue, and never with reduced motion.
+// kept), on a phone that has a queue. B129: maybeHint no longer passes `reduce`: with Reduce Motion it fades instead.
 export const SWIPE_HINT_KEY = "ifizbox.swipeHint";
 export function swipeHintDue({ seen = false, queued = 0, logs = 0, queue = false, reduce = false } = {}) {
   return queue && !seen && !queued && !logs && !reduce;
@@ -779,7 +779,14 @@ function attachAppSwipe(listEl, route) {
     },
   });
   listEl.addEventListener("pointermove", () => { if (swipe.active) markHintSeen(); }, { passive: true });
-  maybeHint(listEl, () => appQueue.size, true);
+  // B129: the hint goes on the top row whose swipe does something (often not the first app row in the sideload build:
+  // iFizBox's own row tops Top 25, Changes and its own source, and has nothing to queue once installed), with that
+  // swipe's control.
+  const hintAction = async (row) => {
+    if (!canSwipeRow(row) || row._item.kind !== "ipa") return null;
+    return rowSwipeAction(row._item, { apps: true, ...(await appRowState(row._item)), listKey });
+  };
+  maybeHint(listEl, () => appQueue.size, true, hintAction);
   return swipe;
 }
 
@@ -791,25 +798,36 @@ function restoreApp(id, prev, { quiet = false } = {}) {
 
 // F193's first-run hint: ~0.7 s after the list opens, its top row on screen eases left by 44pt and back, once.
 // F213: `queued` counts the queue the rows swipe to; `apps` keeps the hint to rows that swipe (app rows in sideload).
-function maybeHint(listEl, queued = () => installQueue.size, apps = false) {
+// B129: `actionOf(row)` (the sideload build's app rows) -> the row's swipe action or null: the hint skips rows whose
+// swipe does nothing and shows the control that row's swipe shows. With Reduce Motion the hint fades instead of
+// moving (rowswipe.js playHint `fade`), so it still shows.
+function maybeHint(listEl, queued = () => installQueue.size, apps = false, actionOf = null) {
   let seen = false;
   try { seen = !!hintStore()?.getItem(SWIPE_HINT_KEY); } catch { /* unreadable: treat as unseen */ }
   const reduce = !!globalThis.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-  if (hintPlayed || !swipeHintDue({ seen, queued: queued(), logs: seen ? 0 : runLogs.list().length, queue: true, reduce })) return;
-  setTimeout(() => {
+  if (hintPlayed || !swipeHintDue({ seen, queued: queued(), logs: seen ? 0 : runLogs.list().length, queue: true })) return;
+  setTimeout(async () => {
     if (hintPlayed || !listEl.isConnected) return;
     const rows = [...listEl.querySelectorAll(".pkg-row:not([hidden])")].filter((r) => r._item?.id && r._.a.getAttribute("href")
       && (!apps || r._item.kind === "ipa"));
     const view = listEl.parentElement?.getBoundingClientRect();
-    let first = null, top = Infinity;
+    const onScreen = [];
     for (const r of rows) {
       const b = r.getBoundingClientRect();
-      if (b.height && b.top >= (view?.top ?? 0) - 1 && b.top < top && b.bottom <= innerHeight) { first = r; top = b.top; }
+      if (b.height && b.top >= (view?.top ?? 0) - 1 && b.bottom <= innerHeight) onScreen.push({ r, top: b.top });
     }
-    if (!first) return; // not on screen (another tab's list), or empty: the next list tries
+    onScreen.sort((a, b) => a.top - b.top);
+    let first = null, kind = "add";
+    for (const { r } of onScreen.slice(0, actionOf ? 6 : 1)) {
+      if (!actionOf) { first = r; break; }
+      const a = await Promise.resolve(actionOf(r)).catch(() => null);
+      if (hintPlayed || !listEl.isConnected) return;
+      if (a && r._item && r.isConnected) { first = r; kind = a.kind; break; }
+    }
+    if (!first) return; // not on screen (another tab's list), empty, or nothing here swipes: the next list tries
     hintPlayed = true;
     markHintSeen();
-    playHint(first, { distance: 44, duration: 1100, kind: "add" });
+    playHint(first, { distance: 44, duration: 1100, kind, fade: reduce });
   }, 700);
 }
 

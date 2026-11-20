@@ -511,12 +511,14 @@ test("B151: the App Store's install coordinator (IX Code 46) reads in plain word
   assert.equal(r.busy, true);
   assert.equal(rowStatus(r), `Failed: ${BUSY_ROW}`);
   assert.ok(!rowStatus(r).includes("IXErrorDomain"), "never installd's dump as the main line");
+  // B155: the real cause was the App Store copy still installed; the row says so, short
+  assert.equal(BUSY_ROW_KEPT, "the App Store version is installed. Delete it, then Retry");
+  assert.equal(rowStatus(r), "Failed: the App Store version is installed. Delete it, then Retry, or tap to install it with its own bundle ID");
   const err = lines.filter((l) => l.kind === "error").map((l) => l.text);
-  assert.equal(err.length, 1);
-  assert.ok(!err[0].includes("IXErrorDomain"));
-  assert.match(err[0], /^X: the App Store holds an install of com\.atebits\.Tweetie2 /);
-  assert.match(err[0], /restarting the iPhone doesn't clear it/);
-  assert.match(err[0], /its own bundle ID/);
+  assert.deepEqual(err, [`X: ${BUSY_ROW}`], "the Log's red line is the same one short line");
+  // installd's error kept, grey, right below it
+  const i = lines.findIndex((l) => l.kind === "error");
+  assert.deepEqual(lines[i + 1], { id: "com.atebits.Tweetie2", kind: "raw", text: IX46 });
   assert.equal(summaryLine(rows), "1 failed");
 
   // the tap: signed again from the start with Keep Bundle IDs off for this app only
@@ -553,7 +555,9 @@ test("B151: iFizBox itself and a record-only re-sign get the plain words without
     assert.equal(rowStatus(r), `Failed: ${BUSY_ROW_KEPT}`);
     assert.equal(run.ownIdRetry(r.id), null);
   }
-  assert.ok(lines.filter((l) => l.kind === "error").every((l) => /^[^:]+: the App Store holds .*Cancel the App Store's download/.test(l.text)));
+  assert.deepEqual(lines.filter((l) => l.kind === "error").map((l) => l.text).sort(),
+    [`Rec: ${BUSY_ROW_KEPT}`, `Self: ${BUSY_ROW_KEPT}`]);
+  assert.equal(lines.filter((l) => l.kind === "raw" && l.text === IX46).length, 2);
 });
 
 // B153: a retry after the run ended is a new pass (onStart(pass)); a retry while the run still goes is not, and the

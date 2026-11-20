@@ -1,10 +1,14 @@
 """F288: fixtures for core/tweaks.test.js, made with the standard library only: small .debs (data.tar.xz, .lzma, .gz,
-and a .zst one that must be refused) holding tiny Mach-O dylibs, a zipped .framework and an app executable.
+.zst, .bz2) holding tiny Mach-O dylibs, a zipped .framework and an app executable, plus payload.zst and payload.bz2
+(F294: a bigger text in two frames/streams, for the zstd and bzip2 decoders).
+zstd needs Python 3.14+ (compression.zstd); its bytes follow the libzstd Python was built with, so --check can
+differ on another libzstd version even when nothing is wrong.
 
     python3 web/app/core/fixtures/tweaks/make.py          write them here
     python3 web/app/core/fixtures/tweaks/make.py --check  exit 1 when the committed files differ (test_fixtures.py)
 
 Everything is deterministic (fixed mtimes, gzip mtime 0), so --check compares bytes."""
+import bz2
 import gzip
 import io
 import lzma
@@ -93,8 +97,39 @@ def compress(data, kind):
     if kind == "lzma":
         return lzma.compress(data, format=lzma.FORMAT_ALONE)
     if kind == "zst":
-        return b"\x28\xb5\x2f\xfd" + data[:64]  # not real zstd: it must be refused before anything reads it
+        from compression import zstd  # Python 3.14+
+        return zstd.compress(data, options={zstd.CompressionParameter.compression_level: 19,
+                                            zstd.CompressionParameter.checksum_flag: 1})
+    if kind == "bz2":
+        return bz2.compress(data, 9)
     return data
+
+
+def payload():
+    """~200 KB of varied, repetitive text: Huffman literals, FSE-described tables and long matches in zstd; several
+    hundred thousand symbols and RLE1 runs in bzip2."""
+    lines = []
+    for i in range(4000):
+        lines.append(f"{i:05d} {'abcdefghij'[i % 10] * (i % 13)} tweak {i * 7919 % 1000:03d} "
+                     f"{'Fixture' if i % 3 else 'Other'}.dylib {'=' * (i % 40)}\n")
+    return "".join(lines).encode()
+
+
+def payload_zst():
+    """Two zstd frames in a row: level 3 without a checksum, level 19 with one."""
+    from compression import zstd
+    p = payload()
+    half = len(p) // 2
+    return (zstd.compress(p[:half], 3) +
+            zstd.compress(p[half:], options={zstd.CompressionParameter.compression_level: 19,
+                                             zstd.CompressionParameter.checksum_flag: 1}))
+
+
+def payload_bz2():
+    """Two bzip2 streams in a row (as pbzip2 writes), the first in 100 KB blocks so it spans several."""
+    p = payload()
+    half = len(p) // 2
+    return bz2.compress(p[:half], 1) + bz2.compress(p[half:], 9)
 
 
 def ar(members):
@@ -160,6 +195,10 @@ def fixtures():
             ("./var/jb/Library/Frameworks/CydiaSubstrate.framework/Info.plist", b"<plist/>"),
         ], "gz"),
         "tweak-zst.deb": deb(control, [("./Library/MobileSubstrate/DynamicLibraries/Z.dylib", plain)], "zst"),
+        "tweak-bz2.deb": deb(control, [("./var/jb/usr/lib/TweakInject/B.dylib", plain),
+                                       ("./var/jb/usr/lib/libFixtureKit.dylib", kit)], "bz2"),
+        "payload.zst": payload_zst(),
+        "payload.bz2": payload_bz2(),
         "Plain.dylib": plain,
         "FixtureUI.framework.zip": fw_zip.getvalue(),
         "app.macho": app,

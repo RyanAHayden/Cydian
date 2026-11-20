@@ -3,8 +3,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { gzipSync, deflateRawSync } from "node:zlib";
-import { inflate, gunzip, unxz, unlzma, readAr, readTar, readZip, decompress } from "./unpack.js";
+import { gzipSync, deflateRawSync, zstdCompressSync, constants as zlibConstants } from "node:zlib";
+import { inflate, gunzip, unxz, unlzma, unzstd, bunzip2, readAr, readTar, readZip, decompress } from "./unpack.js";
 import { prepareTweaks, injectInto, dylibsOf, loadCommands, idOf, slices, tweakParams, tweakProblem, unpackDeb, isMachO,
   LC, SUBSTRATE, RPATH, rewriteDylibs } from "./tweaks.js";
 
@@ -26,7 +26,8 @@ test("inflate and gunzip read what zlib writes, stored and compressed blocks ali
 });
 
 test("the .debs' archives: ar, then each compressed tar", () => {
-  for (const [name, kind] of [["tweak-xz.deb", ".xz"], ["tweak-lzma.deb", ".lzma"], ["ellekit.deb", ".gz"]]) {
+  for (const [name, kind] of [["tweak-xz.deb", ".xz"], ["tweak-lzma.deb", ".lzma"], ["ellekit.deb", ".gz"],
+    ["tweak-zst.deb", ".zst"], ["tweak-bz2.deb", ".bz2"]]) {
     const ar = readAr(fx(name));
     assert.deepEqual(ar.map((m) => m.name), ["debian-binary", "control.tar.gz", `data.tar${kind}`], name);
     const tar = readTar(decompress(ar[2].name, ar[2].data));
@@ -52,6 +53,58 @@ test("xz and lzma decoders round-trip the fixtures' payloads, and refuse damage"
   assert.throws(() => decompress("data.tar.bz2", new Uint8Array(4)), /bzip2/);
 });
 
+// F294: the same text as make.py's payload(), to compare the decoders' output with.
+const payload = () => {
+  let s = "";
+  for (let i = 0; i < 4000; i++) {
+    s += `${String(i).padStart(5, "0")} ${"abcdefghij"[i % 10].repeat(i % 13)} tweak ${String(i * 7919 % 1000).padStart(3, "0")} `
+      + `${i % 3 ? "Fixture" : "Other"}.dylib ${"=".repeat(i % 40)}\n`;
+  }
+  return text(s);
+};
+
+test("unzstd and bunzip2 read Python's zstd and bz2: frames and streams in a row, checksums, several blocks", () => {
+  assert.deepEqual(unzstd(fx("payload.zst")), payload());
+  assert.deepEqual(bunzip2(fx("payload.bz2")), payload());
+  assert.deepEqual(decompress("data.tar.zstd", fx("payload.zst")), payload());
+  assert.throws(() => unzstd(fx("payload.zst"), 1000), /too big/, "a bomb stops at the limit");
+  assert.throws(() => bunzip2(fx("payload.bz2"), 1000), /too big/);
+  assert.throws(() => unzstd(text("not zstd at all")), /isn't zstd/);
+  assert.throws(() => bunzip2(text("not bzip2 at all")), /isn't bzip2/);
+});
+
+test("unzstd and bunzip2 refuse damage instead of returning garbage", () => {
+  const bz = fx("payload.bz2");
+  for (const at of [20, 200, 5000, bz.length - 12]) {
+    const bad = bz.slice(); bad[at] ^= 0x55;
+    assert.throws(() => bunzip2(bad), /bzip2/, `byte ${at}`);
+  }
+  assert.throws(() => bunzip2(bz.subarray(0, bz.length >> 1)), /ends too soon|damaged/);
+  const zs = fx("payload.zst");
+  assert.throws(() => unzstd(zs.subarray(0, zs.length >> 1)), /ends too soon|damaged/);
+  // zstd has no checksum on every frame, so flip bytes in the first frame's block headers and literal headers: a
+  // damaged header must throw; a flip inside entropy-coded data may decode wrong, but must not hang or overrun
+  let thrown = 0;
+  for (let at = 6; at < 400; at += 7) {
+    const bad = zs.slice(); bad[at] ^= 0xa5;
+    try { const out = unzstd(bad); assert.ok(out.length < 1 << 20); } catch (e) { assert.equal(e.name, "UnpackError", `byte ${at}: ${e.message}`); thrown++; }
+  }
+  assert.ok(thrown > 20, `${thrown} damaged copies refused`);
+});
+
+test("unzstd: raw, RLE and compressed blocks at every level node's zlib writes, when it has zstd", { skip: !zstdCompressSync && "node has no zstd" }, () => {
+  const rnd = new Uint8Array(70000);
+  let x = 1;
+  for (let i = 0; i < rnd.length; i++) { x = (x * 1103515245 + 12345) >>> 0; rnd[i] = x >>> 24; }
+  const p = payload();
+  for (const data of [new Uint8Array(0), text("a"), new Uint8Array(300000).fill(9), rnd, p, new Uint8Array([...rnd.subarray(0, 9000), ...p, ...rnd.subarray(0, 9000)])]) {
+    for (const level of [1, 3, 12, 19, 22]) {
+      const z = new Uint8Array(zstdCompressSync(data, { params: { [zlibConstants.ZSTD_c_compressionLevel]: level, [zlibConstants.ZSTD_c_checksumFlag]: level & 1 } }));
+      assert.deepEqual(unzstd(z), data, `${data.length} bytes, level ${level}`);
+    }
+  }
+});
+
 test("readZip: deflated entries, folders and the macOS litter", () => {
   const z = readZip(fx("FixtureUI.framework.zip"));
   assert.deepEqual(z.map((e) => e.path), ["FixtureUI.framework/FixtureUI", "FixtureUI.framework/Info.plist", "__MACOSX/FixtureUI.framework/._FixtureUI"]);
@@ -67,7 +120,15 @@ test("unpackDeb sorts a rootless tweak into the app and names the package", () =
     ["Fixture.bundle/Info.plist", false],
   ]);
   assert.deepEqual(d.ignored, ["Library/PreferenceLoader/Preferences"]);
-  assert.throws(() => unpackDeb(fx("tweak-zst.deb"), "z.deb"), /zstd/);
+});
+
+test("unpackDeb: zstd and bzip2 .debs unpack like the others", () => {
+  assert.deepEqual(unpackDeb(fx("tweak-zst.deb"), "z.deb").files.map((f) => [f.path, f.inject]), [["Frameworks/Z.dylib", true]]);
+  const b = unpackDeb(fx("tweak-bz2.deb"), "b.deb");
+  assert.deepEqual(b.files.map((f) => [f.path, f.inject]), [["Frameworks/B.dylib", true], ["Frameworks/libFixtureKit.dylib", false]]);
+  assert.deepEqual(b.files[0].data, fx("Plain.dylib"));
+  assert.deepEqual(prepareTweaks([{ name: "z.deb", data: fx("tweak-zst.deb") }, { name: "b.deb", data: fx("tweak-bz2.deb") }]).inject,
+    ["@rpath/Z.dylib", "@rpath/B.dylib"]);
 });
 
 test("prepareTweaks: a tweak that links CydiaSubstrate without ElleKit is refused, with what to add", () => {

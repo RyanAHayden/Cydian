@@ -97,4 +97,4 @@ export async function siteUdid() {
   try { return (await import("../screens/signing.js")).storedUdid(); } catch { return null; }
 }
 
-export const buffer = (b) => (b instanceof Uint8Array ? b.slice().buffer : b instanceof ArrayBuffer ? b.slice(0) : new Uint8Array(b ?? []).buffer);
+export { buffer } from "./common.js"; // C32: lives there, so password.js needs no early.js at startup

@@ -66,7 +66,7 @@ import { depIndex, explain, explainApt } from "./deps.js";
 import { withIpaInfo } from "./ipainfo.js";
 import { needsRestart } from "./queue.js";
 import { packageKind } from "./progress.js";
-import { injectableFromFields } from "./tweaks.js"; // F302
+import { injectableFromFields } from "./tweakfields.js"; // F302; C32: not tweaks.js, which pulls unpack.js in
 
 export const ALL = "*";
 export const NO_SECTION = "(No Section)";

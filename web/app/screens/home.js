@@ -42,8 +42,9 @@ import { homeOffer, debUrl, debAlert, REPO_URL, APP_IPA_URL, APP_NAME, ownBuilds
 import { fetchRelease, debFor } from "../core/selfupdate.js";
 const refreshInBackground = (ctx) => load("sources").then((m) => m.refreshInBackground(ctx)); // F313: Sources loads after Home
 import { markiFizBoxInstalled, browsingLocked, askToBrowse } from "../websign-gate.js";
-import * as guides from "./guides.js";
-import { guideRows, JAILBREAK_INFO_URL } from "./guides.js";
+// C32: Home's root needs only the guide list (guide-index.js); the guides load at #/home/guides (lazy.js).
+import { guideRows, JAILBREAK_INFO_URL, isLite } from "./guide-index.js";
+const guides = lazyNs("guides");
 import * as why from "./why.js"; // F303: Why <NAME> (#/home/why)
 import { NAME } from "../brand.js";
 import { rowIcon, PAGE_ICONS } from "../icons/rowicons.js";
@@ -151,7 +152,7 @@ export const SETTINGS_ICON = rowIcon(PAGE_ICONS.general);
 export const THEME_ICON = "home-glyph glyph-theme";
 // F157: the User Guides' lite set (no jailbreak guides) while Not Jailbroken: the sideload build, and the website
 // while Settings > Device says so (as F144).
-const guidesLite = () => guides.isLite(settings.deviceType());
+const guidesLite = () => isLite(settings.deviceType());
 export function homeLinks() {
   return [{ pair: true, rows: [{ label: "Settings", href: format(settingsRoute()), icon: SETTINGS_ICON, cls: "home-settings-row" },
     { label: "Theme", href: format(settingsRoute(["theme"])), icon: { cls: THEME_ICON }, cls: "home-settings-row" }] }, {

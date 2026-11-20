@@ -13,7 +13,9 @@ import { lazyFor, LAZY_TABS, SETTINGS_PARTS, BROWSE_PARTS, TAB_TITLES, TABS, set
 const root = dirname(fileURLToPath(import.meta.url));
 // The bound F313 set (169 modules, 2.74 MB before; 104 after). Raise it only with a reason in the commit.
 // C28 split signing-client.js into signing/ (14 files for 1, the same code): 119, so 124.
-const MAX_MODULES = 124;
+// C32: core/tweaks.js + core/unpack.js, the website's signer (signing/browser.js and its parts) and screens/guides.js
+// left startup (1.55 MB -> 1.34 MB): 114, so 117.
+const MAX_MODULES = 117;
 
 // Static imports only: `import x from "…"`, `import "…"`, `export … from "…"` at the start of a line (multi-line
 // lists included). import() calls are not matched.
@@ -50,7 +52,10 @@ test("no lazily loaded module is in the startup closure", () => {
 
 test("the heavy screens stay out of startup", () => {
   for (const f of ["screens/browse.js", "screens/altstore.js", "screens/myipas.js", "screens/devaccount.js",
-    "screens/free-apple-id.js", "screens/tweaks.js", "core/gsa.js", "core/asc.js"]) {
+    "screens/free-apple-id.js", "screens/tweaks.js", "core/gsa.js", "core/asc.js",
+    // C32
+    "core/tweaks.js", "core/unpack.js", "signing/browser.js", "signing/early.js", "signing/toobig.js",
+    "signing/watch.js", "signing/prompt.js", "screens/guides.js"]) {
     assert.ok(!closure.has(join(root, f)), `${f} loads at startup: ${chain(closure, join(root, f))}`);
   }
 });
@@ -69,7 +74,8 @@ test("the tab bar's titles are the screens' own", async () => {
 
 test("lazyFor: what each route waits for", () => {
   assert.deepEqual(lazyFor({ tab: "home", path: [] }), []);
-  assert.deepEqual(lazyFor({ tab: "home", path: ["guides"] }), []);
+  assert.deepEqual(lazyFor({ tab: "home", path: ["guides"] }), ["guides"]);
+  assert.deepEqual(lazyFor({ tab: "home", path: ["guides", "faq", "app"] }), ["guides"]);
   assert.deepEqual(lazyFor({ tab: "installed", path: [] }), ["installed"]);
   assert.deepEqual(lazyFor({ tab: "sources", path: ["manage", "sources"] }), ["sources"]);
   assert.deepEqual(lazyFor(settingsRoute()), SETTINGS_PARTS);

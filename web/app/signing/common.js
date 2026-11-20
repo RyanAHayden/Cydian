@@ -76,3 +76,5 @@ export const bridge = (native) => {
 export const storageOf = () => { try { return globalThis.localStorage ?? null; } catch { return null; } };
 
 export const browserSigning = () => detectMode() === "site";
+// Bytes as an ArrayBuffer of their own, for the signing worker (early.js re-exports it).
+export const buffer = (b) => (b instanceof Uint8Array ? b.slice().buffer : b instanceof ArrayBuffer ? b.slice(0) : new Uint8Array(b ?? []).buffer);

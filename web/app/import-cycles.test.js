@@ -14,8 +14,10 @@ const root = dirname(fileURLToPath(import.meta.url));
 
 const KNOWN = [
   "core/catalog.js core/installed.js",
-  "signing/browser.js signing/device.js signing/early.js signing/identity.js signing/install.js signing/password.js " +
-    "signing/prompt.js signing/queue.js signing/route.js signing/watch.js",
+  // C32 cut the one signing/ cycle into these three (install.js and password.js reach browser.js with import())
+  "signing/browser.js signing/early.js signing/prompt.js signing/watch.js",
+  "signing/device.js signing/identity.js signing/password.js",
+  "signing/install.js signing/queue.js signing/route.js",
   "screens/browse.js screens/manage.js screens/roulette.js",
 ];
 

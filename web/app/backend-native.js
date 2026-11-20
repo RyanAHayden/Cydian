@@ -47,7 +47,7 @@ import { freshUrl } from "./core/sources.js";
 import { BackendError } from "./backend-http.js";
 import { verifySource, refreshSource, openSourceStore, sortSources, loadTweakSources } from "./core/sources.js";
 import { sourceCalls, loadInjectSources } from "./core/sources.js"; // F302
-import { countInjectable } from "./core/tweaks.js"; // F302
+import { countInjectable } from "./core/tweakfields.js"; // F302; C32: the small module, not core/tweaks.js
 import { parseAptSources, listNamesFor } from "./core/aptsources.js";
 import { healthFields } from "./core/health.js";
 import { DEFAULT_ARCH, compareVersions } from "./core/apt.js";
@@ -60,7 +60,6 @@ import { encodeUrl } from "./core/urlencode.js";
 import { reviewsApi, reviewsBase } from "./core/reviews.js";
 import { updateFailures, failureFor, liveUpdate } from "./core/aptupdate.js";
 import { createKeepAwake } from "./core/keepawake.js";
-import { decompress } from "./core/unpack.js"; // B177: Packages.bz2 / .zst the shell's net.packages can't read
 
 // F287: the shell calls that are work the screen must stay on for: a streamed helper run (apt-get update, an apply,
 // a rollback, an uninstall with its console), a .deb's download and install, an IPA or paid package's install.
@@ -132,6 +131,7 @@ export function createNativeBackend({ native = globalThis.ifizboxNative, sourceO
         throw e;
       }
       if (!bytes.length || bytes[0] === 0x3c) continue; // an HTML page some hosts send for every path
+      const { decompress } = await import("./core/unpack.js"); // C32: loaded here, not at startup
       let plain;
       try { plain = decompress(name, bytes); } catch { continue; }
       return { text: new TextDecoder().decode(plain), source: repoDir + name, cached: false };

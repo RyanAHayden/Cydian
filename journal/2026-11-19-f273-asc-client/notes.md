@@ -41,6 +41,8 @@ that isn't on main; the fallback prefix comes from brand.js `NAME`; the tests us
 native/test_brand.py refuses `com.ryha.*` IDs that aren't the brand's.
 F274 and F275 are ticked in the plan as "landed in F273", but their code is only on wip/F273, and F276/B117 build on
 it. Filed F278 (critical, after F273) to port it.
+`done` couldn't push at first: origin/task/F273 still held that attempt (ea5447c). I did not force-push. I merged it
+with `-s ours`, so the tree is this task's alone and ea5447c stays reachable in history for F278.
 
 ## Not verified
 - No call to the real App Store Connect with a real key: there's no API key on this machine. JWT format and

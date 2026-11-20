@@ -13,13 +13,13 @@ test("B136: recordWhen: a confirmed install now; Sent to iOS waits for iOS; fail
   // Sent to iOS (B76's handoff): not asked yet, or iOS says it doesn't have it (B128: iOS never fetched the IPA)
   assert.equal(recordWhen(row({ unsure: true })), "wait");
   assert.equal(recordWhen(row({ unsure: true }), false), "wait");
-  // iOS has it, or iOS can't be asked: recorded as sent, as before
+  // iOS has it; B170: no answer (null) or nothing to ask about (no bundle ID) waits
   assert.equal(recordWhen(row({ unsure: true }), true), "now");
-  assert.equal(recordWhen(row({ unsure: true }), null), "now");
-  // rows iOS isn't asked about
+  assert.equal(recordWhen(row({ unsure: true }), null), "wait");
+  assert.equal(recordWhen(row({ unsure: true, bundleId: null }), true), "wait");
+  // rows that change no install record
   assert.equal(recordWhen(row({ unsure: true, mode: "resign" })), "now");
   assert.equal(recordWhen(row({ unsure: true, id: SELF_ID, bundleId: SELF_ID })), "now");
-  assert.equal(recordWhen(row({ unsure: true, bundleId: null })), "now");
   for (const state of ["failed", "cancelled", "asking", "waiting"]) assert.equal(recordWhen(row({ state }), true), "never");
   assert.equal(recordWhen(null), "never");
 });

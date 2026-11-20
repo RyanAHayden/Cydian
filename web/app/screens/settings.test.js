@@ -14,10 +14,10 @@ Object.defineProperty(globalThis, "localStorage", { configurable: true, value: {
 } });
 
 test("the shell gets the fixed theme, or auto while Appearance is Automatic (F23)", () => {
-  assert.deepEqual(themeMessage("dark", "dark").params, { style: "dark", theme: "dark", darkPalette: "oled", lightPalette: "classic" });
+  assert.deepEqual(themeMessage("dark", "dark").params, { style: "dark", theme: "dark", darkPalette: "gunmetal", lightPalette: "classic" });
   assert.deepEqual(themeMessage("light", "light", "gunmetal", "sepia").params,
     { style: "light", theme: "light", darkPalette: "gunmetal", lightPalette: "sepia" });
-  assert.deepEqual(themeMessage("auto", "dark").params, { style: "auto", theme: "dark", darkPalette: "oled", lightPalette: "classic" });
+  assert.deepEqual(themeMessage("auto", "dark").params, { style: "auto", theme: "dark", darkPalette: "gunmetal", lightPalette: "classic" });
   assert.equal(themeMessage("auto", "light").method, "app.theme");
 });
 
@@ -32,15 +32,15 @@ test("applyTheme posts app.theme to the bridge once per change", () => {
   applyTheme(doc, win);
   applyTheme(doc, win);
   assert.equal(doc.documentElement.dataset.theme, "dark");
-  assert.equal(doc.documentElement.dataset.palette, "oled"); // F198: OLED Black unless Gunmetal is chosen
-  assert.deepEqual(sent.map((m) => m.params), [{ style: "dark", theme: "dark", darkPalette: "oled", lightPalette: "classic" }]);
+  assert.equal(doc.documentElement.dataset.palette, "gunmetal"); // F320: Gunmetal unless another is chosen
+  assert.deepEqual(sent.map((m) => m.params), [{ style: "dark", theme: "dark", darkPalette: "gunmetal", lightPalette: "classic" }]);
   settings.set("appearance", "auto");
   applyTheme(doc, win);
-  assert.deepEqual(sent.at(-1).params, { style: "auto", theme: "dark", darkPalette: "oled", lightPalette: "classic" });
+  assert.deepEqual(sent.at(-1).params, { style: "auto", theme: "dark", darkPalette: "gunmetal", lightPalette: "classic" });
   // F214: the light theme travels too, in dark as well, for the next launch's ground
   settings.set("lightTheme", "solarized");
   applyTheme(doc, win);
-  assert.deepEqual(sent.at(-1).params, { style: "auto", theme: "dark", darkPalette: "oled", lightPalette: "solarized" });
+  assert.deepEqual(sent.at(-1).params, { style: "auto", theme: "dark", darkPalette: "gunmetal", lightPalette: "solarized" });
   settings.set("lightTheme", "classic");
   // the site: no handler, no throw
   applyTheme(doc, { matchMedia: () => ({ matches: false }) });

@@ -627,7 +627,7 @@ function blockedPage() {
 // ---- Theme ---------------------------------------------------------------------------------------------------
 
 // F198: the dark palette chosen (raw, as theme-boot.js reads it). F199: Theme > Dark sets it (settings' darkTheme,
-// stored at the same key); paletteFor() reads anything but a known palette as OLED Black.
+// stored at the same key); paletteFor() reads anything but a known palette as Gunmetal (the default).
 export function darkTheme(win = globalThis) {
   try { return win.localStorage?.getItem(DARK_THEME_KEY) ?? null; } catch { return null; }
 }
@@ -678,7 +678,7 @@ export function applyTheme(doc = document, win = window) {
 // window at the next launch before the page runs (black for OLED Black), whichever way Automatic then goes.
 // F214: lightPalette (classic, sepia or solarized) likewise, so a light launch paints Sepia's or Solarized Light's
 // pinstripes, not the kit's blue-grey.
-export function themeMessage(appearance, theme, darkPalette = "oled", lightPalette = "classic") {
+export function themeMessage(appearance, theme, darkPalette = "gunmetal", lightPalette = "classic") {
   return { id: 0, method: "app.theme", params: { style: appearance === "auto" ? "auto" : theme, theme, darkPalette, lightPalette } };
 }
 let lastSent = "";

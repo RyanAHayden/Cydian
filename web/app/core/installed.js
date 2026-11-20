@@ -135,6 +135,31 @@ export function appUpgrades(rows, candidateOf) {
   });
 }
 
+// B150: the shell's signed-app list (signing.installed: { apps: [{ bundleId, originalBundleId, name, ... }], ... })
+// names each app by its IPA's Info.plist (RyukGram's IPA says "Instagram"). An app installed from a source keeps the
+// name it was picked as there: the record Install wrote for the app iOS has under that ID (`source` set) gives the
+// name; an app with no source record (My IPAs, Install from URL, no record) keeps the IPA's. The record is the one
+// install iFizBox made on this phone under that ID (a reinstall replaces it), not a source lookup by bundle ID, so
+// RyukGram variants and real Instagram, which share com.burbn.instagram, never borrow each other's names.
+// -> the same object with `apps` renamed (the input untouched); anything else comes back as it is.
+export function withSourceNames(installed, records) {
+  if (!Array.isArray(installed?.apps)) return installed;
+  const named = new Map();
+  for (const r of records ?? []) if (r?.id && r.source && !r.self && text(r.name)) named.set(r.id, text(r.name));
+  if (!named.size) return installed;
+  const apps = installed.apps.map((a) => {
+    const name = named.get(a?.bundleId) ?? (a?.originalBundleId ? named.get(a.originalBundleId) : undefined);
+    return name && a.name !== name ? { ...a, name } : a;
+  });
+  return { ...installed, apps };
+}
+
+// signing.installed through the bridge, renamed by the device's records (withSourceNames). Throws as the call does.
+export async function signedAppsNamed(native = globalThis.ifizboxNative, { store = apps } = {}) {
+  const [installed, records] = await Promise.all([native.call("signing.installed", {}), store().then((s) => s.all()).catch(() => [])]);
+  return withSourceNames(installed, records);
+}
+
 export function memoryAppStore(initial = []) {
   const m = new Map(initial.map((r) => [r.id, r]));
   return {

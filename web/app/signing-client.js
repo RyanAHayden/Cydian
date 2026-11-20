@@ -507,7 +507,8 @@ async function installOnDeviceOnce({ url, name = "", onInstalled = () => {}, par
   // Not for iFizBox itself (host, or its own IPA or ID): iOS closes iFizBox while it installs over it.
   if (result?.bundleId && !host && !isSelfIpa(url) && result.bundleId !== IFIZBOX_ID) {
     const followInstall = follow ?? (await import("./signing-sheet.js")).followInstall;
-    followInstall(bridge(native), result.bundleId, h, { later, name: result.name || name, device: result.device ?? lastDevice });
+    // B150: the caller's name (the source's, as the app was picked) before the IPA's own
+    followInstall(bridge(native), result.bundleId, h, { later, name: shownName(name, result), device: result.device ?? lastDevice });
     return true;
   }
   // B49: iFizBox itself: the page ends locked on "Closing iFizBox" (no Close to tap) until iOS closes the app.
@@ -696,10 +697,18 @@ export function hereLabel(ev) {
   return { label: p > 0 && p < 100 ? `${word} ${p}%` : word };
 }
 
+// B150: the name an install's page shows: the caller's (a source's app name, the variant it was picked as, or Custom
+// Install's), else the signed IPA's own (`result.name`, its Info.plist). A bare file name ("App.ipa") isn't a name:
+// the IPA's own wins over it.
+export function shownName(name, result) {
+  const given = String(name ?? "").trim();
+  return (given && !/\.ipa$/i.test(given) ? given : "") || result?.name || given;
+}
+
 // B111: the single install's end on This iPhone: installd has the app, so "Installed <app>", the bar full, and
 // Open <app> (signing.openApp) above the Return button.
 export function finishHere(h, result, { native, name = "", later = setTimeout } = {}) {
-  const app = result?.name || name || "the app";
+  const app = shownName(name, result) || "the app"; // B150: the source's name before the IPA's
   const text = `Installed ${app}`;
   const bid = result?.bundleId;
   if (typeof h.finish === "function") {

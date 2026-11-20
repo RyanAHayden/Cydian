@@ -29,6 +29,7 @@ import { getBackend } from "../backend.js";
 import { showAlert } from "../nav/alert.js";
 import { dayTitle, filterGroups, filterRows, defaultScope } from "../core/changes.js";
 import { apps, installedIds, onAppsChange } from "../core/installed.js";
+import { signedAppsNamed } from "../core/installed.js"; // B150
 import { settings } from "./settings.js";
 import { sourceFilter } from "../core/sources.js";
 import { detectMode } from "../core/settings.js";
@@ -115,7 +116,7 @@ export const badgeCount = (upgrades, resign = []) => (upgrades?.available?.lengt
 export async function resignNow(upgrades, { mode = detectMode(), native = globalThis.ifizboxNative, get = (k) => settings.get(k), now = new Date() } = {}) {
   if (mode !== "sideload" || typeof native?.call !== "function") return [];
   let installed;
-  try { installed = await native.call("signing.installed", {}); } catch { return []; }
+  try { installed = await signedAppsNamed(native); } catch { return []; } // B150: a source app keeps its source name
   const skip = new Set((upgrades?.available ?? []).map((r) => r?.id).filter(Boolean));
   return needsResign(installed, { now, window: resignWindow(get), skip });
 }

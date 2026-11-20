@@ -19,7 +19,8 @@ An era is clean when all of these hold:
    - every era stylesheet (`web/app/ios<N>.css` other than `ios6.css`) contains only look properties and custom
      properties;
    - every look-only stretch in any `web/app/*.css` (below) contains only look properties;
-   - the nav bar, bar button, tab bar and grouped table selectors have no rule in `ios6.css` outside a look-only stretch.
+   - the nav bar, bar button, tab bar and grouped table selectors have no rule in `ios6.css` outside a look-only
+     stretch, with or without an `html[…]` qualifier in front.
 4. **No visible change in iOS 6.** Splitting a component for eras keeps every pixel and every computed style of the
    iOS 6 page: check it with a 3x screenshot and computed-style diff against main
    (`journal/2026-11-20-c44-era-readiness/shots.mjs` then `diff.py`, both themes and every palette).
@@ -36,8 +37,15 @@ Look is what paints: `color`, `background*`, `border*` (including radius, image 
 Everything else is layout: the box (`display`, size, `margin`, `padding`, `box-sizing`), position (`position`,
 insets, `z-index`, `transform`), flex and grid, `overflow`, wrapping and truncation (`white-space`, `text-overflow`,
 `overflow-wrap`), and behaviour (`cursor`, `touch-action`, `pointer-events`, `user-select`, `will-change`,
-transitions and animations). Type sizes and line heights count as look: an era's titles and labels are its own,
-and with `box-sizing: border-box` everywhere a border or a font does not move a box that has a fixed size.
+transitions and animations). Type sizes, line heights and border widths count as look on purpose: an era's
+titles, labels and hairlines are its own. With `box-sizing: border-box` everywhere they don't resize a box that has
+a fixed size. They do resize a box sized by its content (a group header, a label, a table's outline), and that
+change is part of the era's look. The test cannot tell those cases apart, so this is a choice and not something it
+enforces.
+
+Some geometry of the four components has no hook yet and stays fixed: the icon bar button's 43px, the cell icon's
+29px, the cell count pill, the chevron's 9x13px box and the badge's offset over the tab icon. A hook goes in
+`style.css` the first time an era needs to move one.
 
 ### Look-only stretches
 

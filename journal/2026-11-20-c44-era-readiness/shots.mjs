@@ -4,7 +4,7 @@
 //
 //   node shots.mjs <web/app dir> <out dir> [--pressed]
 //
-// For each theme (Classic, Sepia, OLED Black, Gunmetal, Midnight) it opens Home, Settings, a Settings page pushed from
+// For each theme (Classic, Sepia, Solarized, OLED Black, Gunmetal, Midnight) it opens Home, Settings, a Settings page pushed from
 // it, Sources, Changes, Installed and Search in the app shell (data-shell="app", fake bridge), plus Home and Settings
 // on the website (Classic), at 390x844 and deviceScaleFactor 3. Animations are frozen at their first frame.
 // Writes <name>.png and <name>.json (every element's and ::before/::after's computed style under the nav bar, the
@@ -106,7 +106,7 @@ const PRESS = `(() => {
 })()`;
 
 const THEMES = [
-  { tone: "light", palette: "classic" }, { tone: "light", palette: "sepia" },
+  { tone: "light", palette: "classic" }, { tone: "light", palette: "sepia" }, { tone: "light", palette: "solarized" },
   { tone: "dark", palette: "oled" }, { tone: "dark", palette: "gunmetal" }, { tone: "dark", palette: "midnight" },
 ];
 const ROUTES = ["home", "settings", "settings+push", "sources", "changes", "installed", "search"];

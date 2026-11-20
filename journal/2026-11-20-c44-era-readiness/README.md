@@ -62,16 +62,29 @@ drew white tables under white text in dark: colour tokens on bare `html[data-sty
 ## No visible change: how it was checked
 
 `shots.mjs` (this folder) serves a `web/app` dir to headless Chromium at 390x844, deviceScaleFactor 3, animations
-frozen, in the app shell (fake bridge, `data-shell="app"`) for Classic, Sepia, OLED Black, Gunmetal and Midnight over
-Home, Settings, a Settings page pushed from it, Sources, Changes, Installed, Search, plus Home and Settings on the
-website: 37 shots. Each writes the PNG and a dump of every computed property of every element and `::before`/`::after`
+frozen, in the app shell (fake bridge, `data-shell="app"`) for Classic, Sepia, Solarized, OLED Black, Gunmetal and
+Midnight over Home, Settings, a Settings page pushed from it, Sources, Changes, Installed, Search, plus Home and
+Settings on the website: 44 shots (Solarized was added after the spec review, and both runs were redone). Each writes the PNG and a dump of every computed property of every element and `::before`/`::after`
 under the nav bar, tab bar and shown page. `--pressed` also sets `.is-pressed` on the first bar button, back button
 and cell and shows the tab badges. `diff.py` compares two runs (pixels and computed styles, custom properties
 skipped).
 
 - base (scratch worktree at cee6d94b) vs base again: same (the harness is deterministic).
-- base vs this branch: **same**, all 37 shots, 0 px and 0 computed-style differences; with `--pressed` too.
-- `node --test web/app`: 2552 pass. `tools/check.sh`: see the done run.
+- base vs this branch: **same**, all 44 shots, 0 px and 0 computed-style differences; with `--pressed` too.
+- `node --test web/app`: 2552 pass. `tools/check.sh` is run by `run done`, which refuses to tick unless it passes.
+
+## Spec review (fresh subagent, diff + brief only)
+
+- Fixed: the "no rule outside a stretch" test now also catches `html[…]`-qualified rules (`.navbar::before` added to
+  its list); Solarized added to the screenshot diff; docs/eras.md now says that type and border widths count as look
+  by choice (they do resize boxes sized by their content, and the test can't enforce that), and lists the geometry
+  that has no hook yet.
+- Kept, and why: `.pull-clip.grouped > .pull-refresh` paints `var(--grouped-ground)` (same value, so
+  pullrefresh.test.js's "same ground as the grouped page" still holds once that ground is a token); the three
+  other test edits (the tests read the moved CSS literally); C49 (palettes outrank an era: it is part of "the rest").
+- Cascade risk named by the review: declarations that moved to the end of style.css lose to any equal-specificity
+  rule earlier in ios6.css that used to lose to them. The computed-style dumps found none on the 44 shots. Pages
+  not in the list are under Not verified.
 
 ## Tried and failed
 

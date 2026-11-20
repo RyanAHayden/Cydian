@@ -178,13 +178,15 @@ test("C44: ios6.css's look-only stretches paint only; their layout is style.css'
   assert.deepEqual(regions.flatMap(layoutIn), [], "move these to style.css (Era hooks) and give an era a token for them");
   // The four components' rules all sit in a stretch: none of these selectors has a rule outside one, so their layout
   // can't creep back into ios6.css.
-  const OWN = [".navbar", ".navbar::after", ".nav-title", ".bar-button", ".bar-button.back", ".bar-button.share-button::before",
+  const OWN = [".navbar", ".navbar::after", ".navbar::before", ".nav-title", ".bar-button", ".bar-button.back", ".bar-button.share-button::before",
     ".tabbar", ".tabbar::before", ".tab", ".tab.active", ".tab-icon", ".tab-icon::before", ".tab-label", ".badge", ".tab .badge",
     ".page-body.grouped", ".group", ".group + .group", ".group-header", ".group-footer", ".table", ".table.grouped",
     ".cell-inner", ".cell-text", ".cell-label", ".cell-subtitle", ".cell-detail", ".cell-count", ".cell-icon",
     ".cell-icon.row-icon", ".cell-inner.chevron::after", ".bar-button.bar-icon"];
   const inside = new Set(regions.flatMap((r) => cssRules(r).flatMap(({ sel }) => sel.split(",").map((s) => s.trim()))));
-  for (const { sel } of cssRules(outside)) for (const s of sel.split(",").map((x) => x.trim())) assert.ok(!OWN.includes(s), `${s} has a rule outside the look-only stretches`);
+  // A theme- or shell-qualified rule (html[data-theme="dark"] .tabbar) counts as the same selector.
+  const subject = (s) => s.replace(/^(html|:root)(\[[^\]]*\]|:not\([^)]*\)|\.[\w-]+)*\s+/, "");
+  for (const { sel } of cssRules(outside)) for (const s of sel.split(",").map((x) => x.trim())) assert.ok(!OWN.includes(subject(s)), `${s} has a rule outside the look-only stretches`);
   for (const s of [".navbar", ".bar-button", ".tabbar", ".tab", ".table.grouped", ".group-header", ".cell-inner"]) assert.ok(inside.has(s), s);
 });
 

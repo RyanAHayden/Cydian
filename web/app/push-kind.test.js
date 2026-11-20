@@ -227,10 +227,11 @@ test("B172: the guides' Refresh Sources and Installed push those roots above the
 });
 
 test("B172: a root copy only redraws when it is not the one holding the screen's state", async () => {
-  const sources = await import("./screens/sources.js");
   const search = await import("./screens/search.js");
-  const installed = await import("./screens/installed.js");
-  assert.equal(sources.redrawCopy(null, { tab: "sources", path: [] }), false);
   assert.equal(search.showCopy({}), false); // never drawn by Search's render: nothing to resync
-  assert.equal(installed.redrawCopy({}, { tab: "installed", path: ["myipas"] }), false); // not the root
+  // C25: Sources, Installed and Changes keep each copy's state on its own view (nav/pageviews.js): no copy to resync
+  for (const f of ["sources", "installed", "changes"]) {
+    const m = await import(`./screens/${f}.js`);
+    assert.equal(m.redrawCopy, undefined, f);
+  }
 });

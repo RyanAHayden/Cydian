@@ -41,13 +41,20 @@ import { vendorSoldIds } from "./extras.js";
 import { SELF_ID } from "../core/essential.js";
 import { showHUD } from "../nav/hud.js"; // F250: reloadSources from outside the tab
 import { appQueue } from "../app-queue.js"; // F255: the jailbreak app's Upgrade (N) queues app upgrades there
-import { onPageShow } from "../nav/pagestate.js"; // B169
+import { pageViews } from "../nav/pageviews.js"; // C25
 import { go as navGo, handleOf } from "../nav/go.js";
 import { isInsecureSource } from "../core/sources.js"; // B192
 
 export const title = "Changes";
 
-const state = { body: null, page: null, route: null, list: null, busy: false, seq: 0, query: "", scope: null, data: null, note: null, segs: null };
+// What every copy of the root page shares: the last load (`data`), the session's scope pick, a refresh under way.
+const state = { busy: false, seq: 0, scope: null, data: null };
+
+// C25: the root page can be on screen twice, its own tab and pushed on Home (Home's What's New, Check for Changes:
+// router.js rootOn). Each copy has its own view (its list, search text and nav bar button); a load draws them all.
+const views = pageViews(() => ({ page: null, route: null, list: null, results: null, query: "", note: null, ph: null, segs: null }));
+const drawAll = () => { for (const v of views.all()) draw(v); };
+const shown = () => views.all().length > 0;
 
 export const SCOPES = [["all", "All"], ["installed", "Installed"]];
 
@@ -56,13 +63,12 @@ export const scopeOf = (picked, installed) => picked ?? defaultScope(installed.s
 
 export function init(ctx) {
   state.ctx = ctx;
-  onPageShow((route) => route.tab === "changes" && !route.path.length, (route, el) => redrawCopy(el, route, ctx));
-  catalog.onChange(() => { if (state.body) load(); else badge(); });
-  onAppsChange(() => { if (state.body) load(); else badge(); }); // I3: a recorded install can end an upgrade
+  catalog.onChange(() => { if (shown()) load(); else badge(); });
+  onAppsChange(() => { if (shown()) load(); else badge(); }); // I3: a recorded install can end an upgrade
   // iFizBox's own source read (essential-ui.js readSelfInfo): its upgrade row and the badge count again.
-  globalThis.addEventListener?.("ifizbox:self-info", () => { if (state.body) load(); else badge(); });
-  settings.onChange((key) => { if (key === "holds" || key === "blockedPackages" || key === "resignReminder") { if (state.body) load(); else badge(); } });
-  settings.onChange((key) => { if ((key === "autoInstall" || key === "autoMarked") && state.body) load(); }); // B192
+  globalThis.addEventListener?.("ifizbox:self-info", () => { if (shown()) load(); else badge(); });
+  settings.onChange((key) => { if (key === "holds" || key === "blockedPackages" || key === "resignReminder") { if (shown()) load(); else badge(); } });
+  settings.onChange((key) => { if ((key === "autoInstall" || key === "autoMarked") && shown()) load(); }); // B192
   // At launch, only with a status file: without one there are no upgrades, and no reason to load every source.
   // Without one (the site, the sideload app) the remembered apps count, and iFizBox itself in the app: badge at
   // launch whenever there is anything installed to follow.
@@ -259,23 +265,13 @@ export async function queueUpgrades(available = [], { pkgOf = (id) => catalog.pa
 
 const queueFn = () => { const b = getBackend(); return typeof b.queue === "function" ? (job) => b.queue(job) : null; };
 
-// The root page's nav bar button (its page handle's), labelled and shown with the count.
-function drawUpgradeButton(n) {
-  const b = state.page?.rightButton(); // B176: not a pushed copy's Refresh (nav/go.js pageHandle)
+// A copy's nav bar button (its page handle's), labelled and shown with the count.
+function drawUpgradeButton(view, n) {
+  const b = view.page?.rightButton(); // B176: not a pushed copy's Refresh (nav/go.js pageHandle)
   if (!b) return;
   const label = upgradeLabel(n);
   if (b.textContent !== label) b.textContent = label;
   b.hidden = n === 0;
-}
-
-// B169: Changes' root page can be on screen in two places, its own tab and pushed on Home (Home's What's New), and the
-// module state above follows the copy drawn last. A copy that comes back to the top (a tab switch, Back) while the
-// other one holds the state is drawn again, so its list keeps up. -> true when it redrew.
-export function redrawCopy(body, route, ctx) {
-  if (!body || body === state.body) return false;
-  body.replaceChildren();
-  render(body, route, ctx);
-  return true;
 }
 
 export function render(body, route, ctx, page = handleOf(body)) {
@@ -283,38 +279,37 @@ export function render(body, route, ctx, page = handleOf(body)) {
     browse.render(body, route, ctx, page);
     return;
   }
-  state.body = body;
-  state.page = page;
-  state.route = route;
-  state.list?.destroy();
-  state.list = null;
-  state.data = null;
-  drawUpgradeButton(0);
+  const had = views.of(body);
+  had?.list?.destroy();
+  const view = views.open(body, { page, route, list: null });
+  drawUpgradeButton(view, 0);
   // C10: the bar and the scope row stay put; the list scrolls under them (nav/searchbar.js pinned).
-  state.results = pinned(body, ...filterBar());
+  view.results = pinned(body, ...filterBar(view));
   // F270: pull the list down past its top: Refresh, as the nav button.
-  pullToRefresh(state.results, { onRefresh: () => refresh(ctx), busy: () => state.busy, settings });
-  state.note = note("");
-  state.note.hidden = true; // errors and "no changes" show here; while loading, placeholder rows
-  state.ph = placeholder("list");
-  state.results.append(state.note, state.ph);
+  pullToRefresh(view.results, { onRefresh: () => refresh(ctx), busy: () => state.busy, settings });
+  view.note = note("");
+  view.note.hidden = true; // errors and "no changes" show here; while loading, placeholder rows
+  view.ph = placeholder("list");
+  view.results.append(view.note, view.ph);
+  draw(view); // another copy's last load, at once; the load below brings it up to date
   load();
 }
 
 // The shared bar (nav/searchbar.js) and Search's scope bar (screens/search.js, packages.css), without the Filter button.
-function filterBar() {
+// The search text is the copy's own; the scope is the session's pick, so a tap redraws every copy.
+function filterBar(view) {
   const bar = searchBar({ placeholder: "Search Changes", ariaLabel: "Search changes: name, description or author",
-    value: state.query, delay: 120, className: "has-scope", onQuery: (q) => { state.query = q; draw(); } });
+    value: view.query, delay: 120, className: "has-scope", onQuery: (q) => { view.query = q; draw(view); } });
 
   const scope = el("div", "search-scope");
-  state.segs = segments(SCOPES.map(([value]) => value), Object.fromEntries(SCOPES), null, (value) => { state.scope = value; draw(); });
-  scope.append(state.segs);
-  drawScope();
+  view.segs = segments(SCOPES.map(([value]) => value), Object.fromEntries(SCOPES), null, (value) => { state.scope = value; drawAll(); });
+  scope.append(view.segs);
+  drawScope(view);
   return [bar, scope];
 }
 
-function drawScope(current = state.scope ?? (state.data ? scopeOf(null, state.data.installed) : null)) {
-  state.segs?.select(current);
+function drawScope(view, current = state.scope ?? (state.data ? scopeOf(null, state.data.installed) : null)) {
+  view.segs?.select(current);
 }
 
 // Rows as the package list draws them, with each group's header in front: the upgrades first, then a group per
@@ -409,35 +404,41 @@ async function load() {
     vendorSold = await vendorSoldNow(upgrades); // B19
     autoHttp = await autoHttpNow(upgrades).catch(() => new Set()); // B192
   } catch (e) {
-    if (seq === state.seq && state.note) { state.ph?.remove(); state.note.textContent = e.message; state.note.hidden = false; }
+    if (seq !== state.seq) return;
+    for (const v of views.all()) {
+      if (!v.note) continue;
+      v.ph?.remove();
+      v.note.textContent = e.message;
+      v.note.hidden = false;
+    }
     return;
   }
   if (seq !== state.seq) return;
   badge(upgrades, resign);
   state.data = { groups, upgrades, installed, resign, vendorSold, autoHttp };
-  draw();
+  drawAll();
 }
 
-// Draws the list from the last load with the current search and scope (no reload: typing stays fast).
-function draw() {
-  const body = state.body;
-  if (!body || !state.data) return;
+// Draws a copy's list from the last load with its search and the scope (no reload: typing stays fast).
+function draw(view) {
+  const body = view?.body;
+  if (!body || !state.data || !view.note) return;
   const { groups, upgrades, installed, resign = [], vendorSold = null, autoHttp = null } = state.data;
-  state.ph?.remove();
-  state.ph = null;
-  drawUpgradeButton(canUpgrade() ? jailbreakUpgradeCount(upgrades.available, vendorSold) : upgrades.available.length + resign.length); // B68: apt's and the apps'; F91: re-signs too
+  view.ph?.remove();
+  view.ph = null;
+  drawUpgradeButton(view, canUpgrade() ? jailbreakUpgradeCount(upgrades.available, vendorSold) : upgrades.available.length + resign.length); // B68: apt's and the apps'; F91: re-signs too
   const scope = scopeOf(state.scope, installed);
-  drawScope(scope);
-  const items = itemsOf(groups, undefined, upgrades, { query: state.query, scope, installed, resign, autoHttp });
-  state.note.hidden = items.length > 0;
-  state.note.textContent = items.length ? "" : emptyText({ query: state.query, scope });
-  if (!state.list) {
-    const results = state.results ?? body;
-    state.list = browse.packageList(results, state.route, items, { letters: false, decorate });
-    results.append(state.list.el);
+  drawScope(view, scope);
+  const items = itemsOf(groups, undefined, upgrades, { query: view.query, scope, installed, resign, autoHttp });
+  view.note.hidden = items.length > 0;
+  view.note.textContent = items.length ? "" : emptyText({ query: view.query, scope });
+  if (!view.list) {
+    const results = view.results ?? body;
+    view.list = browse.packageList(results, view.route, items, { letters: false, decorate });
+    results.append(view.list.el);
   } else {
     browse.rememberNames(items.filter((r) => r.id));
-    state.list.setItems(items);
+    view.list.setItems(items);
   }
 }
 

@@ -54,7 +54,10 @@ class LaunchGrounds(unittest.TestCase):
 
     def test_f200_palettes_match_the_css(self):
         for tone, name in [("dark", "midnight"), ("dark", "linen"), ("dark", "nord"), ("dark", "dracula"),
-                           ("light", "sepia"), ("light", "solarized")]:
+                           ("light", "sepia"), ("light", "solarized"),
+                           # F325
+                           ("dark", "leather"), ("dark", "felt"), ("dark", "wood"),
+                           ("light", "legalpad"), ("light", "metal")]:
             dark, light, block = css_pins(self.css, tone, name)
             sd, sl, plain = self.striped(name)
             self.assertEqual((sd, sl), (dark, light), name)

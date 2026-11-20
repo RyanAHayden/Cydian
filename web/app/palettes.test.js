@@ -16,8 +16,8 @@ const blockIn = (css, selector) => {
 const tokens = (css) => new Map([...css.matchAll(/(--[\w-]+):\s*([^;]+);/g)].map((m) => [m[1], m[2].trim()]));
 const root = tokens(blockIn(ios6, ":root"));
 const oled = tokens(blockIn(ios6, 'html[data-theme="dark"]'));
-const NEW_DARK = ["midnight", "linen", "nord", "dracula"];
-const NEW_LIGHT = ["sepia", "solarized"];
+const NEW_DARK = ["midnight", "linen", "nord", "dracula", "leather", "felt", "wood"];
+const NEW_LIGHT = ["sepia", "solarized", "legalpad", "metal"];
 const block = (tone, p) => tokens(blockIn(palettes, `html[data-theme="${tone}"][data-palette="${p}"]`) ?? "");
 
 // WCAG relative luminance and contrast of two #rgb/#rrggbb colours.
@@ -37,13 +37,14 @@ test("every theme in the menu has a palette block", () => {
 });
 
 test("dark palettes override only OLED Black's tokens (--weave is Linen's own); light ones :root's or --lt-*", () => {
+  // --weave: Linen's texture; F325's textured palettes (dark and light) have one too
   for (const p of NEW_DARK) for (const k of block("dark", p).keys()) assert.ok(oled.has(k) || k === "--weave", `${p}: ${k}`);
   // every --lt-* token the chrome rules read, each light palette sets
   const lt = [...new Set([...palettes.matchAll(/var\((--lt-[\w-]+)\)/g)].map((m) => m[1]))];
   assert.ok(lt.length >= 8, lt.join());
   for (const p of NEW_LIGHT) {
     const t = block("light", p);
-    for (const k of t.keys()) assert.ok(root.has(k) || lt.includes(k), `${p}: ${k}`);
+    for (const k of t.keys()) assert.ok(root.has(k) || lt.includes(k) || k === "--weave", `${p}: ${k}`);
     for (const k of lt) assert.ok(t.has(k), `${p} lacks ${k}`);
     // the chrome rules list it
     assert.match(palettes, new RegExp(`html\\[data-theme="light"\\]:is\\([^)]*\\[data-palette="${p}"\\]`), p);

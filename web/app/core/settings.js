@@ -106,7 +106,10 @@ export const SETTINGS = [
     // F200: Sepia and Solarized Light (palettes.css).
     options: [{ value: "classic", label: "Classic", swatch: ["#6f88a8", "#c5ccd4"] },
       { value: "sepia", label: "Sepia", swatch: ["#a5865a", "#ebdfc5"] },
-      { value: "solarized", label: "Solarized Light", swatch: ["#4b93c8", "#eee8d5"] }],
+      { value: "solarized", label: "Solarized Light", swatch: ["#4b93c8", "#eee8d5"] },
+      // F325: palettes.css's textured light ones.
+      { value: "legalpad", label: "Legal Pad", swatch: ["#7a4826", "#f9eba0"] },
+      { value: "metal", label: "Brushed Metal", swatch: ["#dfe2e6", "#b9bec6"] }],
     footer: "The theme in Light mode, and in Automatic while the iPhone is light.",
   },
   {
@@ -119,7 +122,11 @@ export const SETTINGS = [
       { value: "midnight", label: "Midnight", swatch: ["#18253e", "#121d31"] },
       { value: "linen", label: "Linen", swatch: ["#262626", "#36383d"] },
       { value: "nord", label: "Nord", swatch: ["#3b4252", "#2e3440"] },
-      { value: "dracula", label: "Dracula", swatch: ["#383b4c", "#282a36"] }],
+      { value: "dracula", label: "Dracula", swatch: ["#383b4c", "#282a36"] },
+      // F325: palettes.css's textured dark ones.
+      { value: "leather", label: "Leather", swatch: ["#6e4a2c", "#3b2819"] },
+      { value: "felt", label: "Felt", swatch: ["#6a4220", "#2c6834"] },
+      { value: "wood", label: "Wood", swatch: ["#4e2f15", "#66401f"] }],
     footer: "The theme in Dark mode, and in Automatic while the iPhone is dark.",
   },
   {

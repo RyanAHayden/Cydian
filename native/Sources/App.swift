@@ -410,6 +410,12 @@ enum Launch {
     static let dracula = striped(0x282a36, 0x2b2d3a)
     static let sepia = striped(0xe6d9bd, 0xebdfc5)
     static let solarized = striped(0xe9e2cd, 0xeee8d5)
+    // F325: the textured palettes, their --pin-* (the texture's own colours, as near as two stripes get)
+    static let leather = striped(0x382617, 0x3b2819)
+    static let felt = striped(0x2a6432, 0x2c6834)
+    static let wood = striped(0x633e21, 0x66401f)
+    static let legalpad = striped(0xf3e397, 0xf9eba0)
+    static let metal = striped(0xc6cbd2, 0xcbd0d6)
 
     // The ground for a tone and its palette: the light one (F214: Classic, Sepia or Solarized Light) or the dark
     // one; a name this build doesn't know takes the tone's default (Classic, OLED Black).
@@ -418,6 +424,8 @@ enum Launch {
             switch lightPalette {
             case "sepia": return sepia
             case "solarized": return solarized
+            case "legalpad": return legalpad
+            case "metal": return metal
             default: return light
             }
         }
@@ -427,6 +435,9 @@ enum Launch {
         case "linen": return linen
         case "nord": return nord
         case "dracula": return dracula
+        case "leather": return leather
+        case "felt": return felt
+        case "wood": return wood
         default: return oled
         }
     }

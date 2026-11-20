@@ -25,6 +25,14 @@ The brief's file list (screens/installed.js, screens/signing.js, core/signing.js
 guesses; the wait lives in signing/queue.js and core/apprun.js, and the event had to come from the shell, so those
 are the files changed.
 
+## Review (spec axis) and decisions
+- Row words: the handed-off row reads "Finishing on iOS" (row.finishing, core/apprun.js rowStatus) while the watch
+  still runs, then Installed on its true, or "Sent to iOS" when it can't tell (B146's word).
+- "or installd takes over" is not a separate trigger: iOS's progress object (what the 62/70/80% comes from) shows
+  from the start of iOS's download, so it can't tell the handoff apart from a download still running from
+  iFizBox. "Every byte sent" (install server onServed, or the hosted copy's status) is the handoff. The release
+  waits for the watch's next 0.5 s tick after onServed; that's the delay, not a poll timeout.
+
 ## Tried and failed
 Nothing failed. Considered keying off the install log line "iOS has the whole IPA" (already reaching the page as
 `{log}`), but a structured event doesn't depend on wording.

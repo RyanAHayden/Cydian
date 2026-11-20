@@ -350,16 +350,19 @@ export function createAppRun({ rows, sign, install, discard = () => {}, reprompt
     const handedOff = Boolean(res?.handedOff || f.away);
     if (res?.installed === false && !handedOff) { fail(r, "iOS didn't install it"); return; }
     const unsure = res?.installed !== true;
-    finishRow(r, "installed", { token: null, expires, unsure, phase: null, fraction: 1 });
+    // B200: `finishing` while the call's `later` (iOS still installing what it fully has) hasn't answered
+    const finishing = unsure && typeof res?.later?.then === "function";
+    finishRow(r, "installed", { token: null, expires, unsure, phase: null, fraction: 1, ...(finishing ? { finishing } : {}) });
     if (r.mode === "resign") log(r, "step", `Re-signed ${label(r)}${expires ? `, expires ${dateText(expires)}` : ""}`);
     else if (r.mode === "remove") log(r, "step", `Removed ${label(r)}`);
     else log(r, "step", unsure ? `Sent ${label(r)} to iOS` : `Installed ${label(r)}`);
     // B200: answered once iOS had the whole IPA: the watch goes on, and its true later makes the row Installed
-    if (unsure && typeof res?.later?.then === "function") {
+    if (finishing) {
       const row = r;
       res.later.then((v) => {
-        if (v !== true || row.state !== "installed" || !row.unsure) return;
-        set(row, { unsure: false });
+        if (!row.finishing) return;
+        if (v !== true || row.state !== "installed" || !row.unsure) { set(row, { finishing: false }); return; }
+        set(row, { unsure: false, finishing: false });
         if (row.mode !== "resign") log(row, "step", `Installed ${label(row)}`);
       }, () => {});
     }
@@ -371,7 +374,7 @@ export function createAppRun({ rows, sign, install, discard = () => {}, reprompt
   const retryPatch = (r) => {
     const back = r.state === "failed" && r.dismissed && Boolean(reprompt) && Boolean(r.bundleId) && !helperRow(r);
     return { state: back ? "signed" : "waiting", again: back, phase: null, fraction: back ? 1 : 0, progress: back ? 0.5 : 0, error: null,
-      token: null, unsure: false, dismissed: false, busy: false };
+      token: null, unsure: false, dismissed: false, busy: false, finishing: false };
   };
 
   function pump() {
@@ -551,7 +554,8 @@ export function rowStatus(row, opts = {}) {
       return p > 0 && p < 100 ? `Installing ${p}%` : "Installing";
     case "installed":
       if (row.mode === "resign") return row.expires ? `Re-signed, expires ${dateText(row.expires, opts)}` : "Re-signed";
-      return row.unsure ? "Sent to iOS" : "Installed";
+      if (!row.unsure) return "Installed";
+      return row.finishing ? "Finishing on iOS" : "Sent to iOS"; // B200: handed off, iOS still installing
     case "failed": return row.error ? `Failed: ${row.error}` : "Failed";
     case "cancelled": return "Cancelled";
     default: return "";

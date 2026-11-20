@@ -64,7 +64,7 @@ test("B200: two queued installs, the second opens as soon as the first's IPA is 
   await flush();
   assert.equal(rows[0].state, "installed");
   assert.equal(rows[0].unsure, true);
-  assert.equal(rowStatus(rows[0]), "Sent to iOS");
+  assert.equal(rowStatus(rows[0]), "Finishing on iOS");
   assert.deepEqual(opens(), ["a", "b"]);
   assert.ok(native.watches["com.b"], "the second app's watch began");
 
@@ -81,6 +81,8 @@ test("B200: two queued installs, the second opens as soon as the first's IPA is 
   await end;
   assert.equal(rows[1].state, "installed");
   assert.equal(rows[1].unsure, true, "a watch that can't tell stays Sent to iOS");
+  assert.equal(rowStatus(rows[1]), "Sent to iOS");
+  assert.equal(rowStatus(rows[0]), "Installed");
   assert.ok(!lines.includes("Installed Beta"));
 });
 

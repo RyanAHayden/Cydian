@@ -91,3 +91,71 @@ html.native .navbar, html.native .tabbar { display: none; }
    spinner (packages.css .page-body > .loading), not stuck near the top of the empty space. */
 .page-body > .empty:only-child { display: flex; align-items: center; justify-content: center; height: 72%; margin: 0 20px; }
 [hidden] { display: none !important; }
+
+/* ---- Era hooks (docs/eras.md): the layout of the nav bar, bar buttons, tab bar and grouped tables. ios6.css paints
+   them in look-only rules; an era stylesheet paints them its own way and moves their geometry only through these
+   tokens, never with a layout rule of its own. Values are iOS 6's, from the Teehan+Lax kit (ios6.css says where). */
+:root {
+  --bar-btn-h: 29px; --bar-btn-min-w: 50px; --bar-btn-pad: 0 9px;   /* bordered bar button */
+  --bar-back-h: 30px; --bar-back-pad: 0 5px 0 1px;                  /* back button, inside its arrow's border */
+  --tab-item-h: 44px; --tab-item-margin: 3px 2px 0; --tab-item-pad-top: 3.5px; /* a tab inside the 49 pt bar */
+  --tab-icon-size: 28px; --tab-label-gap: 1px;
+  --badge-h: 20px; --badge-pad: 0 5px;
+  --group-margin: 10px 10px 0; --group-gap: 23px; --group-first-head: 10px; /* grouped tables, inset from the sides */
+  --group-head-margin: 0 9px 7px; --group-foot-margin: 7px 9px 0;
+  --cell-min-h: 43px; --cell-pad: 0 10px; --cell-gap: 8px;
+}
+/* Nav bar: a 2.5pt band under it (its shadow, if the style draws one) and the status-bar strip above the 44 pt bar. */
+.navbar::after { content: ""; position: absolute; left: 0; right: 0; top: 100%; height: 2.5px; pointer-events: none; }
+html[data-shell="app"] .navbar::before {
+  content: ""; position: absolute; left: 0; right: 0; top: 0; height: calc(env(safe-area-inset-top) + 22px);
+  pointer-events: none;
+}
+html:not([data-shell="app"]) .navbar::before {
+  content: ""; position: absolute; left: 0; right: 0; top: 0; height: env(safe-area-inset-top); pointer-events: none;
+}
+/* Bar buttons */
+.bar-button {
+  height: var(--bar-btn-h); min-width: var(--bar-btn-min-w); max-width: 100%; padding: var(--bar-btn-pad); overflow: hidden;
+  white-space: nowrap; text-overflow: ellipsis; cursor: pointer; touch-action: manipulation;
+}
+.bar-button.back { height: var(--bar-back-h); min-width: 0; max-width: 100%; padding: var(--bar-back-pad); }
+.bar-button.bar-icon { min-width: 43px; width: 43px; padding: 0; display: inline-flex; align-items: center; justify-content: center; }
+.bar-button.share-button::before { content: ""; width: 25px; height: 20px; }
+/* Tab bar: a 2.5pt band over it (its shadow), each tab an icon over a label, the badge over the icon's corner. */
+.tabbar::before { content: ""; position: absolute; left: 0; right: 0; bottom: 100%; height: 2.5px; pointer-events: none; }
+.tab {
+  display: flex; flex-direction: column; align-items: center;
+  height: var(--tab-item-h); margin: var(--tab-item-margin); padding-top: var(--tab-item-pad-top);
+}
+.tab-label { margin-top: var(--tab-label-gap); max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.tab-icon { width: var(--tab-icon-size); height: var(--tab-icon-size); }
+.tab-icon::before { content: ""; display: block; width: 100%; height: 100%; }
+.badge { min-width: var(--badge-h); height: var(--badge-h); padding: var(--badge-pad); }
+.tab .badge { position: absolute; top: -2px; left: calc(50% + 5px); }
+/* Grouped tables and their cells (the cells are every table's) */
+.page-body.grouped { padding-bottom: calc(var(--tab-h) + 20px); } /* clear the fixed tab bar, then the table's own 20px; the last hint must scroll into view */
+.group { margin: var(--group-margin); }
+.group + .group { margin-top: var(--group-gap); }
+.group-header { margin: var(--group-head-margin); }
+.group:first-child > .group-header { margin-top: var(--group-first-head); }
+.group-footer { overflow-wrap: anywhere; margin: var(--group-foot-margin); } /* a long URL wraps instead of running off the screen */
+.table { list-style: none; margin: 0; padding: 0; }
+.table.grouped { overflow: hidden; }
+.cell-inner {
+  display: flex; align-items: center; gap: var(--cell-gap); width: 100%; min-height: var(--cell-min-h); padding: var(--cell-pad);
+  cursor: default;
+}
+a.cell-inner, button.cell-inner { cursor: pointer; }
+.cell-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.cell-label { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.cell-subtitle { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.cell-detail { flex: none; max-width: 50%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.cell-count { flex: none; min-width: 26px; height: 20px; padding: 0 7px; }
+.cell-icon { flex: none; width: 29px; height: 29px; display: grid; place-items: center; }
+/* F205: iOS 6 Settings' row tiles: the tile 7pt in from the cell's edge and the label 11pt after it (ios6.css). */
+.cell-icon.row-icon { margin: 0 3px 0 -3px; }
+.cell-icon.row-icon img { display: block; width: 29px; height: 29px; }
+.cell-inner.chevron::after { content: ""; flex: none; width: 9px; height: 13px; margin-right: .5px; }
+/* F163 (nav/selection.js): the opened row's selection, a copy over the row that fades by opacity alone during the pop. */
+.cell-inner.sel-ghost { position: absolute; inset: 0; width: auto; pointer-events: none; will-change: opacity; }

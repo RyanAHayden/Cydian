@@ -321,9 +321,11 @@ test("B41: the header's sides are inset like the grouped rows' contents (10px ma
   const css = readFileSync(new URL("../packages.css", import.meta.url), "utf8");
   const head = css.match(/\n\.store-head \{[^}]*\}/s)[0];
   assert.match(head, /padding: 14px 21px 30px/);
-  const ios6 = readFileSync(new URL("../ios6.css", import.meta.url), "utf8");
-  assert.match(ios6, /\.group \{ margin: 10px 10px 0; \}/, "the group margin the 21px is built from");
-  assert.match(ios6, /\.cell-inner \{[^}]*padding: 0 10px/s);
+  const layout = readFileSync(new URL("../style.css", import.meta.url), "utf8"); // C44: style.css's Era hooks
+  assert.match(layout, /--group-margin: 10px 10px 0;/, "the group margin the 21px is built from");
+  assert.match(layout, /\.group \{ margin: var\(--group-margin\); \}/);
+  assert.match(layout, /--cell-pad: 0 10px;/);
+  assert.match(layout, /\.cell-inner \{[^}]*padding: var\(--cell-pad\)/s);
 });
 
 test("F206: the Rating tile holds its place from the first paint and is filled in place; the others never shift", () => {

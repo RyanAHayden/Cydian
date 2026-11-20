@@ -135,3 +135,92 @@ test("B191: no transition in web/app/*.css animates a layout property", () => {
   }
   assert.deepEqual(bad, [], "animate transform/opacity instead (nav/slide.js FLIP, or a counter-transform)");
 });
+
+// C44, docs/eras.md "Definition of clean": an era is one stylesheet of look plus the named hooks, never a layout rule.
+// Look properties are the paint and type ones below; everything else (box, position, flex/grid, overflow, wrapping,
+// touch and cursor behaviour) is layout and lives in style.css, moved only through its "Era hooks" tokens.
+export const LOOK = /^(--.+|color|color-scheme|accent-color|caret-color|opacity|filter|-webkit-backdrop-filter|backdrop-filter|box-shadow|text-shadow|content|background(-[a-z]+)*|border(-[a-z]+)*|outline(-[a-z]+)*|-webkit-mask(-[a-z]+)*|mask(-[a-z]+)*|font(-[a-z]+)*|line-height|letter-spacing|word-spacing|text-align|text-transform|text-decoration(-[a-z]+)*|-webkit-font-smoothing|-webkit-text-stroke(-[a-z]+)*|fill|stroke(-[a-z]+)*|list-style(-[a-z]+)*)$/;
+const splitDecls = (decl) => { // on ";" outside quotes and parentheses (data: URIs hold both)
+  const out = [];
+  let depth = 0, quote = "", cur = "";
+  for (const ch of decl) {
+    if (quote) { if (ch === quote) quote = ""; }
+    else if (ch === '"' || ch === "'") quote = ch;
+    else if (ch === "(") depth++;
+    else if (ch === ")") depth--;
+    else if (ch === ";" && depth === 0) { out.push(cur); cur = ""; continue; }
+    cur += ch;
+  }
+  out.push(cur);
+  return out.map((d) => d.trim()).filter(Boolean);
+};
+export const cssRules = (src) => [...src.replace(/\/\*[\s\S]*?\*\//g, "").matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+  .map(([, sel, decl]) => ({ sel: sel.trim().replace(/\s+/g, " "), props: splitDecls(decl).map((d) => d.slice(0, d.indexOf(":")).trim().toLowerCase()) }));
+// "selector: property" for every declaration that sets layout.
+export const layoutIn = (src) => cssRules(src).flatMap(({ sel, props }) => props.filter((p) => !LOOK.test(p)).map((p) => `${sel}: ${p}`));
+
+// A look-only stretch: from "/* ==== look-only { ====" to "/* ==== } look-only ==== */", in any web/app stylesheet.
+const STRETCH = /\/\* ==== look-only \{ ====[\s\S]*?\*\/([\s\S]*?)\/\* ==== \} look-only ==== \*\//g;
+export const stretchesOf = (src) => [...src.matchAll(STRETCH)].map((m) => m[1]);
+const raw = readFileSync(new URL("./ios6.css", import.meta.url), "utf8");
+const regions = stretchesOf(raw);
+const outside = raw.replace(STRETCH, "");
+
+test("C44: the look/layout checker tells look from layout", () => {
+  assert.deepEqual(layoutIn(".a { color: red; margin: 0; background: url(\"data:x;base64,AA\") 0 0 / 4px; } .b { --x: 1px; height: var(--x); }"),
+    [".a: margin", ".b: height"]);
+  assert.deepEqual(layoutIn("@media (min-width: 1px) { .a { font-size: 2px; text-shadow: none; display: none; } }"), [".a: display"]);
+});
+
+test("C44: ios6.css's look-only stretches paint only; their layout is style.css's", () => {
+  assert.equal((raw.match(/look-only \{/g) ?? []).length, regions.length, "every look-only stretch is closed");
+  assert.ok(regions.length >= 3, "the nav bar and bar buttons, the tab bar and grouped tables, the Share glyph");
+  assert.deepEqual(regions.flatMap(layoutIn), [], "move these to style.css (Era hooks) and give an era a token for them");
+  // The four components' rules all sit in a stretch: none of these selectors has a rule outside one, so their layout
+  // can't creep back into ios6.css.
+  const OWN = [".navbar", ".navbar::after", ".nav-title", ".bar-button", ".bar-button.back", ".bar-button.share-button::before",
+    ".tabbar", ".tabbar::before", ".tab", ".tab.active", ".tab-icon", ".tab-icon::before", ".tab-label", ".badge", ".tab .badge",
+    ".page-body.grouped", ".group", ".group + .group", ".group-header", ".group-footer", ".table", ".table.grouped",
+    ".cell-inner", ".cell-text", ".cell-label", ".cell-subtitle", ".cell-detail", ".cell-count", ".cell-icon",
+    ".cell-icon.row-icon", ".cell-inner.chevron::after", ".bar-button.bar-icon"];
+  const inside = new Set(regions.flatMap((r) => cssRules(r).flatMap(({ sel }) => sel.split(",").map((s) => s.trim()))));
+  for (const { sel } of cssRules(outside)) for (const s of sel.split(",").map((x) => x.trim())) assert.ok(!OWN.includes(s), `${s} has a rule outside the look-only stretches`);
+  for (const s of [".navbar", ".bar-button", ".tabbar", ".tab", ".table.grouped", ".group-header", ".cell-inner"]) assert.ok(inside.has(s), s);
+});
+
+// Every stylesheet can mark its own look-only stretches the same way (a component sheet keeps its layout in its own
+// rules beside them); each one is held to the same rule.
+test("C44: every look-only stretch in web/app/*.css paints only, and every one is closed", () => {
+  const dir = new URL("./", import.meta.url);
+  for (const f of readdirSync(dir).filter((x) => x.endsWith(".css"))) {
+    const src = readFileSync(new URL(f, dir), "utf8");
+    const opened = (src.match(/\/\* ==== look-only \{ ====/g) ?? []).length;
+    const closed = (src.match(/\/\* ==== \} look-only ==== \*\//g) ?? []).length;
+    assert.equal(opened, closed, `${f}: every look-only stretch is closed`);
+    assert.equal(stretchesOf(src).length, opened, `${f}: look-only stretches don't nest`);
+    assert.deepEqual(stretchesOf(src).flatMap(layoutIn), [], `${f}: layout belongs outside the look-only stretches`);
+  }
+});
+
+test("C44: style.css's era hooks are defined once and all used", () => {
+  const src = base;
+  const block = /:root \{([^}]*--bar-btn-h[^}]*)\}/.exec(src)?.[1];
+  assert.ok(block, "style.css's Era hooks :root block");
+  const hooks = [...block.matchAll(/(--[\w-]+)\s*:/g)].map((m) => m[1]);
+  assert.ok(hooks.length >= 20, hooks.join());
+  const rest = src.replace(block, "");
+  for (const h of hooks) assert.match(rest, new RegExp(`var\\(${h}\\)`), `${h} is never used`);
+  // the four components take their geometry from the hooks
+  for (const [sel, hook] of [[".bar-button", "--bar-btn-h"], [".tab", "--tab-item-h"], [".group", "--group-margin"], [".cell-inner", "--cell-min-h"]]) {
+    assert.ok(cssRules(src).some((r) => r.sel === sel) && new RegExp(`(^|\\n)\\${sel}\\s*\\{[^}]*var\\(${hook}\\)`).test(src), `${sel} uses ${hook}`);
+  }
+});
+
+// An era (data-style=ios7, ios13, ios26: docs/eras.md) is a stylesheet web/app/ios<N>.css beside ios6.css. All of it is
+// look: tokens, hooks and look-only rules. None exists yet; this holds the first one to the rule.
+test("C44: an era stylesheet sets no layout", () => {
+  const dir = new URL("./", import.meta.url);
+  for (const f of readdirSync(dir).filter((x) => /^ios\d+\.css$/.test(x) && x !== "ios6.css")) {
+    assert.deepEqual(layoutIn(readFileSync(new URL(f, dir), "utf8")), [], `${f}: layout belongs in style.css; move it through a hook`);
+  }
+});

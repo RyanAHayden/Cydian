@@ -1,0 +1,133 @@
+/* C44 spike, approach A ("overriding"): an iOS 7 look for the nav bar, tab bar, grouped table and bar buttons,
+   written as plain overrides of ios6.css as it was before C44 (cee6d94b). Not shipped; load it after ios6.css with
+   <html data-style="ios7"> to see it. Each declaration is tagged:
+     [L] undoes or changes a layout property ios6.css sets (margin, padding, height, min-width, ...)
+     [D] undoes an iOS 6 decoration (gradient, gloss, emboss, inset shadow, border-image, filter)
+     [N] the new look itself (colour, font)
+   Counts are in ../README.md (journal). */
+
+/* Nav bar: #f7f7f7 with a hairline, 17px semibold black title. */
+html[data-style="ios7"] .navbar {
+  background: #f7f7f7;                                   /* [D] four gradient layers -> one fill */
+  box-shadow: inset 0 -.5px 0 rgba(0,0,0,.3);            /* [N] */
+}
+html[data-style="ios7"] .navbar::after { background: none; }          /* [D] the 2.5px shadow */
+html[data-style="ios7"][data-shell="app"] .navbar::before { background: #f7f7f7; } /* [D] stretched gloss */
+html[data-style="ios7"]:not([data-shell="app"]) .navbar::before { background: #f7f7f7; } /* [N] */
+html[data-style="ios7"] .nav-title {
+  font-size: 17px; font-weight: 600;                     /* [N] [N] */
+  color: #000;                                           /* [N] */
+  text-shadow: none;                                     /* [D] */
+}
+html[data-style="ios7"][data-theme="dark"] .navbar { background: #000; } /* [D] beats ios6.css's dark rule by order only */
+
+/* Bar buttons: text only, #007aff, no box; back is a chevron and the label. */
+html[data-style="ios7"] .bar-button {
+  height: 44px;                                          /* [L] 29px */
+  min-width: 0;                                          /* [L] 50px */
+  padding: 0 8px;                                        /* [L] 0 9px */
+  line-height: 44px;                                     /* [L] 27px */
+  font-size: 17px; font-weight: 400;                     /* [N] [N] */
+  color: #007aff;                                        /* [N] */
+  text-shadow: none;                                     /* [D] */
+  border: 0;                                             /* [D] */
+  border-radius: 0;                                      /* [D] */
+  background: none;                                      /* [D] */
+  box-shadow: none;                                      /* [D] */
+}
+html[data-style="ios7"] .bar-button:active, html[data-style="ios7"] .bar-button.is-pressed {
+  background: none;                                      /* [D] pressed gradient */
+  opacity: .3;                                           /* [N] */
+}
+/* ios6.css's dark and red rules carry :not(.back):not(.done) (0,4,1+), so each needs its own heavier override. */
+html[data-style="ios7"][data-theme="dark"] .bar-button:not(.back):not(.done),
+html[data-style="ios7"][data-theme="dark"] .bar-button:not(.back):not(.done):active {
+  background: none;                                      /* [D] */
+  border-color: transparent;                             /* [D] */
+}
+html[data-style="ios7"] .bar-button.red:not(.back):not(.done),
+html[data-style="ios7"] .bar-button.red:not(.back):not(.done):is(:active, .is-pressed) {
+  background: none;                                      /* [D] */
+  border-color: transparent;                             /* [D] */
+  color: #ff3b30;                                        /* [N] */
+}
+html[data-style="ios7"][data-theme="dark"] .bar-button.red:not(.back):not(.done),
+html[data-style="ios7"][data-theme="dark"] .bar-button.red:not(.back):not(.done):is(:active, .is-pressed) {
+  background: none;                                      /* [D] */
+  border-color: transparent;                             /* [D] */
+}
+html[data-style="ios7"] .bar-button.back {
+  height: 44px;                                          /* [L] 30px */
+  padding: 0 8px 0 20px;                                 /* [L] 0 5px 0 1px */
+  line-height: 44px;                                     /* [L] 28px */
+  border-width: 0;                                       /* [L] 0 5px 0 13px */
+  border-image: none;                                    /* [D] the arrow art */
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 21'%3E%3Cpath d='M10.5 1.5 1.5 10.5l9 9' fill='none' stroke='%23007aff' stroke-width='3'/%3E%3C/svg%3E") 4px center / 12px 21px no-repeat; /* [N] */
+}
+html[data-style="ios7"] .bar-button.back:active, html[data-style="ios7"] .bar-button.back.is-pressed {
+  border-image-source: none;                             /* [D] */
+}
+html[data-style="ios7"][data-theme="dark"] .bar-button.back { border-image-source: none; } /* [D] */
+html[data-style="ios7"][data-theme="dark"] .bar-button.back:active { filter: none; }        /* [D] */
+html[data-style="ios7"] .bar-button.share-button::before { filter: none; }                  /* [D] */
+
+/* Tab bar: #f7f7f7, hairline on top, blue active tint, no gloss or highlight box. */
+html[data-style="ios7"] .tabbar { background: #f7f7f7; box-shadow: inset 0 .5px 0 rgba(0,0,0,.3); } /* [D] [N] */
+html[data-style="ios7"][data-theme="dark"] .tabbar { background: #000; }                 /* [D] */
+html[data-style="ios7"] .tabbar::before { background: none; }                            /* [D] */
+html[data-style="ios7"] .tab {
+  margin: 0;                                             /* [L] 3px 2px 0 */
+  padding-top: 7px;                                      /* [L] 3.5px */
+  height: 49px;                                          /* [L] 44px */
+  border-radius: 0;                                      /* [D] */
+  color: #929292;                                        /* [N] */
+  font-weight: 400;                                      /* [N] */
+}
+html[data-style="ios7"] .tab.active { color: #007aff; background: none; box-shadow: none; } /* [N] [D] [D] */
+html[data-style="ios7"] .tab-icon { filter: none; }                                      /* [D] */
+html[data-style="ios7"] .tab.active .tab-icon { filter: none; }                          /* [D] */
+html[data-style="ios7"] .tab-icon::before { background: currentColor; }                  /* [D] grey gradient */
+html[data-style="ios7"] .tab.active .tab-icon::before { background: currentColor; }      /* [D] blue gloss */
+html[data-style="ios7"] .badge {
+  border: 0;                                             /* [D] ring */
+  background: #ff3b30;                                   /* [D] gloss */
+  box-shadow: none;                                      /* [D] */
+  line-height: 20px;                                     /* [L] 16px (the ring is gone) */
+}
+
+/* Grouped table: edge to edge, white, inset hairlines on #efeff4; uppercase 13px grey headers. */
+html[data-style="ios7"] .page-body.grouped { background: #efeff4; }                      /* [D] pinstripe */
+html[data-style="ios7"] .group { margin: 35px 0 0; }                                     /* [L] 10px 10px 0 */
+html[data-style="ios7"] .group + .group { margin-top: 35px; }                            /* [L] 23px */
+html[data-style="ios7"] .group-header {
+  margin: 0 15px 7px;                                    /* [L] 0 9px 7px */
+  font-size: 13px; font-weight: 400; line-height: 16px;  /* [N] [N] [N] */
+  letter-spacing: 0;                                     /* [N] */
+  text-transform: uppercase;                             /* [N] */
+  color: #6d6d72;                                        /* [N] */
+  text-shadow: none;                                     /* [D] */
+}
+html[data-style="ios7"] .group:first-child > .group-header { margin-top: 0; }            /* [L] 10px */
+html[data-style="ios7"] .group-footer {
+  margin: 7px 15px 0;                                    /* [L] 7px 9px 0 */
+  font-size: 13px; line-height: 16px; text-align: left;  /* [N] [N] [N] */
+  color: #6d6d72; text-shadow: none;                     /* [N] [D] */
+}
+html[data-style="ios7"] .table.grouped {
+  background: #fff;                                      /* [N] */
+  border: 0;                                             /* [D] */
+  border-radius: 0;                                      /* [D] */
+  box-shadow: inset 0 .5px 0 #c8c7cc, inset 0 -.5px 0 #c8c7cc; /* [D] -> [N] */
+}
+html[data-style="ios7"] .cell-inner { min-height: 44px; padding: 0 15px; }              /* [L] 43px, [L] 0 10px */
+html[data-style="ios7"] .grouped .cell + .cell { border-top: 0; }                        /* [D] */
+html[data-style="ios7"] .grouped .cell + .cell > .cell-inner {
+  box-shadow: none;                                      /* [D] the highlight line */
+  background: linear-gradient(#c8c7cc, #c8c7cc) 15px 0 / 100% .5px no-repeat; /* [N] inset hairline */
+}
+html[data-style="ios7"] .cell-label { font-weight: 400; }                                /* [N] */
+html[data-style="ios7"] .cell-detail { color: #8e8e93; }                                 /* [N] */
+html[data-style="ios7"] .cell-inner.is-pressed { background: #d9d9d9; color: inherit; }   /* [D] blue selection */
+html[data-style="ios7"] .cell-inner.is-pressed * { color: inherit; }                     /* [D] */
+html[data-style="ios7"] .cell-inner.chevron.is-pressed::after { background-image: var(--chevron); } /* [D] white chevron */
+html[data-style="ios7"] .cell-inner.chevron::after { width: 8px; height: 13px; }         /* [L] 9px */

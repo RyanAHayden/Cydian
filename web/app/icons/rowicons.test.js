@@ -47,8 +47,12 @@ test("ios6.css places the tile as the 4S does: 7pt in, the label 11pt after", ()
   const rule = css.match(/\.cell-icon\.row-icon \{([^}]*)\}/)?.[1] ?? "";
   assert.match(rule, /background: none/);
   assert.match(rule, /box-shadow: none/);
-  assert.match(rule, /margin: 0 3px 0 -3px/); // .cell-inner: 10px padding, 8px gap -> 7 and 11
-  assert.match(css, /\.cell-inner \{[^}]*gap: 8px;[^}]*padding: 0 10px;/);
+  // C44: the layout is style.css's (its Era hooks): .cell-inner's 10px padding, 8px gap -> 7 and 11
+  const layout = readFileSync(new URL("../style.css", import.meta.url), "utf8");
+  assert.match(layout, /\.cell-icon\.row-icon \{ margin: 0 3px 0 -3px; \}/);
+  assert.match(layout, /--cell-pad: 0 10px;/);
+  assert.match(layout, /--cell-gap: 8px;/);
+  assert.match(layout, /\.cell-inner \{[^}]*gap: var\(--cell-gap\);[^}]*padding: var\(--cell-pad\);/);
 });
 
 test("F223: Home's Settings row and Settings > General draw one gear, from this file", async () => {

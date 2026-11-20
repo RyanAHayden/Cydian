@@ -25,6 +25,8 @@ import { debOf, tweakTitle, withTweaksText, tweakSteps, madeFor, tweakUpdates, i
   HOW_TO_TEXT, tweakParams } from "../core/tweaks.js"; // F302a
 import { BUNDLE_ID } from "../brand.js"; // F302a
 import { loadStyle } from "../nav/motion.js";
+import { isCommercial, paymentEndpointUrl, parseEndpoint, createPaymentClient, createCredentialStore, isFreePrice,
+  paidTweakDeb, PaidNeeded } from "../core/payment.js"; // F308
 
 const DB = "ifizbox-tweaks";
 let storeP = null;
@@ -233,20 +235,157 @@ async function defaultFetchDeb(url) {
   return new Uint8Array(await r.arrayBuffer());
 }
 
-export async function tweakDeb(st, { fetchDeb = defaultFetchDeb } = {}) {
+export async function tweakDeb(st, { fetchDeb = defaultFetchDeb, paid = null } = {}) {
   const k = debKey(st);
   if (debs.has(k)) return debs.get(k);
-  if (!st?.debUrl) throw new Error("This package has no .deb to download.");
-  if (/(^|,)\s*cydia::commercial\s*(,|$)/.test(st.tag ?? "")) throw new Error("A paid tweak: its source only hands the .deb to a buyer's jailbroken phone.");
   let data;
-  try { data = await fetchDeb(st.debUrl); } catch (e) { throw new Error(`The .deb couldn't be downloaded. ${e?.message ?? ""}`.trim()); }
+  if (isCommercial(st)) { // F308: the vendor hands it to this account (PaidNeeded: Sign In or Buy first)
+    try { data = await (paid ?? paidTweaks()).deb(st); } catch (e) {
+      if (e instanceof PaidNeeded || e?.name === "PaymentError") throw e;
+      throw new Error(`The .deb couldn't be downloaded. ${e?.message ?? ""}`.trim());
+    }
+  } else {
+    if (!st?.debUrl) throw new Error("This package has no .deb to download.");
+    try { data = await fetchDeb(st.debUrl); } catch (e) { throw new Error(`The .deb couldn't be downloaded. ${e?.message ?? ""}`.trim()); }
+  }
   if (data.length > TWEAK_LIMIT) throw new Error("This tweak is too big to go into an app (64 MB at most).");
   debs.set(k, data);
   for (const old of [...debs.keys()].slice(0, Math.max(0, debs.size - 4))) debs.delete(old);
   return data;
 }
 
-export async function tweakInfo(st, { fetchDeb = defaultFetchDeb, storage } = {}) {
+// ---- F308: paid tweaks (cydia::commercial) ---------------------------------------------------------------------------
+//
+// The same Sileo Payment Provider calls as the jailbreak build's Purchase group (screens/extras.js), through the
+// shell: sign in (auth.session), Buy, authorize_download with udid/device/version/repo/architecture, then
+// paid.download fetches the one-time URL and keeps the .deb in the app's own storage per package and version
+// (Paid.swift PaidTweaks; paid.cached reads it back for re-signing and updates). The account is the one the package
+// page's Purchase group signs in to (the same credential store).
+//
+//   createPaidTweaks({ call, vendorFor, storage })  -> { deb(st), seller(st), signIn(st), buy(st) }
+//   paidTweaks()                                     the app's one (the shell's bridge)
+//   await offerPaid(st, e, { paid, sheet, alert })   a PaidNeeded's action sheet: Sign In to <seller> or Buy for <price>;
+//                                                    true once it's done (try the add again)
+
+const bridge = () => (globalThis.ifizboxNative?.call ? globalThis.ifizboxNative : null);
+async function bridgeCall(method, params) {
+  const n = bridge();
+  if (!n) throw new Error("A paid tweak downloads in the app, signed in to its seller.");
+  return n.call(method, params);
+}
+
+function b64Bytes(b64) {
+  const bin = atob(b64 || "");
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+
+const endpoints = new Map(); // source key -> Promise<vendor base | null>
+function endpointOf(source, text) {
+  const url = paymentEndpointUrl(source);
+  if (!url) return Promise.resolve(null);
+  if (!endpoints.has(source.key)) endpoints.set(source.key, Promise.resolve().then(() => text(url)).then(parseEndpoint, () => null));
+  return endpoints.get(source.key);
+}
+
+// The source that carries this version and sells it: { base, source } or null.
+async function catalogVendorFor(st) {
+  const [{ catalog }, { getBackend }] = await Promise.all([import("../catalog.js"), import("../backend.js")]);
+  const backend = getBackend();
+  const [p, sources] = await Promise.all([catalog.package(st.package, "*").catch(() => null), backend.sources()]);
+  const keys = [...new Set([p?.key, ...(p?.others ?? []).filter((o) => !st.version || o.version === st.version).map((o) => o.key)].filter(Boolean))];
+  for (const key of keys) {
+    const source = sources.find((s) => s.key === key);
+    const base = source ? await endpointOf(source, (u) => backend.text(u)) : null;
+    if (base) return { base, source };
+  }
+  return null;
+}
+
+export function createPaidTweaks({ call = bridgeCall, vendorFor = catalogVendorFor, storage } = {}) {
+  const clients = new Map();
+  const keychain = {
+    get: (key) => call("keychain.get", { key }),
+    set: (key, value) => call("keychain.set", { key, value }),
+    remove: (key) => call("keychain.remove", { key }),
+  };
+  const request = async ({ method, url, headers, body }) => {
+    const r = await call("net.request", { method, url, headers, body });
+    let json = null;
+    try { json = JSON.parse(new TextDecoder().decode(b64Bytes(r.body))); } catch { json = null; }
+    return { status: r.status, json };
+  };
+  const clientFor = (base) => {
+    if (!clients.has(base)) {
+      clients.set(base, createPaymentClient({ base, request, device: () => call("device.info"),
+        credentials: createCredentialStore({ ...(storage ? { storage } : {}), secure: keychain }) }));
+    }
+    return clients.get(base);
+  };
+  async function vendor(st) {
+    const v = await vendorFor(st);
+    if (!v?.base) throw new Error("This paid tweak's source names no seller to buy it from.");
+    return { ...v, client: clientFor(v.base) };
+  }
+  const which = (st) => ({ package: st.package, version: st.version ?? "" });
+  return {
+    async deb(st) {
+      const { client, source } = await vendor(st);
+      return paidTweakDeb(st, { client, repo: source?.uri ?? "", architecture: "iphoneos-arm64",
+        cached: async (s) => { const r = await call("paid.cached", which(s)); return r?.body ? b64Bytes(r.body) : null; },
+        download: async (url, s) => b64Bytes((await call("paid.download", { url, ...which(s) }))?.body) });
+    },
+    // { name } of the vendor (its /info), or null
+    async seller(st) {
+      const { client, base } = await vendor(st);
+      const info = await client.info().catch(() => null);
+      return { name: info?.name || new URL(base).hostname.replace(/^www\./, "") };
+    },
+    // auth.session answers null when the user closed the sheet: false, nothing to try again
+    async signIn(st) {
+      const { client } = await vendor(st);
+      const cb = await call("auth.session", { url: await client.authenticateUrl(), callbackScheme: "sileo" });
+      if (cb == null) return false;
+      if (!(await client.finishSignIn(cb))) throw new Error("The seller sent nothing back that could be read.");
+      return true;
+    },
+    async buy(st) {
+      const { client } = await vendor(st);
+      const r = await client.purchase(st.package);
+      if (r.status === "action") return (await call("auth.session", { url: r.url, callbackScheme: "sileo" })) != null;
+      if (r.status !== "done") throw new Error("The purchase did not go through.");
+      return true;
+    },
+  };
+}
+
+let appPaid = null;
+export const paidTweaks = () => (appPaid ??= createPaidTweaks());
+
+export const buyLabel = (price) => `Buy${price ? ` for ${isFreePrice(price) ? "Free" : price}` : ""}`;
+
+export async function offerPaid(st, e, { paid = null, sheet = showActionSheet, alert = showAlert } = {}) {
+  const p = paid ?? paidTweaks();
+  const name = st.name || st.package;
+  const who = (await p.seller(st).catch(() => null))?.name || "its seller";
+  if (e.need === "unavailable") {
+    await alert({ title: name, message: `${who} doesn't sell ${name} right now.`, buttons: ["OK"] });
+    return false;
+  }
+  const signIn = e.need === "signin";
+  const price = e.price && !isFreePrice(e.price) ? ` for ${e.price}` : "";
+  const title = signIn ? `${name} is sold by ${who}${price}. Sign in to buy it, or to download it if you have.`
+    : `${name} is sold by ${who}. Buy it to add it to your apps.`;
+  const i = await sheet({ title, buttons: [signIn ? `Sign In to ${who}` : buyLabel(e.price)] });
+  if (i !== 0) return false;
+  try { return await (signIn ? p.signIn(st) : p.buy(st)); } catch (err) {
+    await alert({ title: "Purchase", message: String(err?.message ?? err), buttons: ["OK"] });
+    return false;
+  }
+}
+
+export async function tweakInfo(st, { fetchDeb = defaultFetchDeb, storage, paid = null } = {}) {
   const store = infoStore(storage);
   const hit = store.get(debKey(st));
   if (hit) return hit;
@@ -254,7 +393,7 @@ export async function tweakInfo(st, { fetchDeb = defaultFetchDeb, storage } = {}
   // F304: a bare .dylib has no filter .plist to say which app it is for: it loads into whichever app it is put in.
   if (isDylibTweak(st)) info = { ok: true, why: null, bundles: [], anyApp: true };
   else if (isLibraryStanza(st)) info = { ok: false, why: LIBRARY_WHY, bundles: [], anyApp: false, library: true }; // B185: no download
-  else try { info = inspectTweakDeb(await tweakDeb(st, { fetchDeb })); } catch (e) {
+  else try { info = inspectTweakDeb(await tweakDeb(st, { fetchDeb, paid })); } catch (e) {
     if (e instanceof UnpackError) info = { ok: false, why: String(e.message), bundles: [], anyApp: false };
     else throw e; // a failed download is asked again next time
   }
@@ -295,15 +434,19 @@ export function splitApps(info, apps) {
   return { made, not };
 }
 
-export async function addToApp(st, { alert = showAlert, pick = pickApp, hud = null, apps = signableApps, fetchDeb, storage, store = tweakStore } = {}) {
+export async function addToApp(st, opts = {}) {
+  const { alert = showAlert, pick = pickApp, hud = null, apps = signableApps, fetchDeb, storage, store = tweakStore, paid = null,
+    sheet = showActionSheet } = opts;
   const name = st.name || st.package;
   const hide = hud ? hud("Checking Tweak") : (await import("../nav/hud.js")).showHUD("Checking Tweak");
   let info, list, data;
   try {
-    [info, list] = await Promise.all([tweakInfo(st, { fetchDeb, storage }), apps()]);
-    if (info.ok) data = await tweakDeb(st, { fetchDeb });
+    [info, list] = await Promise.all([tweakInfo(st, { fetchDeb, storage, paid }), apps()]);
+    if (info.ok) data = await tweakDeb(st, { fetchDeb, paid });
   } catch (e) {
     hide();
+    // F308: a paid tweak not bought (or signed out): Sign In or Buy, then the same add again
+    if (e instanceof PaidNeeded) return (await offerPaid(st, e, { paid, sheet, alert })) ? addToApp(st, opts) : null;
     await alert({ title: "Can't Add This Tweak", message: String(e?.message ?? e), buttons: ["OK"] });
     return null;
   }
@@ -335,7 +478,9 @@ const needsHookLib = (st) => /(mobilesubstrate|cydia-substrate|ellekit)/i.test(`
 
 // The package page's group (the sideload build, an injectable tweak): a spinner row while the .deb is read on first
 // open, then "Works In: <apps>" and Add to App…, or why it can't go into an app.
-export function worksInGroup(st, { onAdd = () => addToApp(st), apps = signableApps, fetchDeb, storage } = {}) {
+// F308: a paid tweak not bought yet (or signed out) gets Price and Sign In to <seller> / Buy for <price> instead, and
+// is checked again once that's done.
+export function worksInGroup(st, { paid = null, onAdd = () => addToApp(st, { paid }), apps = signableApps, fetchDeb, storage } = {}) {
   style();
   const g = el("div", "group tweak-works");
   g.append(el("h2", "group-header", "Add to an App"));
@@ -358,7 +503,28 @@ export function worksInGroup(st, { onAdd = () => addToApp(st), apps = signableAp
     li.append(b);
     return li;
   };
-  const ready = Promise.all([tweakInfo(st, { fetchDeb, storage }), apps().catch(() => [])]).then(([info, list]) => {
+  const paidRows = async (e) => {
+    const p = paid ?? paidTweaks();
+    const who = (await p.seller(st).catch(() => null))?.name || "its seller";
+    const price = e.price ? (isFreePrice(e.price) ? "Free" : e.price) : "Paid";
+    const act = async (job) => {
+      let done = false;
+      try { done = await job(); } catch (err) { foot.textContent = String(err?.message ?? err); return; }
+      if (done) { ul.replaceChildren(spin); foot.textContent = ""; await check(); }
+    };
+    if (e.need === "unavailable") {
+      ul.replaceChildren(row("Price", price));
+      foot.textContent = `${who} doesn't sell it right now.`;
+    } else if (e.need === "signin") {
+      ul.replaceChildren(row("Price", price), row(`Sign In to ${who}`, null, () => act(() => p.signIn(st))));
+      foot.textContent = `Sold by ${who}. Sign in to buy it, or to add it if you already have.`;
+    } else {
+      ul.replaceChildren(row("Price", price), row(buyLabel(e.price), null, () => act(() => p.buy(st))));
+      foot.textContent = `Sold by ${who}. Once bought, it goes into an app you sign here.`;
+    }
+    return null;
+  };
+  const check = () => Promise.all([tweakInfo(st, { fetchDeb, storage, paid }), apps().catch(() => [])]).then(([info, list]) => {
     if (!info.ok) {
       ul.replaceChildren(row(info.library ? "A Library for Other Tweaks" : "Can't Go into an App"));
       foot.textContent = info.why || "";
@@ -371,11 +537,13 @@ export function worksInGroup(st, { onAdd = () => addToApp(st), apps = signableAp
     foot.textContent = made.length ? `Made for ${made.map((a) => a.name).join(", ")}.` : "None of your apps is one it's made for yet.";
     return info;
   }, (e) => {
+    if (e instanceof PaidNeeded) return paidRows(e);
     ul.replaceChildren(row("Add to App…", null, () => onAdd()));
     foot.textContent = String(e?.message ?? e);
     return null;
   });
-  return { el: g, ready };
+  const ready = check();
+  return { el: g, ready, check };
 }
 
 // "From a Source…" in Inject Tweaks: the Tweak Sources' tweaks in a sheet, those whose checked filter names this app
@@ -393,7 +561,7 @@ export async function sourceTweakRows({ catalogMod = null } = {}) {
 }
 
 export function pickSourceTweak({ bundleId, onPick, rows = sourceTweakRows, pkg = async (r) => (await (await import("../catalog.js")).catalog.package(r.id, r.key))?.stanza,
-  alert = showAlert, storage } = {}) {
+  alert = showAlert, storage, paid = null } = {}) {
   const body = el("div", "tweak-pick");
   const loading = el("div", "loading");
   loading.append(el("span", "loading-spinner"), el("span", null, "Loading Tweaks"));
@@ -421,9 +589,9 @@ export function pickSourceTweak({ bundleId, onPick, rows = sourceTweakRows, pkg 
           if (!st) return;
           const hide = (await import("../nav/hud.js")).showHUD("Checking Tweak");
           try {
-            const info = await tweakInfo(st, { storage });
+            const info = await tweakInfo(st, { storage, paid });
             if (!info.ok) { hide(); await alert({ title: "Can't Take This Tweak", message: info.why || "", buttons: ["OK"] }); return; }
-            const data = await tweakDeb(st);
+            const data = await tweakDeb(st, { paid });
             hide();
             if (bundleId && !targetsApp(info, bundleId)) {
               const i = await alert({ title: "Not Made for This App", message: `${st.name || st.package} works in ${worksInText(info) ?? "other apps"}.`,
@@ -434,6 +602,7 @@ export function pickSourceTweak({ bundleId, onPick, rows = sourceTweakRows, pkg 
             close();
           } catch (e) {
             hide();
+            if (e instanceof PaidNeeded) { if (await offerPaid(st, e, { paid, alert })) b.click(); return; } // F308
             await alert({ title: "Can't Add This Tweak", message: String(e?.message ?? e), buttons: ["OK"] });
           }
         });
@@ -630,7 +799,7 @@ export const openSearchAllRepos = (o) => import("./findmore.js").then((m) => m.s
 // The Add Tweaks sheet. `pkg(row)` -> the package's stanza (the catalog's).
 export function openAddTweaks({ bundleId, name = "", rows = sourceTweakRows, store = tweakStore, storage, fetchDeb, alert = showAlert,
   sheet = showActionSheet, show = null, pkg = async (r) => (await (await import("../catalog.js")).catalog.package(r.id, r.key))?.stanza,
-  browse = pickSourceTweak, onChange = () => {}, searchAll = openSearchAllRepos } = {}) {
+  browse = pickSourceTweak, onChange = () => {}, searchAll = openSearchAllRepos, paid = null } = {}) {
   style();
   return new Promise((resolve) => {
     const body = el("div", "tweak-pick tw-add-page");
@@ -673,20 +842,25 @@ export function openAddTweaks({ bundleId, name = "", rows = sourceTweakRows, sto
         btn.classList.add("on");
         btn.dataset.busy = "1";
         btn.replaceChildren(el("span", "loading-spinner"), document.createTextNode("ADDED"));
+        let again = false, paidSt = null;
         try {
           const st = await pkg(r);
           if (!st) throw new Error("This tweak isn't on its source any more.");
-          const info = await tweakInfo(st, { fetchDeb, storage });
+          paidSt = st;
+          const info = await tweakInfo(st, { fetchDeb, storage, paid });
           if (!info.ok) throw new Error(info.why || "It can't go into an app.");
-          const data = await tweakDeb(st, { fetchDeb });
+          const data = await tweakDeb(st, { fetchDeb, paid });
           await addDebTo(bundleId, st, data, { store });
           btn.replaceChildren(document.createTextNode("ADDED"));
           onChange();
         } catch (e) {
           btn.classList.remove("on");
           btn.replaceChildren(document.createTextNode("ADD"));
-          await alert({ title: "Can't Add This Tweak", message: String(e?.message ?? e), buttons: ["OK"] });
+          // F308: a paid tweak not bought (or signed out): Sign In or Buy, then ADD again
+          if (e instanceof PaidNeeded) again = await offerPaid(paidSt, e, { paid, sheet, alert });
+          else await alert({ title: "Can't Add This Tweak", message: String(e?.message ?? e), buttons: ["OK"] });
         } finally { delete btn.dataset.busy; }
+        if (again) btn.click();
       });
       return btn;
     }
@@ -811,12 +985,12 @@ export async function tweakUpdatesFor(bundleId, { rows = sourceTweakRows, store 
   return tweakUpdates(kept, await rows().catch(() => []));
 }
 
-export async function updateTweaks(bundleId, ups, { store = tweakStore, fetchDeb, storage, pkg = async (r) => (await (await import("../catalog.js")).catalog.package(r.id, r.key))?.stanza } = {}) {
+export async function updateTweaks(bundleId, ups, { store = tweakStore, fetchDeb, storage, paid = null, pkg = async (r) => (await (await import("../catalog.js")).catalog.package(r.id, r.key))?.stanza } = {}) {
   for (const u of ups) {
     const st = await pkg(u.row);
     if (!st) throw new Error(`${u.title} isn't on its source any more.`);
-    const info = await tweakInfo(st, { fetchDeb, storage });
+    const info = await tweakInfo(st, { fetchDeb, storage, paid });
     if (!info.ok) throw new Error(`${u.title} ${u.to}: ${info.why || "it can't go into an app."}`);
-    await addDebTo(bundleId, st, await tweakDeb(st, { fetchDeb }), { store });
+    await addDebTo(bundleId, st, await tweakDeb(st, { fetchDeb, paid }), { store });
   }
 }

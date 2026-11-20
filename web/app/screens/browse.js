@@ -1150,7 +1150,8 @@ async function renderPackage(body, route, key, id, ctx) {
   }
 
   // F20: price; in the app Sign In, Buy, Install. B11: in the app its state also drives the nav bar button.
-  const payBox = pkg.installedOnly ? null : paymentGroup(st, source, ctx, { onState: (s) => paidButton(body, s) });
+  // F308: a paid sideload tweak's Price, Sign In and Buy are in its Add to an App group (worksInGroup) instead.
+  const payBox = pkg.installedOnly || isSideloadTweak(st) ? null : paymentGroup(st, source, ctx, { onState: (s) => paidButton(body, s) });
   if (payBox) details.append(payBox);
   // F122: the gallery (Screenshots:/Header:, a Sileo depiction's screenshots, else the HTML depiction's pictures or
   // the GitHub repo's), sideways with page dots and tap-to-zoom (F181, altstore.js galleryGroup).

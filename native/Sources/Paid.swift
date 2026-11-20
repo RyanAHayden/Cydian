@@ -21,6 +21,8 @@
 //                                                 `ifizbox-helper install-paid <path> <package> <version>` (copies it,
 //                                                 checks its control is that package and version, apt-get install),
 //                                                 then removes the download
+//   paid.download / paid.cached                   F308, both builds: a paid tweak's .deb kept in the app's own storage
+//                                                 (PaidTweaks, at the end of this file)
 // Errors are "<code>: <message>" as in Apt.swift: bad_url, network, timeout, too_large, not_found, keychain,
 // device, sideload, helper.
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -60,6 +62,8 @@ enum Paid {
         b.on("keychain.remove") { c in Apt.work(c) { () throws -> Any? in try Keychain.remove(try key(c)); return true } }
         b.on("auth.session") { c in AuthSession.start(c) }
         b.on("paid.install") { c in install(c) }
+        b.on("paid.download") { c in PaidTweaks.download(c) } // F308
+        b.on("paid.cached") { c in PaidTweaks.cached(c) } // F308
     }
 
     static func key(_ c: Bridge.Call) throws -> String {
@@ -275,5 +279,78 @@ final class AuthSession: NSObject, ASWebAuthenticationPresentationContextProvidi
                 c.reply(nil, "network: couldn't open the sign-in sheet")
             }
         }
+    }
+}
+
+// F308: a paid tweak's .deb for the sideload build's Inject Tweaks (web/app/screens/tweaks.js paidTweaks). The page
+// gets the one-time URL from authorize_download (core/payment.js paidTweakDeb); the shell downloads it once and keeps
+// it in the app's own Application Support, one file per package and version, so re-signing and updates need no
+// second purchase round trip. No extra encryption: the app's container is private to it, and the dylib ends up
+// unencrypted inside the signed app anyway.
+//
+//   paid.download {url, package, version} -> {body}  base64 of the .deb (checked to start "!<arch>\n", 64 MB at
+//                                                     most); older versions of that package are removed
+//   paid.cached {package, version}        -> {body} | null
+enum PaidTweaks {
+    static let maxSize = 64 << 20 // = core/tweaks.js TWEAK_LIMIT
+    static let dir: URL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        .appendingPathComponent("PaidTweaks", isDirectory: true)
+
+    // <package>_<version>.deb; the version's ':' (an epoch) is written as '%3A'. Anything that isn't a Debian
+    // package name or version is refused, so a name can't step out of the folder.
+    static func file(_ c: Bridge.Call) throws -> (URL, String) {
+        guard let pkg = c.params["package"] as? String, pkg.utf8.count <= 200,
+              pkg.range(of: "^[A-Za-z0-9][A-Za-z0-9+.-]*$", options: .regularExpression) != nil else {
+            throw BridgeError("bad_url", "not a package name")
+        }
+        guard let version = c.params["version"] as? String, version.utf8.count <= 200,
+              version.range(of: "^[A-Za-z0-9][A-Za-z0-9.+~:_-]*$", options: .regularExpression) != nil else {
+            throw BridgeError("bad_url", "not a package version")
+        }
+        let name = "\(pkg)_\(version.replacingOccurrences(of: ":", with: "%3A")).deb"
+        return (dir.appendingPathComponent(name), pkg)
+    }
+
+    static func cached(_ c: Bridge.Call) {
+        Apt.work(c) { () throws -> Any? in
+            let (url, _) = try file(c)
+            guard let data = try? Data(contentsOf: url), data.starts(with: Array("!<arch>\n".utf8)) else { return nil }
+            return ["body": data.base64EncodedString()]
+        }
+    }
+
+    static func download(_ c: Bridge.Call) {
+        guard let src = Apt.httpURL(c.params["url"]), src.scheme?.lowercased() == "https" else {
+            return Apt.reply(c, nil, "bad_url: not an https URL")
+        }
+        let target: URL, pkg: String
+        do { let f = try file(c); target = f.0; pkg = f.1 } catch {
+            return Apt.reply(c, nil, (error as? BridgeError)?.text ?? "bad_url: \(error.localizedDescription)")
+        }
+        // The URL is one-time and expires in a minute or two: fetch it now, once.
+        Paid.session.downloadTask(with: src) { tmp, resp, err in
+            if let e = err as? URLError {
+                return Apt.reply(c, nil, "\(e.code == .timedOut ? "timeout" : "network"): \(e.localizedDescription)")
+            }
+            if let e = err { return Apt.reply(c, nil, "network: \(e.localizedDescription)") }
+            guard let tmp = tmp, let http = resp as? HTTPURLResponse else { return Apt.reply(c, nil, "network: no HTTP answer") }
+            if http.statusCode >= 400 { return Apt.reply(c, nil, "not_found: HTTP \(http.statusCode) for the download") }
+            guard let data = try? Data(contentsOf: tmp, options: .mappedIfSafe) else {
+                return Apt.reply(c, nil, "network: the download went missing")
+            }
+            if data.count > maxSize { return Apt.reply(c, nil, "too_large: more than \(maxSize >> 20) MB") }
+            guard data.starts(with: Array("!<arch>\n".utf8)) else {
+                return Apt.reply(c, nil, "not_found: the vendor's download is not a .deb")
+            }
+            let fm = FileManager.default
+            do {
+                try fm.createDirectory(at: dir, withIntermediateDirectories: true)
+                for old in (try? fm.contentsOfDirectory(atPath: dir.path)) ?? [] where old.hasPrefix(pkg + "_") {
+                    try? fm.removeItem(at: dir.appendingPathComponent(old))
+                }
+                try data.write(to: target, options: .atomic)
+            } catch { return Apt.reply(c, nil, "helper: can't keep the download: \(error.localizedDescription)") }
+            Apt.reply(c, ["body": data.base64EncodedString()], nil)
+        }.resume()
     }
 }

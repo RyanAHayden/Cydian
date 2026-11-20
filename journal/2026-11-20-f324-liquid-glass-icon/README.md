@@ -20,4 +20,21 @@
 
 ## Tried and failed
 
+- The MBA answered once (the Xcode check above), then dropped off Tailscale ("offline, last seen 16m ago",
+  `ssh mba`: connection timed out) and stayed off for 25+ minutes of retries. So actool never ran on the .icon
+  documents: the committed Assets.car / AssetsLite.car are still F323's, and `test_cars_compiled_from_the_current_pngs`
+  fails ("rerun native/icon/assets.sh") until `native/icon/assets.sh mba` runs. Blocked with CONFIRM to wake the MBA.
+
+## Next, once the MBA is back
+
+1. `native/icon/assets.sh mba`; read actool.log and partial.plist: does actool take `.icon` inputs beside the
+   .xcassets as positional arguments, and does a same-named .appiconset keep its PNGs in the .car for iOS 15-25
+   (check `AppIcon60x60@2x.png`, `classic-60x60@2x.png` renditions still present with carfile.icon_sets)?
+   `xcrun actool --help` for any flag Xcode 26 needs (e.g. icon fallback generation). Measure the .car size change.
+2. Add a test that each .car holds every set's .icon (what renditions actool writes for it: probably the SVG layer
+   names, `<icon>-grid.svg`).
+3. Phones: iPhone 7 (iOS 15) must still show the PNG icon; iPhone 15 Pro (iOS 27) Home Screen in Clear and Tinted.
+
 ## Not verified
+
+- Everything past the generator: actool's output, the .car files, both phones. The MBA was offline (above).

@@ -94,6 +94,26 @@ class Wiring(unittest.TestCase):
         self.assertIn("content.badge = NSNumber(value: badge)", self.src)
         self.assertIn("forKey: BackgroundCheck.pageCountKey", read("Sources", "Notifications.swift"))
 
+    def test_self_update_clears_its_badge(self):
+        # B124: iFizBox's own update comes off the icon badge when it is handed to iOS (both routes), the closing
+        # notification carries the new count, and permission is asked before the hosted route's handoff.
+        side = read("Sources", "Sideload.swift")
+        close = side[side.index("private static func closeWith"):]
+        close = close[:close.index("\n    }\n")]
+        self.assertIn("BackgroundCheck.selfHandedOff(", close)
+        self.assertIn("c.badge = NSNumber(value: n)", close)
+        here = side[side.index("static func installHere"):]
+        here = here[:here.index("IDevice.queue.async")]
+        self.assertIn("BackgroundCheck.selfHandedOff(", here)
+        host = side[side.index("static func hostAndOpen"):]
+        host = host[:host.index("\n    }\n")]
+        self.assertLess(host.index("CloseForUpdate.askToNotify("), host.index("UIApplication.shared.open(link)"))
+        self.assertIn("afterPrompt(status: status, app: app)", host)
+        self.assertIn("UpdateCheck.without(", self.src)
+        self.assertIn("UpdateCheck.handedOff(", self.src)
+        self.assertIn("forKey: BackgroundCheck.foundKey", self.src)
+        self.assertIn("removeObject(forKey: BackgroundCheck.foundKey)", read("Sources", "Notifications.swift"))
+
     def test_bridge(self):
         self.assertIn('b.on("updates.watch")', self.src)
         self.assertIn("BackgroundCheck.register(self)", read("Sources", "Bridge.swift"))

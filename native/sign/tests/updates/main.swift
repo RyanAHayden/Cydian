@@ -127,5 +127,36 @@ test("B47: the icon badge is Changes' last count plus updates it didn't count") 
     check(UpdateCheck.badge([f("d", "1.6")], pageCount: -3, pageKeys: ["junk"]) == 1, "a bad count or key")
 }
 
+test("B124: the app's own update handed to iOS comes off the badge") {
+    let me: Set<String> = ["com.ryha.ifizbox", "com.ryha.ifizbox.ABCDE12345"]
+    // Changes counted iFizBox 0.12.0 and Delta: 1 left.
+    var c = UpdateCheck.Counts(pageCount: 2, pageKeys: ["com.ryha.ifizbox 0.12.0", "d 1.6"], found: [])
+    check(c.badge == 2, "before")
+    var w = UpdateCheck.without(me, c)
+    check(w.badge == 1 && w.pageCount == 1 && w.pageKeys == ["d 1.6"], "Changes' row: \(w)")
+    // Only iFizBox waited: 0, the badge goes.
+    c = UpdateCheck.Counts(pageCount: 1, pageKeys: ["com.ryha.ifizbox 0.12.0"], found: [])
+    check(UpdateCheck.without(me, c).badge == 0, "only the app itself")
+    // The background found it (Changes hadn't counted it), plus UTM: UTM stays.
+    c = UpdateCheck.Counts(pageCount: 1, pageKeys: ["d 1.6"], found: ["com.ryha.ifizbox.ABCDE12345 0.12.0", "u 2", "d 1.7"])
+    check(c.badge == 3, "background before: \(c.badge)")
+    w = UpdateCheck.without(me, c)
+    check(w.badge == 2 && w.found == ["u 2", "d 1.7"], "background find: \(w)")
+    // iFizBox wasn't counted at all: nothing changes.
+    c = UpdateCheck.Counts(pageCount: 2, pageKeys: ["d 1.6", "u 2"], found: ["u 3"])
+    check(UpdateCheck.without(me, c) == c, "not counted")
+    // A bad stored count never goes below 0.
+    check(UpdateCheck.without(me, UpdateCheck.Counts(pageCount: 0, pageKeys: ["com.ryha.ifizbox 1"], found: [])).badge == 0, "0 stays 0")
+    // The watch list moves iFizBox to the version handed off, never down, and leaves the rest.
+    let watch = [UpdateCheck.Watched(id: "com.ryha.ifizbox", name: "Self", version: "0.11.0", source: "s"),
+                 UpdateCheck.Watched(id: "d", name: "Delta", version: "1.5", source: "s")]
+    let moved = UpdateCheck.handedOff(watch, ids: me, version: "0.12.0")
+    check(moved[0].version == "0.12.0" && moved[1] == watch[1], "watch moved: \(moved)")
+    check(UpdateCheck.handedOff(moved, ids: me, version: "0.11.5")[0].version == "0.12.0", "never lowered")
+    // and a background run with the source still at 0.12.0 finds nothing for iFizBox
+    let offers = ["s": ["com.ryha.ifizbox": UpdateCheck.Offer(name: "Self", version: "0.12.0")]]
+    check(UpdateCheck.updates(moved, offers: offers).isEmpty, "no second find")
+}
+
 print(failures == 0 ? "all passed" : "\(failures) failed")
 exit(failures == 0 ? 0 : 1)

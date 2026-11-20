@@ -12,6 +12,8 @@
 //   UpdateCheck.fresh(_:known:)   the ones not yet counted on screen or notified (key "<id> <version>")
 //   UpdateCheck.mergeKnown(...)   the known keys after the page sends a new watch list
 //   UpdateCheck.badge(_:pageCount:pageKeys:) the icon badge: Changes' last count plus updates it didn't count (B47)
+//   UpdateCheck.Counts / without(_:_:) / handedOff(_:ids:version:) B124: the badge's parts once iFizBox has handed
+//                                 iOS its own update, without that update's row
 //   UpdateCheck.title(_:)       "1 Update" / "3 Updates" (app-updates.js updatesTitle)
 //   UpdateCheck.body(_:)          "Delta 1.6" / "Delta 1.6 and UTM 4.5" / "Delta 1.6, UTM 4.5 and 2 more"
 //   DebVersion.compare(_:_:)         -1, 0, 1 by dpkg's rules, as web/app/core/apt.js compareVersions
@@ -137,6 +139,41 @@ enum UpdateCheck {
     static func badge(_ found: [Found], pageCount: Int, pageKeys: Set<String>) -> Int {
         let counted = Set(pageKeys.compactMap { k in k.firstIndex(of: " ").map { String(k[..<$0]) } })
         return max(0, pageCount) + Set(found.map(\.id)).subtracting(counted).count
+    }
+
+    // B124: what the icon badge is made of (UpdateCheck.badge's parts, as BackgroundCheck stores them): Changes' last
+    // count and keys, and the "<id> <version>" keys the last background run found (none once the page counts again).
+    struct Counts: Equatable {
+        var pageCount: Int
+        var pageKeys: Set<String>
+        var found: [String]
+        var badge: Int {
+            let counted = Set(pageKeys.compactMap(UpdateCheck.keyID))
+            return max(0, pageCount) + Set(found.compactMap(UpdateCheck.keyID)).subtracting(counted).count
+        }
+    }
+
+    static func keyID(_ k: String) -> String? { k.firstIndex(of: " ").map { String(k[..<$0]) } }
+
+    // B124: iFizBox has handed iOS its own update (any of `ids`: its bundle ID, the source's ID): the icon stops counting
+    // it at once, instead of keeping it until the new version's first launch (app.js lastVersion) or for ever when that
+    // never comes. Changes' row for it (a page key with one of `ids`) comes off its count; a background find of it goes.
+    // Every other update stays counted.
+    static func without(_ ids: Set<String>, _ c: Counts) -> Counts {
+        let mine = { (k: String) in keyID(k).map(ids.contains) ?? false }
+        let row = c.pageKeys.contains(where: mine)
+        return Counts(pageCount: max(0, c.pageCount - (row ? 1 : 0)), pageKeys: c.pageKeys.filter { !mine($0) },
+                      found: c.found.filter { !mine($0) })
+    }
+
+    // B124: the watch list once iFizBox has handed iOS `version` of itself: its entries (any of `ids`) at that version,
+    // so a background run before the new version's first launch doesn't find and badge the same update again. Never
+    // lowers a version.
+    static func handedOff(_ watch: [Watched], ids: Set<String>, version: String) -> [Watched] {
+        watch.map { w in
+            guard ids.contains(w.id), DebVersion.compare(version, w.version) > 0 else { return w }
+            return Watched(id: w.id, name: w.name, version: version, source: w.source)
+        }
     }
 
     static func title(_ n: Int) -> String { n == 1 ? "1 Update" : "\(n) Updates" }

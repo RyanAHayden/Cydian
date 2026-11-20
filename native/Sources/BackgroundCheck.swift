@@ -27,6 +27,9 @@ enum BackgroundCheck {
     // icon count it set (app.badge, Notifications.swift). A background run's badge starts from these.
     static let pageKeysKey = "ifizbox.updates.pageKeys"
     static let pageCountKey = "ifizbox.updates.pageCount"
+    // B124: the "<id> <version>" keys the last background run found (its badge's other part); app.badge drops them,
+    // since the page's count then stands for everything.
+    static let foundKey = "ifizbox.updates.foundKeys"
     static let interval: TimeInterval = 4 * 3600
     static let maxBytes = 8 << 20 // AltStore's own source is about 1 MB; the biggest seen (F9) under 8 MB
     private static let queue = DispatchQueue(label: "com.ryha.ifizbox.updates")
@@ -83,6 +86,37 @@ enum BackgroundCheck {
     private static func save(_ apps: [UpdateCheck.Watched], known: Set<String>) {
         if let d = try? JSONEncoder().encode(apps) { UserDefaults.standard.set(d, forKey: watchKey) }
         UserDefaults.standard.set(known.sorted(), forKey: knownKey)
+    }
+
+    // B124: iFizBox has handed iOS its own update (`version`, under any of `ids`; this copy's bundle ID always counts):
+    // the icon badge drops that update now, rather than at the new version's first launch (app.js lastVersion), which
+    // never comes when the install doesn't land. Other updates stay counted. The watch list moves iFizBox to that
+    // version so a background run meanwhile doesn't badge it again (the new version's page sends its own list).
+    // Returns the new count, for the closing notification's content.badge. Sideload build only; any queue but this
+    // one's own.
+    @discardableResult
+    static func selfHandedOff(ids: Set<String>, version: String) -> Int {
+        guard AppMode.current == .sideload else { return 0 }
+        var mine = ids
+        if let b = Bundle.main.bundleIdentifier { mine.insert(b) }
+        let d = UserDefaults.standard
+        let n: Int = queue.sync {
+            let before = UpdateCheck.Counts(pageCount: d.integer(forKey: pageCountKey),
+                                            pageKeys: Set(d.stringArray(forKey: pageKeysKey) ?? []),
+                                            found: d.stringArray(forKey: foundKey) ?? [])
+            let after = UpdateCheck.without(mine, before)
+            d.set(after.pageCount, forKey: pageCountKey)
+            d.set(after.pageKeys.sorted(), forKey: pageKeysKey)
+            d.set(after.found, forKey: foundKey)
+            save(UpdateCheck.handedOff(loadWatch(), ids: mine, version: version), known: loadKnown())
+            return after.badge
+        }
+        WidgetStore.save(count: n, names: []) // N8: the widget shows the same count
+        let center = UNUserNotificationCenter.current()
+        if n == 0 { center.removeDeliveredNotifications(withIdentifiers: [Notifications.upgradesID]) }
+        if #available(iOS 16.0, *) { center.setBadgeCount(n) }
+        else { DispatchQueue.main.async { UIApplication.shared.applicationIconBadgeNumber = n } }
+        return n
     }
 
     private static func askOnce() {
@@ -151,6 +185,7 @@ enum BackgroundCheck {
                     let pageKeys = Set(UserDefaults.standard.stringArray(forKey: BackgroundCheck.pageKeysKey) ?? [])
                     let badge = UpdateCheck.badge(found, pageCount: UserDefaults.standard.integer(forKey: BackgroundCheck.pageCountKey),
                                                   pageKeys: pageKeys)
+                    UserDefaults.standard.set(found.map(\.key), forKey: BackgroundCheck.foundKey) // B124
                     UNUserNotificationCenter.current().getNotificationSettings { st in
                         guard st.badgeSetting == .enabled else { return }
                         if #available(iOS 16.0, *) { UNUserNotificationCenter.current().setBadgeCount(badge) }

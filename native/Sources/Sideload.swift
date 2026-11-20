@@ -345,7 +345,7 @@ enum Sideload {
     // iFizBox's own update: upload the IPA signed here to the server, which holds it for its 10 minutes and answers the
     // itms-services link; then iOS installs from the server, unaffected by iFizBox closing.
     static func hostAndOpen(_ output: URL, server: String, app: SignedApp, record: SignedRecord, job: SignJob? = nil,
-                            opened: @escaping (Result<(SignedApp, SignedRecord), Error>) -> Void, served: ((Bool) -> Void)?) {
+                            log: ((String) -> Void)? = nil, opened: @escaping (Result<(SignedApp, SignedRecord), Error>) -> Void, served: ((Bool) -> Void)?) {
         // The Worker (worker/src/index.js) doesn't open the IPA: the app says what it is.
         var q = URLComponents(string: server + "/sign/host")!
         q.queryItems = [URLQueryItem(name: "bundleid", value: app.bundleID), URLQueryItem(name: "version", value: app.version),
@@ -373,9 +373,11 @@ enum Sideload {
             let status = (json?["manifest"] as? String).flatMap { m in
                 m.hasSuffix("/manifest.plist") ? URL(string: String(m.dropLast("manifest.plist".count)) + "status") : nil
             }
-            DispatchQueue.main.async {
+            // B124: iFizBox closes itself with a notification once iOS has the IPA; without permission that notification
+            // never shows (a first self-update can come before anything else asked), so ask now, before iOS's prompt.
+            CloseForUpdate.askToNotify(log: log) {
                 UIApplication.shared.open(link)
-                CloseForUpdate.afterPrompt(status: status)
+                CloseForUpdate.afterPrompt(status: status, app: app)
                 opened(.success((app, record)))
                 served?(true)
             }
@@ -428,7 +430,7 @@ enum Sideload {
         emit("installing", 0)
         if let host = servers.host { // B64: this call's own choice, made when it started
             log?("Uploading to \(host)/sign/host (\(app.name) replaces this app, so iOS installs it from the server)")
-            hostAndOpen(output, server: host, app: app, record: record, job: job, opened: opened, served: served)
+            hostAndOpen(output, server: host, app: app, record: record, job: job, log: log, opened: opened, served: served)
             return
         }
         serveAndOpen(output, server: servers.manifest, app: app, record: record, log: log, job: job, opened: opened, served: served)
@@ -452,6 +454,8 @@ enum Sideload {
         if isSelf {
             saveRecords(SignedRecords.adding(record, to: records()))
             log?("\(app.name) replaces this app: iOS closes it while it installs; open it again once it's done")
+            // B124: installd ends this process mid-install, so the icon badge stops counting this update now
+            BackgroundCheck.selfHandedOff(ids: [app.bundleID, app.originalBundleID], version: app.version)
         }
         DispatchQueue.main.async { KeepAlive.shared.begin() }
         IDevice.queue.async {
@@ -1171,8 +1175,36 @@ enum CloseForUpdate {
     private static var run = 0 // each afterPrompt bumps it: an older run's polls stop
     static let startLimit: TimeInterval = 120, finishLimit: TimeInterval = 600, pollEvery: TimeInterval = 2
 
+    // B124: the update being handed off (its IDs and version), for the icon badge when iFizBox closes
+    private static var handing: (ids: Set<String>, version: String)?
+
+    // B124: the closing notification ("Finishing the iFizBox Update") needs notification permission, and a first
+    // self-update can come before anything asked for it (BackgroundCheck asks only once the page follows an app,
+    // app.badge only at a first count). Asks while undecided, then `go` on the main queue; already refused: `go`
+    // straight away, with a line in the console saying iFizBox will close without telling.
+    static func askToNotify(log: ((String) -> Void)?, _ go: @escaping () -> Void) {
+        let center = UNUserNotificationCenter.current()
+        center.getNotificationSettings { s in
+            switch s.authorizationStatus {
+            case .notDetermined:
+                center.requestAuthorization(options: [.alert, .badge, .sound]) { ok, _ in
+                    if !ok { log?(closesQuietly) }
+                    DispatchQueue.main.async(execute: go)
+                }
+            case .denied:
+                log?(closesQuietly)
+                DispatchQueue.main.async(execute: go)
+            default:
+                DispatchQueue.main.async(execute: go)
+            }
+        }
+    }
+    static let closesQuietly = "Notifications are off for \(Brand.name): it closes once iOS has the update but can't tell you; "
+        + "open it again from the Home Screen when its icon has finished installing"
+
     // `status`: the link's GET status URL (nil: the old 8 s close). Main queue.
-    static func afterPrompt(status: URL?) {
+    static func afterPrompt(status: URL?, app: SignedApp? = nil) {
+        handing = app.map { ([$0.bundleID, $0.originalBundleID], $0.version) }
         run += 1
         let mine = run
         set(.prompt)
@@ -1256,6 +1288,10 @@ enum CloseForUpdate {
     }
 
     private static func closeWith(_ c: UNMutableNotificationContent, after: TimeInterval) {
+        // B124: the icon badge counted this very update and iOS keeps it through the install: drop it now (other
+        // updates stay counted), and the notification carries the same count so it can't put the old one back.
+        let n = BackgroundCheck.selfHandedOff(ids: handing?.ids ?? [], version: handing?.version ?? "")
+        c.badge = NSNumber(value: n)
         let req = UNNotificationRequest(identifier: "ifizbox.updating", content: c,
                                         trigger: UNTimeIntervalNotificationTrigger(timeInterval: after, repeats: false))
         UNUserNotificationCenter.current().add(req) { _ in

@@ -237,7 +237,10 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
   top, and where to type it, a short line a step with a ringed screenshot of the Settings row (Privacy & Security,
   Developer Mode, "Pair with iFizBox"; `web/app/img/pair/`, the user's own iPhone screenshots, named in Credits).
   Pairing keeps listening while the page is open, and ends when it's left. Paired: "Paired" with a check, Check
-  Connection (`idevice.verify`, Pair Again when the pairing is refused) and Forget Pairing. Before iOS 27 a pairing
+  Connection (`idevice.verify`, Pair Again when the pairing is refused) and Forget Pairing. Once paired, with the VPN
+  on, Installation & Signing reads Developer Mode for real (`idevice.developerMode`: lockdown GetValue, domain
+  `com.apple.security.mac.amfi`, key `DeveloperModeStatus`) and shows it under Pairing, for every kind of profile
+  (iOS 27 asks for it for Ad Hoc too); off adds the steps to turn it on. Before iOS 27 a pairing
   file made on a computer is imported. Each
   install (`chooseRoute`, signing-client.js) asks `idevice.status`: paired and LocalDevVPN on sends
   `route: "idevice"` with the bridge call (signing.install, signing.open, signing.resign/resignAll,

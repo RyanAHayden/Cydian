@@ -566,6 +566,25 @@ enum IDevice {
             return String(cString: p)
         }
 
+        /// Developer Mode on this phone, from lockdown (GetValue domain com.apple.security.mac.amfi, key
+        /// DeveloperModeStatus, a boolean). nil when iOS doesn't give it (before iOS 16 there is no Developer Mode).
+        func developerMode() throws -> Bool? {
+            watch.begin("asking lockdown for Developer Mode", Limit.service)
+            var c: OpaquePointer?
+            switch kind {
+            case .remotePairing: try check(lockdownd_connect_rsd(adapter, handshake, &c), "devmode_failed")
+            case .lockdown: try check(lockdownd_connect(provider, &c), "devmode_failed")
+            }
+            defer { lockdownd_client_free(c) }
+            var value: plist_t?
+            try check(lockdownd_get_value(c, "DeveloperModeStatus", "com.apple.security.mac.amfi", &value), "devmode_failed")
+            defer { plist_free(value) }
+            guard let v = value, plist_get_node_type(v) == PLIST_BOOLEAN else { return nil }
+            var b: UInt8 = 0
+            plist_get_bool_val(v, &b)
+            return b != 0
+        }
+
         func installationProxy() throws -> OpaquePointer? {
             watch.begin("connecting to installation_proxy", Limit.service)
             var c: OpaquePointer?
@@ -602,6 +621,11 @@ enum IDevice {
         let u = try watched("udid") { try Session(watch: $0).udid() }
         PhoneID.remember(u)
         return u
+    }
+
+    /// Developer Mode through the pairing (blocking): true/false, or nil when iOS doesn't report it.
+    static func readDeveloperMode() throws -> Bool? {
+        try watched("devmode") { try Session(watch: $0).developerMode() }
     }
 
     // ---- Installing

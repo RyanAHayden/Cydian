@@ -9,6 +9,8 @@
 //   idevice.pairState     {active, pin, step, text, error}: the pairing now, for a page that was in the background
 //   idevice.pairCancel    ends a waiting idevice.pair (it replies "canceled: ...")
 //   idevice.verify        connects once: {ok: true, kind} or "not_paired:/connect_failed:/bad_pairing: ..."
+//   idevice.developerMode {on: true|false|null}: Developer Mode read through the pairing (lockdown GetValue
+//                         com.apple.security.mac.amfi DeveloperModeStatus); null when iOS doesn't report it
 //   idevice.forget        deletes the pairing -> status
 //   idevice.openLocalDevVPN  opens the LocalDevVPN app ({opened: false} when it isn't installed)
 //   idevice.vpnApps       {localdevvpn: bool, tailscale: bool}: which VPN apps are installed (canOpenURL on their
@@ -93,6 +95,9 @@ enum IDeviceBridge {
             Apt.reply(c, ["ok": true], nil)
         }
         b.on("idevice.verify") { c in run(c) { ["ok": true, "kind": try IDevice.verify().rawValue] } }
+        b.on("idevice.developerMode") { c in
+            run(c) { ["on": try IDevice.readDeveloperMode().map { $0 as Any } ?? NSNull()] }
+        }
         b.on("idevice.forget") { c in
             run(c) {
                 IDevice.deletePairing(.remotePairing)

@@ -151,6 +151,23 @@ export function setupState(status, pairing = null) {
 // tailscale.use: its VPN on and signed in, or Connect With: Tailscale).
 export function vpnOn(status) { return Boolean(status?.localDevVPN || status?.tailscale?.use); }
 
+// ---- Developer Mode, read for real through the pairing (idevice.developerMode: lockdown's DeveloperModeStatus)
+// iOS asks for it for every kind of profile (the user's iOS 27 test: Ad Hoc too), so it shows whatever the profile.
+// `on`: true, false, or null/undefined (not read: not paired, the VPN off, iOS too old to have it, or the read
+// failed), which shows nothing. On: the row only. Off: the row and the steps.
+export const DEV_MODE_STEPS = "Open Settings > Privacy & Security > Developer Mode, turn it on and tap Restart. "
+  + "After the restart, unlock the iPhone and tap Turn On.";
+export function developerModeInfo(on) {
+  if (on === true) return { row: { label: "Developer Mode", detail: "On" }, footer: "" };
+  if (on === false) {
+    return { row: { label: "Developer Mode", detail: "Off" }, warn: true,
+      footer: `iOS won't open the apps you sign until Developer Mode is on. ${DEV_MODE_STEPS}` };
+  }
+  return null;
+}
+// Whether to ask: only with a pairing and a way to reach iOS (lockdown needs the VPN or Tailscale).
+export const canReadDeveloperMode = (status) => Boolean(status?.paired) && vpnOn(status);
+
 // ---- Which VPN app to pair and install through, decided before sending anyone to an app
 
 // LocalDevVPN's App Store page (App Store ID 6755608044, com.jkcoxson.LocalDevVPN), offered when no VPN app is

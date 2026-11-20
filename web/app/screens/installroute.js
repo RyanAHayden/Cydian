@@ -21,6 +21,7 @@ import { vpnRoute, connectAlert, LOCALDEVVPN_STORE, TAILSCALE_URL } from "../cor
 import { ROUTE_KEY, ROUTE_OPTIONS, VPNS, VPN_POLL, vpnList, vpnOn, IPHONE_INTRO, setupState, PAIR_GUIDE, pairEvent, pairFooter, pairFromNative, pinText, PAIR_STEPS, verifyFailure,
   CONNECT_OPTIONS, connectFooter, tailscaleFooter, tailscaleTestResult } from "../core/installroute.js";
 import { ringStyle } from "../core/installroute.js";
+import { developerModeInfo, canReadDeveloperMode } from "../core/installroute.js";
 import { NAME } from "../brand.js";
 
 export const PAGE = "installation";
@@ -44,7 +45,9 @@ let signingIn = null;
 
 // The main page's groups (pure, for tests): the choice and, with This iPhone chosen, its state, Connect With and
 // Tailscale. `st.tailscale` is tailscale.status's answer (idevice.status carries it).
-export function installationGroups(choice, st, { pick = () => {}, openVPN = () => {}, connect = () => {}, signIn = () => {}, test = () => {}, signOut = () => {}, busy = null } = {}) {
+// `devMode`: idevice.developerMode's `on` (core developerModeInfo): a Developer Mode row under Pairing once paired,
+// and the steps in the footer when it's off.
+export function installationGroups(choice, st, { pick = () => {}, openVPN = () => {}, connect = () => {}, signIn = () => {}, test = () => {}, signOut = () => {}, busy = null, devMode = null } = {}) {
   const groups = [{
     header: "Install Apps With",
     rows: ROUTE_OPTIONS.map((o) => ({ label: o.label, subtitle: o.subtitle, cls: "route-row", checked: o.value === choice, onClick: () => pick(o.value) })),
@@ -53,14 +56,18 @@ export function installationGroups(choice, st, { pick = () => {}, openVPN = () =
       : "The Signing Server hands iOS each app's install link.",
   }];
   if (choice === "iphone") {
+    const dm = st?.paired ? developerModeInfo(devMode) : null;
+    const vpnNote = `${VPN} must be on while apps install, or Tailscale (below).`;
     groups.push({
       header: "This iPhone",
       rows: [
         { label: "Pairing", detail: st?.paired ? "Paired" : "Not Paired", href: route("pair") },
+        ...(dm ? [dm.row] : []),
         { label: VPN, detail: vpnDetail(st) },
         { label: `Open ${VPN}`, cls: "sign-import", onClick: openVPN },
       ],
-      footer: `${VPN} must be on while apps install, or Tailscale (below).`,
+      footer: dm?.footer ? `${dm.footer} ${vpnNote}` : vpnNote,
+      ...(dm?.warn ? { warn: true } : {}),
     });
     const ts = st?.tailscale ?? null;
     const now = ts?.connect ?? "auto";
@@ -109,7 +116,9 @@ export function pickRoute(v, known, { set, open }) {
 async function paintInstallation(el, { store, native, alert, redraw }) {
   const choice = store.get(ROUTE_KEY);
   let known = null; // idevice.status once read, for the tap above
-  const paint = (st) => el.replaceChildren(grouped(installationGroups(choice, st, {
+  let devMode = null; // idevice.developerMode's `on`, once read
+  const paint = (st) => el.replaceChildren(warnFooters(installationGroups(choice, st, {
+    devMode,
     pick: (v) => pickRoute(v, known, { set: (r) => store.set(ROUTE_KEY, r), open: goTo }),
     openVPN: () => openVPN(native, alert),
     connect: async (v) => { await call(native, "tailscale.setConnect", { value: v }).catch(() => {}); redraw(); },
@@ -125,7 +134,23 @@ async function paintInstallation(el, { store, native, alert, redraw }) {
   })));
   paint(null);
   known = await status(native); // read for the Signing Server choice too, so a tap on This iPhone knows the pairing
-  if (choice === "iphone") paint(known);
+  if (choice !== "iphone") return;
+  paint(known);
+  if (!canReadDeveloperMode(known)) return;
+  devMode = await readDeveloperMode(native);
+  if (devMode != null && el.isConnected !== false) paint(known);
+}
+
+// Developer Mode through the pairing: true/false, or null when it couldn't be read (an older shell, no answer).
+export async function readDeveloperMode(native) {
+  try { const r = await call(native, "idevice.developerMode"); return typeof r?.on === "boolean" ? r.on : null; } catch { return null; }
+}
+
+// grouped() with the footers of groups marked `warn` in red (ios6.css .sign-warning, as Settings > Signing's).
+function warnFooters(sections) {
+  const frag = grouped(sections);
+  [...frag.children].forEach((g, i) => { if (sections[i]?.warn) g.querySelector?.(".group-footer")?.classList.add("sign-warning"); });
+  return frag;
 }
 
 async function tailscaleSignIn(native, alert, redraw, done = `${NAME} is on your tailnet. Tap Test Connection to check it reaches this iPhone.`) {

@@ -107,13 +107,16 @@ class ThemeIcons(unittest.TestCase):
                 for n in (180, 192, 512):
                     with self.subTest(theme=t, file=f"{kind}-{n}.png"):
                         self.assertEqual(png_size(HERE / "themes" / t / f"{kind}-{n}.png"), (n, n))
+                for n in (76, 152, 228):
+                    with self.subTest(theme=t, file=f"{kind}-glossy-{n}.png"):
+                        self.assertEqual(png_size(HERE / "themes" / t / f"{kind}-glossy-{n}.png"), (n, n))
 
     def test_no_stray_theme(self):
         # a theme dropped from theme-boot.js leaves no icons behind
         self.assertEqual(sorted(p.name for p in (HERE / "themes").iterdir() if p.is_dir()), sorted(theme_names()))
 
     def test_classic_is_the_real_icon(self):
-        for f in ("icon-180.png", "icon-192.png", "icon-512.png"):
+        for f in ("icon-180.png", "icon-192.png", "icon-512.png", "icon-glossy-152.png", "icon-lite-glossy-228.png"):
             self.assertEqual((HERE / "themes/classic" / f).read_bytes(), (HERE / f).read_bytes(), f)
 
     def test_themes_differ(self):

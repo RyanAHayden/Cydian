@@ -186,7 +186,15 @@ class LaunchThemes(unittest.TestCase):
         self.assertEqual(sorted(settings_palettes()), sorted(make.THEMES))
         self.assertEqual(sorted(launch_check.THEME_KEYS), sorted(make.THEMES))
         swift = read("native", "Sources", "Launch.swift")
-        self.assertIn('return dark ? "oled" : "classic"', swift)  # Launch.ground's defaults
+        # a palette with no set gets nothing, not another theme's frame
+        self.assertIn('fileExists(atPath: dir(k) + "/" + viewNib) ? k : nil', swift)
+
+    def test_tab_shadow_is_every_theme_own(self):
+        """make.py draws LaunchTabShadow at 18 % for every theme: no theme's CSS redraws .tabbar::before."""
+        css = self.ios6 + self.pal
+        rules = re.findall(r"(?m)^([^{}\n]*\.tabbar::before[^{]*)\{([^}]*)\}", css)
+        self.assertEqual(len(rules), 1, rules)
+        self.assertIn("rgba(0,0,0,.18)", rules[0][1].replace(" ", ""))
 
     def test_themes_dir_is_what_make_writes(self):
         """native/launch/themes/ is make.py's output (rerun native/launch/make.py)."""

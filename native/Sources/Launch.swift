@@ -26,39 +26,37 @@ enum Splash {
 
     static func dir(_ key: String) -> String { Bundle.main.bundlePath + "/\(themesDir)/\(key)" }
 
-    // The theme a tone and its palettes open on; a palette this build has no set for takes the tone's default, as
-    // Launch.ground does (Classic, OLED Black).
-    static func key(dark: Bool, palette: String, lightPalette: String) -> String {
+    // The theme a tone and its palettes open on; nil when this build has no set for it (a newer page's palette):
+    // then nothing is copied and there is no cover, never another theme's frame.
+    static func key(dark: Bool, palette: String, lightPalette: String) -> String? {
         let k = dark ? palette : lightPalette
         let ok = !k.isEmpty && k.allSatisfy { ("a"..."z").contains($0) || ("0"..."9").contains($0) }
-        if ok, FileManager.default.fileExists(atPath: dir(k) + "/" + viewNib) { return k }
-        return dark ? "oled" : "classic"
+        return ok && FileManager.default.fileExists(atPath: dir(k) + "/" + viewNib) ? k : nil
     }
 
     // The key this launch opens on: Theme.saved as Theme.launchGround reads it.
-    static func launchKey(systemDark: Bool) -> String {
+    static func launchKey(systemDark: Bool) -> String? {
         let s = Theme.saved
         return key(dark: s.style == "dark" || (s.style == "auto" && systemDark), palette: s.darkPalette,
                    lightPalette: s.lightPalette)
     }
 
     // B180's cover in the theme's colours: LaunchThemes/<key>/LaunchScreen.storyboardc with its own images. nil when
-    // that set is missing; then Classic's own storyboard only for Classic, never another theme's bars.
+    // that set is missing (then the window's ground shows until the page draws), never another theme's bars.
     static func cover(systemDark: Bool) -> UIView? {
-        let k = launchKey(systemDark: systemDark)
-        if let b = Bundle(path: dir(k)), b.path(forResource: "LaunchScreen", ofType: "storyboardc") != nil,
-           let v = UIStoryboard(name: "LaunchScreen", bundle: b).instantiateInitialViewController()?.view {
-            v.isUserInteractionEnabled = false
-            return v
-        }
-        return k == "classic" ? Launch.cover() : nil
+        guard let k = launchKey(systemDark: systemDark), let b = Bundle(path: dir(k)),
+              b.path(forResource: "LaunchScreen", ofType: "storyboardc") != nil,
+              let v = UIStoryboard(name: "LaunchScreen", bundle: b).instantiateInitialViewController()?.view
+        else { return nil }
+        v.isUserInteractionEnabled = false
+        return v
     }
 
     // Theme.apply's: make the next launch open on this theme. Jailbreak build only; off the main thread, one at a
     // time, and only when the bundle's files aren't that theme's already (a byte compare of 13 small files).
     static func follow(dark: Bool, palette: String, lightPalette: String) {
         guard AppMode.current == .jailbreak else { return }
-        let k = key(dark: dark, palette: palette, lightPalette: lightPalette)
+        guard let k = key(dark: dark, palette: palette, lightPalette: lightPalette) else { return }
         queue.async {
             guard !installed(k) else { return }
             do {

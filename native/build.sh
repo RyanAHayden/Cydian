@@ -155,10 +155,11 @@ bundle() {
   cp "icon/$car" "$app/Assets.car"
   # B180: the launch screen, Info.plist's UILaunchStoryboardName (compiled on a Mac by launch/storyboard.sh), and
   # the loose PNGs it names (launch/make.py).
-  cp -R launch/LaunchScreen.storyboardc "$app/"
-  cp launch/Launch*@2x.png launch/Launch*@3x.png "$app/"
+  # B203: the .deb's only: the IPA's splash is the neutral UILaunchScreen (Info-sideload.plist).
+  [ -n "$overlay" ] || cp -R launch/LaunchScreen.storyboardc "$app/"
+  [ -n "$overlay" ] || cp launch/Launch*@2x.png launch/Launch*@3x.png "$app/"
   # B203: every theme's set (launch/make.py): the in-app cover's, and what the helper's launch-theme copies over the
-  # files above. The IPA's own splash is neutral (Info-sideload.plist UILaunchScreen), its storyboard unused.
+  # files above.
   rm -rf "$app/LaunchThemes" && cp -R launch/themes "$app/LaunchThemes"
   cp bridge.js "$app/bridge.js"
   # Apple's WWDR intermediates and roots, public certificates the on-device signer puts in each CMS (I6).

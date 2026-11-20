@@ -286,7 +286,8 @@ Its bar images are stretched to bars whose height depends on the phone (64 to 10
 image is drawn centred at its own size, so anything but a plain fill lines up only on screens whose size is known. A
 launch storyboard lays its views out with Auto Layout against the safe area, so the strips fit every screen.
 
-**What iFizBox ships** (`native/launch/`, copied into both the .deb's and the IPA's `iFizBox.app/` by `build.sh`):
+**What iFizBox ships** (`native/launch/`, copied into the .deb's `iFizBox.app/` by `build.sh`; the IPA gets only
+`LaunchThemes/`, below):
 
 - `LaunchScreen.storyboard`, the source, and `LaunchScreen.storyboardc`, compiled and committed. Only Apple's
   `ibtool` compiles a storyboard, so `native/launch/storyboard.sh <mac-host>` copies the sources to a Mac over ssh
@@ -344,8 +345,9 @@ stripes are one point tall. `test_native.py` keeps the images' total far under t
   `UILaunchScreen` (iOS's own background, white or black with the iPhone's appearance, no bars) and drops
   `UILaunchStoryboardName` (`mkipa.py`'s `IFIZBOX_REMOVE_KEYS`).
 - **Both:** the cover is the theme's frame, `LaunchThemes/<key>/` loaded as a bundle of its own
-  (`Splash.cover`); with that set missing, Classic falls back to the bundle's own storyboard and any other theme
-  gets no cover (the window's ground), never another theme's bars.
+  (`Splash.cover`); with that set missing (a palette this build doesn't know) there is no cover and nothing is
+  copied, never another theme's bars. The IPA therefore goes from the plain fill to the theme's bars, which fade
+  into the page.
 - Automatic follows the page's resolved theme at the last change: an iPhone that switched appearance while the app
   wasn't running opens once on the other tone's frame in the jailbreak build.
 

@@ -61,6 +61,18 @@ in-app cover that holds it until the page draws. Gunmetal, OLED Black and every 
 - Theme nibs first came out different for Classic too (the nib's doubles are rounded, make.py's were exact); it now
   leaves a colour that already matches untouched.
 
+## Spec review (fixed)
+
+- A palette with no set used to fall back to OLED Black / Classic. The helper could then copy another theme's
+  frame, and the cover show one. Now `Splash.key` returns nil: nothing is copied and there is no cover. The cover
+  no longer falls back to the bundle's own storyboard, so the IPA no longer ships the top-level storyboard and PNGs
+  it never used (only `LaunchThemes/`).
+- New test: `.tabbar::before` (the tab shadow, 18 %) has no per-theme override in the CSS, which make.py assumes.
+- Kept as documented limits (not fixable without a Mac or two sets of files): the Automatic flip while closed, and
+  the IPA's white/black fill instead of a named colour near Gunmetal. The review also flagged the IPA's step from
+  the plain fill to the themed cover before the fade. I kept it: the bars come up in the theme with the ground, and
+  then fade into the page. Without it, the bare ground would show and then the page's bars pop in.
+
 ## Known limits
 
 - **Tab bar line 1 pt low** for OLED Black, Midnight, Nord and Dracula. Their tab bars have an opaque top line on

@@ -964,6 +964,15 @@ html[data-theme="dark"] .store-segment:active:not(.selected) { background: var(-
   transition: transform .2s cubic-bezier(.25,.1,.25,1);
 }
 .pull-refresh.armed .pull-arrow { transform: rotate(180deg); }
+/* B188: letting go armed holds the area open (pullrefresh.js) while the refresh runs: the arrow gives way to iOS 6's
+   grey spinner (UIActivityIndicatorViewStyleGray, 20pt, centred where the arrow was; white on dark themes through
+   --spinner-gray) and the title reads "Refreshing...". The arrow turns back without animating while hidden. */
+.pull-spinner {
+  position: absolute; left: 34px; top: 20px; width: 20px; height: 20px; visibility: hidden;
+  background: var(--spinner-gray) center / 20px no-repeat;
+}
+.pull-refresh.refreshing .pull-spinner { visibility: visible; animation: hud-spin .96s linear infinite; }
+.pull-refresh.refreshing .pull-arrow { visibility: hidden; transition: transform 0s; }
 .pull-text {
   position: absolute; left: 80px; right: 10px; top: 13px; display: flex; flex-direction: column; gap: 3px;
   white-space: nowrap; overflow: hidden; text-shadow: 0 1px 0 rgba(255,255,255,.9);
@@ -972,4 +981,4 @@ html[data-theme="dark"] .store-segment:active:not(.selected) { background: var(-
 .pull-time { font-size: 12px; line-height: 15px; }
 html[data-theme="dark"] .pull-refresh { color: var(--dk-index); }
 html[data-theme="dark"] .pull-text { text-shadow: 0 -1px 0 rgba(0,0,0,.8); }
-@media (prefers-reduced-motion: reduce) { .pull-arrow { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .pull-arrow { transition: none; } .pull-spinner { animation-duration: 3s; } }

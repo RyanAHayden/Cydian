@@ -120,6 +120,7 @@ export const ROW_ICONS = {
   help: [C.blue, "question"], server: [C.teal, "globe"], checkServer: [C.green, "pulse"], runYourOwn: [C.orange, "cloud"],
   shareCert: [C.green, "personPlus"], // Share Your Certificate (SideDrop)
   sources: [C.blue, "list"], transfer: [C.green, "transfer"], hidden: [C.grey, "eyeSlash"], recommended: [C.gold, "star"],
+  findMore: [C.purple, "globe"], // Manage > Find More Sources (Canister's repo index)
   share: [C.blue, "share"], copy: [C.grey, "copy"], saveFile: [C.teal, "save"], qr: [C.dark, "qr"],
   fromFile: [C.teal, "file"], fromClipboard: [C.brown, "clipboard"],
   installation: [C.blue, "phone"], // Settings > Installation (Signing Server / This iPhone)

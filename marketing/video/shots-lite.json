@@ -1,0 +1,54 @@
+[
+ {
+  "wait": 6000
+ },
+ {
+  "nav": "",
+  "ms": 14000
+ },
+ {
+  "shot": "lite-home"
+ },
+ {
+  "nav": "#/home/settings/installation",
+  "ms": 6000
+ },
+ {
+  "shot": "lite-signing"
+ },
+ {
+  "nav": "#/home/settings/installation/with",
+  "ms": 5000
+ },
+ {
+  "shot": "lite-with"
+ },
+ {
+  "nav": "#/home/settings/signing/certificate",
+  "ms": 5000
+ },
+ {
+  "shot": "lite-cert"
+ },
+ {
+  "nav": "#/home/settings/signing/apps",
+  "ms": 6000
+ },
+ {
+  "shot": "lite-apps"
+ },
+ {
+  "nav": "#/home/settings/updates",
+  "ms": 8000
+ },
+ {
+  "shot": "lite-updates"
+ },
+ {
+  "nav": "#/installed",
+  "ms": 6000
+ },
+ {
+  "shot": "lite-installed"
+ }
+]

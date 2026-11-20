@@ -412,8 +412,12 @@ async function checkAccount(native, redraw = () => {}) {
 // F316 (AGENTS.md Hints): two short sentences under the key rows; with no key, what one is for. The role the key
 // needs is said only when Apple refuses it (withRoleHint: Key Not Accepted, Check Account's failure).
 export const ROLE_HINT = "Use a key with the Admin or App Manager role.";
+// Only for a refusal about the key's rights (403 / forbidden / permission), not a network error or a typo'd ID.
+export const roleRefusal = (e) => e?.status === 403 || e?.code === "key-role"
+  || /\b403\b|forbidden|permission|not allowed|role/i.test(String(e?.message ?? e));
 export const withRoleHint = (e) => {
   const m = String(e?.message ?? e).replace(/^\w+: /, "").trim();
+  if (!roleRefusal(e) || m.includes(ROLE_HINT)) return m;
   return `${m}${/[.!?]$/.test(m) || !m ? "" : "."} ${ROLE_HINT}`.trim();
 };
 export function accountFooter({ key = false, app = true } = {}) {

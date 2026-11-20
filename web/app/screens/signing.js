@@ -340,9 +340,9 @@ export function udidPageSections({ pending = false, udid = null } = {}) {
   if (udid) return [{ header: "This iPhone", rows: [{ label: "UDID", subtitle: udid }], footer: UDID_FOUND }];
   return [
     { header: "Steps", rows: [{ label: DOWNLOAD_PROFILE, start: true, ...(pending ? { detail: "Waiting" } : {}) }],
-      footer: pending ? UDID_WAITING : UDID_STEPS[0] },
-    { footer: UDID_STEPS[1] },
-    { footer: UDID_STEPS[2] },
+      footer: pending ? UDID_WAITING : `1. ${UDID_STEPS[0]}` },
+    { footer: `2. ${UDID_STEPS[1]}` }, // numbered step groups, as Pairing's (installroute.js setupGroups)
+    { footer: `3. ${UDID_STEPS[2]}` },
   ];
 }
 

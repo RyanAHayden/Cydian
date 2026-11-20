@@ -40,6 +40,15 @@ pages. Each footer is a small exported constant or pure builder, tested in `web/
 - `--mode sideload` capture fakes added to capture.mjs: `signing.status` (SIGN_STATUS env), `signing.installed`,
   `asc.key.info` (ASC_KEY env), `asc.profiles`.
 
+## Spec review
+
+- Fixed: the role hint was added to every failure; now only to a refusal about the key's rights
+  (`roleRefusal`: status 403, code key-role, or 403/forbidden/permission/role in the message).
+- Fixed: Find UDID's footer-only step groups are numbered "1. … 3.", as Pairing's (F317, installroute.js).
+- Kept, with reasons: the expiring-soon warning still takes Certificate Status' footer (it's "something off" and its fix);
+  the never-checked footer, the no-key account footer and the page's "UDID is here" state are needed states, not extras;
+  Other Apps' texts are the concept's own; This iPhone's and Find's footers sit under separate groups, one each.
+
 ## Checks
 
 - `node --test web/app`: 2555 pass, 0 fail.

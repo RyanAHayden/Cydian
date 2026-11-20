@@ -52,7 +52,7 @@ test("Find UDID's page: one group per step, Download Profile starts it, then the
   const g = udidPageSections();
   assert.deepEqual(g.map(labels), [[DOWNLOAD_PROFILE], [], []]);
   assert.equal(g[0].rows[0].start, true);
-  assert.deepEqual(g.map((s) => s.footer), UDID_STEPS);
+  assert.deepEqual(g.map((s) => s.footer), UDID_STEPS.map((s, i) => `${i + 1}. ${s}`));
   const w = udidPageSections({ pending: true });
   assert.equal(w[0].rows[0].detail, "Waiting");
   assert.equal(w[0].footer, UDID_WAITING);
@@ -89,8 +89,9 @@ test("Apple Developer Account: the key rows' two sentences; the role only on fai
   assert.match(accountFooter({ key: true, app: true }), /makes a profile with Push for each app you sign\. The key stays in this iPhone's Keychain\.$/);
   assert.match(accountFooter({ key: true, app: false }), /The key stays in this browser\.$/);
   for (const k of [true, false]) assert.doesNotMatch(accountFooter({ key: k }), /role/);
-  assert.equal(withRoleHint(new Error("Error: Apple refused the key")), `Apple refused the key. ${ROLE_HINT}`);
-  assert.equal(withRoleHint("Not allowed."), `Not allowed. ${ROLE_HINT}`);
+  assert.equal(withRoleHint(Object.assign(new Error("Error: Apple refused the key"), { status: 403 })), `Apple refused the key. ${ROLE_HINT}`);
+  assert.equal(withRoleHint("App Store Connect GET /devices: FORBIDDEN_ERROR"), `App Store Connect GET /devices: FORBIDDEN_ERROR. ${ROLE_HINT}`);
+  assert.equal(withRoleHint(new Error("Couldn't reach App Store Connect (offline).")), "Couldn't reach App Store Connect (offline).", "not for a network error");
 });
 
 test("Website > Other Apps: the footer by lock state", () => {

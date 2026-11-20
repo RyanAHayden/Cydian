@@ -57,7 +57,7 @@ export function showActionSheet({ title = "", buttons = [], cancel = "Cancel", d
       document.removeEventListener("keydown", onKey);
       scrim.style.pointerEvents = "none";
       dim.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 250, easing: "ease-in", fill: "forwards" });
-      const a = sheet.animate([{ transform: "none" }, { transform: "translateY(100%)" }], { duration: 250, easing: ease, fill: "forwards" });
+      const a = sheet.animate([{ transform: "none" }, { transform: "translateY(100%)" }], { duration: 250, easing: EASE, fill: "forwards" });
       const end = () => scrim.remove();
       a.finished.then(end, end);
       resolve(index);

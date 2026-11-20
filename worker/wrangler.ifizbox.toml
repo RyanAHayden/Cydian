@@ -1,6 +1,6 @@
-# ifizbox.com's own deploy (Workers Builds, from the repo root): tools/buildinfo.sh && cd worker && npx wrangler deploy -c wrangler.ifizbox.toml
-# (yours: wrangler.toml, README.md).
-# Workers Builds is connected to RyanAHayden/iFizBox (2026-11-18): every push to main deploys ifizbox.com.
+# ifizbox.com's own deploy, on release tags only: tools/deploy.sh vX.Y.Z (tools/publish.sh runs it right after it tags a
+# release) checks the tag out and runs tools/buildinfo.sh && cd worker && npx wrangler deploy -c wrangler.ifizbox.toml
+# (yours: wrangler.toml, README.md). A push to main deploys nothing.
 name = "ifizbox"
 main = "entry.js"   # src/index.js's handler without its test-only exports, which `wrangler dev` won't start with
 # The website: web/app/ served as static assets (index.html for app routes like /add).

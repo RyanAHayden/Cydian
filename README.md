@@ -258,8 +258,9 @@ Then in the sideload app: **Settings > Installation & Signing > Signing Server**
 install manifests only over HTTPS with a trusted certificate, so a self-hosted Node server has to sit behind
 Tailscale, a Cloudflare Tunnel or a reverse proxy with a real domain.
 
-ifizbox.com itself is deployed by Cloudflare Workers Builds on every push to `main`
-(`tools/buildinfo.sh && cd worker && npx wrangler deploy -c wrangler.ifizbox.toml`).
+ifizbox.com itself is deployed on release tags, not on pushes to `main`: `tools/publish.sh` runs
+`tools/deploy.sh vX.Y.Z` after tagging a release, which checks the tag out and runs
+`tools/buildinfo.sh && cd worker && npx wrangler deploy -c wrangler.ifizbox.toml`.
 
 <br clear="right">
 

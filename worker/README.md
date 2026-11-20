@@ -111,7 +111,7 @@ Then put that `https://` address in **Settings > Installation & Signing > Signin
 | `/apple/<host>/<path>` | the Apple relay above: the free Apple ID hosts with `APPLE_RELAY` on, App Store Connect always |
 | `GET /repo/<file>` | iFizBox's own APT repo (`Release`, `Packages`, `Packages.gz`, `*.deb`): the latest GitHub release's asset, fetched here so clients get no redirect (Zebra can't take GitHub's). `IFIZBOX_REPO` (owner/name) for another repo's releases |
 
-`node test.mjs` checks them against an in-memory KV. ifizbox.com's own deploy: `npx wrangler deploy -c wrangler.ifizbox.toml` (Workers Builds runs it on every push to main).
+`node test.mjs` checks them against an in-memory KV. ifizbox.com's own deploy: `npx wrangler deploy -c wrangler.ifizbox.toml`, run on release tags only by `tools/deploy.sh vX.Y.Z` (which `tools/publish.sh` runs after tagging; a push to main deploys nothing).
 
 The website's **Install** (no app to sign on) signs in the browser (F93: zsign as WebAssembly, `web/app/vendor/zsign`)
 and uploads the signed IPA to `/sign/upload` (in parts, kept 10 minutes) for iOS's install prompt.

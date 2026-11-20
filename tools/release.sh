@@ -17,6 +17,7 @@
 # Run it only when a person asks for a release. How to cut one: docs/release.md.
 #
 #   tools/release.sh [--dry-run] [--notes FILE] [--dist DIR] [--draft] [--minimum X.Y.Z] [--out DIR] [--sync-piracy]
+#                    [--tag-source]
 #     --dry-run   build (or read --dist), check and print what would be published; publish nothing, no network
 #     --notes F   the release notes (Markdown; the first 4 lines show in the app's update alert). Default: the
 #                 commit subjects since the last v* tag, then the standard footer about the two files
@@ -29,6 +30,9 @@
 #                 run writes the source there only, never into web/app/source.json
 #     --sync-piracy  a dry run too fetches Canister's newest piracy list and warns when web/app/core/piracy-list.js
 #                 is older (a real run always refreshes it first and stops when it changed: commit it, run again)
+#     --tag-source  commit the updated web/app/source.json on top of HEAD and tag that commit (pushed as the tag only;
+#                 merge the tag into main afterwards), so the tagged commit, which tools/deploy.sh deploys, already
+#                 lists this release. tools/publish.sh passes it. Without it GitHub tags HEAD
 #   tools/release.sh --check-auth             which account a real run would publish as, and stop
 #   tools/release.sh --verify-release X.Y.Z   the checks a real run makes after publishing, on their own: the release
 #                 lists iFizBox.ipa/.deb, Packages(.gz), Release and source.json, and (not a draft)
@@ -43,7 +47,7 @@ cd "$(dirname "$0")/.."
 . native/brand.env # F170: BRAND_NAME for the release title and notes; F180: the asset names ($BRAND_NAME.ipa, .deb)
 
 repo=${IFIZBOX_RELEASE_REPO:-$BRAND_GITHUB_REPO}
-dry=0 notes= dist= draft=() minimum= out= sync_piracy=0 mode= mode_version=
+dry=0 notes= dist= draft=() minimum= out= sync_piracy=0 mode= mode_version= tag_source=0
 while [ $# -gt 0 ]; do
   case $1 in
     --dry-run) dry=1 ;;
@@ -53,6 +57,7 @@ while [ $# -gt 0 ]; do
     --minimum) minimum=${2:?--minimum needs a version}; shift ;;
     --out) out=${2:?--out needs a directory}; shift ;;
     --sync-piracy) sync_piracy=1 ;;
+    --tag-source) tag_source=1 ;;
     --check-auth) mode=auth ;;
     --verify-release) mode=release; mode_version=${2:?--verify-release needs a version}; shift ;;
     --verify-live) mode=live; mode_version=${2:?--verify-live needs a version}; shift ;;
@@ -174,7 +179,7 @@ while True:
         for s in said:
             print("release: live: " + s, file=sys.stderr)
         print("release: live: %s is NOT up after %ss: check that the release is published and marked latest "
-              "(tools/release.sh --verify-release), and the Workers Builds deploy" % (version, timeout), file=sys.stderr)
+              "(tools/release.sh --verify-release), and the site's deploy (tools/deploy.sh v%s)" % (version, timeout, version), file=sys.stderr)
         sys.exit(1)
     print("release: live: waiting: " + "; ".join(said), file=sys.stderr)
     time.sleep(float(interval))
@@ -375,6 +380,7 @@ if [ $dry = 1 ]; then
     cp "$stage/source.json" "$out/source.json"
     echo "release: dry run: the AltStore source it would write is $out/source.json"
   fi
+  [ $tag_source = 0 ] || echo "release: dry run: a real run would commit web/app/source.json on top of ${sha:0:12} and tag that commit $tag"
   echo "release: dry run, nothing published"
   exit 0
 fi
@@ -383,13 +389,34 @@ assets=("$stage/$BRAND_NAME.ipa" "$stage/$BRAND_NAME.deb" "$stage/$debname")
 for b in "${extra[@]}"; do assets+=("$stage/$b"); done
 for f in "${repofiles[@]}"; do assets+=("$stage/$f"); done
 assets+=("$stage/source.json")
-gh release create "$tag" --repo "$repo" --target "$sha" --title "$BRAND_NAME $version" --notes-file "$stage/notes.md" \
-  "${draft[@]}" "${assets[@]}"
+# --tag-source: the tag goes on a commit that adds the new web/app/source.json to the built one (nothing else changes),
+# pushed as the tag alone; publish.sh merges it into main. The site deployed from the tag then lists this release.
+if [ $tag_source = 1 ]; then
+  cp "$stage/source.json" web/app/source.json
+  python3 tools/altsource.py check >/dev/null
+  git commit -q -m "$BRAND_NAME's AltStore source: $version" web/app/source.json
+  sha=$(git rev-parse HEAD)
+  git tag "$tag" "$sha"
+  git push -q origin "refs/tags/$tag" || die "couldn't push tag $tag ($sha) to origin"
+  echo "release: tagged $tag at $sha (the build's commit plus web/app/source.json)"
+fi
+if ! gh release create "$tag" --repo "$repo" --target "$sha" --title "$BRAND_NAME $version" --notes-file "$stage/notes.md" \
+  "${draft[@]}" "${assets[@]}"; then
+  [ $tag_source = 0 ] && die "gh release create $tag failed"
+  git push -q origin ":refs/tags/$tag" || true
+  git tag -d "$tag" >/dev/null || true
+  die "gh release create $tag failed (tag $tag removed again)"
+fi
 git fetch -q origin "refs/tags/$tag:refs/tags/$tag" || true
 echo "release: published https://github.com/$repo/releases/tag/$tag"
 verify_release "$tag"
 cp "$stage/source.json" web/app/source.json
 python3 tools/altsource.py check
 [ -z "$out" ] || cp web/app/source.json "$out/source.json"
-echo "release: web/app/source.json now names $tag's $BRAND_NAME.ipa: commit it, push it, then run" \
-  "tools/release.sh --verify-live $version (waits until https://$BRAND_DOMAIN/repo/ serves it)"
+if [ $tag_source = 1 ]; then
+  echo "release: $tag ($sha) has web/app/source.json naming its $BRAND_NAME.ipa: merge $tag into main, deploy it" \
+    "(tools/deploy.sh $tag), then run tools/release.sh --verify-live $version"
+else
+  echo "release: web/app/source.json now names $tag's $BRAND_NAME.ipa: commit it, push it, then run" \
+    "tools/release.sh --verify-live $version (waits until https://$BRAND_DOMAIN/repo/ serves it)"
+fi

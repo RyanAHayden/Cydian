@@ -2,14 +2,11 @@
 // offers Try Again when iOS never took the update, and the next launch says so when the version didn't land.
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { memStorage as memory } from "./fakes.test-helper.js";
 import { followSelfUpdate, SELF_UPDATE_LINES, SELF_UPDATE_FAILED } from "./signing-client.js";
 import { unlockSelfUpdate, lockSelfUpdate, TRY_AGAIN_LABEL, CLOSING_LABEL } from "./nav/progress.js";
 import { recordSelfUpdate, unfinishedSelfUpdate, PENDING_KEY, PENDING_TTL } from "./core/selfupdate.js";
 
-const memory = () => {
-  const m = new Map();
-  return { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)), removeItem: (k) => m.delete(k), m };
-};
 
 // A HUD on a fake page: what lockSelfUpdate and unlockSelfUpdate use.
 function fakeHUD() {

@@ -2,6 +2,7 @@
 // kept in memory, Install's HUD following signing.install's phases, and its errors by code.
 import { test, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
+import { fakeNative } from "./fakes.test-helper.js";
 import {
   localSigning, signingReady, deviceStatus, importToDevice, removeFromDevice,
   installOnDevice, loadIdentity, saveIdentity, clearIdentity, firstInstallCheck, getServer, setServer,
@@ -9,20 +10,6 @@ import {
 import { walkOpen } from "./screens/signing.js";
 import { IFIZBOX_ID } from "./core/websign.js";
 
-// A fake bridge: `answers[method]` is a value, an Error (rejects) or fn(params, onEvent).
-function fakeNative(answers = {}) {
-  const calls = [];
-  return {
-    mode: "sideload",
-    calls,
-    async call(method, params, onEvent) {
-      calls.push({ method, params });
-      const a = answers[method];
-      if (a instanceof Error) throw a;
-      return typeof a === "function" ? a(params, onEvent) : a ?? null;
-    },
-  };
-}
 const coded = (code, message) => Object.assign(new Error(message), { code });
 function fakeUI() {
   const ui = { labels: [], hidden: 0, alerts: [], went: [], later: [], followed: [] };

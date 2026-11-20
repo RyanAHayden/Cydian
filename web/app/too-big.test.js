@@ -4,6 +4,7 @@
 // a note. A kept link that is too big is handed to a sideloader, never to the website's signer.
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { memStorage } from "./fakes.test-helper.js";
 import { signInBrowser, tooBigAlert, tooBigText, tooBigNote, TOO_BIG_TITLE, TOO_BIG_BUTTONS, TOO_BIG_FOOTER, sideloaderLinks,
   handOffIpa, whenBack } from "./signing-client.js";
 import { IPA_MAX, SITE_LIMIT_TEXT, overSiteLimit, siteMB } from "./core/websign.js";
@@ -15,7 +16,6 @@ import { NAME } from "./brand.js";
 const MB = 1048576;
 const BIG = 700 * MB;
 const URL1 = "https://dl.example/Big%20Game.ipa";
-const memStorage = () => { const m = new Map(); return { getItem: (k) => m.get(k) ?? null, setItem: (k, v) => m.set(k, String(v)), removeItem: (k) => m.delete(k) }; };
 
 test("F257: one cap for signing and keeping, said the same way everywhere", () => {
   assert.equal(SITE_FILE_MAX, IPA_MAX);

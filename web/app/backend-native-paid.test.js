@@ -5,6 +5,7 @@
 // native/helper/test_helper.py's InstallPaid.
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { memStorage as memoryStorage } from "./fakes.test-helper.js";
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { createFakeNative, makeFixture } from "../../native/fake/fake-native.mjs";
@@ -13,10 +14,6 @@ import { createPaymentClient, createCredentialStore } from "./core/payment.js";
 
 const ID = "com.example.paid";
 
-function memoryStorage() {
-  const m = new Map();
-  return { getItem: (k) => m.get(k) ?? null, setItem: (k, v) => m.set(k, String(v)), removeItem: (k) => m.delete(k) };
-}
 
 function setup(t, { vendor: vopts = {}, env = {}, mode, device } = {}) {
   const fx = makeFixture();

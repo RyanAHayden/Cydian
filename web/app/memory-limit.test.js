@@ -3,6 +3,7 @@
 // iPhone, with Try Anyway) before anything downloads. An IPA that size or bigger that then signs forgets it.
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { memStorage } from "./fakes.test-helper.js";
 import { signInBrowser, tooBigAlert, memoryText, memoryNote, MEMORY_TITLE, MEMORY_BUTTONS, TOO_BIG_BUTTONS } from "./signing-client.js";
 import { IPA_MAX, MEMORY_KEY, memoryLimit, noteOutOfMemory, noteSigned, overMemoryLimit, isOutOfMemory } from "./core/websign.js";
 import { NAME } from "./brand.js";
@@ -10,7 +11,6 @@ import { NAME } from "./brand.js";
 const MB = 1048576;
 const URL1 = "https://dl.example/Unbound.ipa";
 const OOM = "zsign stopped: Out of memory. The app may be too big for this browser.";
-const memStorage = () => { const m = new Map(); return { m, getItem: (k) => m.get(k) ?? null, setItem: (k, v) => m.set(k, String(v)), removeItem: (k) => m.delete(k) }; };
 
 test("F261: the limit keeps the smallest out-of-memory size, and a sign at or past it forgets it", () => {
   const s = memStorage();

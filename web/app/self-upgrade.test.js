@@ -5,6 +5,7 @@
 // itself at the running version, followed through that source, which offers the newer one.
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { memStorage as memoryStorage } from "./fakes.test-helper.js";
 import { readFileSync } from "node:fs";
 import { upgradesWithSelf } from "./essential-ui.js";
 import { withAppUpgrades } from "./app-updates.js";
@@ -15,10 +16,6 @@ import { compareVersions } from "./core/apt.js";
 
 const SOURCE = JSON.parse(readFileSync(new URL("./source.json", import.meta.url), "utf8"));
 
-function memoryStorage() {
-  const m = new Map();
-  return { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)), removeItem: (k) => m.delete(k) };
-}
 
 test("B34: the built-in source lists the current iFizBox as iFizBox.ipa under com.ryha.ifizbox", () => {
   assert.equal(SOURCE.identifier, SELF_ID);

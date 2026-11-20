@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   compat, compatCode, badge, iosFromUserAgent, archNeed, iosRequirement, iosOk, isIncompatible, normalizeDevice,
-  jailbreakOfArch,
+  jailbreakOfArch, IOS_VERSIONS,
 } from "./compat.js";
 import { parseControl } from "./apt.js";
 
@@ -93,6 +93,23 @@ test("not jailbroken: debs need a jailbreak, apps don't", () => {
   assert.equal(badge("jailbreak"), "Jailbreak only");
   const app = { name: "App", bundleIdentifier: "com.ex.app", minOSVersion: "15.0" };
   assert.equal(compatCode(app, none), "works");
+});
+
+test("B184: iOS 27: known, judged on its version; without a jailbreak a deb says jailbreak, an injectable tweak goes by iOS", () => {
+  assert.ok(IOS_VERSIONS.includes("27.0"));
+  assert.equal(IOS_VERSIONS[0].split(".")[0], "27");
+  const st = deb({ Architecture: "iphoneos-arm64", Depends: "mobilesubstrate, firmware (>= 14.0)" });
+  assert.equal(iosOk(iosRequirement(st), "27.0"), true);
+  assert.equal(compat(st, rootless("27.0")).status, "works");
+  const none = compat(st, { ios: "27.0", jailbreak: "none" });
+  assert.equal(none.reason, "jailbreak");
+  assert.equal(none.detail, "Needs a jailbroken iPhone.");
+  // A Tweak Source's tweak in the sideload build (catalog.js marks it injectable): iOS 27 >= 14 works.
+  const tweak = { ...st, injectable: true };
+  assert.equal(compat(tweak, { ios: "27.0", jailbreak: "none" }).status, "works");
+  assert.equal(compat({ ...tweak, architecture: "iphoneos-arm" }, { ios: "27.0", jailbreak: "none" }).status, "works");
+  assert.equal(compat(tweak, { ios: "13.0", jailbreak: "none" }).reason, "ios");
+  assert.equal(compat({ ...deb({ Architecture: "iphoneos-arm64" }), injectable: true }, { ios: "27.0", jailbreak: "none" }).status, "unknown");
 });
 
 test("AltStore apps: minOSVersion / maxOSVersion", () => {

@@ -23,8 +23,9 @@
 import { parseRelations, satisfies, compareVersions } from "./apt.js";
 
 // The iOS versions the site's picker offers (Settings > iOS Version), newest first: every minor release from 12.0,
-// the oldest a checkm8 rootful jailbreak still runs well, to the current 26.x.
-const MINORS = { 12: 5, 13: 7, 14: 8, 15: 8, 16: 7, 17: 7, 18: 7, 26: 3 };
+// the oldest a checkm8 rootful jailbreak still runs well, to the current 27.x. A newer version than the list (from
+// the bridge or the user agent) is still judged: the list is only the picker's choices.
+const MINORS = { 12: 5, 13: 7, 14: 8, 15: 8, 16: 7, 17: 7, 18: 7, 26: 3, 27: 1 };
 export const IOS_VERSIONS = Object.entries(MINORS).flatMap(([major, last]) =>
   Array.from({ length: last + 1 }, (_, i) => `${major}.${i}`)).reverse();
 
@@ -133,7 +134,9 @@ export function compat(st, device = {}) {
   const req = iosRequirement(st);
   const range = rangeText(req);
   const no = (reason, needs, label, detail) => ({ status: "no", reason, need: needs, label, detail, range });
-  if (jb === "none" && !isApp(st)) return no("jailbreak", need, "Jailbreak only", "Needs a jailbroken iPhone.");
+  // An injectable tweak (a sideload Tweak Source's, catalog.js marks it) goes into a signed app, so a phone without
+  // a jailbreak takes it: only its iOS range is judged.
+  if (jb === "none" && !isApp(st) && !st?.injectable) return no("jailbreak", need, "Jailbreak only", "Needs a jailbroken iPhone.");
   if (jb && jb !== "none" && need !== "any" && need !== jb) {
     if (ONLY[need]) return no(need, need, ONLY[need], `Built for ${need} jailbreaks; this iPhone is ${jb}.`);
     return no("arch", need, "Not for iPhone", `Built for ${need}, not an iPhone.`);

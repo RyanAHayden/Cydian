@@ -199,6 +199,8 @@ const NEEDS = { rootless: "Rootless", rootful: "Rootful", roothide: "Roothide" }
 export function worksOnTile(fit) {
   const value = shortRange(fit?.range) ?? NEEDS[fit?.need] ?? (fit?.need === "any" || !fit?.need ? "Any iOS" : fit.need);
   if (fit?.status === "works") return { label: "Works On", value, sub: "Your iPhone ✓", ok: true };
+  // B184: a deb on a phone without a jailbreak: say so, never beside its iOS range as if the version were wrong.
+  if (fit?.status === "no" && fit.reason === "jailbreak") return { label: "Works On", value, sub: "Needs Jailbreak ✗", ok: false };
   if (fit?.status === "no") return { label: "Works On", value, sub: "Not Your iPhone ✗", ok: false };
   if (fit?.status === "unchecked") return { label: "Works On", value, sub: "Not Checked", ok: null };
   return { label: "Works On", value, sub: "Unknown", ok: null };

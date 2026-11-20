@@ -56,7 +56,8 @@ async function cache(native) {
 
 // F277: the Issuer ID without retyping. It isn't in the .p8 and no Apple call made without it returns it, so it comes
 // from a .txt picked with the key (core/certfiles.js sortKeyFiles), else the clipboard when it holds a UUID:
-//   app       the shell's clipboard.read (Bridge.swift; the sideload build may show iOS's Allow Paste once per copy)
+//   app       never (B171): reading another app's copy unasked shows iOS's Allow Paste, and iOS can't say without
+//             reading whether the copy is a UUID; the field's Paste button reads it when tapped
 //   website   navigator.clipboard.readText only once the browser says clipboard-read is granted (Chromium): Safari
 //             can't say, and reading there unasked raises its Paste bubble (screens/sources.js keeps to the same rule).
 //             The field's Paste button covers it.
@@ -65,8 +66,8 @@ export async function issuerPrefill({ native, clipboard = globalThis.navigator?.
   const n = nativeOf(native);
   let text = null;
   try {
-    if (n?.call) text = String((await n.call("clipboard.read", {})) ?? "");
-    else if (clipboard?.readText && (await permissions?.query?.({ name: "clipboard-read" }))?.state === "granted") text = await clipboard.readText();
+    if (n?.call) return null;
+    if (clipboard?.readText && (await permissions?.query?.({ name: "clipboard-read" }))?.state === "granted") text = await clipboard.readText();
   } catch { return null; }
   return text ? issuerFromText(text) : null;
 }

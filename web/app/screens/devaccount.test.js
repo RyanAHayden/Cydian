@@ -95,13 +95,14 @@ test("issuerFromText: an Issuer-labelled UUID first, else the first one; nothing
   assert.ok(ISSUER_FULL.test(ISSUER) && !ISSUER_FULL.test(`x${ISSUER}`));
 });
 
-test("issuerPrefill: the app reads the shell's clipboard, a UUID only", async () => {
-  const native = (text) => ({ calls: [], call(m, p) { this.calls.push([m, p]); return Promise.resolve(text); } });
-  const n = native(`copied ${ISSUER.toUpperCase()}`);
-  assert.equal(await issuerPrefill({ native: n }), ISSUER);
-  assert.deepEqual(n.calls, [["clipboard.read", {}]]);
-  assert.equal(await issuerPrefill({ native: native("https://example.com") }), null);
-  assert.equal(await issuerPrefill({ native: { call: () => Promise.reject(new Error("old shell")) } }), null);
+test("B171: issuerPrefill never reads the app's clipboard (no Allow Paste); the Paste button does", async () => {
+  const n = { calls: [], call(m, p) { this.calls.push([m, p]); return Promise.resolve(ISSUER); } };
+  let reads = 0;
+  const clipboard = { readText: async () => { reads++; return ISSUER; } };
+  const permissions = { query: async () => ({ state: "granted" }) };
+  assert.equal(await issuerPrefill({ native: n, clipboard, permissions }), null);
+  assert.deepEqual(n.calls, []);
+  assert.equal(reads, 0);
 });
 
 test("issuerPrefill: the website reads navigator.clipboard only once clipboard-read is granted", async () => {

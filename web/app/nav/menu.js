@@ -98,6 +98,17 @@ export async function nativePaste(native = globalThis.ifizboxNative, params = {}
   try { return String((await native.call("clipboard.read", params)) ?? ""); } catch { return null; }
 }
 
+// B171: whether the app's clipboard holds a URL, asked without reading it (Bridge.swift clipboard.peek: hasURLs and
+// detectPatterns, which never show iOS's Allow Paste). true/false, or null on the website or a shell from before
+// clipboard.peek (unknown: callers then offer Paste as before).
+export async function nativeHasUrl(native = globalThis.ifizboxNative) {
+  if (!native?.call) return null;
+  try {
+    const r = await native.call("clipboard.peek", {});
+    return typeof r?.url === "boolean" ? r.url : null;
+  } catch { return null; }
+}
+
 // A hold on `el` (or a descendant matching `selector`): HOLD_MS without moving more than HOLD_SLOP px. `onHold(target, e)`
 // runs at the hold; the click that ends it is swallowed so the item doesn't open.
 // B48: any scroll while the finger is down (the pane under it, listened for on the document since the pointermoves

@@ -6,7 +6,9 @@
 //                                                 string (the JSON the page built) or null, body out is base64 like
 //                                                 net.fetch's
 //   device.info                                -> {udid, model}  MobileGestalt's UniqueDeviceID and hw.machine
-//                                                 (iPhone14,2), what Sileo sends as udid and model/device
+//                                                 (iPhone14,2), what Sileo sends as udid and model/device; when
+//                                                 MobileGestalt refuses (the sideload build), PhoneID's UDID
+//                                                 (pairing, or the embedded profile's single device)
 //   keychain.get {key} -> string | null, keychain.set {key, value}, keychain.remove {key}
 //                                                 generic passwords behind the passcode / Face ID (.userPresence,
 //                                                 WhenPasscodeSetThisDeviceOnly); without a passcode on the phone,
@@ -36,8 +38,10 @@ enum Paid {
         b.on("net.request") { c in request(c) }
         b.on("device.info") { c in
             Apt.work(c) { () throws -> Any? in
-                guard let udid = udid() else {
-                    throw BridgeError("device", "can't read this iPhone's UDID (MobileGestalt refused UniqueDeviceID)")
+                guard let udid = deviceUDID() else {
+                    throw BridgeError("device", AppMode.current == .jailbreak
+                        ? "can't read this iPhone's UDID (MobileGestalt refused UniqueDeviceID)"
+                        : "this iPhone's UDID isn't known: pair this iPhone (Settings > Installation & Signing > This iPhone > Pairing) and try again")
                 }
                 return ["udid": udid, "model": machine()]
             }
@@ -108,6 +112,14 @@ enum Paid {
         let f = unsafeBitCast(sym, to: MGCopyAnswer.self)
         guard let v = f("UniqueDeviceID" as CFString)?.takeRetainedValue() as? String, !v.isEmpty else { return nil }
         return v
+    }
+
+    // B183: device.info's UDID. MobileGestalt first; the sideload build can't read it (no private entitlement), so
+    // then PhoneID's: the UDID lockdown gave through pairing, or the embedded profile's one device. A profile listing
+    // several devices names no single UDID: nil, and device.info says to pair.
+    static func deviceUDID() -> String? {
+        if let u = udid() { return u }
+        return PhoneID.udid
     }
 
     static func machine() -> String {

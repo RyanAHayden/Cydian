@@ -14,7 +14,8 @@
 // SIGINT to apt) until its first pmstatus: line.
 // F59: ipa.install downloads into `ipaDir` (default: beside the prefix, ipa-cache/) and runs install-ipa there.
 // F57: paid packages (native/Sources/Paid.swift): `vendors` (native/fake/fake-vendor.mjs) answer net.request,
-// auth.session and paid.install's download; `device` is device.info's answer (null: the UDID can't be read);
+// auth.session and paid.install's download; `device` is device.info's answer (null: MobileGestalt can't read the UDID;
+// `phoneUdid` is then PhoneID's fallback, B183);
 // keychain.* keep secrets in `keychain` (a Map the test can look at); paid.install downloads into `paidDir`
 // (default: beside the prefix, paid-cache/) and runs install-paid there.
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -39,7 +40,7 @@ const read = (p) => (existsSync(p) ? readFileSync(p, "utf8") : null);
 
 export function createFakeNative({ prefix, remote, net = {}, env = {}, helper = FAKE_HELPER, mode = "jailbreak",
   ipaDir = join(dirname(prefix ?? "."), "ipa-cache"), vendors = [],
-  device = { udid: "00008110-000A1B2C3D4E5F60", model: "iPhone14,2" },
+  device = { udid: "00008110-000A1B2C3D4E5F60", model: "iPhone14,2" }, phoneUdid = null,
   paidDir = join(dirname(prefix ?? "."), "paid-cache") } = {}) {
   const calls = [];
   const keychain = new Map(); // F57
@@ -227,8 +228,14 @@ export function createFakeNative({ prefix, remote, net = {}, env = {}, helper = 
       return { status: r.status, headers: r.headers ?? {}, body: Buffer.from(r.body ?? "").toString("base64") };
     },
     "device.info"() {
-      if (!device?.udid) return fail("device: can't read this iPhone's UDID (MobileGestalt refused UniqueDeviceID)");
-      return { udid: device.udid, model: device.model };
+      // B183: MobileGestalt (`device.udid`) first, then PhoneID's UDID (`phoneUdid`: pairing or the embedded profile's
+      // single device), as Paid.deviceUDID does.
+      const udid = device?.udid || phoneUdid;
+      if (!udid) {
+        return fail(mode === "jailbreak" ? "device: can't read this iPhone's UDID (MobileGestalt refused UniqueDeviceID)"
+          : "device: this iPhone's UDID isn't known: pair this iPhone (Settings > Installation & Signing > This iPhone > Pairing) and try again");
+      }
+      return { udid, model: device?.model ?? "iPhone14,2" };
     },
     "keychain.get"({ key }) {
       if (!key) return fail("keychain: no key");

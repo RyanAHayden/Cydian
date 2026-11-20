@@ -591,7 +591,10 @@ async function drawApp(st, source, base, draw, ctx, box, publish = () => {}) {
   if (!info.available) rows.push({ label: "Not available to buy" });
   for (const a of nav.actions) rows.push({ label: a.label, onClick: a.run });
   if (signedIn) rows.push({ label: `Sign Out of ${name}`, onClick: busy("Signing Out", () => client.signOut()) });
-  draw([{ header: "Purchase", rows, footer: vendor?.banner && !signedIn ? vendor.banner.message : `Sold by ${name}.` }]);
+  const footer = vendor?.banner && !signedIn ? vendor.banner.message : `Sold by ${name}.`;
+  // B183: the price came without this iPhone's UDID (the shell has none yet): say so, as Sign In and Buy need it.
+  const udidNote = info.deviceError ? ` ${info.deviceError.replace(/^device:\s*/, "").replace(/^./, (c) => c.toUpperCase()).replace(/([^.])$/, "$1.")}` : "";
+  draw([{ header: "Purchase", rows, footer: footer + udidNote }]);
   publish(nav);
 }
 

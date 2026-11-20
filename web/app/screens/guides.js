@@ -357,6 +357,32 @@ STEPS[KEEP_GUIDE] = [
 ];
 export const keepGuideHref = (fmt = format) => fmt({ tab: "home", path: ["guides", KEEP_GUIDE] });
 
+// ---- F277: Use an App Store Connect API Key (screens/devaccount.js, the Apple Developer Account group) -------
+// Opened only from that group's footer (`only: "link"`: listed nowhere). The Issuer ID isn't in the .p8 and no Apple
+// call returns it without it, so the guide says to copy it (or keep it in a .txt picked with the key).
+export const ASC_GUIDE = "asc-key";
+export const ASC_GUIDE_LINK = "How to make an API key";
+export const ASC_URL = "https://appstoreconnect.apple.com/access/integrations/api";
+export const ASC_INTRO = `With an App Store Connect API key, ${NAME} makes each app's App ID and Ad Hoc profile (with `
+  + "Push) itself and adds this iPhone to your account, so you never download a profile again. You need a paid Apple "
+  + "Developer account; only its Account Holder or an Admin can make a key.";
+GUIDES[ASC_GUIDE] = { title: "API Key", row: "Use an App Store Connect API Key", only: "link", linked: true };
+STEPS[ASC_GUIDE] = [
+  { title: "Open the API Keys", text: "On appstoreconnect.apple.com: Users and Access > Integrations > App Store "
+    + "Connect API > Team Keys. The first time, the Account Holder taps Request Access and agrees.",
+  rows: [{ label: "App Store Connect", subtitle: "appstoreconnect.apple.com", chevron: true,
+    onClick: () => globalThis.open?.(ASC_URL, "_blank", "noopener") }] },
+  { title: "Make a Key", text: "Tap +, give it a name (such as the app's name) and pick Access: Admin, then Generate." },
+  { title: "Download It", text: "Download beside the new key saves AuthKey_<Key ID>.p8, the Key ID in its name. "
+    + "Apple lets you download it only once: keep it in Files. Lost, you revoke it and make another." },
+  { title: "Copy the Issuer ID", text: "It's shown above the keys: tap Copy. It isn't in the .p8, so either keep it "
+    + "on the clipboard or paste it into a .txt saved beside the .p8." },
+  { title: "Add It", text: "Settings > Signing > Apple Developer Account > Add API Key: pick the .p8 (and the .txt, "
+    + "if you made one). The Issuer ID fills in from the .txt or the clipboard; tap Save.",
+  rows: [{ label: "Settings > Signing", href: format(settingsRoute(["signing"])) }] },
+];
+export const ascGuideHref = (fmt = format) => fmt({ tab: "home", path: ["guides", ASC_GUIDE] });
+
 // Home's User Guides group: one row per guide, in Cydia's order; lite leaves out the jailbreak ones.
 export const guideRows = (fmt = format, lite = false) =>
   guideIds(lite).map((id) => ({ label: GUIDES[id].row, href: fmt({ tab: "home", path: ["guides", id] }) }));
@@ -393,6 +419,7 @@ export function render(body, route, opts = {}) {
   else if (p.id === "openssh") page.append(stepsView("openssh", opts));
   else if (p.id === "password") page.append(passwordView(opts));
   else if (p.id === KEEP_GUIDE) page.append(grouped([{ footer: KEEP_INTRO }]), stepsView(KEEP_GUIDE, opts));
+  else if (p.id === ASC_GUIDE) page.append(grouped([{ footer: pageName(ASC_INTRO) }]), stepsView(ASC_GUIDE, opts));
   body.append(page);
   return page;
 }

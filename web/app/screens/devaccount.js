@@ -1,5 +1,5 @@
 // Settings > Installation & Signing: Apple Developer Account. With an App Store Connect API key (AuthKey_<KeyID>.p8,
-// the Key ID read from its name, the Issuer ID typed) iFizBox makes each app's App ID and Ad Hoc profile itself, with
+// the Key ID read from its name, the Issuer ID from a .txt picked with it, the clipboard or typed) iFizBox makes each app's App ID and Ad Hoc profile itself, with
 // Push, and registers this iPhone (core/asc.js; in the app native/Sources/ASC.swift does it while it signs).
 //   app       the key goes into the Keychain (asc.key.set) and never comes back to the page
 //   website   the key stays in this browser (localStorage, like the .p12), and calls go through the site's
@@ -11,10 +11,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { grouped } from "../nav/ui.js";
 import { showAlert, alertOK } from "../nav/alert.js";
-import { NAME } from "../brand.js";
-import { keyIdFromName, makeJwt, httpTransport, ensureProfile, appIdPrefix, profileRows, profileSerials, findCertificate, ensureDevice } from "../core/asc.js";
+import { NAME, DOMAIN } from "../brand.js";
+import { sortKeyFiles, issuerFromText, UUID_RE } from "../core/certfiles.js";
+import { makeJwt, httpTransport, ensureProfile, appIdPrefix, profileRows, profileSerials, findCertificate, ensureDevice } from "../core/asc.js";
 import { parseProfile, fromBase64, normalUdid } from "../core/signing.js";
-import { storedUdid } from "./signing.js";
+import { storedUdid, startUdid, watchUdid } from "./signing.js";
+import { ascGuideHref, ASC_GUIDE_LINK } from "./guides.js";
 
 const KEY = "ifizbox.asc";
 const CACHE = "ifizbox.asc.profiles";
@@ -41,21 +43,54 @@ async function cache(native) {
   return readJson(CACHE) ?? {};
 }
 
-// The .p8 picked, then the Issuer ID asked; saved only once Apple takes a token made from them.
-async function addKey(file, native, redraw) {
-  const keyId = keyIdFromName(file?.name);
-  const p8 = await file.text();
-  if (!/BEGIN PRIVATE KEY/.test(p8)) return alertOK("Not an API Key", "Pick the AuthKey_<Key ID>.p8 you downloaded from App Store Connect > Users and Access > Integrations.");
+// F277: the Issuer ID without retyping. It isn't in the .p8 and no Apple call made without it returns it, so it comes
+// from a .txt picked with the key (core/certfiles.js sortKeyFiles), else the clipboard when it holds a UUID:
+//   app       the shell's clipboard.read (Bridge.swift; the sideload build may show iOS's Allow Paste once per copy)
+//   website   navigator.clipboard.readText only once the browser says clipboard-read is granted (Chromium): Safari
+//             can't say, and reading there unasked raises its Paste bubble (screens/sources.js keeps to the same rule).
+//             The field's Paste button covers it.
+// Resolves with the lowercase UUID, or null.
+export async function issuerPrefill({ native, clipboard = globalThis.navigator?.clipboard, permissions = globalThis.navigator?.permissions } = {}) {
+  const n = nativeOf(native);
+  let text = null;
+  try {
+    if (n?.call) text = String((await n.call("clipboard.read", {})) ?? "");
+    else if (clipboard?.readText && (await permissions?.query?.({ name: "clipboard-read" }))?.state === "granted") text = await clipboard.readText();
+  } catch { return null; }
+  return text ? issuerFromText(text) : null;
+}
+export const ISSUER_FULL = new RegExp(`^${UUID_RE.source}$`, "i");
+
+// The picked files ({ name, bytes }, or File objects) as one key: { p8, keyId, issuerId } or { error }.
+export async function readKeyPick(files, opts) {
+  const list = await Promise.all([...files].map(async (f) => (f.bytes ? f : { name: f.name, bytes: new Uint8Array(await f.arrayBuffer()) })));
+  const k = await sortKeyFiles(list, opts);
+  if (!k.p8) return { error: "Pick the AuthKey_<Key ID>.p8 you downloaded from App Store Connect > Users and Access > Integrations (and a .txt holding the Issuer ID, if you saved one)." };
+  return { p8: k.p8.text, keyId: k.keyId, issuerId: k.issuerId };
+}
+
+// The .p8 picked (with a .txt or in a .zip), then the Issuer ID asked, prefilled; saved only once Apple takes a token
+// made from them.
+async function addKey(files, native, redraw) {
+  const pick = await readKeyPick(files);
+  if (pick.error) return alertOK("Not an API Key", pick.error);
+  const { p8, keyId } = pick;
   let kid = keyId;
   if (!kid) {
     const r = await showAlert({ title: "Key ID", message: "The file name doesn't hold the Key ID. Type it (10 characters).", input: { type: "text", placeholder: "ABC123DEF4" }, buttons: ["Cancel", "Next"], cancel: 0 });
     if (r.index !== 1) return;
     kid = String(r.value ?? "").trim().toUpperCase();
   }
-  const r = await showAlert({ title: "Issuer ID", message: `Key ${kid}. Type the Issuer ID shown above the keys in App Store Connect > Users and Access > Integrations.`,
-    input: { type: "text", placeholder: "69a6de7e-...-5b8c7c11a4d1" }, buttons: ["Cancel", "Save"], cancel: 0 });
+  const shown = showAlert({ title: "Issuer ID", message: pick.issuerId
+    ? `Key ${kid}. The Issuer ID from your .txt:`
+    : `Key ${kid}. Paste the Issuer ID shown above the keys in App Store Connect > Users and Access > Integrations.`,
+  input: { type: "text", placeholder: "69a6de7e-...-5b8c7c11a4d1", value: pick.issuerId ?? "", paste: (t) => issuerFromText(t) ?? "" },
+  buttons: ["Cancel", "Save"], cancel: 0 });
+  if (!pick.issuerId) prefillField([...(globalThis.document?.querySelectorAll(".alert-field") ?? [])].pop(), native);
+  const r = await shown;
   if (r.index !== 1) return;
-  const issuerId = String(r.value ?? "").trim();
+  const issuerId = String(r.value ?? "").trim().toLowerCase();
+  if (!ISSUER_FULL.test(issuerId)) return alertOK("Not an Issuer ID", "An Issuer ID looks like 69a6de7e-1234-47e3-e053-5b8c7c11a4d1. Copy it from above the keys in App Store Connect > Users and Access > Integrations > App Store Connect API.");
   const n = nativeOf(native);
   try {
     if (n?.call) await n.call("asc.key.set", { p8, keyId: kid, issuerId });
@@ -68,6 +103,17 @@ async function addKey(file, native, redraw) {
     return alertOK("Key Not Accepted", String(e?.message ?? e).replace(/^\w+: /, ""));
   }
   redraw();
+}
+
+// Fills the alert's field from the clipboard once it answers, only while it's still empty, untouched and on screen.
+export async function prefillField(field, native, read = issuerPrefill) {
+  if (!field) return false;
+  let typed = false;
+  field.addEventListener?.("input", () => { typed = true; }, { once: true });
+  const id = await read({ native });
+  if (!id || typed || field.isConnected === false || field.value) return false;
+  field.value = id;
+  return true;
 }
 
 async function removeKey(native, redraw) {
@@ -109,10 +155,45 @@ export async function deviceLine(request, { udid = null, candidates = [], app = 
     + "then This iPhone > Pairing) and check again to add it.";
 }
 
+// F277: an iPhone whose app came from another team (its embedded profile's devices aren't in this account) and that
+// isn't paired: the website's Profile Service visit (worker/src/udid.js), started from the app. Safari installs the
+// profile, iOS sends the UDID to the Worker, and this page polls for it (screens/signing.js startUdid / watchUdid);
+// then the UDID is kept by the shell (device.udid.set, PhoneID.swift) and registered in the account.
+export const SITE_ORIGIN = `https://${DOMAIN}`;
+export const FIND_UDID_BUTTON = "Find UDID";
+export const FIND_UDID_TEXT = `${FIND_UDID_BUTTON} opens ${NAME}'s website in Safari, which downloads a small profile. Install it `
+  + `in the Settings app > Profile Downloaded (it says "Not Verified", which is fine, and iOS keeps no profile), then come `
+  + `back here: ${NAME} adds this iPhone to your account.`;
+// Check Account's device line left this iPhone unknown (no UDID, and not shown to be in the account).
+export const udidUnknown = (udid, line) => !udid && !/^This iPhone is in the account/.test(String(line ?? ""));
+
+export async function findUdidViaSite(native, { fetcher = (...a) => globalThis.fetch(...a), store, open, watch = watchUdid,
+  request, alert = alertOK } = {}) {
+  const n = nativeOf(native);
+  const url = await startUdid({ origin: SITE_ORIGIN, fetcher, store });
+  const opened = open ? await open(url) : (await n?.call?.("app.openURL", { url }).catch(() => null))?.opened === true;
+  if (!opened) return alert("Open in Safari", `Open this link in Safari to send this iPhone's UDID:\n\n${url}`).then(() => false);
+  watch(async () => {
+    const udid = storedUdid(store)?.udid;
+    if (!udid) return;
+    await alert("Developer Account", await registerUdid(n, udid, { request }));
+  }, { fetcher, store });
+  return true;
+}
+
+// A UDID found by the visit: kept by the shell (an older one without device.udid.set keeps it in localStorage only,
+// which Check Account also reads), then registered in the account. Resolves with Check Account's line.
+export async function registerUdid(native, udid, { request } = {}) {
+  const n = nativeOf(native);
+  await n?.call?.("device.udid.set", { udid }).catch(() => null);
+  try { return await deviceLine(request ?? (n?.call ? nativeRequest(n) : siteRequest()), { udid }); } catch (e) { return String(e?.message ?? e).replace(/^\w+: /, ""); }
+}
+
 // Check Account: is the certificate in the account, is this iPhone registered (and register it).
 async function checkAccount(native) {
   const n = nativeOf(native);
   const lines = [];
+  let find = false;
   try {
     const request = n?.call ? nativeRequest(n) : siteRequest();
     let serials = [], udid = null, candidates = [];
@@ -123,6 +204,7 @@ async function checkAccount(native) {
       udid = dev?.udid ?? null;
       candidates = Array.isArray(dev?.candidates) ? dev.candidates : [];
       if (!udid) udid = (await n.call("asc.udid", {}).catch(() => null))?.udid ?? null;
+      if (!udid) udid = storedUdid()?.udid ?? null; // F277: a website visit made from the app, kept by an older shell
     } else {
       const id = await (await import("../signing-client.js")).loadIdentity();
       serials = id?.profile ? profileSerials(id.profile) : [];
@@ -133,20 +215,28 @@ async function checkAccount(native) {
       lines.push(c ? `Certificate: in the account (${c.attributes?.displayName || c.attributes?.name || c.id}).`
         : "Certificate: not in this account. Import the .p12 of one of this account's certificates (Apple Distribution).");
     } else lines.push("Certificate: none imported yet.");
-    lines.push(await deviceLine(request, { udid, candidates, app: !!n?.call }));
+    const line = await deviceLine(request, { udid, candidates, app: !!n?.call });
+    lines.push(line);
+    find = !!n?.call && udidUnknown(udid, line);
   } catch (e) {
     lines.push(String(e?.message ?? e).replace(/^\w+: /, ""));
   }
-  await alertOK("Developer Account", lines.join("\n\n"));
+  if (!find) return alertOK("Developer Account", lines.join("\n\n"));
+  // F277: not paired, and the app's own profile doesn't show this iPhone in the account: offer the website's visit
+  const { index } = await showAlert({ title: "Developer Account", message: [...lines, FIND_UDID_TEXT].join("\n\n"),
+    buttons: ["OK", FIND_UDID_BUTTON], cancel: 0 });
+  if (index !== 1) return;
+  try { await findUdidViaSite(native); } catch (e) { await alertOK("UDID Not Found", String(e?.message ?? e).replace(/^\w+: /, "")); }
 }
 
 export function accountGroup({ native, redraw = () => {} } = {}) {
   const box = document.createElement("div");
   const input = document.createElement("input");
   input.type = "file";
-  input.accept = ".p8";
+  input.accept = ".p8,.txt,.zip";
+  input.multiple = true; // F277: the .p8 and a .txt holding the Issuer ID, or the .zip they came in
   input.hidden = true;
-  input.addEventListener("change", () => { const f = input.files?.[0]; input.value = ""; if (f) addKey(f, native, redraw); });
+  input.addEventListener("change", () => { const f = [...(input.files ?? [])]; input.value = ""; if (f.length) addKey(f, native, redraw); });
   const footer = `With an App Store Connect API key, ${NAME} makes an App ID and an Ad Hoc profile (with Push) for each app it signs `
     + "with Keep Bundle IDs on, and adds this iPhone to your account. Use a key with the Admin or App Manager role. "
     + (nativeOf(native)?.call ? "The key stays in this iPhone's Keychain and goes only to Apple." : "The key stays in this browser; calls pass through this site to Apple, which keeps nothing.");
@@ -159,6 +249,12 @@ export function accountGroup({ native, redraw = () => {} } = {}) {
     const made = info ? profileRows(await cache(native)) : [];
     const frag = grouped([{ header: "Apple Developer Account", rows, footer }, ...(made.length ? [{ header: `Profiles Made by ${NAME}`, rows: made }] : [])]);
     frag.querySelector(".asc-add")?.append(input);
+    // F277: the how-to (screens/guides.js) linked from the footer
+    const foot = frag.querySelector(".group-footer");
+    if (foot) {
+      const a = Object.assign(document.createElement("a"), { href: ascGuideHref(), textContent: ASC_GUIDE_LINK, className: "asc-guide-link" });
+      foot.append(" ", a);
+    }
     box.replaceChildren(frag);
   })();
   return box;

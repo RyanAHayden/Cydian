@@ -4,6 +4,7 @@
 // Read once and kept: neither changes while the app runs.
 //
 //   device.udid   -> {udid | null, candidates: [udid], source: "helper" | "profile" | null}   (every build)
+//   device.udid.set {udid} -> as device.udid: the UDID the website's Profile Service visit found, kept as a paired one
 // SPDX-License-Identifier: GPL-3.0-or-later
 import Foundation
 
@@ -69,6 +70,14 @@ enum PhoneID {
     static func register(_ b: Bridge) {
         b.on("device.udid") { c in
             DispatchQueue.global(qos: .userInitiated).async { Apt.reply(c, json(), nil) }
+        }
+        // F277: the UDID the website's Profile Service visit found (screens/devaccount.js findUdidViaSite), from iOS
+        // itself, kept like a paired one. Only a UDID's shape is taken (25 or 40 hex characters with dashes).
+        b.on("device.udid.set") { c in
+            let u = (c.params["udid"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            guard u.range(of: "^[0-9A-Fa-f-]{25,40}$", options: .regularExpression) != nil else { return c.reply(nil, "bad_params: udid") }
+            remember(u)
+            c.reply(json(), nil)
         }
     }
 }

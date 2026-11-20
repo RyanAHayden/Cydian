@@ -322,3 +322,21 @@ test("Notifications guide: the API key route makes a per-app App ID, said the bu
     globalThis.ifizboxNative = was;
   }
 });
+
+// F277: Use an App Store Connect API Key, opened from the Apple Developer Account group's footer only.
+test("F277: the API key guide: where the key is made, the one download, the Issuer ID; listed nowhere", () => {
+  assert.equal(g.ascGuideHref(), "#/home/guides/asc-key");
+  assert.equal(g.guideIds(true).includes("asc-key") || g.guideIds(false).includes("asc-key"), false);
+  assert.equal(g.guidePage(["guides", "asc-key"], false).page, "guide");
+  assert.equal(g.guidePage(["guides", "asc-key"], true).page, "guide");
+  const page = draw(["guides", "asc-key"], { lite: true, store: { getItem: () => null, setItem: () => {} } });
+  assert.deepEqual(byClass(page, "guide-step-title").map((t) => t.textContent),
+    ["Open the API Keys", "Make a Key", "Download It", "Copy the Issuer ID", "Add It"]);
+  const t = page.textContent;
+  assert.match(t, /Users and Access > Integrations > App Store Connect API > Team Keys/);
+  assert.match(t, /Access: Admin/);
+  assert.match(t, /AuthKey_<Key ID>\.p8/);
+  assert.match(t, /only once/);
+  assert.match(t, /above the keys/);
+  assert.match(t, /Add API Key/);
+});

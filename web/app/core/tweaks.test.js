@@ -241,3 +241,13 @@ test("rewriteDylibs: a longer path moves the commands after it; a map that chang
   assert.deepEqual(dylibsOf(out), [long]);
   assert.deepEqual(rewriteDylibs(app, () => null), app);
 });
+
+// B193: the library-description check walks words instead of using a lookbehind (iOS 15 has none).
+test("library descriptions: the word before library/framework decides", async () => {
+  const { isLibraryStanza } = await import("./tweaks.js");
+  const lib = (description) => isLibraryStanza({ section: "Tweaks", description });
+  for (const d of ["A SwiftUI Prefs Framework", "library for Foxfort tweaks", "  The color picker support library",
+    "an a b c d e library", "app library framework", "webapp library"]) assert.equal(lib(d), true, d);
+  for (const d of ["Moves the app library", "A photo library button", "my library", "x b c d e f library",
+    "an a b c d e f library", "web-app library", "librarything", ""]) assert.equal(lib(d), false, d);
+});

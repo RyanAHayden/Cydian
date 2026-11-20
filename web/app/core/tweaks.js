@@ -438,13 +438,31 @@ const LIBRARY_SECTION = /\b(librar(y|ies)|frameworks?)\b/;
 // A description that is about a library or framework: "A SwiftUI Prefs Framework", "Color picker support library for
 // tweaks", "library for Foxfort tweaks", "An API … for developers". Only a short noun phrase at the start counts, and
 // never an app's own library ("moves the app library", "a photo library button").
-const LIBRARY_DESC = /^\s*(?:(?:a|an|the)\s+)?(?:[\w+.-]+\s+){0,5}?(?<!\b(?:app|apps|photos?|music|media|video|ipod|game|games|sticker|emoji|icon|widget|my)\s)(?:librar(?:y|ies)|framework)\b/i;
+// No lookbehind here: it is a SyntaxError before Safari 16.4 and hangs the app on Loading on iOS 15 (B193). Walk the
+// words instead: at most 5 (6 when the first is an article) before "library"/"framework", and the word right before
+// it must not be one of NOT_LIBRARY_BEFORE.
+const LIBRARY_WORD = /^(?:librar(?:y|ies)|framework)\b/i;
+const LIBRARY_ARTICLE = /^(?:a|an|the)\s+/i;
+const LIBRARY_LEAD_WORD = /^[\w+.-]+\s+/;
+const NOT_LIBRARY_BEFORE = /\b(?:app|apps|photos?|music|media|video|ipod|game|games|sticker|emoji|icon|widget|my)\s$/i;
+function libraryDesc(desc) {
+  let pos = desc.length - desc.replace(/^\s+/, "").length;
+  const max = LIBRARY_ARTICLE.test(desc.slice(pos)) ? 6 : 5;
+  for (let words = 0; ; words++) {
+    const rest = desc.slice(pos);
+    if (LIBRARY_WORD.test(rest) && !NOT_LIBRARY_BEFORE.test(desc.slice(0, pos))) return true;
+    if (words === max) return false;
+    const w = LIBRARY_LEAD_WORD.exec(rest);
+    if (!w) return false;
+    pos += w[0].length;
+  }
+}
 const FOR_DEVELOPERS = /\bfor (?:tweak )?developers\b/i;
 export function isLibraryStanza(st) {
   const section = String(st?.section ?? "").toLowerCase().replace(/[_-]+/g, " ");
   const tags = String(st?.tag ?? "").split(",").map((t) => t.trim().toLowerCase());
   const desc = String(st?.description ?? "").split("\n")[0];
-  return LIBRARY_SECTION.test(section) || tags.includes("purpose::library") || LIBRARY_DESC.test(desc) || FOR_DEVELOPERS.test(desc);
+  return LIBRARY_SECTION.test(section) || tags.includes("purpose::library") || libraryDesc(desc) || FOR_DEVELOPERS.test(desc);
 }
 
 export function injectableFromFields(st) {

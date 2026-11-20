@@ -27,6 +27,7 @@
 import { pool, withTimeout, healthFields, REFRESH_TIMEOUT, REFRESH_CONCURRENCY } from "./health.js";
 import { parseIpaSource } from "./sources/ipa.js";
 import { NAME } from "../brand.js";
+import { encodeUrl } from "./urlencode.js";
 
 const ALT_PREFIX = "alt:";
 export const isAltKey = (key) => String(key ?? "").startsWith(ALT_PREFIX);
@@ -34,7 +35,8 @@ export const altKey = (url) => ALT_PREFIX + url;
 
 // A JSON field as trimmed text (strings and numbers), and an http(s) URL field or null (core/sources/ipa.js too).
 export const str = (v) => (typeof v === "string" ? v.trim() : typeof v === "number" ? String(v) : "");
-export const httpUrl = (v) => { const s = str(v); return /^https?:\/\/[^\s]+$/i.test(s) ? s : null; };
+// B149: a raw space (or other character a URL can't hold) after the host is percent-encoded, not refused.
+export const httpUrl = (v) => { const s = encodeUrl(str(v)); return /^https?:\/\/[^\s]+$/i.test(s) ? s : null; };
 const num = (v) => { const n = Number(v); return Number.isFinite(n) && n > 0 ? n : null; };
 
 // "#8A28F7", "8A28F7", "#abc" -> "#8a28f7"; anything else null (it goes into CSS, so only hex gets through).
@@ -81,7 +83,7 @@ const runnableVersions = (app, ios) => app.versions.filter((v) => runsOn(v, ios)
 function parseVersion(v, legacy = false) {
   if (!v || typeof v !== "object") return null;
   const version = str(v.version) || str(v.marketingVersion);
-  const downloadURL = str(v.downloadURL);
+  const downloadURL = encodeUrl(str(v.downloadURL)); // B149: a raw space in it fails URL(string:) before iOS 17
   if (!version && !downloadURL) return null;
   return {
     version: version || "0", buildVersion: str(v.buildVersion) || null,
@@ -105,7 +107,7 @@ function parseScreenshots(app) {
   if (!Array.isArray(list)) return [];
   return list.map(({ s, device }) => {
     const d = device ? { device } : {};
-    if (typeof s === "string") return httpUrl(s) ? { url: s.trim(), width: null, height: null, ...d } : null;
+    if (typeof s === "string") return httpUrl(s) ? { url: httpUrl(s), width: null, height: null, ...d } : null;
     const url = httpUrl(s?.imageURL ?? s?.url);
     return url ? { url, width: num(s.width), height: num(s.height), ...d } : null;
   }).filter(Boolean);

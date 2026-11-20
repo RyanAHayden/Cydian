@@ -7,11 +7,13 @@
 //   const el = renderSileo(json, { open(url) })   // open: for depiction-… links (sub-depictions)
 import { getBackend } from "../backend.js";
 import { el, segmented } from "../nav/ui.js";
+import { encodeUrl } from "../core/urlencode.js";
 
 // An image URL the page can load: https as it is, http through the backend (the site's proxy: an https page
 // can't load http images), data: as it is. Anything else (file:, javascript:) is refused.
+// B149: characters a URL can't hold (a raw space) are percent-encoded first (core/urlencode.js).
 export function mediaUrl(url) {
-  const s = String(url ?? "").trim();
+  const s = encodeUrl(String(url ?? ""));
   if (/^https:\/\//i.test(s) || /^data:image\//i.test(s)) return s;
   if (/^http:\/\//i.test(s)) {
     const b = getBackend();

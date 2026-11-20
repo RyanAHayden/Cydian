@@ -243,7 +243,8 @@ enum Apt {
     // ---- network
 
     static func httpURL(_ v: Any?) -> URL? {
-        guard let s = v as? String, let u = URL(string: s), let scheme = u.scheme?.lowercased(),
+        // B149: a raw space (and the like) is percent-encoded first: URL(string:) refuses it before iOS 17.
+        guard let raw = v as? String, case let s = URLText.encoded(raw), let u = URL(string: s), let scheme = u.scheme?.lowercased(),
               scheme == "http" || scheme == "https", u.host != nil else { return nil }
         return u
     }

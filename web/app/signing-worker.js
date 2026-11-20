@@ -6,6 +6,15 @@
 // checkPasswordInWorker): { ok: true, passwordOk: true | false | null }.
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { runSignJob, runPasswordCheck } from "./websign-job.js";
+import { GROUPFIX } from "./core/groupfix.js";
+
+// B211: the app-group fix dylib next to this file, or null when it can't be had (the app then signs without it).
+async function loadGroupFix() {
+  try {
+    const r = await fetch(new URL(GROUPFIX.file, import.meta.url));
+    return r.ok ? new Uint8Array(await r.arrayBuffer()) : null;
+  } catch { return null; }
+}
 
 self.onmessage = async (e) => {
   try {
@@ -14,7 +23,7 @@ self.onmessage = async (e) => {
       self.postMessage({ ok: true, passwordOk: await runPasswordCheck(createZsign, e.data) });
       return;
     }
-    const r = await runSignJob(createZsign, e.data, { progress: (p) => self.postMessage({ progress: p }) });
+    const r = await runSignJob(createZsign, { ...e.data, groupFix: await loadGroupFix() }, { progress: (p) => self.postMessage({ progress: p }) });
     self.postMessage({ ok: true, ...r }, [r.ipa.buffer]);
   } catch (err) {
     self.postMessage({ ok: false, error: String(err?.message ?? err), code: err?.code ?? "sign_failed" });

@@ -6,7 +6,10 @@
 //   paymentGroup(st, source)    a paid package's Price row; in the app Sign In / Buy / Download & Install
 //   paidStateOf(box)            B11: what the package page's nav bar button does for that paid package
 //   discoveryGroup()            Search's "Other Sources" list (Canister), with Add Source; .search(q). In the
-//                               jailbreak app Add Source & Install (F99): add, refresh it, open the page, queue
+//                               jailbreak app Add Source & Install (F99): add, refresh it, open the page, queue.
+//                               In the sideload app (F305) injectable tweaks only, with Add Source & Add to App
+//   offerTweak(row, ctx)        F305: that tweak's sheet (Add Source & Add to App / View Repo)
+//   canisterApi()               the one Canister client (core/canister.js createCanister), Find More's too
 //
 // Logic lives in core/featured.js, core/payment.js and core/canister.js; this file is DOM and transport only.
 //
@@ -30,6 +33,11 @@ import { settings } from "./settings.js";
 import { runPaidInstall } from "./queue.js";
 import { createFeaturedStore, MAX_BANNERS } from "../core/featured.js";
 import { createCanister, mapResults, priceFor, normalRepo, askable } from "../core/canister.js";
+import { loadInjectable } from "../core/canister.js"; // F305
+import { sourceWarning } from "../core/warnings.js"; // F305
+import { tweakSourcesOn } from "../core/sources.js"; // F305
+import { detectMode } from "../core/settings.js"; // F305
+import { showActionSheet } from "../nav/actionsheet.js"; // F305
 import {
   isCommercial, paymentEndpointUrl, parseEndpoint, createPaymentClient, createCredentialStore, isFreePrice,
 } from "../core/payment.js";
@@ -121,7 +129,8 @@ export async function featuredRefs() {
 // ---- Canister discovery (Search) ---------------------------------------------------------------------------
 
 let canister = null;
-const canisterApi = () => (canister ??= createCanister({ getJson: async (u) => JSON.parse(await getBackend().text(u)) }));
+// F305: shared with screens/findmore.js (Find More Sources), so one cache serves Search, Find More and the trust labels.
+export const canisterApi = () => (canister ??= createCanister({ getJson: async (u) => JSON.parse(await getBackend().text(u)) }));
 
 // Search's "Other Sources" group: packages from sources the user hasn't added. `.search(q)` redraws it; a newer
 // call wins. Failures stay quiet (one footer line): Canister is an extra, local search is the main thing.
@@ -130,8 +139,13 @@ const canisterApi = () => (canister ??= createCanister({ getJson: async (u) => J
 // added sources are; Search runs `.search(q)` again when that switch changes. All hidden: no group at all.
 // `search`, `sources`, `arch` and `wait` are seams for the tests.
 const defaultHideIncompatible = () => settings.get("worksOnMyPhone") === true;
+// F305: the sideload app (Tweak Sources on) lists only tweaks that can go into an app (core/tweaks.js
+// injectableFromFields on Canister's Architecture, Section and tags), each with its repo's trust label; a tap offers
+// Add Source & Add to App or View Repo (offerTweak). Piracy-listed repos are never offered, in either build.
+const defaultTweaks = () => tweakSourcesOn(settings.deviceType(), detectMode());
 export function discoveryGroup(ctx, { hideIncompatible = defaultHideIncompatible, search: ask = (q) => canisterApi().search(q),
-  sources = () => getBackend().sources(), arch = getArch, wait = 450 } = {}) {
+  sources = () => getBackend().sources(), arch = getArch, wait = 450, tweaks = defaultTweaks, injectable = loadInjectable,
+  label = null } = {}) {
   const box = el("div", "discovery");
   let seq = 0;
   async function search(q) {
@@ -150,8 +164,16 @@ export function discoveryGroup(ctx, { hideIncompatible = defaultHideIncompatible
       return;
     }
     if (turn !== seq || !json) return;
+    if (tweaks()) {
+      let check;
+      try { check = await injectable(); } catch { return; }
+      if (turn !== seq) return;
+      const rows = mapResults(json, { have }).filter((r) => !r.repo.added && !piracyRepo(r.repo.uri) && check(r).ok).slice(0, 25);
+      if (rows.length) box.replaceChildren(await tweakGroup(rows, ctx, label));
+      return;
+    }
     const hide = hideIncompatible();
-    const rows = mapResults(json, { have, arch: arch() }).filter((r) => !r.repo.added && (r.archOk || !hide)).slice(0, 25);
+    const rows = mapResults(json, { have, arch: arch() }).filter((r) => !r.repo.added && !piracyRepo(r.repo.uri) && (r.archOk || !hide)).slice(0, 25);
     if (!rows.length) return;
     box.replaceChildren(grouped([{
       header: "Other Sources",
@@ -166,6 +188,119 @@ export function discoveryGroup(ctx, { hideIncompatible = defaultHideIncompatible
     }]));
   }
   return { el: box, search };
+}
+
+const piracyRepo = (uri) => Boolean(sourceWarning(uri));
+
+// F305: the sideload app's Other Sources · Canister: "Works in <apps>" when the tweak's .deb was checked here before
+// (screens/tweaks.js cachedTweakInfo), its repo's label (screens/findmore.js labelOf) and name.
+async function tweakGroup(rows, ctx, label) {
+  const [{ labelOf, labelNode }, { cachedTweakInfo }] = await Promise.all([import("./findmore.js"), import("./tweaks.js")]);
+  const { worksInText } = await import("../core/tweaks.js");
+  const kindOf = label ?? ((repo) => labelOf(repo));
+  const frag = grouped([{
+    header: "Other Sources · Canister",
+    rows: rows.map((r) => {
+      const info = cachedTweakInfo({ package: r.id, version: r.version });
+      const works = info?.ok ? worksInText(info) : null;
+      return { label: r.name, subtitle: [works ? `Works in ${works}` : null, r.repo.name].filter(Boolean).join(" · "),
+        icon: { text: r.name.charAt(0).toUpperCase() }, cls: "discovery-tweak", onClick: () => offerTweak(r, ctx) };
+    }),
+    footer: "Tweaks you can add to a sideloaded app, from repos you haven't added, found by Canister (canister.me).",
+  }]);
+  const cells = frag.querySelectorAll(".cell");
+  rows.forEach((r, i) => {
+    const sub = cells[i]?.querySelector(".cell-subtitle");
+    if (!sub) return;
+    const parts = labelNode(kindOf(r.repo));
+    // the label goes before the repo's name: after "Works in …" when there is one
+    const text = sub.textContent;
+    const cut = text.lastIndexOf(r.repo.name);
+    sub.replaceChildren(text.slice(0, cut), ...parts, r.repo.name);
+  });
+  return frag;
+}
+
+export const ADD_SOURCE_AND_ADD = "Add Source & Add to App";
+export const VIEW_REPO = "View Repo";
+
+// F305: the sheet for a tweak from a repo not added yet (Search's Other Sources · Canister, Find More's repo page, Search
+// All Repos): Add Source & Add to App (adds the repo, then the tweak's Add to App picker) and View Repo (Find More's
+// repo page; left out with `viewRepo: false`). An Unknown repo says so in the sheet. Every outside call is in the
+// options, for the tests. Resolves to what happened: "cancel" | "view" | addSourceAndAddToApp's answer.
+export async function offerTweak(r, ctx, { viewRepo = true, sheet = showActionSheet, label = null, go = null, add = null } = {}) {
+  const { labelOf, repoHref } = await import("./findmore.js");
+  const kind = (label ?? labelOf)(r.repo).kind;
+  const unknown = kind === "unknown" ? ` ${NAME} hasn't checked this repo.` : "";
+  const buttons = [ADD_SOURCE_AND_ADD, ...(viewRepo && r.repo.slug ? [VIEW_REPO] : [])];
+  const i = await sheet({ title: `${r.name} is in ${r.repo.name}, which you haven't added.${unknown}`, buttons });
+  if (buttons[i] === VIEW_REPO) {
+    const href = repoHref({ ...r.repo, count: null });
+    (go ?? ((h) => { location.hash = h.replace(/^#/, ""); }))(href);
+    return "view";
+  }
+  if (buttons[i] !== ADD_SOURCE_AND_ADD) return "cancel";
+  if (add) return add(r);
+  const [{ catalog }, { addToApp }, { sourcesChanged }] = await Promise.all([import("../catalog.js"), import("./tweaks.js"), import("./manage.js")]);
+  return addSourceAndAddToApp(r, { backend: getBackend(), catalog, showHUD: ctx?.showHUD ?? showHUD, showAlert, addToApp,
+    changed: () => sourcesChanged(ctx) });
+}
+
+// F305: Add Source & Add to App: verify and add the repo, refresh it and load it into the catalog (as Add Source &
+// Install), then the tweak's Add to App picker (screens/tweaks.js addToApp: checks the .deb, then the apps its filter
+// names). `deps`: { backend, catalog, showHUD, showAlert, addToApp, changed }. Resolves "error" | "missing" | "added"
+// (the picker ran; it answers for itself whether an app was picked).
+export async function addSourceAndAddToApp(r, deps) {
+  const got = await addAndLoad(r, deps);
+  if (got.status !== "ok") return got.status;
+  deps.changed?.();
+  await deps.addToApp(got.pkg.stanza);
+  return "added";
+}
+
+// Add Source & Install's and Add Source & Add to App's first steps: add the repo (Verifying URL), refresh it alone and
+// load it (Reloading Data), and find the package in it. { status: "ok" | "error" | "missing", key, pkg, added }.
+async function addAndLoad(r, { backend, catalog, showHUD: hud, showAlert: alert, go = () => {}, banner = showBanner }) {
+  let hide = hud("Verifying URL");
+  let added;
+  try {
+    added = await backend.addSource(r.repo.flat ? r.repo.uri : { uri: r.repo.uri, dist: r.repo.dist, components: r.repo.components });
+  } catch (e) {
+    hide();
+    await alert({ title: e.title || "Verification Error", message: e.message, buttons: ["OK"] });
+    return { status: "error" };
+  }
+  hide();
+  hide = hud("Reloading Data");
+  let key = added?.key ?? null, pkg = null;
+  try {
+    if (!key) {
+      const want = normalRepo(r.repo.uri);
+      key = (await backend.sources()).find((s) => normalRepo(s.uri) === want)?.key ?? null;
+    }
+    const only = (s) => s.key === key;
+    const rows = await backend.refreshSources(() => {}, { filter: only });
+    const mine = (rows ?? []).find(only);
+    const own = mine?.aptError || (rows?.failed ?? []).find((f) => f.key === key)?.message;
+    if (own) throw new Error(own);
+    const others = (rows?.failed ?? []).filter((f) => f.key !== key);
+    const words = failedBanner(others);
+    if (words) banner({ ...words, duration: FAILED_BANNER_MS, onTap: () => go(format({ tab: "sources", path: [] })) });
+    await catalog.ensure();
+    pkg = key ? await catalog.package(r.id, key) : null;
+  } catch (e) {
+    hide();
+    await alert({ title: "Error", message: `${r.repo.name} was added, but refreshing it failed: ${e.message}`, buttons: ["OK"] });
+    return { status: "error" };
+  }
+  hide();
+  if (!pkg || pkg.installedOnly || (pkg.key && pkg.key !== key)) {
+    await alert({ title: "Not Found",
+      message: `${r.repo.name} was added, but it doesn't list ${r.name} for this device. Canister's copy may be out of date.`,
+      buttons: ["OK"] });
+    return { status: "missing" };
+  }
+  return { status: "ok", key, pkg, added };
 }
 
 // The alert's buttons for a Canister row. F99: where the backend can queue (the jailbreak app), a flat source's
@@ -217,45 +352,9 @@ async function offer(r, ctx) {
 // which opens Sources when tapped) and the install goes on. Only the added source's own failure is an alert.
 export async function addSourceAndInstall(r, { backend, catalog, showHUD: hud, showAlert: alert, go, sold = soldByVendor,
   banner = showBanner }) {
-  let hide = hud("Verifying URL");
-  let added;
-  try {
-    added = await backend.addSource(r.repo.uri);
-  } catch (e) {
-    hide();
-    await alert({ title: e.title || "Verification Error", message: e.message, buttons: ["OK"] });
-    return "error";
-  }
-  hide();
-  hide = hud("Reloading Data");
-  let key = added?.key ?? null, pkg = null;
-  try {
-    if (!key) {
-      const want = normalRepo(r.repo.uri);
-      key = (await backend.sources()).find((s) => normalRepo(s.uri) === want)?.key ?? null;
-    }
-    const only = (s) => s.key === key;
-    const rows = await backend.refreshSources(() => {}, { filter: only });
-    const mine = (rows ?? []).find(only);
-    const own = mine?.aptError || (rows?.failed ?? []).find((f) => f.key === key)?.message;
-    if (own) throw new Error(own);
-    const others = (rows?.failed ?? []).filter((f) => f.key !== key);
-    const words = failedBanner(others);
-    if (words) banner({ ...words, duration: FAILED_BANNER_MS, onTap: () => go(format({ tab: "sources", path: [] })) });
-    await catalog.ensure();
-    pkg = key ? await catalog.package(r.id, key) : null;
-  } catch (e) {
-    hide();
-    await alert({ title: "Error", message: `${r.repo.name} was added, but refreshing it failed: ${e.message}`, buttons: ["OK"] });
-    return "error";
-  }
-  hide();
-  if (!pkg || pkg.installedOnly || (pkg.key && pkg.key !== key)) {
-    await alert({ title: "Not Found",
-      message: `${r.repo.name} was added, but it doesn't list ${r.name} for this device. Canister's copy may be out of date.`,
-      buttons: ["OK"] });
-    return "missing";
-  }
+  const got = await addAndLoad(r, { backend, catalog, showHUD: hud, showAlert: alert, go, banner });
+  if (got.status !== "ok") return got.status;
+  const { key, pkg, added } = got;
   go(pkgHref(key, r.id));
   if (await Promise.resolve().then(() => sold(pkg.stanza, { key, uri: added?.uri || r.repo.uri })).catch(() => false)) return "paid";
   backend.queue({ op: "install", id: r.id, version: pkg.stanza?.version ?? r.version, name: pkg.row?.name || pkg.stanza?.name || r.name });

@@ -47,6 +47,7 @@ import { settings, createSwitch } from "./settings.js";
 import { NAME } from "../brand.js";
 import { rowIcon } from "../icons/rowicons.js";
 import { confirmUnknownSource, markTrusted, labelSource } from "./safety.js"; // F291
+import * as findMore from "./findmore.js"; // F305: #/sources/manage/find(/<slug>), Find More Sources
 
 export const SEGMENT = "manage";
 export const isManage = (route) => route.path[0] === SEGMENT;
@@ -78,6 +79,7 @@ function page(route) {
 }
 
 export function nav(route, ctx) {
+  if (findMore.isFind(route)) return findMore.nav(route, ctx); // F305
   switch (page(route)) {
     case "root": return { title: "Manage", right: { label: "Add", onClick: () => addSource(ctx) } }; // F52
     case "sources": return { title: "Sources", style: "plain", right: { label: "Add", onClick: () => addSource(ctx) } };
@@ -92,6 +94,7 @@ export function nav(route, ctx) {
 }
 
 export function render(body, route, ctx) {
+  if (findMore.isFind(route)) return findMore.render(body, route, ctx); // F305
   switch (page(route)) {
     case "root": return renderRoot(body, ctx);
     case "sources": return renderSources(body);
@@ -126,8 +129,11 @@ function renderRoot(body, ctx) {
   ];
   const jailbroken = settings.deviceType() !== "none";
   body.replaceChildren(grouped([{ rows, footer: "Add, delete and reorder your sources, or move them to another phone "
-    + "or package manager." }, { rows: [{ label: "Recommended", href: here("recommended"), cls: "rec-entry", icon: rowIcon("recommended") }],
-    footer: jailbroken ? "Tweak repos that suit your jailbreak, and app sources." : "App sources to add in one tap." }]));
+    + "or package manager." }, { rows: [{ label: "Recommended", href: here("recommended"), cls: "rec-entry", icon: rowIcon("recommended") },
+    // F305: Canister's repo index, where APT repos are kept (jailbroken, or the sideload app's Tweak Sources)
+    ...(findMore.findMoreOn() ? [{ label: "Find More Sources", href: findMore.findHref(), cls: "find-entry", icon: rowIcon("globe") }] : [])],
+    footer: jailbroken ? "Tweak repos that suit your jailbreak, and app sources."
+      : findMore.findMoreOn() ? "App sources to add in one tap, and tweak repos from Canister." : "App sources to add in one tap." }]));
   // The badge: how many aren't added yet.
   recRows().then((rs) => {
     const n = rs.filter((r) => !r.added).length;

@@ -40,7 +40,7 @@ final class Bridge: NSObject, WKScriptMessageHandlerWithReply {
             DispatchQueue.main.async {
                 if let w = c.web?.window { Theme.apply(style: c.params["style"] as? String ?? "auto",
                                                        theme: c.params["theme"] as? String ?? "light",
-                                                       darkPalette: c.params["darkPalette"] as? String ?? "oled",
+                                                       darkPalette: c.params["darkPalette"] as? String ?? "gunmetal",
                                                        lightPalette: c.params["lightPalette"] as? String ?? "classic", to: w) }
                 c.reply(nil, nil)
             }
@@ -192,7 +192,7 @@ enum WebKitFeature {
 // The bars themselves are web/app/'s (R3 (a)): the shell draws no UINavigationBar or UITabBar.
 // F198: the window and web view behind the page take the palette's ground (black for OLED Black), and the shell keeps
 // the last {style, darkPalette} so the next launch paints that ground before the page has run (no light or grey
-// flash on a dark launch). Light until the page has said anything.
+// flash on a dark launch). Until the page has said anything: Automatic and Gunmetal, the page's own defaults.
 enum Theme {
     static let savedKey = "ifizbox.shellTheme"
 
@@ -200,7 +200,7 @@ enum Theme {
 
     static var saved: (style: String, darkPalette: String, lightPalette: String) {
         let d = UserDefaults.standard.dictionary(forKey: savedKey) ?? [:]
-        return (d["style"] as? String ?? "light", d["darkPalette"] as? String ?? "oled",
+        return (d["style"] as? String ?? "auto", d["darkPalette"] as? String ?? "gunmetal",
                 d["lightPalette"] as? String ?? "classic")
     }
 

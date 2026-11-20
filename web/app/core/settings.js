@@ -3,7 +3,7 @@
 // `get()`. Both modes and the site run this same file, so a setting means the same everywhere.
 //
 //   const s = createSettings({ mode: detectMode() });
-//   s.get("appearance");            // "auto" | "light" | "dark" (light unless chosen: iOS 6 was light)
+//   s.get("appearance");            // "auto" | "light" | "dark" (Automatic unless chosen: follows the iPhone)
 //   s.set("appearance", "dark");    // stored at localStorage["ifizbox.appearance"], listeners told
 //   s.onChange((key, value) => …);  // returns an unsubscribe function
 //   s.sections();                   // [{ id, page, title, footer, settings: [def…] }], only the rows this mode shows
@@ -93,7 +93,7 @@ export const SETTINGS = [
   {
     // F199: Theme's Mode, drawn as an iOS 6 segmented control. Kept under its old key (ifizbox.appearance) so a
     // stored choice, the transfer to the app (TRAVELS) and the shell's app.theme read the same value.
-    key: "appearance", section: "appearance", kind: "segmented", feature: "appearance", modes: ALL, default: "light",
+    key: "appearance", section: "appearance", kind: "segmented", feature: "appearance", modes: ALL, default: "auto",
     label: "Mode",
     options: [{ value: "auto", label: "Automatic" }, { value: "light", label: "Light" }, { value: "dark", label: "Dark" }],
     footer: "Automatic switches between your Light and Dark themes with the iPhone's own setting.",
@@ -111,7 +111,7 @@ export const SETTINGS = [
   },
   {
     // F198/F199: the dark palette, stored at ifizbox.darkTheme (DARK_THEME_KEY, which theme-boot.js reads raw).
-    key: "darkTheme", section: "themes", kind: "list", feature: "appearance", modes: ALL, default: "oled",
+    key: "darkTheme", section: "themes", kind: "list", feature: "appearance", modes: ALL, default: "gunmetal",
     label: "Dark", tone: "dark",
     options: [{ value: "oled", label: "OLED Black", swatch: ["#000", "#0e0e0f"] },
       { value: "gunmetal", label: "Gunmetal", swatch: ["#5f656f", "#3b3f46"] },
@@ -827,18 +827,20 @@ export function themeFor(appearance, systemDark) {
 }
 
 // F198: the palette inside a tone, for <html data-palette> beside data-theme. Light has one (classic, the kit's);
-// dark has OLED Black (the default, user 2026-11-18) and Gunmetal (F13's). The dark one is stored at
-// localStorage["ifizbox.darkTheme"]; Theme > Dark (F199) sets it (anything else reads as OLED Black). theme-boot.js
-// keeps the same rule.
-// F199: the lists come from the lightTheme and darkTheme settings' options (the first is each one's default), and
+// dark has Gunmetal (F13's, the default) and OLED Black among others. The dark one is stored at
+// localStorage["ifizbox.darkTheme"]; Theme > Dark (F199) sets it (anything else reads as the default, Gunmetal).
+// theme-boot.js keeps the same rule.
+// F199: the lists come from the lightTheme and darkTheme settings' options, the defaults from their `default`, and
 // lightTheme is stored at LIGHT_THEME_KEY the same way.
 export const DARK_PALETTES = byKey.get("darkTheme").options.map((o) => o.value);
 export const LIGHT_PALETTES = byKey.get("lightTheme").options.map((o) => o.value);
+export const DARK_DEFAULT = byKey.get("darkTheme").default;
+export const LIGHT_DEFAULT = byKey.get("lightTheme").default;
 export const DARK_THEME_KEY = "ifizbox.darkTheme";
 export const LIGHT_THEME_KEY = "ifizbox.lightTheme";
 export function paletteFor(theme, darkTheme, lightTheme) {
-  if (theme !== "dark") return LIGHT_PALETTES.includes(lightTheme) ? lightTheme : LIGHT_PALETTES[0];
-  return DARK_PALETTES.includes(darkTheme) ? darkTheme : DARK_PALETTES[0];
+  if (theme !== "dark") return LIGHT_PALETTES.includes(lightTheme) ? lightTheme : LIGHT_DEFAULT;
+  return DARK_PALETTES.includes(darkTheme) ? darkTheme : DARK_DEFAULT;
 }
 
 // F199: everything Theme's page decides, in one call (theme-boot.js keeps the same rule before first paint): Mode

@@ -28,7 +28,8 @@ helper. Parsing, Changes, upgrades and search all run in `core/` in both places.
 - `CADisableMinimumFrameDurationOnPhone = YES` in the app's Info.plist. Without it, WKWebView animations are capped
   at 60 Hz on ProMotion phones.
 - Animate `transform` and `opacity` only (compositor). Nothing that triggers layout during scrolling or
-  transitions.
+  transitions. `node tools/smoke/smoke.mjs` (headless Chromium, outside the gate) pushes, pops, swipes back and
+  opens a sheet, and fails if any animation on the way touched a layout property; run it after changing those.
 - Long lists (BigBoss is tens of thousands of packages) get a virtualised list. `content-visibility: auto` alone
   isn't enough at that size.
 - Heavy parsing (`Packages` files are megabytes) runs in a Web Worker, so the UI thread never blocks. The parsed

@@ -19,6 +19,9 @@ iFizBox: a package manager with the iOS 6 Cydia look, for modern iPhones. Three 
 
 Shortcuts recipes live in `docs/shortcuts.md`.
 
+UI concepts (a screen proposed before it's built) go through the concept skill, `.claude/skills/concept/`: the real
+`web/app` with the change, live in a phone frame, published as an Artifact. Never a hand-copied mockup.
+
 - Gate: `tools/check.sh` (the `native/` builds, jailbreak and sideload, then every `test_*.py`). It must pass
   before `done`.
 - Python: stdlib only (`bz2`, `lzma`, `gzip`, `email`-style parsing); the gate needs no pip packages. Local

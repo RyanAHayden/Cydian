@@ -1,0 +1,336 @@
+<title>{{TITLE}}</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout: a control column beside a stage that holds the phone, scaled to fit; stacked on a narrow screen. */
+:root {
+  --ground: #eef0f3; --panel: #ffffff; --ink: #1d232b; --muted: #5d6773; --line: #d5dae0;
+  --accent: #3d6194; --accent-ink: #ffffff; --chip: #e3e8ee; --warn: #b3261e;
+  --text: -apple-system, "Helvetica Neue", "Segoe UI", Roboto, system-ui, sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --ground: #15181c; --panel: #1e2227; --ink: #e7eaee; --muted: #9aa4af; --line: #343a42;
+  --accent: #7ea4d8; --accent-ink: #0d1520; --chip: #2a3038; --warn: #ff8a80; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --ground: #15181c; --panel: #1e2227; --ink: #e7eaee; --muted: #9aa4af; --line: #343a42;
+  --accent: #7ea4d8; --accent-ink: #0d1520; --chip: #2a3038; --warn: #ff8a80; color-scheme: dark }
+html, body { height: 100%; }
+[hidden] { display: none !important; }
+body { background: var(--ground); color: var(--ink); font: 14px/1.4 var(--text); }
+.wrap { display: grid; grid-template-columns: minmax(240px, 300px) 1fr; gap: 20px; height: 100%; box-sizing: border-box;
+  padding-block: 16px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.panel { display: flex; flex-direction: column; gap: 16px; min-width: 0; overflow: auto; }
+.head h1 { font-size: 19px; line-height: 1.25; margin: 0 0 4px; text-wrap: balance; }
+.head p { margin: 0; color: var(--muted); }
+.group { display: flex; flex-direction: column; gap: 6px; }
+.group > label, .group > .label { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.seg { display: flex; background: var(--chip); border-radius: 8px; padding: 2px; gap: 2px; }
+.seg button { flex: 1; border: 0; background: transparent; color: var(--ink); font: inherit; font-size: 13px; padding: 6px 4px;
+  border-radius: 6px; cursor: pointer; min-width: 0; }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
+.seg button:focus-visible, select:focus-visible, .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+select { font: inherit; color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; }
+.btn { font: inherit; font-size: 13px; color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+  padding: 6px 10px; cursor: pointer; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.route { font: 12px var(--mono); color: var(--muted); word-break: break-all; }
+.note { font-size: 12px; color: var(--muted); }
+.errors { font-size: 12px; color: var(--warn); white-space: pre-wrap; word-break: break-word; max-height: 140px; overflow: auto; }
+.stage { position: relative; min-width: 0; min-height: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.device { position: absolute; left: 50%; top: 50%; transform-origin: 50% 50%; }
+.bezel { background: #111317; padding: var(--bz-y) var(--bz-x); border-radius: calc(var(--r) + var(--bz-x)); box-shadow: 0 0 0 2px #2c3036, 0 18px 50px rgba(0,0,0,.28); position: relative; }
+.screen { position: relative; width: var(--w); height: var(--h); border-radius: var(--r); overflow: hidden; background: #000; display: flex; flex-direction: column; }
+.screen iframe { border: 0; display: block; width: 100%; flex: 1 1 auto; background: #000; }
+.sb { position: absolute; left: 0; right: 0; top: 0; height: var(--sb); display: flex; align-items: center; justify-content: space-between;
+  padding: 0 var(--sb-pad); box-sizing: border-box; color: #fff; font: 600 var(--sb-font) var(--text); pointer-events: none; z-index: 3; }
+.sb.dark-text { color: #000; }
+.sb .glyphs { display: flex; align-items: center; gap: 5px; }
+.sb svg { display: block; fill: currentColor; }
+.sb.center { justify-content: center; }
+.sb.center .time { position: absolute; left: 50%; transform: translateX(-50%); }
+.sb.center .glyphs { position: absolute; right: 6px; }
+.cutout { position: absolute; left: 50%; transform: translateX(-50%); background: #000; z-index: 4; pointer-events: none; }
+.cutout.island { top: 11px; width: 126px; height: 37px; border-radius: 19px; }
+.cutout.notch { top: 0; width: 162px; height: 32px; border-radius: 0 0 20px 20px; }
+.homebar { position: absolute; left: 50%; bottom: 8px; transform: translateX(-50%); width: 134px; height: 5px; border-radius: 3px;
+  background: rgba(255,255,255,.85); z-index: 4; pointer-events: none; }
+.homebar.dark { background: rgba(0,0,0,.8); }
+.homebutton { position: absolute; left: 50%; bottom: calc((var(--bz-y) - 54px) / 2); transform: translateX(-50%); width: 54px; height: 54px;
+  border-radius: 50%; border: 2px solid #3a3e45; box-sizing: border-box; }
+.strip { flex: 0 0 auto; height: var(--strip); background: #4f698b; }
+.safari { flex: 0 0 auto; height: var(--safari); background: #f2f2f4; border-top: 1px solid #d0d0d4; display: flex; justify-content: center;
+  padding-top: 8px; box-sizing: border-box; }
+.safari.dark { background: #1c1c1e; border-top-color: #2c2c2e; }
+.safari .url { height: 36px; width: calc(100% - 32px); max-width: 420px; border-radius: 12px; background: rgba(120,120,128,.16); color: #1d1d1f;
+  font: 15px var(--text); display: flex; align-items: center; justify-content: center; }
+.safari.dark .url { color: #f2f2f7; }
+@media (max-width: 720px) {
+  .wrap { grid-template-columns: 1fr; grid-template-rows: auto minmax(560px, 1fr); height: auto; min-height: 100%; }
+  .panel { overflow: visible; }
+}
+@media (prefers-reduced-motion: no-preference) { .seg button { transition: background-color .15s; } }
+</style>
+
+<div class="wrap">
+  <section class="panel" aria-label="Concept controls">
+    <div class="head">
+      <h1 id="title"></h1>
+      <p id="note"></p>
+    </div>
+    <div class="group" id="version-group">
+      <div class="label" id="version-label">Version</div>
+      <div class="seg" role="group" aria-labelledby="version-label" id="version"></div>
+    </div>
+    <div class="group">
+      <div class="label" id="mode-label">Mode</div>
+      <div class="seg" role="group" aria-labelledby="mode-label" id="mode"></div>
+    </div>
+    <div class="group">
+      <label for="device">Device</label>
+      <select id="device"></select>
+    </div>
+    <div class="group">
+      <label for="theme">Theme</label>
+      <select id="theme"></select>
+    </div>
+    <div class="row">
+      <button class="btn" id="restart" type="button">Restart app</button>
+      <button class="btn" id="startpage" type="button">Back to start</button>
+    </div>
+    <div class="group">
+      <div class="label">Page</div>
+      <div class="route" id="route">#/home</div>
+    </div>
+    <p class="note">The real app with sample sources: nothing is installed or sent anywhere. Taps, pages and sheets work as on the phone.</p>
+    <div class="errors" id="errors" hidden></div>
+  </section>
+  <section class="stage" id="stage" aria-label="Phone">
+    <div class="device" id="device-box">
+      <div class="bezel">
+        <div class="screen" id="screen">
+          <div class="strip" id="strip" hidden></div>
+          <iframe id="app" title="The app" allow="clipboard-write"></iframe>
+          <div class="safari" id="safari" hidden><div class="url" id="safari-url"></div></div>
+          <div class="sb" id="sb"><span class="time">9:41</span><span class="glyphs" id="glyphs"></span></div>
+          <div class="cutout" id="cutout" hidden></div>
+          <div class="homebar" id="homebar" hidden></div>
+        </div>
+        <div class="homebutton" id="homebutton" hidden></div>
+      </div>
+    </div>
+  </section>
+</div>
+<!--{{DATA}}-->
+<script>
+(function () {
+  "use strict";
+  var $ = function (id) { return document.getElementById(id); };
+  var read = function (id) { return JSON.parse($(id).textContent); };
+  var meta = read("concept-meta"), after = read("concept-after"), beforeDiff = read("concept-before");
+  var hasBefore = Boolean(beforeDiff && !beforeDiff.same);
+  var saved = {};
+  try { saved = JSON.parse(localStorage.getItem("concept.controls") || "{}") || {}; } catch (e) { saved = {}; }
+  var state = {
+    version: "after", mode: meta.mode, device: meta.device,
+    theme: "light:" + meta.palettes.lightTheme[0].value, // light by default
+  };
+  ["mode", "device", "theme"].forEach(function (k) { if (typeof saved[k] === "string") state[k] = saved[k]; });
+  if (!meta.modes.some(function (m) { return m.id === state.mode; })) state.mode = meta.mode;
+  if (!meta.devices.some(function (d) { return d.id === state.device; })) state.device = meta.device;
+  var stores = {};      // version|mode -> the app's localStorage, kept across reloads
+  var hash = meta.start || "";
+  var errors = [];
+
+  $("title").textContent = meta.title;
+  $("note").textContent = meta.note || "";
+  $("note").hidden = !meta.note;
+
+  function remember() {
+    try { localStorage.setItem("concept.controls", JSON.stringify({ mode: state.mode, device: state.device, theme: state.theme })); } catch (e) { /* fine */ }
+  }
+
+  // ---- the two versions
+  var beforeData = null;
+  function versionData(v) {
+    if (v !== "before" || !hasBefore) return after;
+    if (beforeData) return beforeData;
+    var d = { html: beforeDiff.html || after.html, boot: beforeDiff.boot || after.boot };
+    ["modules", "files", "assets"].forEach(function (k) {
+      var o = Object.assign({}, after[k]);
+      Object.keys(beforeDiff[k] || {}).forEach(function (p) { if (beforeDiff[k][p] == null) delete o[p]; else o[p] = beforeDiff[k][p]; });
+      d[k] = o;
+    });
+    return (beforeData = d);
+  }
+  function deviceOf() { return meta.devices.filter(function (d) { return d.id === state.device; })[0]; }
+  function tone() { return state.theme.split(":")[0]; }
+  function seeds() {
+    var t = state.theme.split(":");
+    var s = { "ifizbox.appearance": t[0], "ifizbox.firstVisit": "later" };
+    s[t[0] === "dark" ? "ifizbox.darkTheme" : "ifizbox.lightTheme"] = t[1];
+    return s;
+  }
+  function storeKey() { return state.version + "|" + state.mode; }
+  function appStorage() {
+    var k = storeKey();
+    stores[k] = Object.assign(stores[k] || {}, seeds());
+    return stores[k];
+  }
+  function inset(d) {
+    // the website runs in a Safari tab: below the status bar, above Safari's bar
+    if (state.mode === "site") return { top: 0, right: 0, bottom: 0, left: 0 };
+    return d.sa;
+  }
+  function srcdoc() {
+    var d = versionData(state.version), dev = deviceOf();
+    var cfg = { mode: state.mode, storage: appStorage(), device: { sa: inset(dev), ipad: Boolean(dev.ipad) }, hash: hash,
+      files: d.files, assets: d.assets, net: meta.net, apt: meta.apt, names: meta.names, version: meta.version };
+    var mods = Object.keys(d.modules).sort().map(function (p) { return d.modules[p]; }).join("\n");
+    var bundle = meta.runtime + "\n" + mods + '\n__cLoad("app.js").catch(function (e) { console.error(e); });';
+    var html = d.html.replace(/<style data-concept-for="([^"]+)"><\/style>/g, function (m, p) {
+      return '<style data-concept-for="' + p + '">' + (d.files[p] || "") + "</style>";
+    });
+    html = html.replace("<!--concept-head-->", function () {
+      return "<script>window.__concept=" + JSON.stringify(cfg).replace(/</g, "\\u003c") + ";<\/script><script>" + meta.shell + "<\/script>";
+    });
+    html = html.replace("<!--concept-boot-->", function () { return "<script>" + d.boot + "<\/script>"; });
+    html = html.replace("<!--concept-body-->", function () { return "<script>" + bundle + "<\/script>"; });
+    return html;
+  }
+
+  // ---- the phone
+  var GLYPHS = '<svg width="17" height="11" viewBox="0 0 17 11" aria-hidden="true"><rect x="0" y="7" width="3" height="4" rx="1"/><rect x="4.5" y="5" width="3" height="6" rx="1"/><rect x="9" y="2.5" width="3" height="8.5" rx="1"/><rect x="13.5" y="0" width="3" height="11" rx="1"/></svg>' +
+    '<svg width="15" height="11" viewBox="0 0 15 11" aria-hidden="true"><path d="M7.5 2.2c2.2 0 4.2.8 5.7 2.2l1.2-1.2A9.7 9.7 0 0 0 7.5.5 9.7 9.7 0 0 0 .6 3.2l1.2 1.2A8 8 0 0 1 7.5 2.2Zm0 3.3c1.3 0 2.5.5 3.4 1.3l1.2-1.2A6.6 6.6 0 0 0 7.5 3.8c-1.8 0-3.4.7-4.6 1.8l1.2 1.2c.9-.8 2.1-1.3 3.4-1.3Zm0 3.3c-.5 0-.9.2-1.2.5L7.5 10.5l1.2-1.2c-.3-.3-.7-.5-1.2-.5Z"/></svg>' +
+    '<svg width="26" height="12" viewBox="0 0 26 12" aria-hidden="true"><rect x=".5" y=".5" width="22" height="11" rx="3" fill="none" stroke="currentColor" opacity=".45"/><rect x="2" y="2" width="17" height="8" rx="1.8"/><rect x="23.6" y="4" width="1.6" height="4" rx=".8" opacity=".45"/></svg>';
+  function lum(hex) {
+    var m = /^#?([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(String(hex || "").trim());
+    if (!m) return 0;
+    var h = m[1].length === 3 ? m[1].replace(/./g, "$&$&") : m[1];
+    var n = parseInt(h, 16);
+    return (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255;
+  }
+  var stripColor = "#4f698b";
+  function layout() {
+    var d = deviceOf(), box = $("device-box"), site = state.mode === "site";
+    var bzx = d.home === "button" ? 14 : 12, bzy = d.home === "button" ? 72 : 12;
+    if (d.ipad) { bzx = 20; bzy = 20; }
+    var sbH = d.sa.top, safariH = site ? 50 + (d.sa.bottom || 0) : 0;
+    var s = box.style;
+    s.setProperty("--w", d.w + "px"); s.setProperty("--h", d.h + "px"); s.setProperty("--r", d.radius + "px");
+    s.setProperty("--bz-x", bzx + "px"); s.setProperty("--bz-y", bzy + "px");
+    s.setProperty("--sb", (d.cutout === "none" ? sbH : Math.max(sbH - 6, 44)) + "px");
+    s.setProperty("--sb-pad", (d.cutout === "island" ? (d.w > 420 ? 36 : 32) : d.cutout === "notch" ? 26 : 8) + "px");
+    s.setProperty("--sb-font", (d.cutout === "none" ? (d.ipad ? 13 : 12) : 16) + "px");
+    s.setProperty("--strip", (site ? sbH : 0) + "px");
+    s.setProperty("--safari", safariH + "px");
+    $("strip").hidden = !site;
+    $("safari").hidden = !site;
+    $("safari-url").textContent = meta.domain;
+    $("cutout").hidden = d.cutout === "none";
+    $("cutout").className = "cutout " + d.cutout;
+    $("homebar").hidden = d.home !== "bar";
+    $("homebutton").hidden = d.home !== "button";
+    $("sb").className = "sb" + (d.cutout === "none" && !d.ipad ? " center" : "");
+    $("glyphs").innerHTML = GLYPHS;
+    paintBars();
+    fit();
+  }
+  function paintBars() {
+    var d = deviceOf(), site = state.mode === "site", dark = tone() === "dark";
+    $("strip").style.background = stripColor;
+    var darkText = site && lum(stripColor) > 0.6;
+    $("sb").classList.toggle("dark-text", darkText);
+    $("safari").classList.toggle("dark", dark);
+    // over the app's black tab bar the bar is light; over Safari's light bar, dark
+    $("homebar").classList.toggle("dark", site && !dark);
+    if (d) $("sb").style.height = "";
+  }
+  function fit() {
+    var stage = $("stage"), box = $("device-box");
+    var w = box.offsetWidth, h = box.offsetHeight;
+    var sw = stage.clientWidth - 8, sh = stage.clientHeight - 8;
+    var k = Math.min(1, sw / w, sh / h);
+    box.style.transform = "translate(-50%, -50%) scale(" + (k > 0 ? k : 1) + ")";
+  }
+  if (window.ResizeObserver) new ResizeObserver(fit).observe($("stage"));
+  addEventListener("resize", fit);
+
+  function load() {
+    errors = [];
+    showErrors();
+    $("route").textContent = hash || "(start)";
+    $("app").srcdoc = srcdoc();
+  }
+  function showErrors() {
+    $("errors").hidden = !errors.length;
+    $("errors").textContent = errors.slice(-6).join("\n");
+  }
+  addEventListener("message", function (e) {
+    var m = e.data;
+    if (!m || !m.concept || e.source !== $("app").contentWindow) return;
+    var st = stores[storeKey()] || (stores[storeKey()] = {});
+    if (m.type === "hash") { hash = m.hash; $("route").textContent = hash; }
+    else if (m.type === "storage") { if (m.value == null) delete st[m.key]; else st[m.key] = m.value; }
+    else if (m.type === "storage-clear") { stores[storeKey()] = {}; }
+    else if (m.type === "theme-color") { if (m.color) stripColor = m.color; paintBars(); }
+    else if (m.type === "error") { errors.push(m.message); showErrors(); }
+  });
+
+  // ---- controls
+  function seg(el, items, key, onChange) {
+    el.textContent = "";
+    items.forEach(function (it) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.id = el.id + "-" + it.id;
+      b.textContent = it.name;
+      b.setAttribute("aria-pressed", String(state[key] === it.id));
+      b.addEventListener("click", function () {
+        if (state[key] === it.id) return;
+        state[key] = it.id;
+        [].forEach.call(el.children, function (c) { c.setAttribute("aria-pressed", String(c === b)); });
+        onChange();
+      });
+      el.appendChild(b);
+    });
+  }
+  $("version-group").hidden = !hasBefore;
+  if (hasBefore) {
+    seg($("version"), [{ id: "before", name: "Before (" + meta.before + ")" }, { id: "after", name: "After" }], "version", function () { load(); });
+  }
+  seg($("mode"), meta.modes, "mode", function () { remember(); layout(); load(); });
+  meta.devices.forEach(function (d) {
+    var o = document.createElement("option");
+    o.value = d.id; o.textContent = d.name + " · " + d.w + "×" + d.h;
+    $("device").appendChild(o);
+  });
+  $("device").value = state.device;
+  $("device").addEventListener("change", function () {
+    var was = deviceOf();
+    state.device = $("device").value;
+    remember();
+    layout();
+    // the app takes the new size and safe areas without a reload, unless phone and iPad differ (user agent)
+    if (Boolean(was.ipad) !== Boolean(deviceOf().ipad)) load();
+    else $("app").contentWindow.postMessage({ concept: true, type: "device", sa: inset(deviceOf()) }, "*");
+  });
+  [["light", "Light", meta.palettes.lightTheme], ["dark", "Dark", meta.palettes.darkTheme]].forEach(function (g) {
+    var og = document.createElement("optgroup");
+    og.label = g[1];
+    g[2].forEach(function (p) {
+      var o = document.createElement("option");
+      o.value = g[0] + ":" + p.value; o.textContent = g[1] + " · " + p.label;
+      og.appendChild(o);
+    });
+    $("theme").appendChild(og);
+  });
+  $("theme").value = state.theme;
+  if ($("theme").value !== state.theme) { state.theme = "light:" + meta.palettes.lightTheme[0].value; $("theme").value = state.theme; }
+  $("theme").addEventListener("change", function () { state.theme = $("theme").value; remember(); paintBars(); load(); });
+  $("restart").addEventListener("click", function () { stores[storeKey()] = {}; load(); });
+  $("startpage").addEventListener("click", function () { hash = meta.start || ""; load(); });
+
+  layout();
+  load();
+})();
+</script>

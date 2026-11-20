@@ -41,3 +41,12 @@ Notifications.swift needed no change: app.notifyStatus already reports `status` 
   in worker/test-push.mjs only.
 - The D1 `ALTER TABLE` on the live database: tested on Node's SQLite with an old-shaped table, not on Cloudflare D1.
 - The Settings footer was checked by unit tests only, not rendered on a phone.
+
+## Spec review
+
+- Fixed: with notifications denied (and the background check on), the badge hint added a second "Turn On in
+  Settings" row beside the check group's; the badge hint now shows only where no other group carries that fix.
+- Kept: the worker/page changes outside the brief's file list (the push payload was the actual cause) and the
+  iFizBox Updates switch's own group (the one-hint-per-group rule).
+- Known, minor: the push badge and the background check's badge are worked out separately (server vs phone); the
+  page's next count (app.badge) sets the icon to Changes' count either way.

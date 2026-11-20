@@ -1583,7 +1583,8 @@ export function notifyRows(st, now = Date.now(), { push = null, selfAlerts = tru
   const selfRow = { label: self.label, detail: selfAlerts ? "On" : "Off", on: selfAlerts, toggle: "self" };
   // B207: Icon Badge off in iOS (once iOS has been asked): an update alert can't badge the icon, so the group says so
   // with the fix row, and the <NAME> Updates switch takes a group of its own for its footer (one hint per group).
-  const badgeOff = st.badges === false && st.status !== "notDetermined";
+  // Notifications off too, with the check on: its group already says so with the same fix row; one is enough.
+  const badgeOff = st.badges === false && st.status !== "notDetermined" && (st.alerts !== false || st.backgroundOn === false);
   const alertGroups = badgeOff
     ? [{ header: "Update Alerts", rows: [row("Notifications"), row("Icon Badge"), { label: "Turn On in Settings", chevron: true, open: true }],
       footer: "Icon Badge is off in iOS, so update alerts can't show a count on the icon." }, { rows: [selfRow], footer: self.footer }]

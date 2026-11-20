@@ -67,6 +67,13 @@ test("Update Alerts: what iOS allows, the last background check, and a way to Se
   // not asked yet (iOS answers no badges then): nothing to fix in Settings, the group as when on
   const [asked] = notifyRows({ status: "notDetermined", badges: false, alerts: false, backgroundRefresh: true, lastCheck: null }, now);
   assert.deepEqual(rows(asked).map(([l]) => l), ["Notifications", "Icon Badge", `${NAME} Updates`]);
+  // notifications off altogether: the check's group carries the one fix row, not a second one here
+  const denied = notifyRows({ status: "denied", badges: false, alerts: false, backgroundRefresh: true, lastCheck: null }, now);
+  assert.equal(denied.length, 2);
+  assert.equal(denied.flatMap((g) => g.rows).filter((r) => r.label === "Turn On in Settings").length, 1);
+  // ...unless the check is turned off here, when only this group can say it
+  const deniedOff = notifyRows({ status: "denied", backgroundOn: false, badges: false, alerts: false, backgroundRefresh: true }, now);
+  assert.equal(deniedOff[0].rows.at(-1).label, "Turn On in Settings");
   const [alerts, check, extra] = notifyRows({ badges: true, alerts: true, backgroundRefresh: true, lastCheck: null }, now);
   assert.equal(extra, undefined, "no push: two groups");
   assert.equal(alerts.header, "Update Alerts");

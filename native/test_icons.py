@@ -104,5 +104,45 @@ class Bundle(unittest.TestCase):
         self.assertTrue(any("unreadable" in p for p in carfile.icon_problems(self.info, files, APP, lite=False)))
 
 
+def theme_names():
+    """theme-boot.js's dark and light theme names, the themes tools/icons.sh renders an icon for (F322)."""
+    import re
+    with open(os.path.join(HERE, "..", "web", "app", "theme-boot.js")) as f:
+        js = f.read()
+    names = []
+    for var in ("darks", "lights"):
+        m = re.search(var + r"\s*=\s*\[([^\]]*)\]", js)
+        names += re.findall(r'"([a-z0-9-]+)"', m.group(1))
+    return names
+
+
+class ThemeIcons(unittest.TestCase):
+    """F322: icon/themes/<theme>/ holds that theme's icon, plain and LITE, at every size icon/ has."""
+
+    def test_every_theme_plain_and_lite_at_every_size(self):
+        names = theme_names()
+        self.assertGreaterEqual(len(names), 9)
+        for t in names:
+            d = os.path.join(ICON, "themes", t)
+            for src in ("AppIcon", "AppIconLite"):
+                sizes = {"%s%dx%d@%dx.png" % (src, pt, pt, s): pt * s
+                         for pt, scales in carfile.ICON_SIZES.items() for s in scales}
+                sizes[src + "60x60.png"] = 60
+                sizes[src + "1024.png"] = 1024
+                for name, px in sizes.items():
+                    with self.subTest(theme=t, file=name):
+                        with open(os.path.join(d, name), "rb") as f:
+                            self.assertEqual(carfile.png_size(f.read()), (px, px))
+
+    def test_no_stray_theme(self):
+        have = sorted(n for n in os.listdir(os.path.join(ICON, "themes"))
+                      if os.path.isdir(os.path.join(ICON, "themes", n)))
+        self.assertEqual(have, sorted(theme_names()))
+
+    def test_classic_is_the_real_icon(self):
+        for name in ("AppIcon60x60@2x.png", "AppIconLite60x60@3x.png", "AppIcon1024.png", "AppIconLite20x20@2x.png"):
+            self.assertEqual(read(os.path.join("themes", "classic", name)), read(name), name)
+
+
 if __name__ == "__main__":
     unittest.main()

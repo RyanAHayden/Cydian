@@ -12,6 +12,7 @@
 import { DOMAIN, SIGN_HOST } from "../brand.js";
 import { isAts, ATS_TITLE, atsText, INSECURE_IPA_ALERT, insecureText } from "./insecureipa.js"; // B104
 import { signingPage } from "./signingpage.js"; // C15: the sideload build's page is Installation & Signing
+import { developerModeFailure } from "./installroute.js"; // F300
 
 const bytesOf = (b) => (b instanceof Uint8Array ? b : new Uint8Array(b));
 
@@ -452,6 +453,8 @@ export function deviceError(err, name = "") {
   // B104: an http link nothing asked about, and any other ATS refusal: our words, never iOS's raw sentence
   if (code === "insecure") return { title: INSECURE_IPA_ALERT.title, open: null, message: insecureText(name) };
   if (isAts(err)) return { title: ATS_TITLE, open: null, message: atsText(name) };
+  const dm = developerModeFailure(err); // F300: Developer Mode has no Settings row: the failure itself says what to do
+  if (dm) return { ...dm, open: null };
   return { title: name ? `Couldn't Install ${name}` : "Couldn't Install", open: null, message };
 }
 

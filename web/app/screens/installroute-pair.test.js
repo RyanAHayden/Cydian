@@ -149,12 +149,10 @@ test("connect groups: each way's rows and footer (pure)", () => {
   assert.deepEqual(setupGroups("checking", undefined, null)[1], { spinner: "Checking…" });
 });
 
-test("a tap on This iPhone acts at once: checked when known paired, else the pair page, never waiting", () => {
+test("F300: a tap on This iPhone is checked at once, paired or not (Pairing shows right under it), never waiting", () => {
   const did = [];
-  const h = { set: (v) => did.push(["set", v]), open: (p) => did.push(["open", p]) };
-  pickRoute("iphone", { paired: "rp" }, h);
-  pickRoute("iphone", null, h);
-  pickRoute("iphone", { paired: null }, h);
-  pickRoute("server", null, h);
-  assert.deepEqual(did, [["set", "iphone"], ["open", "pair"], ["open", "pair"], ["set", "server"]]);
+  const h = { set: (v) => did.push(v) };
+  pickRoute("iphone", h);
+  pickRoute("server", h);
+  assert.deepEqual(did, ["iphone", "server"]);
 });

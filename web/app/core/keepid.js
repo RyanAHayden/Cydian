@@ -85,7 +85,7 @@ export function profileNotes(profile, { keep = true, name = "", as = "" } = {}) 
       text: `Your profile's App ID (${f.appId}) doesn't have Push Notifications: ${who} keeps its ID but won't get notifications.` });
   }
   notes.push({ id: "one-app", guide: false,
-    text: `Your profile is for one App ID (${f.appId}): use it for one app. Two apps signed with it share their keychain, so their sign-ins mix.` });
+    text: `Your profile's App ID (${f.appId}) covers every app's notifications, but apps signed with it share a keychain and App Groups, so their sign-ins can mix. Make an App ID per app only to keep those apart.` });
   return notes;
 }
 

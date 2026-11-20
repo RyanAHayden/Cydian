@@ -55,7 +55,9 @@ Keep the `.p12` and its password safe: anyone with both can sign as you. The cer
 - Tick **Push Notifications**. App Groups and Associated Domains are worth ticking too, since many apps ask for them.
 - Continue, Register.
 
-One App ID per app: apps signed with the same App ID share a keychain, so they can see each other's sign-ins.
+One App ID with Push covers every app's notifications: iOS registers each app for push under its own Info.plist ID,
+not the App ID. Apps signed with the same App ID do share a keychain and App Groups, so they can see each other's
+sign-ins; make an App ID (and a profile) per app only if you want those kept apart.
 
 If you add a capability to an App ID later, make its profile again (step 5): a profile holds the capabilities the
 App ID had when it was made.

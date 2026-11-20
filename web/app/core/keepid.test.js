@@ -46,6 +46,10 @@ test("profileNotes per profile kind: what it can't do with the ID kept, and the 
   assert.match(profileNotes(ADHOC)[0].text, /doesn't have Push/);
   for (const p of [ADHOC, DEV, PREFIX]) assert.equal(profileNotes(p)[0].guide, true, "links the guide");
   assert.equal(profileNotes(ADHOC_PUSH)[0].guide, false);
+  // one explicit App ID with Push covers every app; an ID per app only keeps keychains and App Groups apart
+  const oneApp = profileNotes(ADHOC_PUSH)[0].text;
+  assert.match(oneApp, /com\.you\.youtube.*covers every app's notifications.*keychain and App Groups.*App ID per app only/);
+  assert.doesNotMatch(oneApp, /use it for one app/);
   // off: one plain warning, whatever the profile
   const off = profileNotes(ADHOC_PUSH, { keep: false, name: "YouTube", as: "com.you.youtube" });
   assert.deepEqual(ids(off), ["old-way"]);

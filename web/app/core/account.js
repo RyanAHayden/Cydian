@@ -1,4 +1,4 @@
-// F97: iFizBox Account. Settings, sources, Ignored Upgrades, installed-app records and the signing certificate kept on
+// F97: iFizBox Account. Settings, sources, Ignored Upgrades, installed-app records, repo sign-ins and the signing certificate kept on
 // the site (brand.js DOMAIN), so a new phone, a reinstall or the website gets them back. No email, no password: the account is a
 // random 128-bit account key made on the device. Everything is encrypted here (AES-GCM, its key from the account key
 // with HKDF) before it leaves, so the server (worker/src/account.js) only ever holds ciphertext; the URL's id is a
@@ -22,7 +22,8 @@
 // ignoredVersions?: ["<id> <version>"] (F281's Ignore This Version, core/settings.js ignoredVersions.lines; a set merged
 // like holds, left out while empty),
 // identity?: { p12, profile (base64url), password, p12Name, profileName } | null (null: no certificate; left out: this
-// build doesn't say), apps: [core/installed.js appRecord], stamps: { "settings.<key>": ms, identity: ms }, savedAt }.
+// build doesn't say), apps: [core/installed.js appRecord], repoLogins?: { "<vendor base>": { token, at } } (F309's repo
+// sign-ins, token only, null a sign-out; rules at mergeLogins), stamps: { "settings.<key>": ms, identity: ms }, savedAt }.
 //
 // Merging: sources, holds, the wish list and apps are sets, merged three ways against what this device last synced ("seen"): the
 // account's list, plus what this device added since, minus what it removed since. So a removal travels too, and a
@@ -173,11 +174,43 @@ export function summarize(p) {
     sources: [...new Set(p?.sources ?? [])].sort(), holds: [...new Set(p?.holds ?? [])].sort(), wishlist: [...new Set(p?.wishlist ?? [])].sort(),
     settings: { ...(p?.settings ?? {}) }, identity: identityPrint(p?.identity),
     apps: Object.fromEntries((p?.apps ?? []).map((r) => [r.id, appVer(r)])), ...versionsField([...new Set(p?.ignoredVersions ?? [])].sort()),
+    ...loginsSummary(p?.repoLogins), // F309
   };
 }
 
 // F281: the ignoredVersions field, only when it holds something (payloads and summaries from before it stay equal).
 const versionsField = (list) => (list?.length ? { ignoredVersions: list } : {});
+
+// ---- F309: repo sign-ins ----------------------------------------------------------------------------------------
+//
+// repoLogins?: { "<vendor base>": { token, at } } — a repo's payment sign-in token (core/payment.js
+// createCredentialStore: Chariz, Havoc, any source with the Payment Provider API), keyed by the vendor's endpoint
+// URL. Only the token travels: the payment secret stays in each iPhone's Keychain. `token: null` is a sign-out,
+// kept so it reaches every device. Merged per repo, last write wins: a repo this device signed in to or out of
+// since the last sync (against "seen", which keeps a fingerprint, never the token) takes the account's entry over
+// unless the account's is newer; otherwise the account's stands. A repo the account doesn't name at all (an
+// older build wrote it) keeps what this device has. Left out while empty, and an older payload reads as none.
+// This device's own payload has { token } per repo it is signed in to (declined tokens too, see payment.js).
+export const loginPrint = (token) => (token ? identityPrint({ p12: "repo", profile: String(token) }) : null);
+const liveLogins = (logins) => Object.fromEntries(Object.entries(logins ?? {}).filter(([, e]) => e?.token).map(([b, e]) => [b, e.token]));
+const loginsSummary = (logins) => {
+  const live = Object.entries(liveLogins(logins)).sort(([a], [b]) => (a < b ? -1 : 1));
+  return live.length ? { repoLogins: Object.fromEntries(live.map(([b, t]) => [b, loginPrint(t)])) } : {};
+};
+const loginsField = (logins) => (Object.keys(logins).length ? { repoLogins: logins } : {});
+
+export function mergeLogins(local = {}, remote = {}, seen = null, now = Date.now()) {
+  const out = {};
+  const mine = liveLogins(local);
+  for (const base of new Set([...Object.keys(remote ?? {}), ...Object.keys(mine)])) {
+    const l = mine[base] ?? null, r = remote?.[base], rTok = r?.token ?? null;
+    const changed = seen ? loginPrint(l) !== (seen.repoLogins?.[base] ?? null) : l !== null;
+    if (changed && l !== rTok && (r?.at ?? 0) <= now) { if (l !== null || r) out[base] = { token: l, at: now }; }
+    else if (r) out[base] = { token: rTok, at: r.at ?? 0 };
+    else if (l !== null) out[base] = { token: l, at: now };
+  }
+  return out;
+}
 
 // (remote + added here since seen) - removed here since seen, the remote order first.
 function mergeSet(remote = [], local = [], seenList = null) {
@@ -195,7 +228,8 @@ export function mergePayload(local, remote, seen = null, now = Date.now()) {
     if (local.identity !== undefined) stamps.identity = now;
     return { v: ACCOUNT_VERSION, sources: [...new Set(local.sources ?? [])], settings: { ...local.settings }, holds: [...new Set(local.holds ?? [])],
       wishlist: [...new Set(local.wishlist ?? [])], ...versionsField([...new Set(local.ignoredVersions ?? [])]),
-      ...(local.identity !== undefined ? { identity: local.identity } : {}), apps: [...(local.apps ?? [])], stamps, savedAt: now };
+      ...(local.identity !== undefined ? { identity: local.identity } : {}), apps: [...(local.apps ?? [])],
+      ...loginsField(mergeLogins(local.repoLogins, {}, null, now)), stamps, savedAt: now };
   }
   const rs = remote.stamps ?? {};
   const settings = {};
@@ -224,7 +258,8 @@ export function mergePayload(local, remote, seen = null, now = Date.now()) {
   return { v: ACCOUNT_VERSION, sources: mergeSet(remote.sources, local.sources, seen?.sources), settings,
     holds: mergeSet(remote.holds, local.holds, seen?.holds),
     wishlist: mergeSet(remote.wishlist, local.wishlist, seen?.wishlist),
-    ...versionsField(mergeSet(remote.ignoredVersions, local.ignoredVersions, seen?.ignoredVersions)), ...(identity !== undefined ? { identity } : {}), apps, stamps, savedAt: now };
+    ...versionsField(mergeSet(remote.ignoredVersions, local.ignoredVersions, seen?.ignoredVersions)), ...(identity !== undefined ? { identity } : {}), apps,
+    ...loginsField(mergeLogins(local.repoLogins, remote.repoLogins, seen, now)), stamps, savedAt: now };
 }
 
 // Whether the account needs writing: what it would hold differs from what it holds (stamps and times aside).
@@ -254,7 +289,14 @@ export function changesFor(local, merged, { syncCert = true } = {}) {
   const addVersions = [...mV].filter((x) => !lV.has(x)), removeVersions = [...lV].filter((x) => !mV.has(x));
   if (addVersions.length) c.addVersions = addVersions;
   if (removeVersions.length) c.removeVersions = removeVersions;
-  c.empty = !c.addSources.length && !c.removeSources.length && !Object.keys(settings).length && !c.addHolds.length &&
+  // F309: repo sign-ins: the account's token for a repo this device holds another (or none) for; a sign-out for one
+  // it holds. payment.js adopt() keeps a sign-in made on this device; these keys only appear when non-empty.
+  const lL = liveLogins(local.repoLogins), mAll = merged.repoLogins ?? {};
+  const adoptLogins = Object.entries(liveLogins(mAll)).filter(([b, t]) => lL[b] !== t).map(([base, token]) => ({ base, token }));
+  const dropLogins = Object.keys(lL).filter((b) => mAll[b] && !mAll[b].token);
+  if (adoptLogins.length) c.adoptLogins = adoptLogins;
+  if (dropLogins.length) c.dropLogins = dropLogins;
+  c.empty = !adoptLogins.length && !dropLogins.length &&!c.addSources.length && !c.removeSources.length && !Object.keys(settings).length && !c.addHolds.length &&
     !c.removeHolds.length && !c.addWishes.length && !c.removeWishes.length && !identity && !c.putApps.length && !c.removeApps.length &&
     !addVersions.length && !removeVersions.length;
   return c;
@@ -320,6 +362,14 @@ export function createAccountSync({ keys, state, collect, apply, api = null, bas
       const after = await collect({ syncCert: s.syncCert });
       const seen = summarize(write && ahead ? merged : remote ?? merged);
       if (after.identity !== undefined && identityPrint(after.identity) !== identityPrint(merged.identity)) seen.identity = identityPrint(after.identity);
+      // F309: likewise a repo sign-in this device kept against the account's (payment.js adopt() keeps its own).
+      const kept = liveLogins(after.repoLogins), took = liveLogins(merged.repoLogins);
+      for (const b of new Set([...Object.keys(kept), ...Object.keys(took)])) {
+        if (kept[b] === took[b]) continue;
+        seen.repoLogins = { ...(seen.repoLogins ?? {}) };
+        if (kept[b]) seen.repoLogins[b] = loginPrint(kept[b]); else delete seen.repoLogins[b];
+        if (!Object.keys(seen.repoLogins).length) delete seen.repoLogins;
+      }
       put({ version, seen, lastSynced: now(), pending: ahead && !write });
       return { changes, wrote: write && ahead };
     }

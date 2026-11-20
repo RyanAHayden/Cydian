@@ -24,23 +24,29 @@ test("every list entry is well formed: a range, a later fix, a CVE page", () => 
   for (const e of EXPLOITABLE_IOS) {
     assert.ok(compareVersions(e.from, e.through) <= 0, e.id);
     assert.ok(compareVersions(e.fixed, e.through) > 0, e.id);
-    assert.match(e.cve, /^CVE-\d{4}-\d{4,}$/);
-    assert.match(e.link, /^https:\/\//);
-    assert.ok(Array.isArray(e.patches));
+    if (e.cve !== null) assert.match(e.cve, /^CVE-\d{4}-\d{4,}$/);
+    assert.match(e.link, /^https:\/\//);    assert.ok(Array.isArray(e.patches));
   }
 });
 
 test("exposureOf: listed versions, the newest fix among overlapping entries, unlisted ones null", () => {
   assert.equal(exposureOf("17.4"), null);
-  assert.equal(exposureOf("16.7"), null);
+  assert.equal(exposureOf("16.7.6"), null);
+  assert.equal(exposureOf("18.7.2"), null);
+  assert.equal(exposureOf("15.8.7"), null);
+  assert.equal(exposureOf("13.7"), null);
   assert.equal(exposureOf(null), null);
   assert.equal(exposureOf("garbage"), null);
   const e = exposureOf("16.2");
-  assert.deepEqual(e.entries.map((x) => x.id).sort(), ["kfd-landa", "kfd-smith-16"]);
-  assert.equal(e.fixed, "16.7");
-  assert.equal(exposureOf("15.1").fixed, "15.7.7");
-  assert.equal(exposureOf("16.6.1").fixed, "16.7");
-  assert.equal(exposureOf("14.8.1").fixed, "15.2");
+  assert.deepEqual(e.entries.map((x) => x.id).sort(), ["coruna-gruber-16", "kfd-landa", "kfd-physpuppet-16", "kfd-smith-16"]);
+  assert.equal(e.fixed, "17.0");
+  assert.equal(exposureOf("15.1").fixed, "15.8.7");
+  assert.equal(exposureOf("15.8.6").fixed, "15.8.7");
+  assert.equal(exposureOf("16.7").fixed, "17.0");
+  assert.equal(exposureOf("16.7.5").fixed, "16.7.6");
+  assert.equal(exposureOf("17.2.1").fixed, "17.3");
+  assert.equal(exposureOf("18.6.2").fixed, "18.7.2");
+  assert.equal(exposureOf("14.8.1").fixed, "15.7.7");
 });
 
 test("exposureDue: sideload and site only, untrusted installs only, once per iOS version", () => {
@@ -63,7 +69,7 @@ test("exposureAlert: plain wording, Software Update only where Settings opens", 
   assert.equal(app.title, "Check Before You Install");
   assert.deepEqual(app.buttons, [SOFTWARE_UPDATE, UNDERSTOOD]);
   assert.match(app.message, /iOS 16\.2 has a known flaw/);
-  assert.match(app.message, /iOS 16\.7 fixes it\./);
+  assert.match(app.message, /iOS 17\.0 fixes it\./);
   const site = exposureAlert(ex);
   assert.deepEqual(site.buttons, [UNDERSTOOD]);
   assert.match(site.message, /Settings > General > Software Update/);

@@ -28,6 +28,14 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
         Push.received(nil, error)
     }
 
+    // B166: iOS only calls this when the app runs without scenes (Info.plist's UIApplicationSceneManifest missing);
+    // with the manifest, URLs come through SceneDelegate. Kept so a build without one still takes files and links.
+    func application(_ app: UIApplication, open url: URL, options: [UIApplication.OpenURLOptionsKey: Any] = [:]) -> Bool {
+        OpenLog.hop("AppDelegate open URL: \(OpenLog.url(url)) (open in place: \(options[.openInPlace] as? Bool ?? false))")
+        Incoming.receive(url)
+        return true
+    }
+
     func application(_ application: UIApplication, configurationForConnecting session: UISceneSession,
                      options: UIScene.ConnectionOptions) -> UISceneConfiguration {
         let c = UISceneConfiguration(name: "Default", sessionRole: session.role)
@@ -54,7 +62,13 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         w.overrideUserInterfaceStyle = Theme.style(Theme.saved.style)
         w.makeKeyAndVisible()
         window = w
-        if let u = options.urlContexts.first?.url { Incoming.receive(u) } // F75: launched by a ifizbox:// link
+        // F75: launched by a ifizbox:// link; B166: or a file another app handed over (Open in iFizBox). Every one,
+        // logged (OpenLog), and a launch with none says so too: the trail then shows whether iOS handed anything over.
+        OpenLog.scene("launched: \(options.urlContexts.count) URL(s), \(options.userActivities.count) activity(ies)\(options.sourceApplication.map { ", from \($0)" } ?? "")")
+        for c in options.urlContexts {
+            OpenLog.hop("SceneDelegate willConnectTo: \(OpenLog.url(c.url)) (open in place: \(c.options.openInPlace), from \(c.options.sourceApplication ?? "?"))")
+            Incoming.receive(c.url)
+        }
         if let item = options.shortcutItem { Shortcut.perform(item.type) } // launched from the icon's Upgrade All
         Replaced.watch()
     }
@@ -67,7 +81,18 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     }
 
     func scene(_ scene: UIScene, openURLContexts URLContexts: Set<UIOpenURLContext>) {
-        for c in URLContexts { Incoming.receive(c.url) }
+        for c in URLContexts {
+            OpenLog.hop("SceneDelegate openURLContexts: \(OpenLog.url(c.url)) (open in place: \(c.options.openInPlace), from \(c.options.sourceApplication ?? "?"))")
+            Incoming.receive(c.url)
+        }
+    }
+
+    // B166: context for the trail: iFizBox came forward (a hand-off that never arrives shows as this line alone).
+    func sceneWillEnterForeground(_ scene: UIScene) { OpenLog.scene("came forward") }
+
+    // B166: a hand-off as a user activity (none expected for files; logged so a report would show one).
+    func scene(_ scene: UIScene, continue userActivity: NSUserActivity) {
+        OpenLog.hop("SceneDelegate continue: activity \(userActivity.activityType)\(userActivity.webpageURL.map { " " + OpenLog.url($0) } ?? "")")
     }
 }
 
@@ -80,11 +105,32 @@ enum Incoming {
     private static var pending: String?
 
     static func receive(_ url: URL) {
+        OpenLog.hop("Incoming: \(OpenLog.url(url))")
         if SharedInbox.receive(url) { return } // N9: shared .ipa/.deb files and the share extension's links
         if MyIPAs.receive(url) { return } // F77: an .ipa file goes into My IPAs, which then sends ifizbox://myipas
-        guard IncomingLink.accepts(url) || OtherLink.accepts(url) else { return } // F83: other sideloaders' links too
+        if url.isFileURL {
+            // B166: a file nothing above took: say so, never silence.
+            OpenLog.hop("Incoming: error: no handler for the file \(url.lastPathComponent)")
+            return SharedInbox.refuse(OpenTrail.unhandled(url.lastPathComponent))
+        }
+        guard IncomingLink.accepts(url) || OtherLink.accepts(url) else { // F83: other sideloaders' links too
+            OpenLog.hop("Incoming: error: not a link \(Brand.name) takes; dropped")
+            return openLogReady()
+        }
         pending = url.absoluteString
+        OpenLog.hop("Incoming: waiting for the page to take it")
         notify(tries: 50)
+    }
+
+    // B166: a hand-off ended without a link for the page: tell it to take the trail (app.takeOpenLog) now.
+    static func openLogReady() {
+        DispatchQueue.main.async {
+            let web = UIApplication.shared.connectedScenes
+                .compactMap { ($0 as? UIWindowScene)?.windows.first?.rootViewController?.view as? WKWebView }.first
+            guard let web, !web.isLoading, web.url != nil else { return } // the page takes it at start
+            web.callAsyncJavaScript("window.dispatchEvent(new Event('ifizbox:openlog'))", arguments: [:], in: nil, in: .page,
+                                    completionHandler: nil)
+        }
     }
 
     // The page's hash-style wake-up, as Notifications.open does: wait for the web view to finish loading.
@@ -93,6 +139,7 @@ enum Incoming {
             .compactMap { ($0 as? UIWindowScene)?.windows.first?.rootViewController?.view as? WKWebView }.first
         guard let web, !web.isLoading, web.url != nil else {
             if tries > 0 { DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { notify(tries: tries - 1) } }
+            else { OpenLog.hop("Incoming: the page wasn't ready in 10 s; it takes the link when it starts") }
             return
         }
         web.callAsyncJavaScript("window.dispatchEvent(new Event('ifizbox:url'))", arguments: [:], in: nil, in: .page,
@@ -118,8 +165,13 @@ enum Incoming {
             DispatchQueue.main.async {
                 let u = pending
                 pending = nil
+                if let u, let url = URL(string: u) { OpenLog.hop("Incoming: the page took \(OpenLog.url(url))") }
                 c.reply(u.map { ["url": $0] }, nil)
             }
+        }
+        // B166: the hand-off trail for Settings > Console Logs (web/app/incoming.js openLog).
+        b.on("app.takeOpenLog") { c in
+            Apt.work(c) { ["lines": OpenLog.trail.take()] } // not SharedInbox.queue: a big copy holds that one
         }
         b.on("app.gunzip") { c in
             guard let d = (c.params["data"] as? String).flatMap({ Data(base64Encoded: $0) }) else {

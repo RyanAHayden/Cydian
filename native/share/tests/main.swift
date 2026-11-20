@@ -434,5 +434,39 @@ test("http stream: Content-Length, chunked, close-delimited, any split") {
     check(fails("HTTP/1.1 200 OK\r\n" + String(repeating: "X-A: b\r\n", count: 5000)) != nil, "endless header")
 }
 
+test("B166: the hand-off trail: hops in order, lifecycle lines kept as context, capped, links without their values") {
+    let dir = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("trail-" + UUID().uuidString)
+    defer { try? fm.removeItem(at: dir) }
+    let file = dir.appendingPathComponent("sub/open.log")
+    var t = Date(timeIntervalSince1970: 0)
+    let trail = OpenTrail(file: file, max: 6, keepScene: 2, clock: { t })
+    // only lifecycle lines: nothing to take, the newest keepScene stay
+    for i in 0..<4 { trail.add("came forward \(i)", scene: true) }
+    check(trail.take() == [], "lifecycle only: no entry")
+    check(trail.lines().count == 2 && trail.lines()[1].hasSuffix("came forward 3"), "kept: \(trail.lines())")
+    check(trail.lines().allSatisfy(OpenTrail.isScene), "scene lines marked")
+    // a hand-off: everything since the last take, in order, then empty; on disk, so a new OpenTrail reads it
+    t = Date(timeIntervalSince1970: 1.5)
+    trail.add("Incoming: file …/Downloads/A.ipa")
+    trail.add("SharedInbox: took A.ipa\nsecond line")
+    check(OpenTrail(file: file).lines().count == 4, "persisted")
+    let got = trail.take()
+    check(got.count == 4 && got[2].hasSuffix("Incoming: file …/Downloads/A.ipa") && !OpenTrail.isScene(got[2]), "\(got)")
+    check(got[3].hasSuffix("took A.ipa second line"), "one line per hop: \(got[3])")
+    check(got[3].contains(":01.500  "), "time stamp: \(got[3])") // local time: only the seconds are known here
+    check(trail.take() == [] && trail.lines() == [], "taken")
+    // capped at max, the newest kept
+    for i in 0..<10 { trail.add("hop \(i)") }
+    let capped = trail.lines()
+    check(capped.count == 6 && capped.first!.hasSuffix("hop 4") && capped.last!.hasSuffix("hop 9"), "\(capped)")
+    // describe: a file's folder and name; a link's route but no other values
+    check(OpenTrail.describe(URL(fileURLWithPath: "/private/var/mobile/Library/Mobile Documents/com~apple~CloudDocs/Downloads/Y.ipa")) == "file …/Downloads/Y.ipa", "file")
+    let link = URL(string: "ifizbox://shared?route=sign-ipa&file=Y.ipa&name=Secret")!
+    check(OpenTrail.describe(link) == "ifizbox://shared?route=sign-ipa&file&name", OpenTrail.describe(link))
+    check(OpenTrail.describe(URL(string: "ifizbox://account?k=KEY")!) == "ifizbox://account?k", "no key in the log")
+    check(OpenTrail.describe(URL(string: "feather://install/https://x/y.ipa")!).hasPrefix("feather://install/"), "path kept")
+    check(OpenTrail.unhandled("notes.txt").contains("notes.txt"), "unhandled names the file")
+}
+
 print(failures == 0 ? "all passed" : "\(failures) failed")
 exit(failures == 0 ? 0 : 1)

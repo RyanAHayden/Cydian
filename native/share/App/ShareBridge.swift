@@ -56,12 +56,32 @@ struct PhoneSigner: ShareSigner {
     }
 }
 
+// B166: the hand-off's trail (../Share.swift OpenTrail), in mobile's / the app's Caches. Any thread.
+//   OpenLog.hop(text)    a step a URL took ("error: …" for a failure)
+//   OpenLog.scene(text)  a lifecycle line (launched, came forward), context for the next hand-off
+//   app.takeOpenLog      -> {lines: [String]} since the last take ([] when only lifecycle lines came); the page puts
+//                        them in Settings > Console Logs (web/app/incoming.js openLog)
+// Once a hand-off has ended (the link handed to the page, or its alert), "ifizbox:openlog" on window tells the page.
+enum OpenLog {
+    static let trail: OpenTrail = {
+        let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+        return OpenTrail(file: caches.appendingPathComponent("com.ryha.ifizbox/open.log"))
+    }()
+    static func hop(_ text: String) { trail.add(text) }
+    static func scene(_ text: String) { trail.add(text, scene: true) }
+    static func url(_ u: URL) -> String { OpenTrail.describe(u) }
+}
+
 enum SharedInbox {
     static let queue = DispatchQueue(label: "com.ryha.ifizbox.share", qos: .userInitiated)
     static let dirs = ShareDirs()
 
     static func receive(_ url: URL) -> Bool {
-        if url.scheme?.lowercased() == "ifizbox", url.host?.lowercased() == "share" { link(url); return true }
+        if url.scheme?.lowercased() == "ifizbox", url.host?.lowercased() == "share" {
+            OpenLog.hop("SharedInbox: a link from the share extension")
+            link(url)
+            return true
+        }
         guard url.isFileURL else { return false }
         let host = PhoneShareHost()
         let ext = url.pathExtension.lowercased()
@@ -69,12 +89,18 @@ enum SharedInbox {
         // (the page's Install asks signing.status, as Settings > Signing does).
         if host.mode == .sideload, ext == "ipa" || ext == "tipa" {
             let docs = MyIPAs.library.root.standardizedFileURL.resolvingSymlinksInPath().path
-            if url.standardizedFileURL.resolvingSymlinksInPath().deletingLastPathComponent().path == docs { return false }
+            if url.standardizedFileURL.resolvingSymlinksInPath().deletingLastPathComponent().path == docs {
+                OpenLog.hop("SharedInbox: already in Documents, for My IPAs")
+                return false
+            }
         }
         // B163: the sideload build opens documents in place (Info-sideload.plist), so a file from Safari's download
         // preview or Files is the other app's, reachable only through the URL's security scope. Start it here, on
         // the main thread, as iOS hands the URL over; file() ends it once the copy is made.
         let scoped = url.startAccessingSecurityScopedResource()
+        OpenLog.hop("SharedInbox: took \(url.lastPathComponent) (\(host.mode == .sideload ? "sideload" : "jailbreak") build, security scope \(scoped ? "started" : "not needed or refused"))")
+        // B166: the HUD at once, so the person sees the file arrived even while the file provider brings it down.
+        Incoming.receiving(String(url.lastPathComponent.prefix(60)), progress: 0)
         queue.async { file(url, host, scoped: scoped) }
         return true
     }
@@ -83,16 +109,19 @@ enum SharedInbox {
     static func file(_ url: URL, _ host: PhoneShareHost, scoped: Bool = false) {
         defer { if scoped { url.stopAccessingSecurityScopedResource() } }
         let name = url.lastPathComponent
+        defer { Incoming.receiving(String(name.prefix(60)), progress: nil) } // B166: the HUD goes, whatever the end
         // B163: a file provider's file (iCloud Drive's Downloads, where Safari saves) is read under a file
         // coordinator, which also brings it down when only its placeholder is on the phone.
         var coordError: NSError?
         var handled = false
+        OpenLog.hop("SharedInbox: waiting for the file (file coordinator)")
         NSFileCoordinator(filePresenter: nil).coordinate(readingItemAt: url, options: .withoutChanges, error: &coordError) { u in
             handled = true
+            OpenLog.hop("SharedInbox: file ready at \(OpenLog.url(u))")
             read(u, original: url, host)
         }
         if !handled {
-            Incoming.receiving(name, progress: nil)
+            OpenLog.hop("SharedInbox: error: the file coordinator refused it: \(coordError?.localizedDescription ?? "no reason given")")
             refuse(ShareInbox.unreadable(name, coordError))
         }
     }
@@ -104,9 +133,13 @@ enum SharedInbox {
             let h = try FileHandle(forReadingFrom: url)
             defer { try? h.close() }
             head = h.readData(ofLength: 512)
-        } catch { return refuse(ShareInbox.unreadable(name, error)) }
+        } catch {
+            OpenLog.hop("SharedInbox: error: can't open it: \(error.localizedDescription)")
+            return refuse(ShareInbox.unreadable(name, error))
+        }
         let item = ShareClassifier.classify(file: url, head: head)
         let route = ShareRouter.route(item, host)
+        OpenLog.hop("SharedInbox: read \(head.count) bytes: \(item.kind), route \(route.name)")
         // iOS's Documents/Inbox copy is ours: moved, or removed once handled. B163: only our own Inbox, never a
         // folder of the user's that happens to be called Inbox.
         let inbox = ShareInbox.isOurInbox(original, documents: MyIPAs.library.root)
@@ -122,8 +155,10 @@ enum SharedInbox {
         } catch {
             Incoming.receiving(name, progress: nil)
             let why = (error as? IntentFailure)?.message ?? "\(Brand.name) couldn't keep a copy of \(item.name): \(error.localizedDescription)"
+            OpenLog.hop("SharedInbox: error: couldn't keep it: \(why)")
             return refuse(why)
         }
+        if let staged { OpenLog.hop("SharedInbox: kept as \(staged)") }
         hand(ShareRouter.link(route, file: staged))
     }
 
@@ -156,7 +191,12 @@ enum SharedInbox {
     }
 
     static func hand(_ link: URL?) {
-        guard let link else { return }
+        guard let link else {
+            // B166: never silence: a route without a link would have dropped the file without a word.
+            OpenLog.hop("SharedInbox: error: no link for the page")
+            return refuse("\(Brand.name) didn't know what to do with that.")
+        }
+        OpenLog.hop("SharedInbox: handing the page \(OpenLog.url(link))")
         DispatchQueue.main.async { Incoming.receive(link) }
     }
 

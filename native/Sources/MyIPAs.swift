@@ -215,6 +215,7 @@ enum MyIPAs {
         guard url.isFileURL, url.pathExtension.lowercased() == "ipa", AppMode.current == .sideload else { return false }
         // B163: the security scope from the moment iOS hands the URL over (documents open in place), not later.
         let scoped = url.startAccessingSecurityScopedResource()
+        OpenLog.hop("MyIPAs: took \(url.lastPathComponent)")
         SignBridge.queue.async {
             defer { if scoped { url.stopAccessingSecurityScopedResource() } }
             let docs = library.root.standardizedFileURL.resolvingSymlinksInPath().path
@@ -227,13 +228,16 @@ enum MyIPAs {
                 // page's Copying HUD, and an alert when it fails, never silence).
                 do { file = try SharedInbox.keep(url, name: url.lastPathComponent, move: ShareInbox.isOurInbox(url, documents: library.root)) } catch {
                     Incoming.receiving(url.lastPathComponent, progress: nil)
+                    OpenLog.hop("MyIPAs: error: couldn't keep it: \(error)")
                     return SharedInbox.refuse((error as? IntentFailure)?.message ?? "\(Brand.name) couldn't keep a copy of \(url.lastPathComponent): \(error.localizedDescription)")
                 }
             }
             guard var q = URLComponents(string: "ifizbox://myipas") else { return }
             let f = file
             q.queryItems = [URLQueryItem(name: "file", value: f)]
-            if let link = q.url { DispatchQueue.main.async { Incoming.receive(link) } }
+            guard let link = q.url else { return SharedInbox.refuse("\(Brand.name) couldn't open \(f) in My IPAs.") }
+            OpenLog.hop("MyIPAs: handing the page \(OpenLog.url(link))")
+            DispatchQueue.main.async { Incoming.receive(link) }
         }
         return true
     }

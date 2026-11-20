@@ -2,6 +2,7 @@
 __pycache__/
 /ref
 *.deb
+!/web/app/core/fixtures/tweaks/*.deb
 *.ipa
 .env
 .venv/

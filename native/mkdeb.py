@@ -267,9 +267,12 @@ def check(path):
     for need in ("index.html", "app.js", "style.css", "router.js"):
         if need not in web:
             problems.append("web/%s missing from the bundle" % need)
-    tests = sorted(n for n in web if n.endswith(".test.js"))
+    tests = sorted(n for n in web if n.endswith((".test.js", ".test.mjs")))
     if tests:
         problems.append("tests shipped in the bundle: %s" % ", ".join(tests))
+    fixtures = sorted(n for n in web if n.startswith("core/fixtures/"))
+    if fixtures:
+        problems.append("test fixtures shipped in the bundle (%d): %s" % (len(fixtures), ", ".join(fixtures[:5])))
     summary = "%s %s (%s): %d web files, %s" % (fields.get("Package"), fields.get("Version"),
                                                fields.get("Architecture"), len(web), summary)
     return problems, summary

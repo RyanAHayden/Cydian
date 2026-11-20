@@ -132,7 +132,9 @@ bundle() {
     echo "native build: WARNING no ldid or rcodesign; $app/$BRAND_NAME is ad hoc signed without entitlements" >&2
   fi
   # web/app/ goes in as it is, minus the tests and the website's zsign WebAssembly (F93: the app signs natively).
-  (cd ../web/app && find . -type f ! -name '*.test.js' ! -name '.*' ! -path './vendor/zsign/*' -print0) |
+  # Test fixtures (core/fixtures/: test .p12s, a tiny IPA) stay out too; mkdeb.py/mkipa.py check refuse them.
+  (cd ../web/app && find . -type f ! -name '*.test.js' ! -name '*.test.mjs' ! -name '.*' ! -path './vendor/zsign/*' \
+    ! -path './core/fixtures/*' -print0) |
     while IFS= read -r -d '' f; do mkdir -p "$app/web/$(dirname "$f")" && cp "../web/app/$f" "$app/web/$f"; done
   ../tools/buildinfo.sh "$(cd "$app/web" && pwd)" >/dev/null # version and commit for Home's footer
   # The bundled web/ must start (web/app/startup.test.js, skipped without Chromium): a module that fails to load

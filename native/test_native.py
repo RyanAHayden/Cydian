@@ -158,6 +158,11 @@ class Deb(unittest.TestCase):
         self.write(self.app, "web/router.test.js", b"x")
         self.assertTrue(any("tests shipped" in p for p in self.problems()))
 
+    def test_fixtures_in_bundle_flagged(self):
+        os.makedirs(os.path.join(self.app, "web/core/fixtures"))
+        self.write(self.app, "web/core/fixtures/test.p12", b"x")
+        self.assertTrue(any("test fixtures shipped" in p for p in self.problems()))
+
     def test_wrong_binary_flagged(self):
         self.write(self.app, "iFizBox", fake_macho(cpu=0x01000007, minos=(14, 0), signed=False), 0o755)
         p = " | ".join(self.problems())

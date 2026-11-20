@@ -160,6 +160,10 @@ class Ipa(unittest.TestCase):
         self.assertIn("tests shipped", p)
         self.assertIn("web/router.js missing", p)
 
+    def test_fixtures_flagged(self):
+        self.write("web/core/fixtures/signing/test.p12", b"x")
+        self.assertTrue(any("test fixtures shipped" in x for x in self.problems()))
+
     def test_missing_bridge_flagged(self):
         os.remove(os.path.join(self.app, "bridge.js"))
         self.assertTrue(any("bridge.js missing" in x for x in self.problems()))

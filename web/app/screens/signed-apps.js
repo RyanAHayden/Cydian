@@ -11,6 +11,7 @@ import { showAlert, alertOK } from "../nav/alert.js";
 import { liveHUD } from "../nav/hud.js";
 import { certificateWarnings, revocationLabel, resignLabel, signedAppRows, deviceError, callWithStall } from "../core/signing.js";
 import { resignJob } from "../core/appqueue.js";
+import { signedAppsNamed } from "../core/installed.js"; // B150
 import { getServer, chooseRoute } from "../signing-client.js";
 
 let styled = false;
@@ -75,7 +76,7 @@ async function check({ redraw, native, alert, hud }) {
 async function fillApps(box, { identity, redraw, native, alert, hud, dates = true }) {
   let installed;
   try {
-    installed = await native.call("signing.installed", {});
+    installed = await signedAppsNamed(native); // B150: a source app keeps its source name
   } catch {
     return; // an older shell without the call: no list
   }

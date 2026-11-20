@@ -70,6 +70,7 @@ import { detectMode } from "../core/settings.js";
 import { apps, appRows, appUpgrades, removeInstall, onAppsChange, MODES, MODE_LABEL, TYPES, modeRows, typeRows, queryRows,
   dayHeaders, dayLabel, markedRows, manageKinds, manageable, presetIds, selectSheet, selectLabel, manageCounts, manageSummary,
   manageToolbar, pruneSelection, SELECT } from "../core/installed.js";
+import { signedAppsNamed } from "../core/installed.js"; // B150
 import { mediaUrl } from "./depiction.js";
 import { rememberedApps } from "../app-updates.js";
 import { signatureState, signedIndex, resignWindow } from "../core/signing.js";
@@ -605,7 +606,7 @@ export function withSignatures(rows, installed, { now = new Date(), window, show
 // signing.installed in the sideload app; null anywhere else or when the call fails.
 async function signedApps(native = globalThis.ifizboxNative) {
   if (detectMode() !== "sideload" || typeof native?.call !== "function") return null;
-  try { return await native.call("signing.installed", {}); } catch { return null; }
+  try { return await signedAppsNamed(native); } catch { return null; } // B150: a source app keeps its source name
 }
 
 async function loadApps() {

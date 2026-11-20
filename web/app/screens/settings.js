@@ -37,6 +37,7 @@ import { accountSection, drawAccount, startAccountSync } from "./account.js";
 import { signingExtras } from "./signed-apps.js";
 import { syncReminder } from "../core/signing.js";
 import { websiteSection } from "./website-settings.js";
+import { pushSection } from "./push-settings.js";
 import { versionLines } from "./version-foot.js";
 import { ipaSection } from "./ipa-install.js";
 import { otherLinksOn, setOtherLinks } from "../core/otherlinks.js";
@@ -174,6 +175,7 @@ function groupPage(id) {
   if (id === "general") frag.append(sideloadingSection()); // F83, sideload build
   if (id === "general") frag.append(websiteSection()); // F145: Lock Home, Install on the Website; website only
   if (id === "updates") frag.append(notifySection()); // Update Alerts, sideload build
+  if (id === "updates") frag.append(pushSection()); // F280: Push Notifications, sideload build (push-settings.js)
   return frag;
 }
 

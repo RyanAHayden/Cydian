@@ -66,9 +66,10 @@ export async function runSignJob(createZsign, { ipa, p12, password = "", profile
   // install link was opened for it, and an IPA under an older ID (0.9.3's) left iOS waiting on a link
   // nothing filled, then a second prompt from Ready to Install (user 2026-11-18).
   const own = appBundleId || info.bundleId;
-  // F237: Keep Bundle IDs (keepBundleId, on unless the user turned it off). iFizBox's own IPA keeps the old way here:
-  // the website can't see under which ID an earlier iFizBox went in, and an update must replace it.
-  const { bundleId, entitlementsId } = signingIds(prof.appId, own, { keep: keepBundleId !== false && own !== IFIZBOX_ID });
+  // F237: Keep Bundle IDs (keepBundleId, on unless the user turned it off). F280: iFizBox's own IPA keeps its ID too:
+  // APNs delivers by the Info.plist ID, so only a copy that kept it gets push notifications. One installed earlier
+  // under the profile's ID stays beside it (the app says so once, core/push.js renamedUpdateNotice).
+  const { bundleId, entitlementsId } = signingIds(prof.appId, own, { keep: keepBundleId !== false });
   // App extensions (PlugIns, a Watch app) come out: zsign gives every binary the app's own entitlements, which don't
   // match an extension's bundle ID, and iOS then refuses the app ("its integrity could not be verified", user
   // 2026-11-18, iFizBox's Share and Widget). The app's own Sign Options do the same with Remove App Extensions.

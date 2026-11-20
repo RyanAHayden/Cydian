@@ -948,8 +948,8 @@ export async function uploadSigned(bytes, { bundleId, name, version }, { base = 
 export const EARLY_WINDOW = 8 * 60 * 1000;
 
 // The bundle ID `id`'s profile signs this app as, when it's known before signing; else null.
-// F237: with Keep Bundle IDs (keep), that is the app's own ID when the caller knows it (websign-job.js keeps
-// iFizBox's own IPA the old way, so its prediction stays the profile's).
+// F237: with Keep Bundle IDs (keep), that is the app's own ID when the caller knows it (F280: iFizBox's own IPA
+// too, as websign-job.js now signs it).
 export function expectedBundleId(id, { url = "", bundleId = null, keep = storedKeep() } = {}) {
   // Only a password known to open the .p12: a sign that fails after iOS was sent to the link leaves iOS waiting, and
   // it gives up with "the certificate for <domain> is not valid" (user 2026-11-18). Unchecked (null, e.g. synced from
@@ -959,7 +959,7 @@ export function expectedBundleId(id, { url = "", bundleId = null, keep = storedK
     const { appId } = profileInfo(id.profile instanceof Uint8Array ? id.profile : new Uint8Array(id.profile));
     if (!appId) return null;
     const own = bundleId || (isSelfIpa(url) ? IFIZBOX_ID : null);
-    if (keep && own && own !== IFIZBOX_ID) return own;
+    if (keep && own) return own;
     if (keep && !own) return null; // its own ID comes with the download
     if (!appId.includes("*")) return appId;
     return own ? targetBundleId(appId, own) : null;

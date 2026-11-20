@@ -55,6 +55,7 @@ import { reviews, isReviewsPath } from "./reviews.js";
 import { udid, isUdidPath } from "./udid.js";
 import { appleRelay, isApplePath } from "./apple-relay.js";
 import { setup, isSetupPath } from "./setup.js";
+import { push, isPushPath, scheduled as pushScheduled } from "./push.js";
 import { NAME, GITHUB_REPO, DOMAIN } from "../../web/app/brand.js";
 
 const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
@@ -717,6 +718,8 @@ export async function ipaInfo(u, env = {}, { fetcher = fetch, cache = env.LOOKUP
 const token = () => [...crypto.getRandomValues(new Uint8Array(24))].map((b) => b.toString(16).padStart(2, "0")).join("");
 
 export default {
+  // F280: the Cron Trigger (wrangler.toml [triggers]): the push check (src/push.js), off without an APNs key.
+  async scheduled(event, env, ctx) { await pushScheduled(event, env, ctx); },
   async fetch(req, env, ctx) {
     const u = new URL(req.url);
     const ttl = Math.max(60, Number(env.TTL) || 600);
@@ -724,6 +727,7 @@ export default {
     if (isReviewsPath(u.pathname)) return reviews(req, env); // F182: user reviews (src/reviews.js)
     if (isUdidPath(u.pathname)) return udid(req, env); // F253: this iPhone's UDID via a profile (src/udid.js)
     if (isApplePath(u.pathname)) return appleRelay(req, env); // F251: Apple sign-in relay (src/apple-relay.js)
+    if (isPushPath(u.pathname)) return push(req, env); // F280: push notifications (src/push.js)
     if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
 
     if (u.pathname === "/api/fetch" && req.method === "GET") return apiFetch(u, uploadCap(env), env.GITHUB_TOKEN ?? null, env, req.headers.get("Range"));

@@ -79,6 +79,15 @@ Then put that `https://` address in **Settings > Installation & Signing > Signin
   Authorization header (your JWT) goes out and DELETE is allowed (an old profile, before its new one). The caps and
   the same-origin rule apply as above, and nothing is logged or kept.
 
+- **Push notifications** (`src/push.js`, `docs/push.md`): the sideload app's update alerts, sent through Apple's push
+  service. They need an **APNs Auth Key** from the Apple Developer team that owns your iFizBox's App ID
+  (developer.apple.com > Keys > + > Apple Push Notifications service; an App Store Connect API key can't do it):
+  `npx wrangler secret put APNS_KEY` (paste the `AuthKey_<id>.p8` file's text), then `APNS_KEY_ID` and
+  `APNS_TEAM_ID`, and `APNS_TOPICS` if your iFizBox runs under another bundle ID than `com.ryha.ifizbox`. The
+  devices are kept in the `PUSH` D1 database (made on the first deploy) and checked every 30 minutes (the Cron
+  Trigger in `[triggers]`). Without the key push stays off on your server, the app's Settings says so, and update
+  alerts come from the app's own background check. `node.mjs` has no push.
+
 ## Routes
 
 | | |

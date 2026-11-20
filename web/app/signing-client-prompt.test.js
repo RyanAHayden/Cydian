@@ -188,7 +188,7 @@ test("signInBrowser: a prompt that was answered (no cancel) carries on into watc
     hud: hr.make, alert: async () => ({ index: 0 }), open: () => {}, go: () => {},
     now: () => ID, identity: async () => ID, fetcher: srv.fetcher, transfer: async () => null, origin: () => "https://ifizbox.example",
     phone: async () => null, prompt: fakePrompt,
-    worker: async () => ({ ok: true, ipa: new Uint8Array([0x50, 0x4b, 1, 2]), bundleId: "com.you.ifizbox", name: "iFizBox", version: "1" }),
+    worker: async () => ({ ok: true, ipa: new Uint8Array([0x50, 0x4b, 1, 2]), bundleId: "com.ryha.ifizbox", name: "iFizBox", version: "1" }),
     watch: (token) => { watched = token; return { first: Promise.resolve() }; },
   };
   // the upload's done answers with a link

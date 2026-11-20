@@ -35,6 +35,18 @@ simple = { limit = 12, period = 60 }
 binding = "REVIEWS"
 database_name = "ifizbox-reviews"
 
+# F280: push notifications (src/push.js, docs/push.md): devices and what they follow, in their own D1 database (made
+# on the first deploy, like REVIEWS). Push stays off until you add an APNs Auth Key from the Apple team that owns the
+# topic's App ID: `npx wrangler secret put APNS_KEY` (the AuthKey_<id>.p8 file's text), then APNS_KEY_ID and
+# APNS_TEAM_ID (secrets or [vars]), and APNS_TOPICS if your iFizBox runs under another bundle ID.
+[[d1_databases]]
+binding = "PUSH"
+database_name = "ifizbox-push"
+
+# F280: the push check runs every 30 minutes (it does nothing without an APNs key).
+[triggers]
+crons = ["*/30 * * * *"]
+
 # F182: review writes (posts, reports) per address across isolates; keep limit at REVIEW_WRITES.
 [[ratelimits]]
 name = "REVIEW_RATE_LIMIT"

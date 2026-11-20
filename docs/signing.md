@@ -517,8 +517,10 @@ Notifications:
   (`signing-client.js libraryCall`), `IPALibrary.options(_:keep:)` signs with it, and a signed copy made the other way
   no longer counts. `library.list` answers `options.keepBundleId` null for such an IPA, so the IPA queue's job
   (`core/appqueue.js libraryJob`) leaves it to the setting and sends a saved switch as it is.
-- iFizBox's own IPA keeps its ID only when the running iFizBox has it (`SignOptions.keeps`); on the website it is
-  always signed the old way (the website can't see under which ID an earlier one went in).
+- iFizBox's own IPA keeps `com.ryha.ifizbox` like any other app (`SignOptions.keeps`, `websign-job.js`): push
+  notifications reach only a copy with that Info.plist ID (docs/push.md). On a copy installed earlier under the
+  profile's ID, the update installs beside it; the app says so once before signing (`core/push.js
+  renamedUpdateNotice`), and the old copy is deleted by hand.
 - Warnings (`core/keepid.js profileNotes`, under the switch and in Custom Install): a wildcard profile (Apple gives
   it no Push), a development one (sandbox push only), an App ID without Push, and an explicit App ID's shared
   keychain (apps signed with one App ID share their keychain; their notifications are not affected). Custom Install also warns when the original (same ID, not signed by iFizBox:

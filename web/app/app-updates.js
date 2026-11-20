@@ -27,6 +27,7 @@ import { SELF_ALT_URL } from "./core/essential.js";
 import { rememberedUpgrades, mergeUpgrades, watchList, upgradeKeys, altSourceOf, SELF_ID, splitIgnoredVersions,
   settleIgnoredVersions } from "./core/appupdates.js";
 import { NAME } from "./brand.js";
+import { syncPush } from "./core/push.js";
 
 let lastSent = null;
 
@@ -107,6 +108,8 @@ export async function withAppUpgrades(upgrades, holds = [], { mode = detectMode(
     if (json !== lastSent) {
       lastSent = json;
       Promise.resolve().then(() => native.call("updates.watch", watch)).catch(() => { lastSent = null; });
+      // F280: the push server (the signing server) follows the same list (core/push.js; does nothing while Push is off)
+      import("./signing-client.js").then((s) => syncPush({ native, watch, server: s.getServer() })).catch(() => {});
     }
   }
   return merged;

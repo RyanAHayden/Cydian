@@ -40,7 +40,7 @@ function deps(id, over = {}) {
     go: () => {},
     now: () => id,
     identity: async () => { log.order.push("identity"); return id; },
-    worker: async () => ({ ok: true, ipa: new Uint8Array([0x50, 0x4b, 1, 2, 3]), bundleId: "com.you.ifizbox", name: "iFizBox", version: "0.4" }),
+    worker: async () => ({ ok: true, ipa: new Uint8Array([0x50, 0x4b, 1, 2, 3]), bundleId: "com.ryha.ifizbox", name: "iFizBox", version: "0.4" }),
     transfer: async () => null,
     origin: () => "https://ifizbox.example",
     ...over,
@@ -48,12 +48,12 @@ function deps(id, over = {}) {
   return { d, log };
 }
 
-test("F237: expectedBundleId with Keep Bundle IDs (the default): the app's own ID when known; iFizBox's own the old way", () => {
+test("F237: expectedBundleId with Keep Bundle IDs (the default): the app's own ID when known, iFizBox's own too (F280)", () => {
   assert.equal(expectedBundleId(idFor("com.you.app"), { url: "https://x/a.ipa", bundleId: "io.dev.delta" }), "io.dev.delta");
   assert.equal(expectedBundleId(idFor("com.you.*"), { url: "https://x/a.ipa", bundleId: "io.dev.delta" }), "io.dev.delta");
   assert.equal(expectedBundleId(idFor("com.you.app"), { url: "https://x/a.ipa" }), null); // its own ID comes with the download
-  assert.equal(expectedBundleId(idFor("com.you.*"), { url: SELF }), "com.you.ifizbox");
-  assert.equal(expectedBundleId(idFor("com.you.app"), { url: SELF }), "com.you.app");
+  assert.equal(expectedBundleId(idFor("com.you.*"), { url: SELF }), "com.ryha.ifizbox");
+  assert.equal(expectedBundleId(idFor("com.you.app"), { url: SELF }), "com.ryha.ifizbox");
 });
 
 test("expectedBundleId (Keep Bundle IDs off): explicit profiles, wildcards with a known app ID, else null", () => {
@@ -83,14 +83,14 @@ test("Install with the bundle ID known: iOS's prompt opens first, reserved, then
   let recorded = null;
   assert.equal(await signInBrowser({ url: SELF, name: "iFizBox", onInstalled: (r) => { recorded = r; } }, d), true);
   assert.deepEqual(log.order.slice(0, 2), ["open", "identity"]); // the link opened before anything waited
-  const token = /%2Fsign%2Fup%2F([0-9a-f]{48})%2Fmanifest\.plist%3Fbundleid%3Dcom\.you\.ifizbox%26/.exec(log.opened[0])?.[1];
+  const token = /%2Fsign%2Fup%2F([0-9a-f]{48})%2Fmanifest\.plist%3Fbundleid%3Dcom\.ryha\.ifizbox%26/.exec(log.opened[0])?.[1];
   assert.ok(token, log.opened[0]);
   assert.equal(log.opened.length, 1);
   assert.deepEqual(log.alerts, []);
   const ups = srv.calls.filter((c) => c.path === "/sign/upload");
-  assert.deepEqual(ups.map((c) => [c.q.token, c.q.bundleid, "size" in c.q]), [[token, "com.you.ifizbox", false], [token, "com.you.ifizbox", true]]);
+  assert.deepEqual(ups.map((c) => [c.q.token, c.q.bundleid, "size" in c.q]), [[token, "com.ryha.ifizbox", false], [token, "com.ryha.ifizbox", true]]);
   assert.ok(srv.calls.some((c) => c.path === `/sign/upload/${token}/done`));
-  assert.equal(recorded.bundleId, "com.you.ifizbox");
+  assert.equal(recorded.bundleId, "com.ryha.ifizbox");
   assert.equal(log.hud.at(-1), "done Installing");
 });
 

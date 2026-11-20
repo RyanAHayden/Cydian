@@ -59,7 +59,7 @@ test("an app signed under another bundle ID drops the early link before its own 
 });
 
 test("the early link that gets the app isn't dropped", async () => {
-  const s = setup({ worker: async () => ({ ipa: new Uint8Array([0x50, 0x4b]), bundleId: "com.you.ifizbox", name: "iFizBox", version: "1" }) });
+  const s = setup({ worker: async () => ({ ipa: new Uint8Array([0x50, 0x4b]), bundleId: "com.ryha.ifizbox", name: "iFizBox", version: "1" }) });
   assert.equal(await signInBrowser({ url: SELF, name: "iFizBox" }, s.deps), true);
   assert.ok(!s.calls.some((c) => /\/fail$/.test(c)));
 });

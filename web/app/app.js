@@ -537,8 +537,9 @@ if (globalThis.ifizboxNative) {
     globalThis.addEventListener("ifizbox:reloaded", lookForPatch); // asked once a launch; this catches a late dpkg read
   }
   globalThis.addEventListener("ifizbox:reloaded", lookForSelf); // Home's Reload (screens/home.js reloadHome)
-  // F285: Push is on by default in the sideload app, once the signing server can push and nothing blocks it, unless
-  // the user turned it off (core/push.js autoEnablePush). Each launch asks until it's on.
+  // Push is on by default in the sideload app, once the signing server can push and nothing blocks it, unless the
+  // user turned it off (core/push.js autoEnablePush). iOS's permission prompt shows here the first time; each launch
+  // tries until it's on.
   if (detectMode() === "sideload") {
     setTimeout(() => Promise.all([import("./core/push.js"), import("./signing-client.js")])
       .then(([p, s]) => p.autoEnablePush({ server: s.getServer() })).catch(() => {}), 3000);

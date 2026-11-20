@@ -15,19 +15,20 @@ The sideload app's Updates page, what you get first, how it's checked after:
 | Group | Rows |
 |---|---|
 | **Update Alerts** | Notifications and Icon Badge (iOS's; flipping opens iOS Settings), iFizBox Updates |
-| **Checking for Updates** | Push, Check in the Background, Background App Refresh (iOS's), Last Push, Last Background Check, Test Push, Turn On in Settings (when iOS has something off) |
+| **Checking for Updates** | Push, Check in the Background, Background App Refresh (iOS's), Last Push, Last Background Check, Turn On in Settings (when iOS has something off) |
 | **Ignored Upgrades** | the held apps |
 
 **iFizBox Updates** (on by default): off, iFizBox's own entry leaves the list the background check and the push
 server follow, so only your apps' updates alert you. iFizBox's own update still shows in Changes, and the
 Signature Expiring push still comes. The jailbreak build's Updates page is unchanged.
 
-**Push is on by default.** At launch, when the signing server says it can push (`GET /api/push` answers
-`enabled: true`), nothing below blocks it, iOS notifications are already allowed for iFizBox and the user never
-turned Push off, the app turns Push on by itself. While the server has no APNs key it stays off, and turns on by
-itself at the first launch after the key is added, with no app update. Turning Push off by hand is remembered
-(`ifizbox.push.userOff`): it never turns itself on again; turning it on by hand clears that. An automatic try that
-fails (no token, the server refused) leaves Push off and tries again next launch.
+**Push is on by default.** A few seconds after launch, when the signing server says it can push (`GET /api/push`
+answers `enabled: true`), nothing below blocks it and the user never turned Push off, the app turns Push on by
+itself. If iOS has never asked about notifications for iFizBox, its permission prompt shows then; Don't Allow leaves
+Push off for good (iOS won't ask again; Notifications on this page opens iOS Settings). While the server has no APNs
+key it stays off, and turns on by itself at the first launch after the key is added, with no app update. Turning
+Push off by hand is remembered (`ifizbox.push.userOff`): it never turns itself on again; turning it on by hand
+clears that. An automatic try that fails (no token, the server refused) leaves Push off and tries again next launch.
 
 ## What travels
 
@@ -52,20 +53,22 @@ never logged.
 | **iFizBox X.Y** | iFizBox's own source has a newer iFizBox |
 | **n Updates** (names in the body) | a followed app's source has a newer version that runs on this iOS (minOSVersion / maxOSVersion), not already counted on screen |
 | **Signature Expiring** | iFizBox's signature ends within two days |
-| **Test Push** | Settings' Test Push |
+| **Test Push** | `POST /api/push/test` with the device's token (server admins; no button in the app) |
 
 Each version is pushed once. A tap opens Changes.
 
 ## When push can't work
 
-Checking for Updates shows the Push switch without Last Push or Test Push, and its footer says why:
+Checking for Updates shows no Push switch at all (update alerts then come from the background check alone) when:
 
 - **The copy was renamed by its signer.** APNs delivers by topic = the app's **Info.plist bundle ID**, whichever team
   signed the copy. The key on ifizbox.com reaches `com.ryha.ifizbox` (an explicit App ID with Push Notifications on
   team S8NFX3A2LT), so every copy that keeps that ID gets pushes: Arctic Sign, RSideload, SideDrop, iFizBox's own
   signing, any team. iFizBox and the website now keep iFizBox's own ID when they sign it (Keep Bundle IDs, on by
   default). A copy installed earlier under the profile's ID gets the update **beside** it: the app says so once
-  before signing, and the old copy is deleted by hand.
+  before signing, and the old copy is deleted by hand. (ifizbox.com's key: Apple Push Notifications service key
+  made on developer.apple.com > Keys by an Admin of S8NFX3A2LT; set on the `ifizbox` Worker with
+  `npx wrangler secret put APNS_KEY -c wrangler.ifizbox.toml` and `APNS_KEY_ID`.)
 - **The profile has no Push** (no `aps-environment`): iOS gives no token. Wildcard profiles never have it; an explicit
   App ID with Push Notifications does (RSideload's and SideDrop's profiles do). `development` profiles push through
   APNs's sandbox host, `production` (Ad Hoc, distribution) through the production one. Other re-signed apps can need

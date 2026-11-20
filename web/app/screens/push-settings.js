@@ -3,12 +3,10 @@
 //   Push        a switch: on asks iOS for notifications (once) and a push token, and registers with the signing
 //               server; off unregisters (the server deletes the token and the list) and is remembered, so Push never
 //               turns itself on again (core/push.js autoEnablePush)
-//   Test Push   one push now
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { showHUD } from "../nav/hud.js";
-import { alertOK } from "../nav/alert.js";
 import { getServer } from "../signing-client.js";
-import { pushInfo, enablePush, disablePush, testPush, setUserTurnedOff } from "../core/push.js";
+import { pushInfo, enablePush, disablePush, setUserTurnedOff } from "../core/push.js";
 
 export function pushActions({ native = globalThis.ifizboxNative } = {}) {
   const deps = () => ({ native, server: getServer() });
@@ -19,12 +17,6 @@ export function pushActions({ native = globalThis.ifizboxNative } = {}) {
       const hide = showHUD(on ? "Turning On" : "Turning Off");
       try { if (on) await enablePush(deps()); else await disablePush(deps()); } catch { /* the footer says */ }
       hide();
-    },
-    async test() {
-      const hide = showHUD("Sending");
-      const t = await testPush(deps());
-      hide();
-      alertOK(t.ok ? "Test Push Sent" : "Test Push Failed", t.text);
     },
   };
 }

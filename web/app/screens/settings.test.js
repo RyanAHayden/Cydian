@@ -70,7 +70,7 @@ test("Update Alerts: what iOS allows, the last background check, and a way to Se
 });
 
 // F285: Push's rows (core/push.js pushRows) join Checking for Updates: Push first, Last Push before the last
-// background check, Test Push after it, then Turn On in Settings; Push's footer before the check's.
+// background check, then Turn On in Settings; Push's footer before the check's.
 test("Checking for Updates: Push's rows woven in, its footer first", async () => {
   const { notifyRows } = await import("./settings.js");
   const { pushRows } = await import("../core/push.js");
@@ -79,18 +79,16 @@ test("Checking for Updates: Push's rows woven in, its footer first", async () =>
   const live = pushRows({ state: { on: true }, status: { registered: true, lastPush: "2026-11-19T11:50:00Z" }, reason: null }, now);
   const [, g] = notifyRows(st, now, { push: live });
   assert.deepEqual(g.rows.map((r) => [r.label, r.detail ?? ""]), [["Push", ""], ["Check in the Background", "On"],
-    ["Background App Refresh", "On"], ["Last Push", "10 min ago"], ["Last Background Check", "1 h ago"], ["Test Push", ""],
+    ["Background App Refresh", "On"], ["Last Push", "10 min ago"], ["Last Background Check", "1 h ago"],
     ["Turn On in Settings", ""]]);
   assert.equal(g.rows[0].toggle, "push");
   assert.equal(g.rows[0].on, true);
-  assert.ok(g.rows[5].test);
   assert.ok(g.footer.startsWith(live.footer + " iOS asks only once"), g.footer);
-  // push can't work: only its switch, and its why-footer kept
+  // push can't work: no Push row and no explanation, only the background check's
   const why = pushRows({ state: { on: false }, reason: { code: "no_key", text: "sign.example has no APNs key." } }, now);
   const [, g2] = notifyRows({ ...st, badges: true }, now, { push: why });
-  assert.deepEqual(g2.rows.map((r) => r.label), ["Push", "Check in the Background", "Background App Refresh", "Last Background Check"]);
-  assert.equal(g2.rows[0].on, false);
-  assert.match(g2.footer, /^sign\.example has no APNs key\. Update alerts still come from the background check/);
+  assert.deepEqual(g2.rows.map((r) => r.label), ["Check in the Background", "Background App Refresh", "Last Background Check"]);
+  assert.match(g2.footer, /^iOS decides when the background check runs/);
 });
 
 // F128: Settings' pages and their titles, like iOS 6's (the root, General, Theme, Updates, a list page under one),

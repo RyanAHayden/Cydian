@@ -4,3 +4,6 @@
 /* Delete Account: the action sheet's red button (packages.css .action-button.destructive), full width like iOS 6's Delete Account */
 .account-delete-wrap { display: flex; padding: 10px 10px 30px; }
 .account-delete { flex: 1; }
+/* Sign Out (F286): the action sheet's plain silver button (packages.css .action-button), above Delete Account */
+.account-signout-wrap { display: flex; padding: 10px 10px 0; }
+.account-signout { flex: 1; }

@@ -2,8 +2,9 @@
 // with fake backends; the key store's fallback for an older shell; ifizbox://account links.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { collectHere, applyHere, keyStore, sourceLine, lastSyncedText } from "./account.js";
-import { changesFor, identityOf } from "../core/account.js";
+import { collectHere, applyHere, keyStore, sourceLine, lastSyncedText, SIGN_OUT_ALERT, signOutFlow } from "./account.js";
+import { changesFor, identityOf, createAccountSync } from "../core/account.js";
+import { NAME } from "../brand.js";
 import { handleIncoming } from "../incoming.js";
 import { memoryAppStore } from "../core/installed.js";
 import { createWishlist } from "../core/wishlist.js";
@@ -100,4 +101,71 @@ test("ifizbox://account?k= goes to Sign In With Key", async () => {
   const got = [];
   assert.equal(await handleIncoming("ifizbox://account?k=0123456789ABCDEFGHJKMNPQRS", { signIn: async (u) => got.push(u) }), "account");
   assert.deepEqual(got, ["ifizbox://account?k=0123456789ABCDEFGHJKMNPQRS"]);
+});
+
+// F286: Sign Out writes unsaved changes, then forgets the key; the account stays on the server.
+function signedInDevice() {
+  const calls = [];
+  let stored = null, version = 0, key = null, saved = null;
+  const here = { sources: ["https://a.example/"], settings: {}, holds: [], wishlist: [], apps: [] };
+  const api = () => ({
+    get: async () => { calls.push("get"); return stored ? { version, data: stored } : null; },
+    put: async (data) => { calls.push("put"); stored = data; return ++version; },
+    remove: async () => { calls.push("remove"); stored = null; },
+  });
+  const acct = createAccountSync({
+    keys: { get: async () => key, set: async (k) => { key = k; }, remove: async () => { calls.push("key.remove"); key = null; } },
+    state: { get: () => (saved ? JSON.parse(saved) : null), set: (v) => { saved = v ? JSON.stringify(v) : null; } },
+    collect: async () => JSON.parse(JSON.stringify(here)), apply: async () => {}, api,
+  });
+  return { acct, here, calls, server: () => stored, state: () => saved };
+}
+
+test("Sign Out: unsaved changes written first, then the key forgotten; no delete reaches the server", async () => {
+  const d = signedInDevice();
+  await d.acct.create();
+  d.calls.length = 0;
+  d.here.holds.push("tweak.new");
+  assert.equal(await d.acct.signOut(), true, "the unsaved change was written");
+  assert.ok(d.calls.includes("put"));
+  assert.ok(!d.calls.includes("remove"), "the account isn't deleted");
+  assert.equal(d.calls.at(-1), "key.remove");
+  assert.ok(d.server(), "the account is still on the server");
+  assert.equal(d.state(), null, "sync state cleared");
+  assert.equal((await d.acct.status()).signedIn, false);
+
+  // nothing changed: no write; offline: still signs out
+  const e = signedInDevice();
+  await e.acct.create();
+  e.calls.length = 0;
+  assert.equal(await e.acct.signOut(), false);
+  assert.deepEqual(e.calls, ["key.remove"]);
+  const f = signedInDevice();
+  await f.acct.create();
+  f.here.sources.push("https://b.example/");
+  const off = createAccountSync({ keys: { get: async () => (await f.acct.status()).code, set: async () => {}, remove: async () => f.calls.push("key.remove") },
+    state: { get: () => null, set: () => {} }, collect: async () => f.here, apply: async () => {},
+    api: () => ({ get: async () => { throw new Error("offline"); }, put: async () => {}, remove: async () => { f.calls.push("remove"); } }) });
+  f.calls.length = 0;
+  assert.equal(await off.signOut(), false);
+  assert.deepEqual(f.calls, ["key.remove"]);
+});
+
+test("Sign Out's alert: what stops, what stays, the key to come back; Cancel does nothing", async () => {
+  assert.equal(SIGN_OUT_ALERT.title, "Sign Out?");
+  assert.deepEqual(SIGN_OUT_ALERT.buttons, ["Cancel", "Sign Out"]);
+  assert.match(SIGN_OUT_ALERT.message, new RegExp(`stops syncing with your ${NAME} Account`));
+  assert.match(SIGN_OUT_ALERT.message, /What's on it stays/);
+  assert.match(SIGN_OUT_ALERT.message, /account key/);
+  assert.ok(!/delete/i.test(SIGN_OUT_ALERT.message));
+  let out = 0, drawn = 0, asked = null;
+  const acct = { signOut: async () => { out++; return true; }, remove: async () => { throw new Error("no delete on sign out"); } };
+  const hud = () => Object.assign(() => {}, { done: () => {} });
+  const el = {};
+  assert.equal(await signOutFlow(el, { acct, hud, ask: async (o) => { asked = o; return { index: 0 }; }, draw: async () => { drawn++; } }), false);
+  assert.equal(out + drawn, 0, "Cancel");
+  assert.equal(asked.title, "Sign Out?");
+  assert.equal(await signOutFlow(el, { acct, hud, ask: async () => ({ index: 1 }), draw: async () => { drawn++; } }), true);
+  assert.equal(out, 1);
+  assert.equal(drawn, 1, "the page redraws (signed out: Create Account / Sign In With Key)");
 });

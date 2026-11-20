@@ -280,6 +280,7 @@ export const identityFiles = (id) => ({ ...id, p12: fromB64url(id.p12), profile:
 //   await acct.save()          the batched write: only when something changed since the last sync (or a read found
 //                              this device ahead). Called when the app goes to the background / the page is hidden
 //   await acct.remove()        deletes the account on the server and forgets the key here
+//   await acct.signOut()       saves unsaved changes if it can, then forgets the key here; the account stays
 //   await acct.status()        { signedIn, code, lastSynced, syncCert }
 export function createAccountSync({ keys, state, collect, apply, api = null, base = "", fetcher, now = () => Date.now() }) {
   let busy = Promise.resolve();
@@ -371,6 +372,26 @@ export function createAccountSync({ keys, state, collect, apply, api = null, bas
       });
     },
     async forget() { return serial(async () => { await keys.remove(); state.set(null); }); },
+    // F286: Sign Out. Writes this device's unsaved changes first when it can (as save() would; offline, a deleted
+    // account or any other failure doesn't stop it), then forgets the key and the sync state. The account on the
+    // server and the other devices are never touched. -> whether the changes were written
+    async signOut() {
+      return serial(async () => {
+        let saved = false;
+        try {
+          if (await keys.get()) {
+            const s = st();
+            if (s.pending || !s.seen || changedSince(await collect({ syncCert: s.syncCert }), s.seen)) {
+              await syncOnce({ write: true });
+              saved = true;
+            }
+          }
+        } catch { saved = false; }
+        await keys.remove();
+        state.set(null);
+        return saved;
+      });
+    },
     setSyncCert(on) { put({ syncCert: !!on }); },
     async status() {
       const code = await keys.get();

@@ -28,8 +28,9 @@ export const KNOWN_SAFE_EXTRA = [
   { url: "https://apt.procurs.us/", name: "Procursus", reason: "The bootstrap every rootless jailbreak installs.", link: "https://github.com/ProcursusTeam/Procursus" },
   { url: "https://apt.thebigboss.org/", name: "BigBoss", reason: "The oldest tweak repo, one of Dopamine's defaults.", link: "https://github.com/opa334/Dopamine" },
   { url: "https://xitrix.github.io/iTorrent/AltStore.json", name: "iTorrent", reason: "An open-source torrent client, from its developer's own repo.", link: "https://github.com/XITRIX/iTorrent" },
-  { url: "https://repository.apptesters.org/", name: "AppTesters", reason: `A long-running community IPA source, one of ${NAME}'s defaults.`, link: "https://repository.apptesters.org/" },
 ];
+// Not listed, on purpose (user 2026-11-20): AppTesters (repository.apptesters.org), a source of modded store apps.
+// It was a default until then; people who added it keep it, shown as Unknown like any other source.
 
 const hostOf = (url) => inputHost(url);
 

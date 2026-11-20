@@ -85,10 +85,20 @@ THEMES = {
     "linen": ("radial", ramp("4a4c52", "36383d", "1e1f22"), (190, 205, 230), "#3d78c8"),
     "nord": ("radial", ramp("434c5e", "2e3440", "1f232c"), (136, 192, 208), "#4c8fa8"),
     "dracula": ("radial", ramp("44475a", "282a36", "16171e"), (189, 147, 249), "#8a5cd8"),
+    # F325: the textured themes, R2's glass globe in their colours (accent: the theme's details, darkened)
+    "leather": ("radial", ramp("5a3d26", "3b2819", "1e130a"), (240, 190, 122), "#b07830"),
+    "felt": ("radial", ramp("3f8a4a", "1c4a24", "0c2410"), (247, 215, 116), "#b89a2a"),
+    "wood": ("radial", ramp("6e4526", "4e2f15", "2a1806"), (255, 207, 138), "#c0803a"),
     "classic": ("classic",),
     "sepia": ("tone", "3a240e", "f6dfb2", *WHITE_GLOBE, ("#6b4f30", "#4f381f")),
     "solarized": ("tone", "073642", "8fd8f0", ("#fdf6e3", "#eee8d5", "#d5ceb8"), ("#fffcf2", "#e4dcc4"),
                   ("#268bd2", "#1b6fab")),
+    # F325: today's starburst recoloured: Legal Pad's yellow paper inked in its leather brown, Brushed Metal's silver
+    # inked in its blue
+    "legalpad": ("tone", "3a2a10", "f9eba0", ("#fffdf0", "#f6eabc", "#dcc98a"), ("#fffef6", "#e8dcaa"),
+                 ("#7a4826", "#5a3218")),
+    "metal": ("tone", "2f343b", "eef0f3", ("#ffffff", "#e6e9ed", "#c2c7ce"), ("#ffffff", "#d3d6db"),
+              ("#3f6fb5", "#2f5a98")),
 }
 
 

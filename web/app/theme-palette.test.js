@@ -15,7 +15,7 @@ const mem = (init) => {
 };
 
 test("paletteFor: classic in light; Gunmetal in dark unless another is chosen (F320)", () => {
-  assert.deepEqual(DARK_PALETTES, ["oled", "gunmetal", "midnight", "linen", "nord", "dracula"]);
+  assert.deepEqual(DARK_PALETTES, ["oled", "gunmetal", "midnight", "linen", "nord", "dracula", "leather", "felt", "wood"]);
   assert.equal(paletteFor("light", "gunmetal"), "classic");
   assert.equal(paletteFor("dark", null), "gunmetal");
   assert.equal(paletteFor("dark", "oled"), "oled");
@@ -104,8 +104,8 @@ test("applyTheme: data-palette and a black theme-color for OLED Black, Gunmetal 
 // F199: every combination of Mode, light theme, dark theme, system and preview, through the one rule (themeState),
 // theme-boot.js before first paint, and the settings store's own stored values.
 test("F199: themeState, theme-boot.js and the store agree for every Mode, theme pair, system and preview", () => {
-  const lights = [null, "classic", "sepia", "solarized", "neon"];
-  const darks = [null, "oled", "gunmetal", "midnight", "linen", "nord", "dracula", "neon"];
+  const lights = [null, "classic", "sepia", "solarized", "legalpad", "metal", "neon"];
+  const darks = [null, "oled", "gunmetal", "midnight", "linen", "nord", "dracula", "leather", "felt", "wood", "neon"];
   const previews = [[null, ""], ["light", "#/home/settings/theme/lightTheme"], ["dark", "#/home/settings/theme/darkTheme"]];
   for (const appearance of [null, "auto", "light", "dark", "bogus"]) {
     for (const lightTheme of lights) for (const darkTheme of darks) for (const systemDark of [false, true]) for (const [preview, hash] of previews) {
@@ -119,7 +119,27 @@ test("F199: themeState, theme-boot.js and the store agree for every Mode, theme 
       assert.deepEqual(boot({ appearance, lightTheme, darkTheme, systemDark, hash }), { ...want, color: THEME_COLORS[want.palette] }, what);
     }
   }
-  assert.deepEqual(LIGHT_PALETTES, ["classic", "sepia", "solarized"]);
+  assert.deepEqual(LIGHT_PALETTES, ["classic", "sepia", "solarized", "legalpad", "metal"]);
+});
+
+// F325: the textured themes (Leather, Felt, Wood; Legal Pad, Brushed Metal): a texture drawn in CSS where Linen's
+// weave goes, nothing that moves (120 Hz), and their nav bars keep the four layers the app's status strip stretches.
+test("F325: the textured themes paint a still CSS texture and keep the nav bar's four layers", () => {
+  const pal = read("palettes.css");
+  const layers = (v) => { const out = []; let d = 0, cur = ""; for (const ch of v) { if (ch === "(") d++; if (ch === ")") d--; if (ch === "," && !d) { out.push(cur.trim()); cur = ""; } else cur += ch; } out.push(cur.trim()); return out; };
+  for (const [tone, p, bar] of [["dark", "leather", "--dk-nav-bar"], ["dark", "felt", "--dk-nav-bar"], ["dark", "wood", "--dk-nav-bar"],
+    ["light", "legalpad", "--lt-nav-bar"], ["light", "metal", "--lt-nav-bar"]]) {
+    const sel = `html[data-theme="${tone}"][data-palette="${p}"] {`;
+    const at = pal.indexOf(sel);
+    assert.ok(at >= 0, p);
+    const t = tokens(pal.slice(at, pal.indexOf("\n}", at)));
+    assert.match(t.get("--weave") ?? "", /gradient\(/, `${p}: a CSS texture`);
+    assert.doesNotMatch(t.get("--weave"), /url\(/, `${p}: no artwork`);
+    assert.equal(layers(t.get(bar).replace(/\/\*[\s\S]*?\*\//g, "")).length, 4, `${p}: four nav bar layers`);
+    assert.match(pal, new RegExp(`\\[data-palette="${p}"\\][^{]*\\.page-body\\.grouped`), `${p}: the texture on grouped pages`);
+  }
+  // the textures sit still: no keyframe animation in the palettes (transitions on other rules stay allowed)
+  assert.doesNotMatch(pal.replace(/\/\*[\s\S]*?\*\//g, ""), /animation|@keyframes/, "no animated texture");
 });
 
 // ---- the stylesheets ----

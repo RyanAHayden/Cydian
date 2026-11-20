@@ -1,0 +1,258 @@
+[
+ {
+  "wait": 2000
+ },
+ {
+  "eval": "localStorage.setItem('ifizbox.firstVisit','later'); 'ok'"
+ },
+ {
+  "eval": "localStorage.setItem('ifizbox.appearance','dark'); localStorage.setItem('ifizbox.darkTheme','leather'); 'ok'"
+ },
+ {
+  "nav": "#/home",
+  "ms": 8000
+ },
+ {
+  "eval": "[document.documentElement.dataset.theme, document.documentElement.dataset.palette, document.querySelector('meta[name=theme-color]').content].join(' | ')"
+ },
+ {
+  "shot": "leather-home"
+ },
+ {
+  "go": "#/changes",
+  "ms": 6000
+ },
+ {
+  "shot": "leather-changes"
+ },
+ {
+  "go": "#/home/settings",
+  "ms": 3000
+ },
+ {
+  "shot": "leather-settings"
+ },
+ {
+  "go": "#/home/settings/theme/darkTheme",
+  "ms": 3000
+ },
+ {
+  "shot": "leather-theme-list"
+ },
+ {
+  "nav": "#/sources/alt%3Ahttps%3A%2F%2Fprovenance-emu.com%2Fapps.json/package%3Acom.provenance-emu.provenance",
+  "ms": 12000
+ },
+ {
+  "shot": "leather-package"
+ },
+ {
+  "eval": "import('./nav/alert.js').then((m) => { m.showAlert({ title: 'Remove Source', message: 'Packages from this source will no longer be available.', buttons: ['Cancel', 'Remove'] }); return 'shown'; })"
+ },
+ {
+  "wait": 1500
+ },
+ {
+  "shot": "leather-alert"
+ },
+ {
+  "eval": "localStorage.setItem('ifizbox.appearance','dark'); localStorage.setItem('ifizbox.darkTheme','felt'); 'ok'"
+ },
+ {
+  "nav": "#/home",
+  "ms": 8000
+ },
+ {
+  "eval": "[document.documentElement.dataset.theme, document.documentElement.dataset.palette, document.querySelector('meta[name=theme-color]').content].join(' | ')"
+ },
+ {
+  "shot": "felt-home"
+ },
+ {
+  "go": "#/changes",
+  "ms": 6000
+ },
+ {
+  "shot": "felt-changes"
+ },
+ {
+  "go": "#/home/settings",
+  "ms": 3000
+ },
+ {
+  "shot": "felt-settings"
+ },
+ {
+  "go": "#/home/settings/theme/darkTheme",
+  "ms": 3000
+ },
+ {
+  "shot": "felt-theme-list"
+ },
+ {
+  "nav": "#/sources/alt%3Ahttps%3A%2F%2Fprovenance-emu.com%2Fapps.json/package%3Acom.provenance-emu.provenance",
+  "ms": 12000
+ },
+ {
+  "shot": "felt-package"
+ },
+ {
+  "eval": "import('./nav/alert.js').then((m) => { m.showAlert({ title: 'Remove Source', message: 'Packages from this source will no longer be available.', buttons: ['Cancel', 'Remove'] }); return 'shown'; })"
+ },
+ {
+  "wait": 1500
+ },
+ {
+  "shot": "felt-alert"
+ },
+ {
+  "eval": "localStorage.setItem('ifizbox.appearance','dark'); localStorage.setItem('ifizbox.darkTheme','wood'); 'ok'"
+ },
+ {
+  "nav": "#/home",
+  "ms": 8000
+ },
+ {
+  "eval": "[document.documentElement.dataset.theme, document.documentElement.dataset.palette, document.querySelector('meta[name=theme-color]').content].join(' | ')"
+ },
+ {
+  "shot": "wood-home"
+ },
+ {
+  "go": "#/changes",
+  "ms": 6000
+ },
+ {
+  "shot": "wood-changes"
+ },
+ {
+  "go": "#/home/settings",
+  "ms": 3000
+ },
+ {
+  "shot": "wood-settings"
+ },
+ {
+  "go": "#/home/settings/theme/darkTheme",
+  "ms": 3000
+ },
+ {
+  "shot": "wood-theme-list"
+ },
+ {
+  "nav": "#/sources/alt%3Ahttps%3A%2F%2Fprovenance-emu.com%2Fapps.json/package%3Acom.provenance-emu.provenance",
+  "ms": 12000
+ },
+ {
+  "shot": "wood-package"
+ },
+ {
+  "eval": "import('./nav/alert.js').then((m) => { m.showAlert({ title: 'Remove Source', message: 'Packages from this source will no longer be available.', buttons: ['Cancel', 'Remove'] }); return 'shown'; })"
+ },
+ {
+  "wait": 1500
+ },
+ {
+  "shot": "wood-alert"
+ },
+ {
+  "eval": "localStorage.setItem('ifizbox.appearance','light'); localStorage.setItem('ifizbox.lightTheme','legalpad'); 'ok'"
+ },
+ {
+  "nav": "#/home",
+  "ms": 8000
+ },
+ {
+  "eval": "[document.documentElement.dataset.theme, document.documentElement.dataset.palette, document.querySelector('meta[name=theme-color]').content].join(' | ')"
+ },
+ {
+  "shot": "legalpad-home"
+ },
+ {
+  "go": "#/changes",
+  "ms": 6000
+ },
+ {
+  "shot": "legalpad-changes"
+ },
+ {
+  "go": "#/home/settings",
+  "ms": 3000
+ },
+ {
+  "shot": "legalpad-settings"
+ },
+ {
+  "go": "#/home/settings/theme/lightTheme",
+  "ms": 3000
+ },
+ {
+  "shot": "legalpad-theme-list"
+ },
+ {
+  "nav": "#/sources/alt%3Ahttps%3A%2F%2Fprovenance-emu.com%2Fapps.json/package%3Acom.provenance-emu.provenance",
+  "ms": 12000
+ },
+ {
+  "shot": "legalpad-package"
+ },
+ {
+  "eval": "import('./nav/alert.js').then((m) => { m.showAlert({ title: 'Remove Source', message: 'Packages from this source will no longer be available.', buttons: ['Cancel', 'Remove'] }); return 'shown'; })"
+ },
+ {
+  "wait": 1500
+ },
+ {
+  "shot": "legalpad-alert"
+ },
+ {
+  "eval": "localStorage.setItem('ifizbox.appearance','light'); localStorage.setItem('ifizbox.lightTheme','metal'); 'ok'"
+ },
+ {
+  "nav": "#/home",
+  "ms": 8000
+ },
+ {
+  "eval": "[document.documentElement.dataset.theme, document.documentElement.dataset.palette, document.querySelector('meta[name=theme-color]').content].join(' | ')"
+ },
+ {
+  "shot": "metal-home"
+ },
+ {
+  "go": "#/changes",
+  "ms": 6000
+ },
+ {
+  "shot": "metal-changes"
+ },
+ {
+  "go": "#/home/settings",
+  "ms": 3000
+ },
+ {
+  "shot": "metal-settings"
+ },
+ {
+  "go": "#/home/settings/theme/lightTheme",
+  "ms": 3000
+ },
+ {
+  "shot": "metal-theme-list"
+ },
+ {
+  "nav": "#/sources/alt%3Ahttps%3A%2F%2Fprovenance-emu.com%2Fapps.json/package%3Acom.provenance-emu.provenance",
+  "ms": 12000
+ },
+ {
+  "shot": "metal-package"
+ },
+ {
+  "eval": "import('./nav/alert.js').then((m) => { m.showAlert({ title: 'Remove Source', message: 'Packages from this source will no longer be available.', buttons: ['Cancel', 'Remove'] }); return 'shown'; })"
+ },
+ {
+  "wait": 1500
+ },
+ {
+  "shot": "metal-alert"
+ }
+]

@@ -94,5 +94,5 @@ test("ios6.css: .bar-button.red has a pressed state, dark variants, and a border
   assert.match(css, /--lt-red: linear-gradient\(#d4848b, #b01a27\);/);
   assert.match(css, /--dk-red: linear-gradient\(#d07079, #b82e3a 51\.7%, #b01825 51\.7%\);/);
   const pal = read("../palettes.css");
-  assert.match(pal, /\[data-palette="solarized"\]\) \.bar-button\.red:not\(\.back\):not\(\.done\) \{/);
+  assert.match(pal, /\[data-palette="solarized"\][^)]*\) \.bar-button\.red:not\(\.back\):not\(\.done\) \{/);
 });

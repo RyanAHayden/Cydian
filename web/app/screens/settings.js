@@ -105,7 +105,9 @@ export { settings, createSwitch };
 // By palette (F198): OLED Black's status bar is #000, Gunmetal's the top of its bar. ios6.css --dk-ground matches.
 // F200: the palettes.css ones, each its bar's status-bar colour.
 export const THEME_COLORS = { classic: "#4f698b", oled: "#000", gunmetal: "#5f656f", midnight: "#0a1424", linen: "#000",
-  nord: "#2e3440", dracula: "#21222c", sepia: "#7a5c36", solarized: "#2a74a8" };
+  nord: "#2e3440", dracula: "#21222c", sepia: "#7a5c36", solarized: "#2a74a8",
+  // F325: the textured ones, each its bar's status-bar colour
+  leather: "#4a2e1a", felt: "#6a4220", wood: "#42270f", legalpad: "#5a3218", metal: "#9aa0a9" };
 
 const defOf = (key) => SETTINGS.find((d) => d.key === key);
 const optionLabel = (d, v) => d.options.find((o) => o.value === v)?.label ?? String(v);

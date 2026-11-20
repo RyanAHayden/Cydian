@@ -27,6 +27,8 @@
  *   ifizbox-helper remove-malware <path>...   (F232: Installed's Malware Found > Delete; known-malware dylibs no dpkg
  *                                             package owns, in the tweak folders only, then respring; remove_malware)
  *   ifizbox-helper udid                       (F236: this iPhone's UDID from MobileGestalt, one line; runs nothing)
+ *   ifizbox-helper launch-theme <key>         (B203: the launch screen in that theme: copies the app's
+ *                                             LaunchThemes/<key>/ over its own launch files; runs nothing; launch.h)
  *   ifizbox-helper notifications on|off  (F65: Settings' Upgrade Notifications; off creates
  *                                         <prefix>/var/lib/ifizbox/upgrades.off, which N5's daemon reads; runs nothing)
  *
@@ -44,6 +46,7 @@
 #include "ipa.h"
 #include "paid.h"
 #include "policy.h"
+#include "launch.h"
 
 #include <dirent.h>
 #include <errno.h>
@@ -503,6 +506,25 @@ int main(int argc, char *argv[]) {
     if (argc >= 2 && !strcmp(argv[1], "udid")) {
         if (argc != 2) { fprintf(stderr, "ifizbox-helper: udid takes no arguments\n"); return HELPER_EX_USAGE; }
         return print_udid();
+    }
+    /* B203: launch-theme copies files inside the app's own bundle and runs nothing (launch.h). */
+    if (argc >= 2 && !strcmp(argv[1], "launch-theme")) {
+        if (argc != 3 || !helper_launch_key_ok(argv[2])) {
+            fprintf(stderr, "ifizbox-helper: launch-theme takes one theme ([a-z0-9], 1-32)\n");
+            return HELPER_EX_USAGE;
+        }
+        char app[PATH_MAX];
+        snprintf(app, sizeof app, "%s", expected);
+        char *slash = strrchr(app, '/');
+        if (slash) *slash = 0; /* <prefix>/Applications/<name>.app */
+        umask(022);
+        errno = 0;
+        if (helper_launch_theme(app, argv[2], &err)) {
+            fprintf(stderr, "ifizbox-helper: launch-theme: %s%s%s\n", err, errno ? ": " : "", errno ? strerror(errno) : "");
+            return HELPER_EX_IOERR;
+        }
+        printf("Launch screen: %s\n", argv[2]);
+        return 0;
     }
 
     int status_fd = fcntl(3, F_GETFD) != -1 ? 3 : -1;

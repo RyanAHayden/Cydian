@@ -367,9 +367,9 @@ test("F205: Settings root, General and Theme rows carry iOS 6 tiles where iOS 6 
   // (then the preview's sample rows, which start at Sources)
   const list = (k) => { const r = rows(["theme", k]); return r.slice(0, r.findIndex((x) => x[0] === "Sources")).map((x) => [x[0], x[1]]); };
   assert.deepEqual(list("darkTheme"),
-    ["OLED Black", "Gunmetal", "Midnight", "Linen", "Nord", "Dracula"].map((t) => [t, "cell-icon theme-swatch"]));
+    ["OLED Black", "Gunmetal", "Midnight", "Linen", "Nord", "Dracula", "Leather", "Felt", "Wood"].map((t) => [t, "cell-icon theme-swatch"]));
   assert.deepEqual(list("lightTheme"),
-    ["Classic", "Sepia", "Solarized Light"].map((t) => [t, "cell-icon theme-swatch"]));
+    ["Classic", "Sepia", "Solarized Light", "Legal Pad", "Brushed Metal"].map((t) => [t, "cell-icon theme-swatch"]));
 });
 
 // F199: Settings > Theme: Mode (segmented Automatic / Light / Dark) under its header, then Themes with Light and Dark

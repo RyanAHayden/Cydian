@@ -33,8 +33,8 @@ for (const [name, src] of [["ios6.css", ios6], ["palettes.css", palettes]]) {
   for (const m of src.matchAll(/--dk-tabbar\s*:\s*([^;]+);/g)) backgrounds.push([`${name} --dk-tabbar #${backgrounds.length}`, m[1]]);
 }
 
-test("every tab bar background is found (Classic, OLED Black, Gunmetal, Midnight, Linen, Nord, Dracula)", () => {
-  assert.equal(backgrounds.length, 7);
+test("every tab bar background is found (Classic, OLED Black, Gunmetal, Midnight, Linen, Nord, Dracula, Leather, Felt, Wood)", () => {
+  assert.equal(backgrounds.length, 10);
 });
 
 test("the gloss is 48 px tall from 1 px down, not sized by the bar's height", () => {

@@ -52,6 +52,8 @@ def copy_launch(app):
             shutil.copy(os.path.join(HERE, "launch", name), app)
     shutil.copytree(os.path.join(HERE, "launch", "LaunchScreen.storyboardc"),
                     os.path.join(app, "LaunchScreen.storyboardc"))
+    # B203: every theme's set (launch/make.py), as LaunchThemes/
+    shutil.copytree(os.path.join(HERE, "launch", "themes"), os.path.join(app, "LaunchThemes"))
 
 
 def copy_icons(app, lite=False):
@@ -248,8 +250,9 @@ class Plists(unittest.TestCase):
         for root, _, names in os.walk(launch):
             for name in names:
                 if name.endswith(".png") or ".storyboardc" in root:
-                    with open(os.path.join(root, name), "rb") as f:
-                        files[os.path.relpath(os.path.join(root, name), launch)] = f.read()
+                    rel = os.path.relpath(os.path.join(root, name), launch)
+                    with open(os.path.join(root, name), "rb") as f:  # B203: themes/ goes in as LaunchThemes/
+                        files[("Launch" + rel[0].upper() + rel[1:]) if rel.startswith("themes/") else rel] = f.read()
         self.assertEqual(launch_check.problems(info, files, ""), [])
         info["UILaunchScreen"] = {}
         self.assertIn("UILaunchScreen", launch_check.problems(info, files, "")[0])

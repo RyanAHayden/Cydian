@@ -1,0 +1,440 @@
+[
+{
+"wait": 2000
+},
+{
+"eval": "localStorage.setItem('ifizbox.firstVisit','later'); 'ok'"
+},
+{
+"nav": "#/sources",
+"ms": 5000
+},
+{
+"touch": "start",
+"x": 200,
+"y": 250
+},
+{
+"touch": "move",
+"x": 200,
+"y": 262
+},
+{
+"touch": "move",
+"x": 200,
+"y": 274
+},
+{
+"touch": "move",
+"x": 200,
+"y": 286
+},
+{
+"touch": "move",
+"x": 200,
+"y": 298
+},
+{
+"touch": "move",
+"x": 200,
+"y": 310
+},
+{
+"touch": "move",
+"x": 200,
+"y": 322
+},
+{
+"touch": "move",
+"x": 200,
+"y": 334
+},
+{
+"touch": "move",
+"x": 200,
+"y": 346
+},
+{
+"touch": "move",
+"x": 200,
+"y": 358
+},
+{
+"touch": "move",
+"x": 200,
+"y": 370
+},
+{
+"touch": "move",
+"x": 200,
+"y": 382
+},
+{
+"touch": "move",
+"x": 200,
+"y": 394
+},
+{
+"touch": "move",
+"x": 200,
+"y": 406
+},
+{
+"touch": "move",
+"x": 200,
+"y": 418
+},
+{
+"touch": "move",
+"x": 200,
+"y": 430
+},
+{
+"touch": "move",
+"x": 200,
+"y": 442
+},
+{
+"touch": "move",
+"x": 200,
+"y": 454
+},
+{
+"touch": "move",
+"x": 200,
+"y": 466
+},
+{
+"touch": "move",
+"x": 200,
+"y": 478
+},
+{
+"touch": "move",
+"x": 200,
+"y": 490
+},
+{
+"touch": "move",
+"x": 200,
+"y": 502
+},
+{
+"touch": "move",
+"x": 200,
+"y": 514
+},
+{
+"touch": "move",
+"x": 200,
+"y": 526
+},
+{
+"touch": "move",
+"x": 200,
+"y": 538
+},
+{
+"touch": "move",
+"x": 200,
+"y": 550
+},
+{
+"wait": 300
+},
+{
+"eval": "(()=>{const c=document.querySelector('.page.is-top .pull-clip')||document.querySelector('.pull-clip');if(!c) return 'no clip'; const a=c.querySelector('.pull-refresh'); const sc=c.previousElementSibling;const kids=[...sc.children].map(k=>k.style.transform||'-');const sp=getComputedStyle(a.querySelector('.pull-spinner')); const ar=getComputedStyle(a.querySelector('.pull-arrow'));return {on:c.classList.contains('on'), cls:a.className, title:a.querySelector('.pull-title').textContent,time:a.querySelector('.pull-time').textContent, area:a.style.transform, kids:[...new Set(kids)],spinner:sp.visibility+' '+sp.animationName, arrow:ar.visibility+' '+ar.transform, top:sc.scrollTop,anims:document.getAnimations().length, count:globalThis.ifizboxRefreshing,reloadBar:document.documentElement.classList.contains('has-reload')}})()"
+},
+{
+"shot": "sources-1-armed"
+},
+{
+"touch": "end",
+"x": 200,
+"y": 550,
+"ms": 10
+},
+{
+"eval": "globalThis.ifizboxRefreshing=1; dispatchEvent(new Event('ifizbox:refreshing')); 'ok'"
+},
+{
+"wait": 120
+},
+{
+"eval": "(()=>{const c=document.querySelector('.page.is-top .pull-clip')||document.querySelector('.pull-clip');if(!c) return 'no clip'; const a=c.querySelector('.pull-refresh'); const sc=c.previousElementSibling;const kids=[...sc.children].map(k=>k.style.transform||'-');const sp=getComputedStyle(a.querySelector('.pull-spinner')); const ar=getComputedStyle(a.querySelector('.pull-arrow'));return {on:c.classList.contains('on'), cls:a.className, title:a.querySelector('.pull-title').textContent,time:a.querySelector('.pull-time').textContent, area:a.style.transform, kids:[...new Set(kids)],spinner:sp.visibility+' '+sp.animationName, arrow:ar.visibility+' '+ar.transform, top:sc.scrollTop,anims:document.getAnimations().length, count:globalThis.ifizboxRefreshing,reloadBar:document.documentElement.classList.contains('has-reload')}})()"
+},
+{
+"shot": "sources-2-sliding"
+},
+{
+"wait": 1500
+},
+{
+"eval": "(()=>{const c=document.querySelector('.page.is-top .pull-clip')||document.querySelector('.pull-clip');if(!c) return 'no clip'; const a=c.querySelector('.pull-refresh'); const sc=c.previousElementSibling;const kids=[...sc.children].map(k=>k.style.transform||'-');const sp=getComputedStyle(a.querySelector('.pull-spinner')); const ar=getComputedStyle(a.querySelector('.pull-arrow'));return {on:c.classList.contains('on'), cls:a.className, title:a.querySelector('.pull-title').textContent,time:a.querySelector('.pull-time').textContent, area:a.style.transform, kids:[...new Set(kids)],spinner:sp.visibility+' '+sp.animationName, arrow:ar.visibility+' '+ar.transform, top:sc.scrollTop,anims:document.getAnimations().length, count:globalThis.ifizboxRefreshing,reloadBar:document.documentElement.classList.contains('has-reload')}})()"
+},
+{
+"shot": "sources-3-held"
+},
+{
+"touch": "start",
+"x": 200,
+"y": 300
+},
+{
+"touch": "move",
+"x": 200,
+"y": 420
+},
+{
+"touch": "end",
+"x": 200,
+"y": 420,
+"ms": 300
+},
+{
+"eval": "(()=>{const c=document.querySelector('.page.is-top .pull-clip')||document.querySelector('.pull-clip');if(!c) return 'no clip'; const a=c.querySelector('.pull-refresh'); const sc=c.previousElementSibling;const kids=[...sc.children].map(k=>k.style.transform||'-');const sp=getComputedStyle(a.querySelector('.pull-spinner')); const ar=getComputedStyle(a.querySelector('.pull-arrow'));return {on:c.classList.contains('on'), cls:a.className, title:a.querySelector('.pull-title').textContent,time:a.querySelector('.pull-time').textContent, area:a.style.transform, kids:[...new Set(kids)],spinner:sp.visibility+' '+sp.animationName, arrow:ar.visibility+' '+ar.transform, top:sc.scrollTop,anims:document.getAnimations().length, count:globalThis.ifizboxRefreshing,reloadBar:document.documentElement.classList.contains('has-reload')}})()"
+},
+{
+"shot": "sources-4-held-after-pull"
+},
+{
+"eval": "globalThis.ifizboxRefreshing=0; dispatchEvent(new Event('ifizbox:refreshing')); 'ok'"
+},
+{
+"eval": "new Promise(r=>{const t0=Date.now();const f=()=>{const c=document.querySelector('.pull-clip.on');const k=c&&c.previousElementSibling.children[0];if(!k||!k.style.transform.includes('60px')||Date.now()-t0>60000) return r(Date.now()-t0); setTimeout(f,20)};f()})"
+},
+{
+"wait": 100
+},
+{
+"eval": "(()=>{const c=document.querySelector('.page.is-top .pull-clip')||document.querySelector('.pull-clip');if(!c) return 'no clip'; const a=c.querySelector('.pull-refresh'); const sc=c.previousElementSibling;const kids=[...sc.children].map(k=>k.style.transform||'-');const sp=getComputedStyle(a.querySelector('.pull-spinner')); const ar=getComputedStyle(a.querySelector('.pull-arrow'));return {on:c.classList.contains('on'), cls:a.className, title:a.querySelector('.pull-title').textContent,time:a.querySelector('.pull-time').textContent, area:a.style.transform, kids:[...new Set(kids)],spinner:sp.visibility+' '+sp.animationName, arrow:ar.visibility+' '+ar.transform, top:sc.scrollTop,anims:document.getAnimations().length, count:globalThis.ifizboxRefreshing,reloadBar:document.documentElement.classList.contains('has-reload')}})()"
+},
+{
+"shot": "sources-5-closing"
+},
+{
+"wait": 900
+},
+{
+"eval": "(()=>{const c=document.querySelector('.page.is-top .pull-clip')||document.querySelector('.pull-clip');if(!c) return 'no clip'; const a=c.querySelector('.pull-refresh'); const sc=c.previousElementSibling;const kids=[...sc.children].map(k=>k.style.transform||'-');const sp=getComputedStyle(a.querySelector('.pull-spinner')); const ar=getComputedStyle(a.querySelector('.pull-arrow'));return {on:c.classList.contains('on'), cls:a.className, title:a.querySelector('.pull-title').textContent,time:a.querySelector('.pull-time').textContent, area:a.style.transform, kids:[...new Set(kids)],spinner:sp.visibility+' '+sp.animationName, arrow:ar.visibility+' '+ar.transform, top:sc.scrollTop,anims:document.getAnimations().length, count:globalThis.ifizboxRefreshing,reloadBar:document.documentElement.classList.contains('has-reload')}})()"
+},
+{
+"shot": "sources-6-reset"
+},
+{
+"nav": "#/home",
+"ms": 5000
+},
+{
+"touch": "start",
+"x": 200,
+"y": 250
+},
+{
+"touch": "move",
+"x": 200,
+"y": 262
+},
+{
+"touch": "move",
+"x": 200,
+"y": 274
+},
+{
+"touch": "move",
+"x": 200,
+"y": 286
+},
+{
+"touch": "move",
+"x": 200,
+"y": 298
+},
+{
+"touch": "move",
+"x": 200,
+"y": 310
+},
+{
+"touch": "move",
+"x": 200,
+"y": 322
+},
+{
+"touch": "move",
+"x": 200,
+"y": 334
+},
+{
+"touch": "move",
+"x": 200,
+"y": 346
+},
+{
+"touch": "move",
+"x": 200,
+"y": 358
+},
+{
+"touch": "move",
+"x": 200,
+"y": 370
+},
+{
+"touch": "move",
+"x": 200,
+"y": 382
+},
+{
+"touch": "move",
+"x": 200,
+"y": 394
+},
+{
+"touch": "move",
+"x": 200,
+"y": 406
+},
+{
+"touch": "move",
+"x": 200,
+"y": 418
+},
+{
+"touch": "move",
+"x": 200,
+"y": 430
+},
+{
+"touch": "move",
+"x": 200,
+"y": 442
+},
+{
+"touch": "move",
+"x": 200,
+"y": 454
+},
+{
+"touch": "move",
+"x": 200,
+"y": 466
+},
+{
+"touch": "move",
+"x": 200,
+"y": 478
+},
+{
+"touch": "move",
+"x": 200,
+"y": 490
+},
+{
+"touch": "move",
+"x": 200,
+"y": 502
+},
+{
+"touch": "move",
+"x": 200,
+"y": 514
+},
+{
+"touch": "move",
+"x": 200,
+"y": 526
+},
+{
+"touch": "move",
+"x": 200,
+"y": 538
+},
+{
+"touch": "move",
+"x": 200,
+"y": 550
+},
+{
+"wait": 300
+},
+{
+"eval": "(()=>{const c=document.querySelector('.page.is-top .pull-clip')||document.querySelector('.pull-clip');if(!c) return 'no clip'; const a=c.querySelector('.pull-refresh'); const sc=c.previousElementSibling;const kids=[...sc.children].map(k=>k.style.transform||'-');const sp=getComputedStyle(a.querySelector('.pull-spinner')); const ar=getComputedStyle(a.querySelector('.pull-arrow'));return {on:c.classList.contains('on'), cls:a.className, title:a.querySelector('.pull-title').textContent,time:a.querySelector('.pull-time').textContent, area:a.style.transform, kids:[...new Set(kids)],spinner:sp.visibility+' '+sp.animationName, arrow:ar.visibility+' '+ar.transform, top:sc.scrollTop,anims:document.getAnimations().length, count:globalThis.ifizboxRefreshing,reloadBar:document.documentElement.classList.contains('has-reload')}})()"
+},
+{
+"shot": "home-1-armed"
+},
+{
+"touch": "end",
+"x": 200,
+"y": 550,
+"ms": 10
+},
+{
+"eval": "globalThis.ifizboxRefreshing=1; dispatchEvent(new Event('ifizbox:refreshing')); 'ok'"
+},
+{
+"wait": 120
+},
+{
+"eval": "(()=>{const c=document.querySelector('.page.is-top .pull-clip')||document.querySelector('.pull-clip');if(!c) return 'no clip'; const a=c.querySelector('.pull-refresh'); const sc=c.previousElementSibling;const kids=[...sc.children].map(k=>k.style.transform||'-');const sp=getComputedStyle(a.querySelector('.pull-spinner')); const ar=getComputedStyle(a.querySelector('.pull-arrow'));return {on:c.classList.contains('on'), cls:a.className, title:a.querySelector('.pull-title').textContent,time:a.querySelector('.pull-time').textContent, area:a.style.transform, kids:[...new Set(kids)],spinner:sp.visibility+' '+sp.animationName, arrow:ar.visibility+' '+ar.transform, top:sc.scrollTop,anims:document.getAnimations().length, count:globalThis.ifizboxRefreshing,reloadBar:document.documentElement.classList.contains('has-reload')}})()"
+},
+{
+"shot": "home-2-sliding"
+},
+{
+"wait": 1500
+},
+{
+"eval": "(()=>{const c=document.querySelector('.page.is-top .pull-clip')||document.querySelector('.pull-clip');if(!c) return 'no clip'; const a=c.querySelector('.pull-refresh'); const sc=c.previousElementSibling;const kids=[...sc.children].map(k=>k.style.transform||'-');const sp=getComputedStyle(a.querySelector('.pull-spinner')); const ar=getComputedStyle(a.querySelector('.pull-arrow'));return {on:c.classList.contains('on'), cls:a.className, title:a.querySelector('.pull-title').textContent,time:a.querySelector('.pull-time').textContent, area:a.style.transform, kids:[...new Set(kids)],spinner:sp.visibility+' '+sp.animationName, arrow:ar.visibility+' '+ar.transform, top:sc.scrollTop,anims:document.getAnimations().length, count:globalThis.ifizboxRefreshing,reloadBar:document.documentElement.classList.contains('has-reload')}})()"
+},
+{
+"shot": "home-3-held"
+},
+{
+"touch": "start",
+"x": 200,
+"y": 300
+},
+{
+"touch": "move",
+"x": 200,
+"y": 420
+},
+{
+"touch": "end",
+"x": 200,
+"y": 420,
+"ms": 300
+},
+{
+"eval": "(()=>{const c=document.querySelector('.page.is-top .pull-clip')||document.querySelector('.pull-clip');if(!c) return 'no clip'; const a=c.querySelector('.pull-refresh'); const sc=c.previousElementSibling;const kids=[...sc.children].map(k=>k.style.transform||'-');const sp=getComputedStyle(a.querySelector('.pull-spinner')); const ar=getComputedStyle(a.querySelector('.pull-arrow'));return {on:c.classList.contains('on'), cls:a.className, title:a.querySelector('.pull-title').textContent,time:a.querySelector('.pull-time').textContent, area:a.style.transform, kids:[...new Set(kids)],spinner:sp.visibility+' '+sp.animationName, arrow:ar.visibility+' '+ar.transform, top:sc.scrollTop,anims:document.getAnimations().length, count:globalThis.ifizboxRefreshing,reloadBar:document.documentElement.classList.contains('has-reload')}})()"
+},
+{
+"shot": "home-4-held-after-pull"
+},
+{
+"eval": "globalThis.ifizboxRefreshing=0; dispatchEvent(new Event('ifizbox:refreshing')); 'ok'"
+},
+{
+"eval": "new Promise(r=>{const t0=Date.now();const f=()=>{const c=document.querySelector('.pull-clip.on');const k=c&&c.previousElementSibling.children[0];if(!k||!k.style.transform.includes('60px')||Date.now()-t0>60000) return r(Date.now()-t0); setTimeout(f,20)};f()})"
+},
+{
+"wait": 100
+},
+{
+"eval": "(()=>{const c=document.querySelector('.page.is-top .pull-clip')||document.querySelector('.pull-clip');if(!c) return 'no clip'; const a=c.querySelector('.pull-refresh'); const sc=c.previousElementSibling;const kids=[...sc.children].map(k=>k.style.transform||'-');const sp=getComputedStyle(a.querySelector('.pull-spinner')); const ar=getComputedStyle(a.querySelector('.pull-arrow'));return {on:c.classList.contains('on'), cls:a.className, title:a.querySelector('.pull-title').textContent,time:a.querySelector('.pull-time').textContent, area:a.style.transform, kids:[...new Set(kids)],spinner:sp.visibility+' '+sp.animationName, arrow:ar.visibility+' '+ar.transform, top:sc.scrollTop,anims:document.getAnimations().length, count:globalThis.ifizboxRefreshing,reloadBar:document.documentElement.classList.contains('has-reload')}})()"
+},
+{
+"shot": "home-5-closing"
+},
+{
+"wait": 900
+},
+{
+"eval": "(()=>{const c=document.querySelector('.page.is-top .pull-clip')||document.querySelector('.pull-clip');if(!c) return 'no clip'; const a=c.querySelector('.pull-refresh'); const sc=c.previousElementSibling;const kids=[...sc.children].map(k=>k.style.transform||'-');const sp=getComputedStyle(a.querySelector('.pull-spinner')); const ar=getComputedStyle(a.querySelector('.pull-arrow'));return {on:c.classList.contains('on'), cls:a.className, title:a.querySelector('.pull-title').textContent,time:a.querySelector('.pull-time').textContent, area:a.style.transform, kids:[...new Set(kids)],spinner:sp.visibility+' '+sp.animationName, arrow:ar.visibility+' '+ar.transform, top:sc.scrollTop,anims:document.getAnimations().length, count:globalThis.ifizboxRefreshing,reloadBar:document.documentElement.classList.contains('has-reload')}})()"
+},
+{
+"shot": "home-6-reset"
+}
+]

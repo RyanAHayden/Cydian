@@ -56,7 +56,33 @@ reads 33 stretches in these 14 files). `tools/check.sh` runs in `run done`.
 
 ## Result
 
-(filled in below once the runs end)
+- cascade.mjs: **same cascade** on all 14 files (`cascade.log`).
+- shots.mjs base (0439559b) vs this branch: **same**, all 124 shots, 0 px and 0 computed-style differences.
+- What the shots showed of the small sheets (`cover.txt`): guides (22 shots), progress's `.pl` lines (14, in the
+  guides' terminal panels), signing (How Signing Works on the website) and notiphone. Account, Manage, My IPAs and
+  Browse open, but empty: the fake bridge has no account, sources, IPAs or featured banners, so their own rules
+  draw nothing there. Those rules, and the other sheets, rest on the cascade proof.
+- `tools/check.sh`: run by `run done`, which refuses to tick unless it passes.
+
+## Eras and lazily loaded sheets
+
+Several of these sheets load late (nav/motion.js loadStyle: signing, signsheet, myipas, freeid, tweaks), after any
+era sheet linked in index.html, and their `:root` token blocks then come later in the cascade. An era therefore
+sets these tokens the way docs/eras.md already says to set colours, on `html[data-style="…"][data-theme="…"]`,
+which outranks `:root`. A bare `:root` token in an era would lose to a sheet that loads later. tweaks.css repeating
+myipas.css's `--price-btn*` values changes nothing here: both are `:root`, and the era's selector outranks both.
+
+## Spec review (fresh subagent, diff + brief only)
+
+- Nothing lost or wrong: every token matched the literal it replaced and no stretch holds layout.
+- Missing: the shot results and cover.txt (the runs had not ended when the review started): filled in above.
+- Routes were added to a C48 copy of C44's shots.mjs rather than to C44's own: kept on purpose, so C44's journal
+  stays a record of what C44 ran; the copy runs C44's 44 shots too.
+- Pages without screenshot routes (AltStore, reviews, sign sheet, Free Apple ID, progress/queue run, Confirm, Add
+  Tweaks): the fake bridge can't open them with data; covered by cascade.mjs, listed under Not verified.
+- Not asked: cascade.mjs (kept: it is the check for those pages) and a two-line note in each file's header saying
+  where layout, look and tokens are (kept: it points the next reader at the stretches).
+- Risk named: tweaks.css's repeated `--price-btn*` at `:root`. Answered under "Eras and lazily loaded sheets".
 
 ## Tried and failed
 
@@ -70,7 +96,10 @@ reads 33 stretches in these 14 files). `tools/check.sh` runs in `run done`.
   custom properties that resolve to the same text; the one construct worth a look on a phone is a token holding a
   multi-value `border-color` (`--ss-cancel-edge: #2c1c1c #6b1516 #721819`, signsheet.css's red Cancel). The task did
   not ask for a phone, and the phones are driven only when a task says so.
-- **Pixels of pages the fake bridge can't open** (AltStore source and app pages, reviews and the Write a Review sheet,
-  the sign sheet, Signed Apps, Free Apple ID, the install progress page and queue run, Confirm, Add Tweaks, the QR
-  sheet, wide screens): covered by the cascade proof only, not by screenshots. See `cover.txt` for what the shots did
-  show of each sheet.
+- **Pixels of pages the fake bridge can't open, or opens empty** (AltStore source and app pages, reviews and the
+  Write a Review sheet, the sign sheet, Signed Apps, Free Apple ID, the install progress page and queue run, Confirm,
+  Add Tweaks, the QR sheet, an account's key, Manage's rows, My IPAs' rows, featured banners, wide screens): covered
+  by the cascade proof only, not by screenshots; seeding the fake bridge with data for each was more than the proof
+  needed. See `cover.txt` for what the shots did show of each sheet.
+- **docs/eras.md** still lists "the small ones" under "Not yet clean": it is not in this task's files, and C45-C47
+  edit the same list; filed as a follow-up to update it once they land.

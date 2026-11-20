@@ -1,0 +1,16 @@
+C48: what the 124 shots showed of each small sheet (visible elements matching its classes, shots.mjs SHEETS)
+
+altstore: 0 shots
+progress: 14 shots: home_guides_openssh, home_guides_password   (.pl lines in the guides' terminal panels)
+reviews: 0 shots
+guides: 22 shots: home_guides_copying, home_guides_openssh, home_guides_password, notiphone   (notiphone: the step badges)
+freeid: 0 shots
+myipas: 0 shots      (My IPAs opens, empty: the fake bridge has no IPAs)
+signing: 2 shots: home_settings_signing_help   (website, Classic and OLED Black)
+signsheet: 0 shots
+extras: 0 shots      (Browse opens without a repo's featured banners)
+queue: 0 shots
+tweaks: 0 shots
+notiphone: 2 shots: notiphone
+account: 0 shots     (Settings > Account opens without an account: no key, no Delete/Sign Out)
+manage: 0 shots      (Sources > Manage opens with no sources)

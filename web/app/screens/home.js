@@ -14,7 +14,7 @@
 // (core/catalog.js BROWSE_LISTS: new, updated, popular, featured, free-apps...), browse/category:<name>, and below those browse.js's tokens
 // (package:<id>, author:<name>, versions:<id>), as in the Search tab.
 import { grouped, el, placeholder, note } from "../nav/ui.js";
-import { format, settingsRoute, parse } from "../router.js";
+import { format, settingsRoute, parse, rootOn } from "../router.js";
 import { getBackend } from "../backend.js";
 import { showAlert } from "../nav/alert.js";
 import { popupOpen, whenNoPopup } from "../nav/popups.js";
@@ -56,6 +56,10 @@ export const CURATED_SOURCES = [
   { name: "palera1n", uri: "https://repo.palera.in/", blurb: "palera1n's own packages" },
 ].map((s) => ({ ...s, key: sourceKey({ uri: s.uri, dist: "./" }) }));
 
+// B169: Home's links to Changes push it onto Home's stack (it slides in, Back returns to Home), as every other page
+// opens; a plain #/changes would switch tabs without a slide.
+export const CHANGES_HREF = format(rootOn("changes"));
+
 // The green tile: what Home suggests next, from the source list and the upgrade count.
 //   sources: the backend's list, or null while it loads; upgrades: a count, or null where nothing knows it yet
 //   (the site has no installed list). Returns { kind, label, href }.
@@ -63,7 +67,7 @@ export function stateTile({ sources = null, upgrades = null, refreshing = 0 } = 
   if (sources == null) return { kind: "loading", label: "Loading Sources", href: format({ tab: "sources" }) };
   if (!sources.length) return { kind: "add", label: "Add a Source", href: format({ tab: "home", path: ["sources"] }) };
   if (upgrades > 0) {
-    return { kind: "upgrades", label: `${upgrades} ${upgrades === 1 ? "Upgrade" : "Upgrades"} Available`, href: format({ tab: "changes" }) };
+    return { kind: "upgrades", label: `${upgrades} ${upgrades === 1 ? "Upgrade" : "Upgrades"} Available`, href: CHANGES_HREF };
   }
   // While a refresh runs, its errors aren't known yet: no "failed" until a source has actually failed this time.
   // The tile keeps what it said (no "Refreshing Sources": user 2026-11-18, it's distracting); the bar shows the refresh.
@@ -71,8 +75,8 @@ export function stateTile({ sources = null, upgrades = null, refreshing = 0 } = 
   if (failed) {
     return { kind: "failed", label: `${failed} ${failed === 1 ? "Source" : "Sources"} Failed to Load`, href: format({ tab: "sources" }) };
   }
-  if (upgrades === 0) return { kind: "current", label: "Everything Up to Date", href: format({ tab: "changes" }) };
-  return { kind: "changes", label: "See What's New", href: format({ tab: "changes" }) };
+  if (upgrades === 0) return { kind: "current", label: "Everything Up to Date", href: CHANGES_HREF };
+  return { kind: "changes", label: "See What's New", href: CHANGES_HREF };
 }
 
 // F79: Home's Install IPAs tile, beside Browse: the Installed tab's Install IPAs page (screens/myipas.js). F212: in the
@@ -757,7 +761,7 @@ function renderHelp(body) {
     },
     {
       header: "Upgrading",
-      rows: [{ label: "Check for Changes", href: format({ tab: "changes" }) }, { label: "Refresh Sources", href: format({ tab: "sources" }) }],
+      rows: [{ label: "Check for Changes", href: format(rootOn("changes", { tab: "home", path: ["help"] })) }, { label: "Refresh Sources", href: format({ tab: "sources" }) }],
       footer: "Refresh in Sources fetches every source's package list again. Changes then shows what is new "
         + "or updated since the last refresh. Hold a package in Settings to keep it at its version.",
     },

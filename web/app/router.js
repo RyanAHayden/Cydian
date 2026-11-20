@@ -29,14 +29,20 @@ export function format({ tab, path = [] }) {
 // The pages a route stands on, root first: ["a", "b"] -> [[], ["a"], ["a", "b"]]. Each one is a screen in its tab's
 // navigation stack, so a deep link builds the whole stack and back walks it.
 export function prefixes(path) {
-  // A "~tab" segment only opens another tab's pages inside this one (see mounted): it is no page of its own.
-  return Array.from({ length: path.length + 1 }, (_, i) => path.slice(0, i)).filter((p) => !isMount(p.at(-1)));
+  // A "~tab" segment only opens another tab's pages inside this one (see mounted): it is no page of its own, except
+  // at the end of the route, where it stands for that tab's root page (B169: Home's What's New, #/home/~changes).
+  return Array.from({ length: path.length + 1 }, (_, i) => path.slice(0, i))
+    .filter((p) => p.length === path.length || !isMount(p.at(-1)));
 }
 
 // Another tab's pages opened inside this tab (user 2026-11-17: a link keeps the current page and slides the new one
 // in; Back comes back): #/home/~installed/myipas is Installed's myipas page on Home's stack.
 const MOUNT = "~";
 const isMount = (seg) => typeof seg === "string" && seg.startsWith(MOUNT) && TABS.includes(seg.slice(1));
+// B169: a tab's root page pushed on another tab's stack (Home's What's New tile: Changes slides in, Back returns), for
+// links that open a page; a plain format({ tab }) link switches tabs without a slide, like the tab bar. `on` is the
+// route the link sits on (Home's root by default).
+export const rootOn = (tab, on = { tab: "home", path: [] }) => ({ tab: on.tab, path: [...on.path, MOUNT + tab] });
 // The screen a route shows: its innermost "~tab" and the path after it, or the route itself; Home's settings/… is
 // the Settings screen's (F123).
 export function mounted(route) {
@@ -79,6 +85,8 @@ function safeDecode(s) {
   try { return decodeURIComponent(s); } catch { return s; }
 }
 
+const STEP = "ifizboxStep"; // history.state's key for an entry's step (createRouter)
+
 // onRoute(route, previous) runs on start and on every change (links, back/forward, go(), selectTab()).
 export function createRouter({ win, onRoute }) {
   let current = null;
@@ -86,16 +94,40 @@ export function createRouter({ win, onRoute }) {
 
   const seen = []; // the hashes walked, to tell a back (to the one before) from a link
   let switching = false; // the tab bar's own switch: never a mounted link
+  // B169: every history entry the router lands on carries its step in history.state ({ ifizboxStep: n }, rising), so
+  // a back (or forward) to an entry it already saw is told from a new link by the entry itself. Comparing the hash
+  // with the one before took a link for a back when its text matched: Installed > Install IPAs, the Home tab, then
+  // Home's Install IPAs tile (#/installed/myipas again) jumped to the Installed tab instead of sliding in on Home.
+  // A window without history.state (tests' stubs) keeps that comparison.
+  const tracks = Boolean(win.history) && "state" in win.history;
+  let step = 0; // the step of the entry on screen
+  let lastStep = 0; // the highest step handed out
+  let replacing = false; // replace(): the same entry, another route
+  const stepOf = () => {
+    let s;
+    try { s = win.history.state?.[STEP]; } catch { s = undefined; }
+    return Number.isInteger(s) ? s : null;
+  };
   function sync() {
     let route = parse(win.location.hash);
-    const back = seen.length > 1 && seen.at(-2) === format(route);
-    const link = !switching && !back ? mountLink(current, route) : null;
+    const known = tracks && !replacing ? stepOf() : null; // a step: an entry walked to again; null: a new one
+    const back = known != null ? Boolean(current) && known < step
+      : (!tracks || replacing) && seen.length > 1 && seen.at(-2) === format(route);
+    // An entry walked to again already holds the route the router gave it: only a new one can be a mounted link.
+    const link = !switching && !back && known == null ? mountLink(current, route) : null;
     switching = false;
-    if (link) { win.history.replaceState(null, "", format(link)); route = link; }
+    if (link) route = link;
     const canonical = format(route);
-    if (win.location.hash !== canonical) {
+    if (tracks) {
+      const s = known ?? (replacing && step ? step : ++lastStep);
+      lastStep = Math.max(lastStep, s);
+      step = s;
+      // Normalise without adding a history entry (e.g. "" or "#/bogus" -> "#/home"), and stamp the entry's step.
+      if (win.location.hash !== canonical || known !== s) win.history.replaceState({ [STEP]: s }, "", canonical);
+    } else {
+      if (link) win.history.replaceState(null, "", canonical);
       // Normalise without adding a history entry (e.g. "" or "#/bogus" -> "#/home").
-      win.history.replaceState(null, "", canonical);
+      if (win.location.hash !== canonical) win.history.replaceState(null, "", canonical);
     }
     if (current && format(current) === canonical) return;
     if (back) seen.pop(); else seen.push(canonical);
@@ -120,7 +152,8 @@ export function createRouter({ win, onRoute }) {
       const hash = format(route);
       if (win.location.hash === hash) return;
       win.history.replaceState(null, "", hash);
-      sync();
+      replacing = true;
+      try { sync(); } finally { replacing = false; }
     },
     // Tab bar tap: switch to the tab where the user left it; tapping the tab you are on pops it to its root.
     selectTab(tab) {

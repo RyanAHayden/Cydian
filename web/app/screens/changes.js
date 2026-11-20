@@ -41,6 +41,7 @@ import { vendorSoldIds } from "./extras.js";
 import { SELF_ID } from "../core/essential.js";
 import { showHUD } from "../nav/hud.js"; // F250: reloadSources from outside the tab
 import { appQueue } from "../app-queue.js"; // F255: the jailbreak app's Upgrade (N) queues app upgrades there
+import { onPageShow } from "../nav/pagestate.js"; // B169
 
 export const title = "Changes";
 
@@ -53,6 +54,7 @@ export const scopeOf = (picked, installed) => picked ?? defaultScope(installed.s
 
 export function init(ctx) {
   state.ctx = ctx;
+  onPageShow((route) => route.tab === "changes" && !route.path.length, (route, el) => redrawCopy(el, route, ctx));
   catalog.onChange(() => { if (state.body) load(); else badge(); });
   onAppsChange(() => { if (state.body) load(); else badge(); }); // I3: a recorded install can end an upgrade
   // iFizBox's own source read (essential-ui.js readSelfInfo): its upgrade row and the badge count again.
@@ -265,6 +267,16 @@ function drawUpgradeButton(n) {
   const label = upgradeLabel(n);
   if (b.textContent !== label) b.textContent = label;
   b.hidden = n === 0;
+}
+
+// B169: Changes' root page can be on screen in two places, its own tab and pushed on Home (Home's What's New), and the
+// module state above follows the copy drawn last. A copy that comes back to the top (a tab switch, Back) while the
+// other one holds the state is drawn again, so its list keeps up. -> true when it redrew.
+export function redrawCopy(body, route, ctx) {
+  if (!body || body === state.body) return false;
+  body.replaceChildren();
+  render(body, route, ctx);
+  return true;
 }
 
 export function render(body, route, ctx) {

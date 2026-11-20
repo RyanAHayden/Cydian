@@ -109,3 +109,13 @@ test("reportMalicious: a reason and the version go out; Something Else asks for 
   assert.equal(await reportMalicious({ id: "x", version: "1" }, { ask: async () => 0, alert: b.alert, api: down, hash: () => null }), "failed");
   assert.match(b.seen[0].message, /Too many reports/);
 });
+
+test("installSafety: the alert names the fix the phone's model can get", async () => {
+  const base = { mode: "sideload", ios: () => "16.2", trusted: [], summary: quiet, canOpenSettings: true, open: async () => true };
+  const x = alerts([1]);
+  await installSafety([unknownJob], { ...base, alert: x.alert, storage: mem(), machine: () => "iPhone10,6" });
+  assert.match(x.seen[0].message, /iOS 16\.7\.6 fixes it/, "an iPhone X stops at 16.7.x");
+  const n = alerts([1]);
+  await installSafety([unknownJob], { ...base, alert: n.alert, storage: mem(), machine: async () => { throw new Error("old shell"); } });
+  assert.match(n.seen[0].message, /iOS 17\.3 fixes it/, "model unknown: the newest fix");
+});

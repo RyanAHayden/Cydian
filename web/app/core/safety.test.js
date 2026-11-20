@@ -3,7 +3,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { EXPLOITABLE_IOS, exposureOf, exposureDue, exposureAlert, loadSeen, markSeen, patchesFor, duePatch, patchAlert, patchRow,
-  loadSnooze, snoozePatch, SOFTWARE_UPDATE, UNDERSTOOD, INSTALL_PATCH, LATER } from "./ios-exposure.js";
+  loadSnooze, snoozePatch, SOFTWARE_UPDATE, UNDERSTOOD, INSTALL_PATCH, LATER, LAST_IOS_LINE, lastIosLine } from "./ios-exposure.js";
 import { KNOWN_SAFE, knownSafe, placeOf } from "./safe-sources.js";
 import { trustOf, loadTrusted, setTrusted, isTrustedInput, untrustedJobs, unknownSourceAlert, TRUST_LABEL, ADD_TRUST } from "./trust.js";
 import { MALICIOUS_REASONS, reportBody, reportsApi, bannerOf, malwareIpa, malwareAlert, rememberIpaHash, ipaHash, MALWARE_IPAS,
@@ -39,14 +39,46 @@ test("exposureOf: listed versions, the newest fix among overlapping entries, unl
   assert.equal(exposureOf("garbage"), null);
   const e = exposureOf("16.2");
   assert.deepEqual(e.entries.map((x) => x.id).sort(), ["coruna-gruber-16", "kfd-landa", "kfd-physpuppet-16", "kfd-smith-16"]);
-  assert.equal(e.fixed, "17.0");
+  assert.equal(e.fixed, "17.3", "17.0 closes landa, but Gruber runs on 17.0: the fix named is a clean version");
+  assert.equal(e.stuck, false);
   assert.equal(exposureOf("15.1").fixed, "15.8.7");
   assert.equal(exposureOf("15.8.6").fixed, "15.8.7");
-  assert.equal(exposureOf("16.7").fixed, "17.0");
+  assert.equal(exposureOf("16.7").fixed, "17.3");
   assert.equal(exposureOf("16.7.5").fixed, "16.7.6");
   assert.equal(exposureOf("17.2.1").fixed, "17.3");
   assert.equal(exposureOf("18.6.2").fixed, "18.7.2");
-  assert.equal(exposureOf("14.8.1").fixed, "15.7.7");
+  assert.equal(exposureOf("14.8.1").fixed, "15.8.7", "15.7.7 closes smith, but landa runs to 15.8.6");
+  for (const v of ["15.1", "15.8.6", "16.2", "16.7", "16.7.5", "17.2.1", "18.6.2", "14.8.1"]) {
+    assert.equal(exposureOf(exposureOf(v).fixed), null, `${v}: the named fix is on no listed version`);
+  }
+});
+
+test("exposureOf: the fix named is one the phone's model can get", () => {
+  assert.equal(lastIosLine("iPhone10,6"), "16.7");
+  assert.equal(lastIosLine("iPhone9,3"), "15.8");
+  assert.equal(lastIosLine("iPhone16,1"), null, "newer models take any update");
+  assert.equal(lastIosLine(null), null);
+  for (const line of Object.values(LAST_IOS_LINE)) assert.match(line, /^\d+\.\d+$/);
+  // iPhone 8 / 8 Plus / X stop at 16.7.x: Gruber's 16.7.6, never 17.x
+  for (const m of ["iPhone10,1", "iPhone10,4", "iPhone10,3", "iPhone10,6"]) {
+    assert.equal(exposureOf("16.2", undefined, { machine: m }).fixed, "16.7.6", m);
+    assert.equal(exposureOf("16.7", undefined, { machine: m }).fixed, "16.7.6", m);
+  }
+  assert.equal(exposureOf("16.2", undefined, { machine: "iPhone11,2" }).fixed, "17.3", "an XS runs iOS 17");
+  assert.equal(exposureOf("15.1", undefined, { machine: "iPhone9,3" }).fixed, "15.8.7", "an iPhone 7 gets 15.8.7");
+  assert.equal(exposureOf("18.6.2", undefined, { machine: "iPhone11,8" }).fixed, "18.7.2");
+  assert.equal(exposureOf("16.2", undefined, { machine: "iPhone15,2" }).fixed, "17.3");
+  // No fix in reach: none named, and the phone is stuck
+  const landaOnly = EXPLOITABLE_IOS.filter((x) => x.id === "kfd-landa");
+  const x = exposureOf("16.2", landaOnly, { machine: "iPhone10,6" });
+  assert.equal(x.fixed, null);
+  assert.equal(x.stuck, true);
+  assert.equal(exposureOf("16.2", landaOnly).fixed, "17.0", "model unknown (the site): any update counts");
+  assert.equal(exposureOf("16.2", landaOnly).stuck, false);
+  // A reachable fix that is itself still listed is no fix
+  const chain = [{ id: "a", from: "16.0", through: "16.4", fixed: "16.5" }, { id: "b", from: "16.5", through: "16.7.9", fixed: "17.0" }];
+  assert.equal(exposureOf("16.2", chain, { lastLine: "16.7" }).stuck, true);
+  assert.equal(exposureOf("16.2", chain, { lastLine: "17.0" }).fixed, "17.0");
 });
 
 test("exposureDue: sideload and site only, untrusted installs only, once per iOS version", () => {
@@ -69,12 +101,18 @@ test("exposureAlert: plain wording, Software Update only where Settings opens", 
   assert.equal(app.title, "Check Before You Install");
   assert.deepEqual(app.buttons, [SOFTWARE_UPDATE, UNDERSTOOD]);
   assert.match(app.message, /iOS 16\.2 has a known flaw/);
-  assert.match(app.message, /iOS 17\.0 fixes it\./);
+  assert.match(app.message, /iOS 17\.3 fixes it\./);
   const site = exposureAlert(ex);
   assert.deepEqual(site.buttons, [UNDERSTOOD]);
   assert.match(site.message, /Settings > General > Software Update/);
   assert.doesNotMatch(app.message + site.message, /danger|hack|!|malware/i, "not scary");
   assert.deepEqual(exposureAlert({ ios: "1.0", entries: [], fixed: null }, { canOpenSettings: true }).buttons, [UNDERSTOOD]);
+  const x8 = exposureAlert(exposureOf("16.2", undefined, { machine: "iPhone10,6" }), { canOpenSettings: true });
+  assert.match(x8.message, /iOS 16\.7\.6 fixes it\./, "an iPhone X is told the fix it can get");
+  const stuck = exposureAlert(exposureOf("16.2", EXPLOITABLE_IOS.filter((x) => x.id === "kfd-landa"), { machine: "iPhone10,6" }), { canOpenSettings: true });
+  assert.match(stuck.message, /No iOS update for this iPhone fixes it\./);
+  assert.doesNotMatch(stuck.message, /iOS 17/);
+  assert.deepEqual(stuck.buttons, [UNDERSTOOD], "no Software Update when no update fixes it");
 });
 
 test("patches: listed per version, the first not installed or snoozed, Later until a newer version", () => {

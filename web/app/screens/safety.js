@@ -40,14 +40,14 @@ async function openOutside(url) {
 
 // ---- before installing ------------------------------------------------------------------------------------------
 
-// deps: { alert, mode, ios() -> string | null, storage, trusted, open(url) }
+// deps: { alert, mode, ios() -> string | null, machine() -> hw.machine | null, storage, trusted, open(url) }
 // `summary(id, version)`: the reports for an app's version (reports().summary), asked for each app at once, at most
 // REPORTS_WAIT ms: unreachable or slow says nothing.
 export const REPORTS_WAIT = 2000;
 const approved = new Set();
 export async function installSafety(jobs, { alert = showAlert, mode = detectMode(), ios = currentIos, storage = local(),
   trusted = trustedNow(storage), open = openOutside, canOpenSettings = Boolean(native()?.call),
-  summary = (id, v) => reports().summary(id, v), wait = REPORTS_WAIT } = {}) {
+  summary = (id, v) => reports().summary(id, v), wait = REPORTS_WAIT, machine = currentMachine } = {}) {
   const list = (jobs ?? []).filter((j) => j && j.op !== "remove");
   const idOf = (j) => (typeof j.bundleId === "string" && j.bundleId) || (typeof j.id === "string" && !j.id.startsWith("library:") ? j.id : null);
   for (const j of list) {
@@ -76,12 +76,19 @@ export async function installSafety(jobs, { alert = showAlert, mode = detectMode
   const v = await Promise.resolve().then(ios).catch(() => null);
   const seen = loadSeen(storage);
   if (!exposureDue({ mode, ios: v, untrusted: untrustedJobs(list, { trusted }).length > 0, seen })) return true;
-  const ex = exposureOf(v);
+  const ex = exposureOf(v, undefined, { machine: await Promise.resolve().then(machine).catch(() => null) });
   const a = exposureAlert(ex, { canOpenSettings });
   markSeen(storage, ex.ios);
   const { index } = await alert(a);
   if (a.buttons[index] === SOFTWARE_UPDATE) { await open(SOFTWARE_UPDATE_URL); return false; }
   return true;
+}
+
+// The phone's model (hw.machine) from the app's app.info, so the alert names only a fix the model can get. The site
+// can't tell the model (the user agent says "iPhone"): any update counts as in reach there.
+async function currentMachine() {
+  const info = await native()?.call?.("app.info", {});
+  return typeof info?.machine === "string" ? info.machine : null;
 }
 
 async function currentIos() {

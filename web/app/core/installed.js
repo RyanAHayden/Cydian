@@ -10,7 +10,7 @@
 // candidate (the newest version on any source) is newer than the installed one. Held packages (dpkg's `hold`
 // selection, or iFizBox's Ignored Upgrades list) go under Ignored Upgrades, not Available Upgrades.
 import { parseControl, description, compareVersions, parseRelations } from "./apt.js";
-import { sectionName, parseAuthor, compareNames, sectionGroup } from "./catalog.js";
+import { sectionName, parseAuthor, compareNames, sectionGroup } from "./sections.js"; // C36: not catalog.js, which imports this file
 import { NAME } from "../brand.js";
 
 // Where dpkg keeps it: rootful, then rootless (Dopamine, palera1n rootless).

@@ -13,7 +13,6 @@ import { fileURLToPath } from "node:url";
 const root = dirname(fileURLToPath(import.meta.url));
 
 const KNOWN = [
-  "core/catalog.js core/installed.js",
   "screens/browse.js screens/manage.js screens/roulette.js",
 ];
 

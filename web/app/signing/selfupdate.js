@@ -35,9 +35,9 @@ export async function followSelfUpdate(h, { native, retry = null, waiting = fals
     later(byHand, CLOSE_GRACE);
   };
   let last = null;
-  let hinted = false;
-  const hint = () => { // B208
-    if (closing || h?.page?.closed || typeof h?.finish !== "function") return;
+  let hinted = false, over = false;
+  const hint = () => { // B208: not once the follow has ended (Try Again or the by-hand end stand)
+    if (closing || over || h?.page?.closed || typeof h?.finish !== "function") return;
     h.page?.step?.(DOWNLOAD_BY_HAND);
     h.finish({ label: RETURN_LABEL, status: "Done" });
   };
@@ -48,6 +48,7 @@ export async function followSelfUpdate(h, { native, retry = null, waiting = fals
   };
   const s = await watchSelfUpdate(say, native);
   say(s);
+  over = true;
   if (SELF_UPDATE_FAILED[s]) unlockSelfUpdate(h, { message: SELF_UPDATE_FAILED[s], retry });
   else if (waiting && !s) byHand();
   return s;

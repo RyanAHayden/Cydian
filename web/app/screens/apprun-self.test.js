@@ -159,6 +159,26 @@ test("followSelfUpdate (single install), stuck on downloading: the hint and Retu
   assert.deepEqual([finishes.at(-1).label, finishes.at(-1).locked], [CLOSING_LABEL, true]);
 });
 
+test("a hint due after the follow failed leaves Try Again standing (queue run and single install)", () => withDom(async () => {
+  const w = selfWatch();
+  const s = setup([self()], { selfUpdate: w.fn });
+  await s.done;
+  await settle();
+  w.push("downloading");
+  w.end("stalled");
+  await settle();
+  s.timers.find((t) => t.ms === DOWNLOAD_HINT).f();
+  assert.equal(s.page.finished.label, TRY_AGAIN_LABEL);
+  assert.ok(!steps(s.page).includes(DOWNLOAD_BY_HAND));
+  const finishes = [], timers = [];
+  const h = { page: { closed: false, step: () => {}, error: () => {} }, finish: (o) => finishes.push(o) };
+  const native = { call: async (m, p, onEvent) => { onEvent({ state: "downloading" }); return { state: "stalled" }; } };
+  await followSelfUpdate(h, { native, waiting: true, later: (f, ms) => timers.push({ f, ms }) });
+  const n = finishes.length;
+  timers.find((t) => t.ms === DOWNLOAD_HINT).f();
+  assert.equal(finishes.length, n, "no late Return over the failure");
+}));
+
 test("self row, hosted: a guess (older server) is Closing too; a closed page gets no late instruction", () => withDom(async () => {
   const w = selfWatch();
   const s = setup([self()], { selfUpdate: w.fn });

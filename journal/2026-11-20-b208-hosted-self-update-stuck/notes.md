@@ -50,6 +50,16 @@ the button locked on "Waiting for iOS", and iFizBox never closes, so iOS can't i
   backstops cover the next updates if the mark is ever late again (KV caching, see below).
 - Worker files weren't in the brief's file list; the cause lives there, so they are changed (small, local edits).
 
+## Review (spec axis)
+
+- Fixed: the single install's hint could land after a failed follow and replace Try Again with Return; it now stands
+  down once the follow has ended (test added). The queue's run already did, because a failure clears `following`.
+- Kept: the Worker edits (the cause is there), `promptLimit` (it answers the brief's "is the poll alive while the
+  prompt is up?"), docs/test edits. The 15 s hint also shows during a slow but healthy download; its wording only
+  asks to close iFizBox if the new one is already installing on the Home Screen, so it's safe to keep.
+  `downloadGuess` only runs inside the poll, which KeepAlive keeps alive in the background as it does for the rest
+  of the follow.
+
 ## Tried and failed
 
 - Nothing failed. One of my own comments first quoted "Finishing the update", which `native/test_updates.py`

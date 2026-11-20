@@ -53,6 +53,7 @@ import { readIpaFile } from "../core/ipainfo.js";
 import { localSigning, libraryCall, installFromLibrary, signAndInstall, openSigning, handOffIpa } from "../signing-client.js";
 import { siteCertificateAlert } from "./altstore.js";
 import { NAME } from "../brand.js";
+import { signingPage } from "../core/signingpage.js"; // C15: Installation & Signing in the sideload build
 import { serverReachable } from "../signing-client.js";
 import { libraryJob } from "../core/appqueue.js";
 import { queueApp } from "./queue.js";
@@ -1030,7 +1031,7 @@ async function renderIpa(body, route, file) {
   if (entry.extensions?.length) details.push({ label: "Extensions", detail: String(entry.extensions.length) });
   details.push({ label: "File", detail: entry.file });
   const groups = [
-    { rows: status, footer: entry.error ? `This file can't be signed: ${entry.error}` : !identity ? "Add your certificate in Settings > Signing to sign it." : "" },
+    { rows: status, footer: entry.error ? `This file can't be signed: ${entry.error}` : !identity ? `Add your certificate in ${signingPage()} to sign it.` : "" },
   ];
   if (!entry.error) groups.push({ rows: actions, footer: "Signing happens on this iPhone and works offline. Installing needs a connection only for the Signing Server's install manifest." });
   groups.push({ header: "Details", rows: details });
@@ -1357,7 +1358,7 @@ export function keepFooter(entry, ed, orig = { installed: false, ours: false }) 
   if (!ed?.keepBundleId) return OLD_WAY_TEXT(name, "");
   const own = !String(ed?.bundleId ?? "").trim() || String(ed.bundleId).trim() === entry?.bundleId;
   const note = own ? originalNote(name, orig) : null;
-  return note ? note.text : "The app keeps its own ID: it replaces the original and can get its notifications. Settings > Signing's Keep Bundle IDs decides for IPAs without Sign Options.";
+  return note ? note.text : `The app keeps its own ID: it replaces the original and can get its notifications. ${signingPage()}'s Keep Bundle IDs decides for IPAs without Sign Options.`;
 }
 
 async function saveOptions(file) {

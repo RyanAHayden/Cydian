@@ -43,6 +43,7 @@ import { PUBLIC_SITE } from "../core/handoff.js";
 import { lookupApp, lookupNeed, mergeDetails, pageLinks, lookupUrl, workerLookupUrl, regionOf, ownPageLinks, shortText,
   storeTrackId, storeReviews, reviewsFeedUrl, workerReviewsUrl } from "../core/applookup.js";
 import { NAME, BUNDLE_ID } from "../brand.js";
+import { signingPage } from "../core/signingpage.js"; // C15: Installation & Signing in the sideload build
 import { addNavIcon } from "../nav/navbar.js";
 import { haptic } from "../nav/haptic.js";
 import { showHUD } from "../nav/hud.js";
@@ -821,7 +822,7 @@ export function renderApp(body, route, pkg, source, { related = null } = {}) {
     footer: gated ? SITE_GATE_FOOTER
       : options.download && ipaInstallAvailable() ? IPA_FOOTER
       : options.itms ? "Installs over the air with the source's signed link."
-      : localSigning() ? "Install queues it and opens Confirm, which signs it with your own certificate (Settings > Signing) and installs it. Custom Install first lets you change its bundle ID, name, icon or extensions. Download IPA keeps the file."
+      : localSigning() ? `Install queues it and opens Confirm, which signs it with your own certificate (${signingPage()}) and installs it. Custom Install first lets you change its bundle ID, name, icon or extensions. Download IPA keeps the file.`
       : options.download ? SITE_INSTALL_FOOTER : null }]);
   const installBox = installGroup.firstElementChild; // grouped() gives a fragment, empty once appended
   details.append(installGroup);

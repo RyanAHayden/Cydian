@@ -25,6 +25,7 @@ import { runSetup, pickTeam, setupError, SETUP_STEPS, otherTool, freeExpiry } fr
 import { storedZip } from "../core/freecert.js";
 import { parseProfile } from "../core/signing.js";
 import { storedUdid } from "./signing.js";
+import { MERGED_PAGE } from "../core/signingpage.js";
 
 export const FREE_KEY = "ifizbox.freeid";
 const ANISETTE_KEY = "ifizbox.freeid.anisette";
@@ -350,7 +351,8 @@ function readyView(ctx, saved) {
     footer: setupDone ? Object.values(flow.steps).map((s) => s.summary).join(". ") + "." : null }])];
   out.push(button("Save for the App", () => download(handoffZip(saved), `${NAME} Free Apple ID.zip`), "free-primary"));
   out.push(grouped([{ footer: `The .zip holds the certificate, its password and ${NAME}'s 7-day profile, for the ${NAME} app's `
-    + "Settings > Signing > Select All Files. iOS refuses free Apple ID apps from a website, so they have to be installed by an "
+    + `${MERGED_PAGE} > Select All Files. iOS refuses` // C15: the app it names is the sideload build
+    + " free Apple ID apps from a website, so they have to be installed by an "
     + `app on the iPhone through LocalDevVPN; ${NAME}'s own install route for that isn't out yet. Sign in here again for a `
     + "new profile each week (the certificate is kept for its year)." }]));
   // F254i: the Developer Mode + Trust steps, a page of their own; gone once an app on this route installed fine

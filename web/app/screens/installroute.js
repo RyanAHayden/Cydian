@@ -41,7 +41,36 @@ const VPN = VPNS[0];
 const route = (sub) => format(settingsRoute(sub ? [PAGE, sub] : [PAGE]));
 const goTo = (sub) => { location.hash = route(sub).replace(/^#/, ""); };
 const call = (native, m, p = {}, ev) => native?.call ? native.call(m, p, ev) : Promise.reject(new Error(`This needs the ${NAME} app.`));
-async function status(native) { try { return await call(native, "idevice.status"); } catch { return null; } }
+// F301: every call the page waits on has a deadline. Past it the row (or the alert) says Not Responding instead of
+// spinning on; a later answer is dropped. idevice.status answers in under a second (VPNCheck: no probe when no tunnel
+// is up, both ports at once otherwise), tailscale.status at once (UserDefaults and getifaddrs); idevice.verify and
+// tailscale.test talk to iOS or start Tailscale's node, so they get longer.
+export const TIMEOUTS = { status: 5000, tailscale: 4000, verify: 20000, test: 25000 };
+export const NOT_RESPONDING = "Not Responding";
+export function within(p, ms) {
+  let t = null;
+  const late = new Promise((_, no) => {
+    t = setTimeout(() => no(Object.assign(new Error(`not_responding: no answer in ${Math.round(ms / 1000)} s`), { code: "not_responding" })), ms);
+    t?.unref?.(); // Node (tests): a deadline alone doesn't keep the process up
+  });
+  return Promise.race([Promise.resolve(p), late]).finally(() => clearTimeout(t));
+}
+const isLate = (e) => e?.code === "not_responding";
+// idevice.status with its deadline: { st } (null when it failed) and `late` when it didn't answer in time.
+async function readStatus(native) {
+  try { return { st: (await within(call(native, "idevice.status"), TIMEOUTS.status)) ?? null, late: false }; } catch (e) { return { st: null, late: isLate(e) }; }
+}
+async function status(native) { return (await readStatus(native)).st; }
+async function readTailscale(native) {
+  try { return { ts: (await within(call(native, "tailscale.status"), TIMEOUTS.tailscale)) ?? null, late: false }; } catch (e) { return { ts: null, late: isLate(e) }; }
+}
+
+// F301: the last idevice.status answer, shown at once the next time a page draws (its rows spinning while it's read
+// again). Kept for this run of the app only: after a relaunch the VPN may well be another, so the first read waits.
+let lastStatus = null;
+export function rememberStatus(st) { if (st && typeof st === "object") lastStatus = st; }
+export function forgetStatus() { lastStatus = null; } // tests, and Forget Pairing
+export const cachedStatus = () => lastStatus;
 
 // B133: every step that waits on the phone, the network or the pairing shows iOS 6's activity indicator and what it
 // does. A one-off action (Check Connection, Forget Pairing, Test Connection, Sign Out, a Connect With pick, importing
@@ -97,8 +126,13 @@ let signInVisit = null; // B143: the pair page's visit that started it (leaving 
 // `connectPick` keeps it checked and spinning while the status read after it runs). `hint`: the last idevice.status
 // read, so that while the page reads again the LocalDevVPN rows don't come and go (Tailscale the way in, or not).
 // F300: no Developer Mode row (an app can't open without it; an install it stops says so in its alert).
+// F301: the page reads idevice.status (Pairing, the VPN) and tailscale.status (Connect With, Tailscale) at once, and
+// each part has its own state: `reading` the device part isn't known (`tsReading` the Tailscale part; it defaults to
+// `reading`), `refreshing: {device, tailscale}` the rows show the last answer (`st`, cached) with their spinner while
+// that part is read again, `late: {device, tailscale}` that part didn't answer in time: its rows say Not Responding.
 export function installationGroups(choice, st, { pick = () => {}, openVPN = () => {}, connect = () => {}, signIn = () => {}, test = () => {}, signOut = () => {}, busy = null,
-  reading = false, connectPick = null, picking = false, connectBusy = null, hint = null, server = () => [] } = {}) {
+  reading = false, connectPick = null, picking = false, connectBusy = null, hint = null, server = () => [],
+  tsReading = reading, refreshing = {}, late = {}, testing = false } = {}) {
   const groups = [{
     header: "Install Apps With",
     rows: ROUTE_OPTIONS.map((o) => ({ label: o.label, subtitle: o.subtitle, cls: "route-row", checked: o.value === choice, onClick: () => pick(o.value),
@@ -112,17 +146,21 @@ export function installationGroups(choice, st, { pick = () => {}, openVPN = () =
     const ts = st?.tailscale ?? null;
     // B167: while idevice.status (tailscale.status with it) hasn't answered, Tailscale's state is unknown, not signed
     // out: its row says Checking… with the spinner (one row, as Sign In is), and Connect With keeps the pick just made.
-    const tsUnknown = reading || !st;
-    const now = connectBusy ?? ts?.connect ?? (tsUnknown && (connectPick ?? hint?.tailscale?.connect)) ?? "auto";
-    const spinning = connectBusy ?? (tsUnknown ? connectPick : null);
+    const tsUnknown = (tsReading || !st) && !late.tailscale;
+    const tsAgain = Boolean(refreshing.tailscale) && !tsUnknown; // F301: the last answer shown while it's read again
+    const now = connectBusy ?? (tsUnknown || tsAgain ? connectPick : null) ?? ts?.connect ?? (tsUnknown ? hint?.tailscale?.connect : null) ?? "auto";
+    const spinning = connectBusy ?? (tsUnknown || tsAgain ? connectPick : null);
     const viaTs = tailscaleRoute(tsUnknown ? hint : st, now); // F300: no LocalDevVPN rows then
+    const devLate = Boolean(late.device), devAgain = Boolean(refreshing.device) && !reading && !devLate;
     groups.push({
       header: "This iPhone",
       rows: [
-        reading ? { label: "Pairing", detail: "Checking…", href: route("pair"), spin: true }
-          : { label: "Pairing", detail: st?.paired ? "Paired" : "Not Paired", href: route("pair") },
+        devLate ? { label: "Pairing", detail: NOT_RESPONDING, href: route("pair") }
+          : reading ? { label: "Pairing", detail: "Checking…", href: route("pair"), spin: true }
+          : { label: "Pairing", detail: st?.paired ? "Paired" : "Not Paired", href: route("pair"), ...(devAgain ? { spin: true } : {}) },
         ...(viaTs ? [] : [
-          { label: VPN, detail: reading ? "Checking…" : vpnDetail(st) },
+          devLate ? { label: VPN, detail: NOT_RESPONDING }
+            : { label: VPN, detail: reading ? "Checking…" : vpnDetail(st), ...(reading || devAgain ? { spin: true } : {}) },
           { label: `Open ${VPN}`, cls: "sign-import", onClick: openVPN },
         ]),
       ],
@@ -135,10 +173,11 @@ export function installationGroups(choice, st, { pick = () => {}, openVPN = () =
     });
     const rows = busy
       ? [{ label: "Signing In…", detail: busy, spin: true }]
+      : late.tailscale && !ts ? [{ label: "Tailscale", detail: NOT_RESPONDING }]
       : tsUnknown ? [{ label: "Tailscale", detail: "Checking…", spin: true }]
       : ts?.signedIn
-        ? [{ label: "Device", detail: ts.name || NAME },
-          { label: "Test Connection", cls: "sign-import", onClick: test },
+        ? [{ label: "Device", detail: ts.name || NAME, ...(tsAgain ? { spin: true } : {}) },
+          { label: "Test Connection", cls: "sign-import", onClick: test, ...(testing ? { detail: "Testing…", spin: true } : {}) },
           { label: "Sign Out", cls: "sign-import", onClick: signOut }]
         : [{ label: "Sign In", cls: "sign-import", onClick: signIn }];
     groups.push({ header: "Tailscale", rows, footer: tailscaleFooter(ts) });
@@ -175,33 +214,47 @@ export const subGroups = (sections, sub) => (sub === "iphone" ? sections.slice(1
 
 let picked = null; // F300: the choice just tapped, until idevice.status answers on the page it redrew
 let connectBusy = null; // F300: the Connect With pick whose tailscale.setConnect hasn't answered
-let lastStatus = null; // F300: the last idevice.status the page read (installationGroups' `hint`)
 const painting = new WeakMap(); // page element → its latest paintInstallation (an older one stops painting)
+let testing = false; // F301: Test Connection runs (its row spins; a second tap waits for it)
 
 async function paintInstallation(el, { store, native, alert, redraw, server = () => [], sub = null }) {
   const choice = sub === "iphone" ? "iphone" : store.get(ROUTE_KEY);
   const me = {};
   painting.set(el, me);
   const mine = () => painting.get(el) === me;
-  let known = null; // idevice.status once read
-  const paint = (st, { reading = false } = {}) => {
+  // F301: what the rows show (the last answer at first, then each part as it answers) and each part's state
+  let view = lastStatus;
+  const cached = Boolean(view);
+  const got = { device: false, tailscale: false }, late = { device: false, tailscale: false };
+  const paint = () => {
     if (!mine()) return;
-    const sections = installationGroups(choice, st, {
-      reading, connectPick, connectBusy, hint: lastStatus, server, picking: reading && picked === choice,
+    const devWait = !got.device && !late.device, tsWait = !got.tailscale && !late.tailscale;
+    const sections = installationGroups(choice, view, {
+      reading: devWait && !cached, tsReading: tsWait && !view?.tailscale,
+      refreshing: { device: devWait && cached, tailscale: tsWait && Boolean(view?.tailscale) }, late, testing,
+      connectPick, connectBusy, hint: lastStatus, server, picking: devWait && picked === choice,
       // the store's set redraws Settings' pages (this one too); a store that doesn't, redraws it here
       pick: (v) => { if (v === choice && !picked) return; picked = v; pickRoute(v, { set: (r) => store.set(ROUTE_KEY, r) }); if (mine()) redraw(); },
       openVPN: () => openVPN(native, alert),
-      // F300: checked at once with the spinner in its row (no HUD), until setConnect and then idevice.status answer
+      // F300: checked at once with the spinner in its row (no HUD), until setConnect and then the status answer.
+      // F301: setConnect answers with tailscale.status, which fills the Tailscale part at once.
       connect: async (v) => {
         if (connectBusy) return;
         connectBusy = v;
         connectPick = v;
-        paint(known, { reading: !known });
-        try { await call(native, "tailscale.setConnect", { value: v }).catch(() => {}); } finally { connectBusy = null; }
+        paint();
+        let ts = null;
+        try { ts = await within(call(native, "tailscale.setConnect", { value: v }), TIMEOUTS.tailscale).catch(() => null); } finally { connectBusy = null; }
+        if (ts && typeof ts === "object" && ts.connect && lastStatus) lastStatus = { ...lastStatus, tailscale: ts };
         redraw();
       },
       signIn: () => tailscaleSignIn(native, alert, redraw),
-      test: () => tailscaleTest(native, alert),
+      test: async () => {
+        if (testing) return;
+        testing = true;
+        paint();
+        try { await tailscaleTest(native, alert, () => { testing = false; paint(); }); } finally { if (testing) { testing = false; paint(); } }
+      },
       signOut: async () => {
         const { index } = await alert({ title: "Sign Out of Tailscale?", message: `${NAME} leaves your tailnet. Installs use LocalDevVPN until you sign in again.`, buttons: ["Cancel", "Sign Out"], cancel: 0 });
         if (index !== 1) return;
@@ -213,22 +266,97 @@ async function paintInstallation(el, { store, native, alert, redraw, server = ()
       busy: signingIn,
     });
     const shown = subGroups(sections, sub);
-    const frag = spinRows(warnFooters(shown), shown);
-    for (const d of frag.querySelectorAll?.(".cell-detail") ?? []) if (d.textContent === "Another VPN") d.classList.add("install-red");
-    slideLayout(el, () => el.replaceChildren(frag));
+    patchGroups(el, shown, (s) => {
+      const frag = spinRows(warnFooters(s), s);
+      for (const d of frag.querySelectorAll?.(".cell-detail") ?? []) if (d.textContent === "Another VPN" || d.textContent === NOT_RESPONDING) d.classList.add("install-red");
+      return frag;
+    });
   };
-  paint(null, { reading: true });
-  known = await status(native); // read for the Signing Server choice too (the choice row's spinner waits on it)
-  if (!mine()) return;
-  if (known) lastStatus = known;
-  connectPick = null; // the answer carries Connect With now
-  const wasPicked = picked === choice;
-  if (wasPicked) picked = null;
-  if (choice !== "iphone" && !wasPicked) return; // nothing on the page waited on the answer
-  paint(known);
+  paint();
+  // F301: both reads at once; each part fills its rows as it answers. idevice.status is read for the Signing Server
+  // choice too (the choice row's spinner waits on it); tailscale.status only feeds This iPhone's groups.
+  const device = readStatus(native).then(({ st }) => {
+    if (!mine()) return;
+    got.device = Boolean(st);
+    late.device = !st; // failed or too slow: Not Responding (a failure says no more than that)
+    if (st) {
+      rememberStatus(st);
+      view = got.tailscale && view?.tailscale ? { ...st, tailscale: view.tailscale } : st;
+      got.tailscale = true;
+      connectPick = null; // the answer carries Connect With now
+    }
+    const wasPicked = picked === choice;
+    if (wasPicked) picked = null;
+    if (choice !== "iphone" && !wasPicked) return; // nothing on the page waited on the answer
+    paint();
+  });
+  const tailscale = choice !== "iphone" ? null : readTailscale(native).then(({ ts }) => {
+    if (!mine() || got.tailscale) return; // idevice.status brought it first
+    if (!ts || typeof ts !== "object") { late.tailscale = true; paint(); return; } // idevice.status may still bring it
+    got.tailscale = true;
+    view = { ...(view ?? {}), tailscale: ts };
+    connectPick = null;
+    paint();
+  });
+  await Promise.all([device, tailscale]);
 }
 
 let connectPick = null; // B167: the Connect With pick just made, until idevice.status answers with it
+
+// F301: a repaint of a page's groups changes only what changed, in place: a group whose rows are the same keeps its
+// element and only the rows whose content changed are swapped (a detail, a spinner, a checkmark), a footer's text is
+// set on the footer that's there, and only groups that come, go or change their rows are rebuilt. Moves slide
+// (slideLayout). Rows kept from an earlier draw call the latest draw's handlers (each tap goes through a holder).
+// `build(sections)` makes the groups' DOM (grouped() and what the page adds to it).
+const sigOf = (r) => JSON.stringify(r, (k, v) => (typeof v === "function" ? "ƒ" : v));
+export function patchGroups(box, sections, build) {
+  const holders = sections.map((s) => (s.rows ?? []).map((r) => {
+    if (!r?.onClick) return null;
+    const h = { f: r.onClick };
+    r.onClick = (e) => h.f(e);
+    return h;
+  }));
+  const fresh = [...build(sections).children];
+  const keyOf = (s) => s.header || s.rows?.[0]?.label || (s.spinner ? "spinner" : "");
+  const frameOf = (s) => sigOf({ h: s.header, w: s.warn, f: Boolean(s.footer), rows: (s.rows ?? []).map((r) => [r.label, r.cls, Boolean(r.href), Boolean(r.onClick)]) });
+  fresh.forEach((g, i) => {
+    const s = sections[i];
+    g.__key = keyOf(s);
+    g.__frame = frameOf(s);
+    g.__footer = s.footer ?? "";
+    const ul = [...g.children].find((c) => c.classList?.contains("table"));
+    [...(ul?.children ?? [])].forEach((li, j) => { li.__sig = sigOf(s.rows[j]); li.__h = holders[i][j]; });
+  });
+  slideLayout(box, () => {
+    const old = [...box.children];
+    const used = new Set();
+    const next = fresh.map((g) => {
+      const o = old.find((x) => !used.has(x) && x.__key === g.__key && x.__frame === g.__frame);
+      if (!o) return g;
+      used.add(o);
+      const oul = [...o.children].find((c) => c.classList?.contains("table"));
+      const nul = [...g.children].find((c) => c.classList?.contains("table"));
+      if (oul && nul) {
+        const lis = [...oul.children], nlis = [...nul.children];
+        let changed = false;
+        const keep = nlis.map((n, j) => {
+          const k = lis[j];
+          if (k && k.__sig === n.__sig) { if (k.__h && n.__h) k.__h.f = n.__h.f; return k; }
+          changed = true;
+          return n;
+        });
+        if (changed) oul.replaceChildren(...keep);
+      }
+      if (o.__footer !== g.__footer) {
+        const f = o.querySelector?.(".group-footer");
+        if (f) f.textContent = g.__footer;
+        o.__footer = g.__footer;
+      }
+      return o;
+    });
+    if (next.length !== old.length || next.some((g, i) => g !== old[i])) box.replaceChildren(...next);
+  });
+}
 
 // F300: a repaint of a page's groups slides: a group that stays starts where it was and slides to its new place, a
 // group that comes in fades in from a little above, and what's under the box slides as slideBelow does (FLIP, by
@@ -303,10 +431,15 @@ async function tailscaleSignIn(native, alert, redraw, done = `${NAME} is on your
   }
 }
 
-async function tailscaleTest(native, alert) {
+// F301: the test runs with the spinner in its own row (installationGroups' `testing`, no HUD), at most TIMEOUTS.test;
+// `ended()` stops the row's spinner before the answer's alert.
+async function tailscaleTest(native, alert, ended = () => {}) {
   let r;
-  try { r = await busy("Testing Connection", () => call(native, "tailscale.test")); } catch (e) { r = { ok: false, code: "error", detail: e?.message }; }
-  const why = tailscaleTestResult(r);
+  try { r = await within(call(native, "tailscale.test"), TIMEOUTS.test); } catch (e) { r = isLate(e) ? { ok: false, code: "not_responding" } : { ok: false, code: "error", detail: e?.message }; }
+  ended();
+  const why = r?.code === "not_responding"
+    ? { title: NOT_RESPONDING, message: `Tailscale didn't answer in ${TIMEOUTS.test / 1000} seconds. Check that the Tailscale app's VPN is on, then test again.` }
+    : tailscaleTestResult(r);
   if (!why.copy) return alert({ title: why.title, message: why.message, buttons: ["OK"] });
   const { index } = await alert({ title: why.title, message: why.message, buttons: ["OK", "Copy Rule"], cancel: 0 });
   if (index === 1) copyText(why.copy);
@@ -403,12 +536,14 @@ export function mainPage({ store, native = globalThis.ifizboxNative, alert = sho
     const h = host();
     if (choice !== "iphone") { paintStatus(installStatus(choice, undefined, { host: h })); slots.with.set(withDetail(choice)); }
     else if (lastChoice && lastChoice !== choice) { paintStatus(CHECKING); title.wait(); subtitle.wait(); slots.with.wait(); } // just picked
+    else if (!lastChoice && lastStatus) { paintStatus(installStatus(choice, lastStatus, { host: h })); slots.with.set(withDetail(choice, lastStatus)); } // F301: the last answer at once
     lastChoice = choice;
     const reads = [
       status(native).then((st) => {
         if (n < statusShown) return;
         statusShown = n;
         known = st;
+        rememberStatus(st);
         const c = store.get(ROUTE_KEY);
         paintStatus(installStatus(c, st, { host: h }));
         slots.with.set(withDetail(c, st));
@@ -682,6 +817,7 @@ async function drawPair(box, { store, native, alert, redraw }) {
   const [st, apps] = pairing ? [null, null] : await Promise.all([status(native), vpnApps(native)]);
   if (v !== visit) return; // left while idevice.status answered
   v.checking = false;
+  rememberStatus(st);
   const state = setupState(st, pairing);
   if (state !== "connect" && v.poll) { clearInterval(v.poll); v.poll = null; }
   const connect = st?.tailscale?.connect ?? "auto";
@@ -724,6 +860,7 @@ async function drawPair(box, { store, native, alert, redraw }) {
     check: () => check(native, alert, recheck, store, checkButton),
     forget: async () => {
       await busy("Forgetting Pairing", () => call(native, "idevice.forget").catch(() => {}));
+      forgetStatus(); // F301: the cached answer says Paired
       store.set(ROUTE_KEY, "server"); v.started = false; recheck();
     },
     vpn,
@@ -762,7 +899,12 @@ async function drawPair(box, { store, native, alert, redraw }) {
   box.replaceChildren(frag);
 
   if (state === "connect") {
-    v.poll ??= setInterval(async () => { if (visit === v && !pairing && vpnOn(await status(native))) redraw(); }, VPN_POLL);
+    // F301: one read at a time (a read slower than VPN_POLL used to start the next one on top of it)
+    v.poll ??= setInterval(async () => {
+      if (visit !== v || pairing || v.polling) return;
+      v.polling = true;
+      try { if (visit === v && !pairing && vpnOn(await status(native))) redraw(); } finally { v.polling = false; }
+    }, VPN_POLL);
     const ask = connectAlert(vpn);
     if (ask && !v.asked) {
       v.asked = true;
@@ -776,19 +918,29 @@ async function drawPair(box, { store, native, alert, redraw }) {
 
 // B135: Check Connection answers on its own button (`mark`, checkMark below): a success is a check and a green
 // "Successful" in place of the label, no alert; a failure keeps the alert and puts an x on the button.
+// F301: the check runs with the spinner on its own button (no HUD) and at most TIMEOUTS.verify. It reads
+// idevice.status first (under a second): with neither LocalDevVPN nor Tailscale's route on, idevice.verify could only
+// wait out its 30 s tunnel limit, so the answer (Turn On LocalDevVPN) comes at once instead.
 async function check(native, alert, redraw, store, mark = null) {
+  if (mark?.spinning()) return; // a second tap while it checks
   mark?.reset();
+  const stop = mark?.spin() ?? (() => {});
   try {
-    await busy("Checking Connection", () => call(native, "idevice.verify"));
+    const st = await status(native);
+    rememberStatus(st);
+    if (st && !vpnOn(st)) { stop(); throw Object.assign(new Error("connect_failed: neither LocalDevVPN nor Tailscale is on"), { code: "connect_failed" }); }
+    try { await within(call(native, "idevice.verify"), TIMEOUTS.verify); } finally { stop(); }
     if (store.get(ROUTE_KEY) !== "iphone") store.set(ROUTE_KEY, "iphone"); // a set redraws Settings' pages, and the mark with them
     mark?.show(true);
   } catch (e) {
-    const why = verifyFailure(e);
+    const why = isLate(e)
+      ? { title: NOT_RESPONDING, message: `This iPhone didn't answer in ${TIMEOUTS.verify / 1000} seconds. Check that ${VPN} (or Tailscale) is on, then check again.`, again: false }
+      : verifyFailure(e);
     mark?.show(false);
     try {
       if (!why.again) return await alert({ title: why.title, message: why.message, buttons: ["OK"] });
       const { index } = await alert({ title: why.title, message: why.message, buttons: ["Cancel", "Pair Again"], cancel: 0 }) || {};
-      if (index === 1) { await busy("Forgetting Pairing", () => call(native, "idevice.forget").catch(() => {})); if (visit) visit.started = false; redraw(); }
+      if (index === 1) { await busy("Forgetting Pairing", () => call(native, "idevice.forget").catch(() => {})); forgetStatus(); if (visit) visit.started = false; redraw(); }
     } finally { mark?.expire(); } // the x stays while the alert is up, then the same few seconds
   }
 }
@@ -821,7 +973,23 @@ export function checkMark(inner, text = STATUS_ACTIONS.check) {
     label.replaceChildren(mark, words);
     if (ok) expire();
   };
-  return { show, reset, expire, active: () => on };
+  // F301: the grey spinner at the button's right end while the check runs; returns its stop
+  let spinning = false;
+  const spin = () => {
+    if (!inner?.append) return () => {};
+    const sp = el("span", "loading-spinner");
+    sp.setAttribute("aria-hidden", "true");
+    inner.append(sp);
+    inner.setAttribute("aria-busy", "true");
+    spinning = true;
+    return () => {
+      if (!spinning) return;
+      spinning = false;
+      if (sp.remove) sp.remove(); else if (Array.isArray(inner.children)) inner.children = inner.children.filter((c) => c !== sp); // tests' small DOM
+      inner.setAttribute("aria-busy", "false");
+    };
+  };
+  return { show, reset, expire, spin, active: () => on, spinning: () => spinning };
 }
 
 // B148: This iPhone's page (installation/iphone) shown again, Back from Pairing: idevice.status read again and each

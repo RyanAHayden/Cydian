@@ -1,11 +1,12 @@
 // F270: pull to refresh's arm/release logic (nav/pullrefresh.js): where it arms, that a release under the trigger or
 // while a refresh runs does nothing, the rubber band, the Last Updated line, and that every page with a Refresh /
-// Reload nav button wires it. B188: an armed release holds the area open (refreshing), slides back when the refresh
-// ends (closing) and resets to the arrow only once hidden (idle).
+// Reload nav button wires it. B209: an armed release springs straight back (nothing held open) while the hidden area
+// shows the spinner (refreshing); a pull during the refresh reveals it and runs nothing; the area goes back to the
+// arrow once the refresh ended (closing) and the area is out of sight (idle).
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { pullState, pullTracker, rubber, lastUpdatedText, titleFor, bounceHold, refreshEnd, TRIGGER, HOLD, TEXT,
+import { pullState, pullTracker, rubber, lastUpdatedText, titleFor, refreshEnd, TRIGGER, TEXT,
   MIN_HOLD_MS, MAX_HOLD_MS, pullHaptic } from "./pullrefresh.js";
 import { createSettings } from "../core/settings.js";
 
@@ -32,24 +33,26 @@ function run({ busyAtStart = false, busyAtEnd = false, pulls }) {
   return { went, refreshed, states, t };
 }
 
-test("release past the trigger runs the refresh once and holds: refreshing, closing when it ends, idle once hidden", () => {
+test("release past the trigger runs the refresh once: refreshing, closing when it ends, idle once hidden", () => {
   const r = run({ pulls: [10, 40, 59, 61, 90] });
   assert.equal(r.went, true);
   assert.equal(r.refreshed, 1);
   assert.deepEqual(r.states, ["pull", "armed", "refreshing"]);
   assert.equal(r.t.state, "refreshing");
-  assert.equal(r.t.held, true);
+  assert.equal(r.t.refreshing, true);
+  assert.equal(r.t.spinning, true); // the hidden area shows the spinner
   r.t.hidden(); // not before the refresh ended
   assert.equal(r.t.state, "refreshing");
   r.t.done();
-  assert.equal(r.t.state, "closing"); // the list slides back up, still "Refreshing..."
-  assert.equal(r.t.held, true);
+  assert.equal(r.t.state, "closing"); // still "Refreshing..." while the area may be on screen
+  assert.equal(r.t.spinning, true);
   r.t.hidden();
   assert.deepEqual(r.states, ["pull", "armed", "refreshing", "closing", "idle"]);
-  assert.equal(r.t.held, false);
+  assert.equal(r.t.refreshing, false);
+  assert.equal(r.t.spinning, false);
 });
 
-test("a pull while the area is held never arms, runs nothing and leaves the state alone", () => {
+test("a pull while refreshing shows the spinner, never arms, runs nothing and leaves the state alone", () => {
   let n = 0;
   const states = [];
   const t = pullTracker({ onRefresh: () => n++, onState: (s) => states.push(s) });
@@ -57,6 +60,7 @@ test("a pull while the area is held never arms, runs nothing and leaves the stat
   for (const s of ["refreshing", "closing"]) {
     t.start(); t.move(120);
     assert.equal(t.blocked, true);
+    assert.equal(t.spinning, true);
     assert.equal(t.state, s);
     assert.equal(t.end(), false);
     t.start(); t.cancel();
@@ -70,25 +74,12 @@ test("a pull while the area is held never arms, runs nothing and leaves the stat
   assert.equal(n, 2);
 });
 
-test("titles: pull, armed, Refreshing... while held and while it slides back", () => {
+test("titles: pull, armed, Refreshing... while refreshing and until the area is out of sight", () => {
   assert.equal(titleFor("idle"), TEXT.pull);
   assert.equal(titleFor("pull"), TEXT.pull);
   assert.equal(titleFor("armed"), TEXT.armed);
   assert.equal(titleFor("refreshing"), "Refreshing...");
   assert.equal(titleFor("closing"), "Refreshing...");
-});
-
-test("native bounce: the list follows the bounce down to HOLD and stops there, never jumping back up", () => {
-  assert.equal(HOLD, 60);
-  assert.equal(bounceHold(0, -120), 0);   // still bounced farther than HOLD: the bounce itself shows the area
-  assert.equal(bounceHold(0, -60), 0);
-  assert.equal(bounceHold(0, -40), 20);   // 40 of bounce + 20 of hold: 60 of list below its top
-  assert.equal(bounceHold(20, -50), 20);  // never shrinks
-  assert.equal(bounceHold(20, -10), 50);
-  assert.equal(bounceHold(50, 0), 60);    // the bounce is over: held at HOLD
-  assert.equal(bounceHold(50, 200), 60);
-  // the list's visible top (bounce + hold) on the way back: the bounce until HOLD, then HOLD
-  for (let top = -100; top <= 0; top += 5) assert.equal(-top + bounceHold(0, top), Math.max(-top, HOLD));
 });
 
 function fakeTimers() {
@@ -167,12 +158,10 @@ test("refreshEnd: a quick refresh still holds MIN_HOLD_MS; a rejected one ends t
   assert.equal(timers.pending, 0);
 });
 
-test("the DOM side holds and lets go through the tracker: spinner markup, closing slides back, reset on hidden", () => {
+test("the DOM side: spinner markup, nothing held open, refreshEnd ends it through the tracker", () => {
   const js = readFileSync(new URL("./pullrefresh.js", import.meta.url), "utf8");
   assert.match(js, /<span class="pull-spinner"><\/span>/);
-  assert.match(js, /if \(went\) holdOpen\(was\);/);
-  assert.match(js, /if \(s === "closing"\) close\(\);/);
-  assert.match(js, /a\.finished\.then\(reset, reset\)/);
+  assert.doesNotMatch(js, /holdOpen|setHold|bounceHold|MutationObserver/);
   assert.match(js, /refreshEnd\(result, \{ busy, onEnd: \(\) => \{ stopWatch = null; tracker\.done\(\); \} \}\)/);
   const css = readFileSync(new URL("../ios6.css", import.meta.url), "utf8");
   assert.match(css, /\.pull-spinner \{[^}]*background: var\(--spinner-gray\) center \/ 20px no-repeat;/);
@@ -191,10 +180,11 @@ test("release under the trigger runs nothing", () => {
   assert.equal(run({ pulls: [20, 59] }).refreshed, 0);
 });
 
-test("a pull while a refresh runs does nothing: never arms, never runs", () => {
+test("a pull while another refresh runs shows the spinner: never arms, never runs", () => {
   const r = run({ busyAtStart: true, busyAtEnd: true, pulls: [30, 120] });
   assert.equal(r.refreshed, 0);
   assert.deepEqual(r.states, []);
+  assert.equal(r.t.spinning, true);
   // a refresh that ended mid-pull still doesn't make that pull count
   assert.equal(run({ busyAtStart: true, pulls: [30, 120] }).refreshed, 0);
   // one that started mid-pull (the nav button, launch) stops the release too
@@ -321,7 +311,7 @@ test("haptics: none on a release that runs nothing", () => {
   c.start(); c.cancel(); c.end();
 });
 
-test("haptics: each re-arm ticks again; a pull while held is silent", () => {
+test("haptics: each re-arm ticks again; a pull while refreshing is silent", () => {
   const r = hapticRun({ pulls: [70, 40, 70] });
   assert.deepEqual(r.buzz, ["tick", "tick", "tap"]);
   const before = r.buzz.length;
@@ -369,4 +359,108 @@ test("pullHaptic: only where the app bridge plays haptics; tick -> haptic.tick, 
 test("pullToRefresh wires the tracker's haptics through pullHaptic", () => {
   const src = readFileSync(new URL("./pullrefresh.js", import.meta.url), "utf8");
   assert.match(src, /onHaptic: \(kind\) => pullHaptic\(kind\)/);
+});
+
+// ---- B209: the DOM side, driven by touches and scroll events on a stand-in DOM -------------------------------------
+
+function fakeEl() {
+  const classes = new Set();
+  const e = {
+    style: {}, anims: [], textContent: "", children: [],
+    classList: {
+      toggle(c, on = !classes.has(c)) { if (on) classes.add(c); else classes.delete(c); return on; },
+      contains: (c) => classes.has(c),
+    },
+    setAttribute() {},
+    animate(kf) { e.anims.push(kf); return { finished: Promise.resolve() }; },
+  };
+  return e;
+}
+
+// A page with two rows in its scroller; `fire(type, y)` sends a touch, `scroll(top)` a scroll event at scrollTop top.
+async function page(t, tag) {
+  const area = fakeEl(), title = fakeEl(), time = fakeEl(), clip = fakeEl();
+  area.querySelector = (s) => (s === ".pull-title" ? title : time);
+  clip.querySelector = () => area;
+  const on = {};
+  const scroller = fakeEl();
+  Object.assign(scroller, {
+    scrollTop: 0, offsetTop: 0, clientHeight: 600, parentNode: {}, children: [fakeEl(), fakeEl()],
+    addEventListener: (type, fn) => { on[type] = fn; },
+    after(x) { x.parentNode = scroller.parentNode; x.previousSibling = scroller; },
+  });
+  const saved = { document: globalThis.document, gcs: globalThis.getComputedStyle };
+  globalThis.document = { createElement: () => clip, documentElement: fakeEl() };
+  globalThis.getComputedStyle = () => ({ paddingTop: "0px" });
+  t.after(() => { globalThis.document = saved.document; globalThis.getComputedStyle = saved.gcs; });
+  t.mock.timers.enable({ apis: ["setTimeout", "setInterval", "Date"] });
+  const mod = await import(`./pullrefresh.js?${tag}`); // a module of its own: the native/script guess starts fresh
+  let refreshes = 0;
+  mod.pullToRefresh(scroller, { onRefresh: () => { refreshes++; return Promise.resolve(); } });
+  const fire = (type, y) => on[type]({ type, touches: y == null ? [] : [{ clientY: y }] });
+  const scroll = (top) => { scroller.scrollTop = top; on.scroll(); };
+  const rows = () => scroller.children.map((c) => c.style.transform || "");
+  const look = () => ({ spinner: area.classList.contains("refreshing"), armed: area.classList.contains("armed"),
+    title: title.textContent, shown: clip.classList.contains("on") });
+  const flush = async () => { for (let i = 0; i < 5; i++) await new Promise((r) => setImmediate(r)); };
+  return { t, fire, scroll, rows, look, flush, scroller, area, get refreshes() { return refreshes; } };
+}
+
+test("native rubber band: an armed release lets the list spring back, the hidden area spins; a second pull shows it", async (t) => {
+  const p = await page(t, "native");
+  p.fire("touchstart", 100);
+  for (const top of [-20, -45, -70, -90]) p.scroll(top);
+  assert.deepEqual(p.look(), { spinner: false, armed: true, title: TEXT.armed, shown: true });
+  assert.match(p.area.style.transform, /translateY\(-390px\)/); // the area's foot on the content's top edge
+  p.fire("touchend");
+  for (const top of [-60, -30, -5, 0]) p.scroll(top); // iOS's own bounce: nothing of the list is moved by script
+  t.mock.timers.tick(0);
+  await p.flush();
+  assert.equal(p.refreshes, 1);
+  assert.deepEqual(p.rows(), ["", ""]);
+  assert.deepEqual(p.look(), { spinner: true, armed: false, title: "Refreshing...", shown: false });
+  // pulling again while it runs reveals the spinner; letting go springs back and runs nothing more
+  p.fire("touchstart", 100);
+  for (const top of [-30, -80, -120]) p.scroll(top);
+  assert.deepEqual(p.look(), { spinner: true, armed: false, title: "Refreshing...", shown: true });
+  p.fire("touchend");
+  for (const top of [-50, 0]) p.scroll(top);
+  assert.equal(p.refreshes, 1);
+  assert.deepEqual(p.rows(), ["", ""]);
+  // the refresh ends: back to the arrow (out of sight already)
+  t.mock.timers.tick(MIN_HOLD_MS + 300);
+  await p.flush();
+  t.mock.timers.tick(300);
+  assert.deepEqual(p.look(), { spinner: false, armed: false, title: TEXT.pull, shown: false });
+});
+
+test("script pull (no rubber band): rows follow the finger, spring back to none on release, no hold, no second refresh", async (t) => {
+  const p = await page(t, "script");
+  p.fire("touchstart", 100);
+  p.fire("touchmove", 112); // past DECIDE: pulled by script
+  const seen = [];
+  for (let y = 120; y <= 400; y += 8) { p.fire("touchmove", y); seen.push(parseFloat(p.rows()[0].slice(11)) || 0); }
+  for (let i = 1; i < seen.length; i++) assert.ok(seen[i] > seen[i - 1], "follows every move, never stalls or snaps");
+  assert.equal(p.look().armed, true);
+  p.fire("touchend");
+  await p.flush();
+  assert.equal(p.refreshes, 1);
+  assert.deepEqual(p.rows(), ["", ""]); // straight back: nothing held at 60
+  const spring = p.scroller.children[0].anims.at(-1);
+  assert.deepEqual(spring.at(-1), { transform: "none" });
+  assert.equal(p.look().spinner, true);
+  assert.equal(p.look().shown, false); // the spring ended: out of sight
+  p.fire("touchstart", 100);
+  p.fire("touchmove", 112);
+  p.fire("touchmove", 400); // a pull during the refresh is never stopped
+  assert.notEqual(p.rows()[0], "");
+  assert.deepEqual(p.look(), { spinner: true, armed: false, title: "Refreshing...", shown: true });
+  p.fire("touchend");
+  await p.flush();
+  assert.equal(p.refreshes, 1);
+  assert.deepEqual(p.rows(), ["", ""]);
+  t.mock.timers.tick(MIN_HOLD_MS + 300);
+  await p.flush();
+  t.mock.timers.tick(300);
+  assert.deepEqual(p.look(), { spinner: false, armed: false, title: TEXT.pull, shown: false });
 });

@@ -29,15 +29,16 @@ test("package page: the jailbreak app says an installed package is held too", ()
 
 test("Settings > Blocked: packages and authors, checked; empty says how to block", () => {
   const empty = blockedLayout({});
-  assert.equal(empty.length, 1);
+  assert.equal(empty.length, 2); // F317: the mode's sentence is a group of its own, last
   assert.match(empty[0].footer, /^Nothing is blocked/);
-  assert.match(empty[0].footer, /Kept on this device/);
-  assert.match(blockedLayout({ mode: "jailbreak" })[0].footer, /held with dpkg/);
+  assert.match(empty[1].footer, /kept on this device/);
+  assert.match(blockedLayout({ mode: "jailbreak" }).at(-1).footer, /held with dpkg/);
   const g = blockedLayout({ entries: [{ id: "com.a", name: "Ay" }, { id: "b", name: "b" }], authors: ["Jane"] });
-  assert.deepEqual(g.map((x) => x.header), ["Packages", "Authors"]);
+  assert.deepEqual(g.map((x) => x.header), ["Packages", "Authors", undefined]);
+  assert.doesNotMatch(g[0].footer, /device|dpkg/);
   assert.deepEqual(g[0].rows, [{ id: "com.a", label: "Ay", subtitle: "com.a", checked: true }, { id: "b", label: "b", subtitle: undefined, checked: true }]);
   assert.deepEqual(g[1].rows, [{ author: "Jane", label: "Jane", checked: true }]);
-  assert.deepEqual(blockedLayout({ authors: ["Jane"] }).map((x) => x.header), ["Authors"]);
+  assert.deepEqual(blockedLayout({ authors: ["Jane"] }).map((x) => x.header), ["Authors", undefined]);
   assert.equal(nav({ tab: "home", path: ["general", "blocked"] }).title, "Blocked");
 });
 

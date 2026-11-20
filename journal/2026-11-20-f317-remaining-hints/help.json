@@ -1,0 +1,11 @@
+[
+  { "wait": 2000 },
+  { "eval": "localStorage.setItem('ifizbox.firstVisit','later'); 'ok'" },
+  { "nav": "#/home/help", "ms": 5000 },
+  { "eval": "location.hash + '\\n' + [...document.querySelectorAll('.page.is-top .group-header, .page.is-top .group li, .page.is-top .group-footer')].map(e => e.className.split(' ')[0] + ': ' + e.textContent.trim().replace(/\\s+/g, ' ').slice(0, 140)).join('\\n')" },
+  { "shot": "help" },
+  { "nav": "#/home/credits", "ms": 5000 },
+  { "eval": "(() => { const h = [...document.querySelectorAll('.page.is-top .group-header')].find(e => e.textContent === 'Software'); const b = document.querySelector('.page.is-top .page-body'); b.scrollTop += h.getBoundingClientRect().top - 110; return b.scrollTop; })()" },
+  { "wait": 800 },
+  { "shot": "credits-software" }
+]

@@ -810,35 +810,32 @@ function renderRoot(body) {
 // The Home footer's text (version-foot.js; Settings' root shows it too, F183).
 export { footLine };
 
-// Which Jailbreak's footer. F144: the sideload build lists apps only and has no Settings > Device, so it names no
-// way to tweaks there; the website and the jailbreak app keep the Device hint.
-export function helpJailbreakFooter(mode = "site") {
-  if (mode === "sideload") {
-    return `On a phone without a jailbreak ${NAME} lists apps from AltStore-style sources, signed and installed on `
-      + `the phone. Tweaks and themes need a jailbroken iPhone and ${NAME}'s jailbreak app.`;
-  }
-  return `On a phone without a jailbreak ${NAME} lists apps from AltStore-style sources, installed with a `
-    + "sideloader. Set Settings > Device to Jailbroken to list tweaks and themes built for rootless "
-    + "(iphoneos-arm64), rootful (iphoneos-arm) or roothide (iphoneos-arm64e) jailbreaks. A package built for "
-    + "another kind will not install.";
+// F317: Help's Which Jailbreak and Upgrading in the iOS 6 hint style (AGENTS.md, Hints): Not Jailbroken in a group
+// of its own with what it lists, the three jailbreak kinds in one with how to list their packages; Check for Changes
+// and Refresh Sources a group each. F144: the sideload build lists apps only and has no Settings > Device, so its
+// kinds footer names the jailbreak app instead of the Device setting.
+export const HELP_NOT_JAILBROKEN_FOOTER = { sideload: "Apps from AltStore-style sources, signed and installed on this iPhone.",
+  other: "Apps from AltStore-style sources, installed with a sideloader." };
+export const HELP_KINDS_FOOTER = { sideload: `Tweaks and themes need a jailbroken iPhone and ${NAME}'s jailbreak app.`,
+  other: "Set Settings > Device to Jailbroken to list packages for your kind. A package built for another kind will not install." };
+export const HELP_CHANGES_FOOTER = "Shows what is new or updated since the last refresh. Hold a package to keep it at its version.";
+export const HELP_REFRESH_FOOTER = "Fetches every source's package list again.";
+export function helpSections(mode = "site", { changes = null, refresh = null } = {}) {
+  const k = mode === "sideload" ? "sideload" : "other";
+  return [
+    { header: "Which Jailbreak", rows: [{ label: "Not Jailbroken", detail: "apps only" }], footer: HELP_NOT_JAILBROKEN_FOOTER[k] },
+    { rows: [{ label: "Rootless", detail: "iOS 15 and later" }, { label: "Rootful", detail: "older, or palera1n" },
+      { label: "Roothide", detail: "Dopamine roothide, Bootstrap" }], footer: HELP_KINDS_FOOTER[k] },
+    { header: "Upgrading", rows: [{ label: "Check for Changes", href: changes }], footer: HELP_CHANGES_FOOTER },
+    { rows: [{ label: "Refresh Sources", href: refresh }], footer: HELP_REFRESH_FOOTER },
+  ];
 }
 
 // Our own help page: what iFizBox lists, for which jailbreaks, and how upgrades reach the phone.
 function renderHelp(body) {
   body.append(wrap(grouped([
-    {
-      header: "Which Jailbreak",
-      rows: [{ label: "Not Jailbroken", detail: "apps only" }, { label: "Rootless", detail: "iOS 15 and later" },
-        { label: "Rootful", detail: "older, or palera1n" },
-        { label: "Roothide", detail: "Dopamine roothide, Bootstrap" }],
-      footer: helpJailbreakFooter(settings.mode),
-    },
-    {
-      header: "Upgrading",
-      rows: [{ label: "Check for Changes", href: format(rootOn("changes", { tab: "home", path: ["help"] })) }, { label: "Refresh Sources", href: format(rootOn("sources", HELP_ROUTE)) }],
-      footer: "Refresh in Sources fetches every source's package list again. Changes then shows what is new "
-        + "or updated since the last refresh. Hold a package in Settings to keep it at its version.",
-    },
+    ...helpSections(settings.mode, { changes: format(rootOn("changes", { tab: "home", path: ["help"] })),
+      refresh: format(rootOn("sources", HELP_ROUTE)) }),
     {
       header: "Jailbreaking",
       // ponytail: the site isn't up yet; drop "Coming Soon" once it is.
@@ -889,32 +886,40 @@ function renderCredits(body) {
         + "buttons and alerts, typos fixed), under GPLv3, from its source at git.saurik.com/cydia.git. "
         + `${NAME} is not affiliated with SaurikIT.`,
     },
-    { // ElleKit (vendor/ellekit): bundled for tweak injection, with its BSD-3-Clause licence
-      header: "Software",
-      rows: [{ label: "ElleKit", subtitle: "Évelyne Bélanger\nTweak injection, BSD-3-Clause", chevron: true,
-        cls: "thanks-row", icon: { text: "E", color: "#7a8a99" },
-        onClick: () => window.open("https://github.com/tealbathingsuit/ellekit", "_blank", "noopener") },
-      // F305: Canister's package search and repo index (Search's Other Sources, Find More Sources, the piracy list)
-      { label: "Canister", subtitle: "Aarnav Tale\nPackage search and repo index", chevron: true, cls: "thanks-row canister-credit",
-        icon: { text: "C", color: "#7a8a99" }, onClick: () => window.open("https://canister.me/", "_blank", "noopener") },
-      // Third-party notices (native/test_notices.py): what the signer and the install route are built from
-      ...[["zsign", "zhlynn\nApp signing, MIT", "https://github.com/zhlynn/zsign"],
-        ["OpenSSL", "The OpenSSL Project\nzsign's cryptography, Apache-2.0", "https://www.openssl.org/"],
-        ["zlib", "Jean-loup Gailly and Mark Adler\nzsign's compression, zlib licence", "https://zlib.net/"],
-        ["idevice", "Jackson Coxson\nInstalling on this iPhone, MIT", "https://github.com/jkcoxson/idevice"],
-        ["Tailscale", "Tailscale Inc\nInstalling over a tailnet, BSD-3-Clause", "https://github.com/tailscale/tailscale"],
-      ].map(([label, subtitle, url]) => ({ label, subtitle, chevron: true, cls: "thanks-row",
-        icon: { text: label.charAt(0).toUpperCase(), color: "#7a8a99" },
-        onClick: () => window.open(url, "_blank", "noopener") }))],
-      footer: `${NAME} adds ElleKit's libellekit.dylib to a signed app when a tweak you inject needs CydiaSubstrate `
-        + "and you added none. ElleKit is © 2022 Évelyne Bélanger, under the BSD 3-Clause licence. "
-        + "Search's Other Sources, Find More Sources, the piracy list and the Known Safe · Canister label come from "
-        + "Canister (canister.me).",
-    },
+    ...softwareSections(),
   ])));
   globalThis.ifizboxNative?.call?.("app.info", {}).then((i) => {
     if (i?.version) body.querySelector(".cell-detail").textContent = i.version;
   }, () => {});
+}
+
+// F317: Credits > Software, one group per row (AGENTS.md, Hints): ElleKit and Canister each with the footer that says
+// what of theirs ships; the signer's and install route's parts (native/test_notices.py) need none past their subtitle.
+export const ELLEKIT_FOOTER = `Added to a signed app when a tweak you inject needs CydiaSubstrate and you added none. `
+  + "© 2022 Évelyne Bélanger, BSD 3-Clause licence.";
+export const CANISTER_FOOTER = "Other Sources in Search, Find More Sources, the piracy list and the Known Safe label come from canister.me.";
+export function softwareSections() {
+  const open = (url) => () => window.open(url, "_blank", "noopener");
+  const row = (label, subtitle, url) => ({ label, subtitle, chevron: true, cls: "thanks-row",
+    icon: { text: label.charAt(0).toUpperCase(), color: "#7a8a99" }, onClick: open(url) });
+  return [
+    // ElleKit (vendor/ellekit): bundled for tweak injection, with its BSD-3-Clause licence
+    // literal labels: native/test_notices.py reads `label: "X"` rows and ["X", "subtitle", url] entries
+    { header: "Software", rows: [{ label: "ElleKit", subtitle: "Évelyne Bélanger\nTweak injection, BSD-3-Clause", chevron: true, cls: "thanks-row",
+      icon: { text: "E", color: "#7a8a99" }, onClick: open("https://github.com/tealbathingsuit/ellekit") }],
+      footer: ELLEKIT_FOOTER },
+    // F305: Canister's package search and repo index (Search's Other Sources, Find More Sources, the piracy list)
+    { rows: [{ label: "Canister", subtitle: "Aarnav Tale\nPackage search and repo index", chevron: true, cls: "thanks-row", // F317: one class (ui.js classList.add): two threw and broke Credits
+      icon: { text: "C", color: "#7a8a99" }, onClick: open("https://canister.me/") }],
+      footer: CANISTER_FOOTER },
+    // Third-party notices: no hint, so one group (a footer-less row per group would only add gaps)
+    { rows: [["zsign", "zhlynn\nApp signing, MIT", "https://github.com/zhlynn/zsign"],
+      ["OpenSSL", "The OpenSSL Project\nzsign's cryptography, Apache-2.0", "https://www.openssl.org/"],
+      ["zlib", "Jean-loup Gailly and Mark Adler\nzsign's compression, zlib licence", "https://zlib.net/"],
+      ["idevice", "Jackson Coxson\nInstalling on this iPhone, MIT", "https://github.com/jkcoxson/idevice"],
+      ["Tailscale", "Tailscale Inc\nInstalling over a tailnet, BSD-3-Clause", "https://github.com/tailscale/tailscale"],
+    ].map(([label, subtitle, url]) => row(label, subtitle, url)) },
+  ];
 }
 
 function renderFeatured(body) {

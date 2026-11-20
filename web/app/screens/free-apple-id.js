@@ -126,8 +126,37 @@ function table(header, ...cells) {
   return g;
 }
 
-function button(label, onClick, cls = "") {
-  return grouped([{ rows: [{ label, onClick, cls: cls || "free-button" }] }]); // ui.js takes one class per row
+function button(label, onClick, cls = "", footer = null) {
+  return grouped([{ rows: [{ label, onClick, cls: cls || "free-button" }], footer }]); // ui.js takes one class per row
+}
+
+// F317: the route's hints in the iOS 6 hint style (AGENTS.md, Hints): each under the group it explains, one or two
+// short sentences, never joined. Entry: under Use a Free Apple ID. Sign-in: the spare-ID advice under the Apple ID
+// fields, the password note under Sign In (or, while Apple makes us wait, the wait in its place: the fix). Ready: the
+// zip under Save for the App, the weekly sign-in under Sign In Again / Refresh Profile.
+export const FREE_ENTRY_FOOTER = "Signs up to 3 apps for 7 days at a time, no certificate needed. "
+  + `They install from the ${NAME} app, not this website.`;
+export const FREE_FIELDS_FOOTER = "Use a spare Apple ID if you have one: Apple can lock one that signs in from too many places.";
+export const FREE_PASSWORD_FOOTER = `Your password is checked in this browser and never sent anywhere. ${NAME}'s server only passes messages to Apple.`;
+export const freeWaitFooter = (wait) =>
+  `Apple refused the last try: wait until ${wait.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}.`;
+export const FREE_ZIP_FOOTER = `Holds the certificate, its password and the 7-day profile, for the ${NAME} app's `
+  + `${MERGED_PAGE} > Select All Files.`; // C15: the app it names is the sideload build
+export const FREE_RENEW_FOOTER = "Sign in again for a new profile each week. The certificate is kept for its year.";
+export const FREE_DEVICE_LABEL = "This iPhone";
+
+// F317: the ready page's rows, split by setup step: each step's summary from this session's setup under the row it
+// made (This iPhone: device, Certificate Until: certificate, App ID: appId), never joined with ". ". Profile Until's
+// detail already is the profile step's summary ("Good until …"), so it gets none. Team is a status row: no footer.
+export function readySections(rows, steps = {}) {
+  const by = Object.fromEntries(rows.map((r) => [r.label, r]));
+  const say = (id) => (steps[id]?.summary ? `${steps[id].summary}.`.replace(/\.\.$/, ".") : null);
+  const out = [{ header: "Free Apple ID", rows: [by.Team].filter(Boolean) }];
+  if (steps.device?.summary) out.push({ rows: [{ label: FREE_DEVICE_LABEL, detail: "Registered" }], footer: say("device") });
+  out.push({ rows: [by["Certificate Until"]].filter(Boolean), footer: say("certificate") });
+  out.push({ rows: [by["App ID"]].filter(Boolean), footer: say("appId") });
+  out.push({ rows: [by["Profile Until"]].filter(Boolean) });
+  return out.filter((g) => g.rows.length);
 }
 
 export function freeRouteBlock({ alert, store, onChange = () => {} } = {}) {
@@ -148,8 +177,7 @@ function render(box, ctx) {
     const has = saved ? "Set Up" : null;
     parts.push(grouped([{ header: "Free Apple ID",
       rows: [{ label: "Use a Free Apple ID", detail: has, onClick: () => { flow.open = true; if (saved && !flow.session) flow.view = "ready"; ctx.redraw(); }, chevron: true }],
-      footer: "No certificate? A free Apple ID can sign up to 3 apps for 7 days at a time. A certificate stays the better way: "
-        + `its apps last a year and install from this website. Apps signed with a free Apple ID have to be installed by the ${NAME} app on the iPhone.` }]));
+      footer: FREE_ENTRY_FOOTER }]));
   } else if (flow.view === "signin") parts.push(...signInView(ctx));
   else if (flow.view === "code") parts.push(...codeView(ctx));
   else if (flow.view === "setup") parts.push(...setupView(ctx));
@@ -170,12 +198,10 @@ function signInView(ctx) {
   const go = () => signIn(ctx, email.input, pw.input);
   pw.input.addEventListener("keydown", (e) => { if (e.key === "Enter") go(); });
   const wait = waitingUntil(ctx.store);
-  const out = [table("Sign In With a Free Apple ID", email.li, pw.li),
-    button(flow.busy ? "Signing In…" : "Sign In", go, "free-primary"),
-    grouped([{ footer: "Your password is checked in this browser (Apple's SRP sign-in) and never sent anywhere. "
-      + `${NAME}'s server only passes messages between this page and Apple. Use a spare Apple ID if you have one: Apple `
-      + "can lock an account that signs in from too many places."
-      + (wait ? ` Apple refused the last try: wait until ${wait.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}.` : "") }]),
+  const fields = table("Sign In With a Free Apple ID", email.li, pw.li);
+  fields.append(el("p", "group-footer", FREE_FIELDS_FOOTER));
+  const out = [fields,
+    button(flow.busy ? "Signing In…" : "Sign In", go, "free-primary", wait ? freeWaitFooter(wait) : FREE_PASSWORD_FOOTER),
     button("Cancel", () => { flow.open = false; ctx.redraw(); })];
   queueMicrotask(() => (flow.email ? pw.input : email.input).focus?.());
   return out;
@@ -260,8 +286,10 @@ function codeView(ctx) {
   };
   code.input.addEventListener("keydown", (e) => { if (e.key === "Enter") go(); });
   queueMicrotask(() => code.input.focus?.());
-  return [table("Two-Factor Authentication", code.li), button("Verify", go, "free-primary"),
-    grouped([{ footer: flow.sms ? `Enter the code Apple texted to ${flow.sms.number}.` : "Enter the code shown on your other Apple devices." }]),
+  // F317: the hint under the field it explains, not a footer-only group after Verify
+  const fields = table("Two-Factor Authentication", code.li);
+  fields.append(el("p", "group-footer", flow.sms ? `Enter the code Apple texted to ${flow.sms.number}.` : "Enter the code shown on your other Apple devices."));
+  return [fields, button("Verify", go, "free-primary"),
     button("Cancel", () => { flow.view = "signin"; flow.session = null; ctx.redraw(); })];
 }
 
@@ -348,21 +376,15 @@ function readyView(ctx, saved) {
     { label: "Profile Until", detail: exp.state === "expired" ? "Expired" : day(prof?.expires) },
   ];
   const setupDone = checklist(flow.steps).every((s) => s.state === "done");
-  const out = [grouped([{ header: "Free Apple ID", rows,
-    footer: setupDone ? Object.values(flow.steps).map((s) => s.summary).join(". ") + "." : null }])];
-  out.push(button("Save for the App", () => download(handoffZip(saved), `${NAME} Free Apple ID.zip`), "free-primary"));
-  out.push(grouped([{ footer: `The .zip holds the certificate, its password and ${NAME}'s 7-day profile, for the ${NAME} app's `
-    + `${MERGED_PAGE} > Select All Files. iOS refuses` // C15: the app it names is the sideload build
-    + " free Apple ID apps from a website, so they have to be installed by an "
-    + `app on the iPhone through LocalDevVPN; ${NAME}'s own install route for that isn't out yet. Sign in here again for a `
-    + "new profile each week (the certificate is kept for its year)." }]));
+  const out = [grouped(readySections(rows, setupDone ? flow.steps : {}))];
+  out.push(button("Save for the App", () => download(handoffZip(saved), `${NAME} Free Apple ID.zip`), "free-primary", FREE_ZIP_FOOTER));
   // F254i: the Developer Mode + Trust steps, a page of their own; gone once an app on this route installed fine
   if (!freeInstalled(ctx.store)) {
     out.push(grouped([{ header: "Before the First Install",
       rows: [{ label: "Developer Mode and Trust", onClick: () => { flow.view = "devmode"; ctx.redraw(); }, chevron: true }],
       footer: "iOS 16 and later: a few steps in Settings on the iPhone, once." }]));
   }
-  out.push(button(flow.portal ? "Refresh Profile" : "Sign In Again", () => (flow.portal ? setup(ctx) : signOut(ctx))));
+  out.push(button(flow.portal ? "Refresh Profile" : "Sign In Again", () => (flow.portal ? setup(ctx) : signOut(ctx)), "", FREE_RENEW_FOOTER));
   out.push(button("Forget Free Apple ID", async () => {
     const { index } = await ctx.ask({ title: "Forget Free Apple ID?",
       message: "This removes the certificate and key from this browser. Apple keeps the certificate (it isn't revoked); a new one "
@@ -488,7 +510,7 @@ function devModeView(ctx) {
   page.append(list);
   const back = () => { flow.view = "ready"; ctx.redraw(); };
   return [page,
-    button("An App Installed Fine", () => { markFreeInstalled(ctx.store); back(); }, "free-primary"),
-    grouped([{ footer: "Once an app on this route opens fine, these steps are done for good: this page stops showing." }]),
+    button("An App Installed Fine", () => { markFreeInstalled(ctx.store); back(); }, "free-primary",
+      "Once an app on this route opens fine, these steps are done for good: this page stops showing."),
     button("Back", back)];
 }

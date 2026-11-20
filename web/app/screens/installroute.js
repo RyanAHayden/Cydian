@@ -166,7 +166,7 @@ export function installationGroups(choice, st, { pick = () => {}, openVPN = () =
           { label: `Open ${VPN}`, cls: "sign-import", onClick: openVPN },
         ]),
       ],
-      ...(viaTs ? {} : { footer: `${VPN} must be on while apps install, or Tailscale (below).` }),
+      ...(viaTs ? {} : { footer: `${VPN} must be on while apps install.` }), // F317: no "(below)": Tailscale's group says its own
     });
     groups.push({
       header: "Connect With",
@@ -543,8 +543,10 @@ let visit = null; // this visit of the page: { started, asked, failed, poll }; n
 // with their screenshots are drawn after the groups marked `pin` and `guide` (drawPair).
 // "checking" is drawn at once while idevice.status answers, with a spinner (`spinner` marks the group). "connect"
 // draws the way to connect `vpn` (core vpnRoute) with connectGroups.
+export const IMPORT_PAIRING = "Import Pairing File";
 export function setupGroups(state, st, p, { openVPN = () => {}, retry = () => {}, check = () => {}, forget = () => {}, failed = false,
-  vpn = "localdevvpn", choose = () => {}, signIn = () => {}, openTailscale = () => {}, install = () => {}, busy = null } = {}) {
+  vpn = "localdevvpn", choose = () => {}, signIn = () => {}, openTailscale = () => {}, install = () => {}, installTailscale = () => {}, busy = null,
+  importFile = () => {} } = {}) {
   const intro = { header: "Install on This iPhone", footer: IPHONE_INTRO };
   if (state === "paired") {
     return [intro,
@@ -553,12 +555,18 @@ export function setupGroups(state, st, p, { openVPN = () => {}, retry = () => {}
         footer: `Checks that ${NAME} can reach this iPhone through ${vpnList()}.` },
       { rows: [{ label: "Forget Pairing", cls: "sign-import", onClick: forget }] }];
   }
-  if (state === "file") return [intro, { header: "Pair This iPhone", footer: PAIR_STEPS.file.map((s, i) => `${i + 1}. ${s}`).join(" ") }];
+  // F317: one group per numbered step (AGENTS.md, Hints), never the steps joined into one footer; the last step's
+  // group holds Import Pairing File, the row its footer names
+  if (state === "file") {
+    const last = PAIR_STEPS.file.length - 1;
+    return [intro, ...PAIR_STEPS.file.map((s, i) => ({ ...(i ? {} : { header: "Pair This iPhone" }),
+      ...(i === last ? { rows: [{ label: IMPORT_PAIRING, cls: "sign-import", onClick: importFile }] } : {}), footer: `${i + 1}. ${s}` }))];
+  }
   if (state === "checking") return [intro, { spinner: "Checking…" }];
   if (state === "connect") {
     // B133: while the page polls for the VPN (its way known and nothing left to tap but the app), say so with a spinner
     const waitFor = vpn === "localdevvpn" ? VPN : vpn === "tailscale" && st?.tailscale?.signedIn && !busy ? "Tailscale" : null;
-    return [intro, ...connectGroups(vpn, st, { openVPN, choose, signIn, openTailscale, install, busy }), ...(waitFor ? [{ spinner: vpnWaitText(waitFor) }] : [])];
+    return [intro, ...connectGroups(vpn, st, { openVPN, choose, signIn, openTailscale, install, installTailscale, busy }), ...(waitFor ? [{ spinner: vpnWaitText(waitFor) }] : [])];
   }
   const conn = { rows: [{ label: VPN, detail: "On" }] };
   const line = failed && !p ? `Pairing stopped.` : p ? pairFooter(p) : "Starting…";
@@ -576,7 +584,11 @@ export function setupGroups(state, st, p, { openVPN = () => {}, retry = () => {}
 //   tailscale    Sign In (or its state once signed in) and Open Tailscale
 //   ask          both installed: Connect With, LocalDevVPN or Tailscale; the answer is kept
 //   none         neither: Install LocalDevVPN (its App Store page), Tailscale named as the other way
-export function connectGroups(vpn, st, { openVPN = () => {}, choose = () => {}, signIn = () => {}, openTailscale = () => {}, install = () => {}, busy = null } = {}) {
+export const NO_VPN_FOOTER = `${NAME} pairs and installs through ${VPN}, a free app. This page checks again when you come back.`;
+export const NO_VPN_TAILSCALE_FOOTER = "The other way in: install Tailscale and sign in to it.";
+export const TAILSCALE_STORE = "https://apps.apple.com/app/tailscale/id1470499037";
+export function connectGroups(vpn, st, { openVPN = () => {}, choose = () => {}, signIn = () => {}, openTailscale = () => {}, install = () => {},
+  installTailscale = () => {}, busy = null } = {}) {
   const goesOn = "This page goes on by itself when it's on.";
   if (vpn === "ask") {
     return [{
@@ -599,9 +611,13 @@ export function connectGroups(vpn, st, { openVPN = () => {}, choose = () => {}, 
     }];
   }
   if (vpn === "none") {
+    // F317: one group per way in (AGENTS.md, Hints): LocalDevVPN's with its hint, Tailscale's with its own
     return [{
       rows: [{ label: VPN, detail: "Not Installed" }, { label: `Install ${VPN}`, cls: "sign-import", onClick: install }],
-      footer: `${NAME} pairs with this iPhone and installs through ${VPN}, a free app. The other way is Tailscale: install the Tailscale app and sign in to it. This page checks again when you come back.`,
+      footer: NO_VPN_FOOTER,
+    }, {
+      rows: [{ label: "Install Tailscale", cls: "sign-import", onClick: installTailscale }],
+      footer: NO_VPN_TAILSCALE_FOOTER,
     }];
   }
   return [{
@@ -808,7 +824,9 @@ async function drawPair(box, { store, native, alert, redraw }) {
   // instead of leaving the old page up with nothing moving.
   const recheck = () => { if (visit === v && !pairing) box.replaceChildren(); return redraw(); };
   let checkButton = null; // B135: the Check Connection button's answer, set once the rows are drawn
+  let input = null; // the pairing file picker, made below for the "file" state
   const sections = setupGroups(state, st, pairing, {
+    importFile: () => input?.click(),
     failed: v.failed,
     openVPN: () => openVPN(native, alert),
     retry: start,
@@ -824,6 +842,7 @@ async function drawPair(box, { store, native, alert, redraw }) {
     signIn: async () => { await useTailscale(); tailscaleSignIn(native, alert, () => { if (visit === v) redraw(); }, `${NAME} is on your tailnet. Turn on the Tailscale app's VPN to pair.`, v); }, // B143: once left, an ending sign-in mustn't draw the page (a new visit and its poll)
     openTailscale: async () => { await useTailscale(); openApp(native, alert, TAILSCALE_URL, "Tailscale"); },
     install: () => openApp(native, alert, LOCALDEVVPN_STORE, "App Store"),
+    installTailscale: () => openApp(native, alert, TAILSCALE_STORE, "App Store"),
   });
   if (state === "paired" && store.get(ROUTE_KEY) !== "iphone") store.set(ROUTE_KEY, "iphone"); // picked This iPhone, already paired
   const frag = pairSections(sections);
@@ -834,7 +853,7 @@ async function drawPair(box, { store, native, alert, redraw }) {
     checkButton = checkMark(ul?.children[j]?.children?.[0]);
   }
   if (state === "file") {
-    const input = Object.assign(document.createElement("input"), { type: "file", className: "visually-hidden" });
+    input = Object.assign(document.createElement("input"), { type: "file", className: "visually-hidden" });
     input.addEventListener("change", async () => {
       const f = input.files?.[0];
       input.value = "";
@@ -848,8 +867,7 @@ async function drawPair(box, { store, native, alert, redraw }) {
         alert({ title: "Not a Pairing File", message: e?.message || "That file isn't a pairing for this iPhone.", buttons: ["OK"] });
       }
     });
-    frag.append(grouped([{ rows: [{ label: "Import Pairing File", cls: "sign-import", onClick: () => input.click() }] }]));
-    frag.querySelector(".sign-import")?.append(input);
+    frag.querySelector(".sign-import")?.append(input); // F317: the row is in step 2's group (setupGroups)
   }
   box.replaceChildren(frag);
 

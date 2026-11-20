@@ -1,0 +1,18 @@
+[
+  { "wait": 2000 },
+  { "eval": "localStorage.setItem('ifizbox.firstVisit','later'); 'ok'" },
+  { "nav": "#/home/settings/signing", "ms": 6000 },
+  { "eval": "(() => { const g = document.querySelector('.page.is-top .free-route'); if (!g) return 'no free route'; const b = document.querySelector('.page.is-top .page-body'); b.scrollTop += g.getBoundingClientRect().top - 110; return 'ok ' + g.innerText.slice(0, 300); })()" },
+  { "wait": 800 },
+  { "shot": "free-entry" },
+  { "clicktext": "Use a Free Apple ID", "ms": 1500 },
+  { "eval": "(() => { const g = document.querySelector('.page.is-top .free-route'); const b = document.querySelector('.page.is-top .page-body'); b.scrollTop += g.getBoundingClientRect().top - 110; return g.innerText.slice(0, 400); })()" },
+  { "wait": 800 },
+  { "shot": "free-signin" },
+  { "eval": "localStorage.setItem('ifizbox.freeid', JSON.stringify({ teamId: 'ABCDE12345', teamName: 'Example Team', serial: '1', password: 'x', p12: 'AAAA', expires: '2027-11-20T00:00:00.000Z', profile: null, appId: 'com.example.app.ABCDE12345' })); 'ok'" },
+  { "nav": "#/home/settings/signing", "ms": 6000 },
+  { "clicktext": "Use a Free Apple ID", "ms": 1500 },
+  { "eval": "(() => { const g = document.querySelector('.page.is-top .free-route'); const b = document.querySelector('.page.is-top .page-body'); b.scrollTop += g.getBoundingClientRect().top - 110; return g.innerText.slice(0, 600); })()" },
+  { "wait": 800 },
+  { "shot": "free-ready" }
+]

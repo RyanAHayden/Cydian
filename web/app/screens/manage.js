@@ -407,6 +407,9 @@ async function confirmWarning(input) {
 }
 
 // ---- Import & Export -------------------------------------------------------------------------------------------
+// F317: Import's hint in two short sentences (AGENTS.md, Hints).
+export const IMPORT_FOOTER = "Reads a list of URLs, Sileo's .sources, Cydia's .list and AltStore-style JSON. "
+  + "You see which are new before anything is added.";
 
 function renderIO(body, route, ctx) {
   const file = Object.assign(document.createElement("input"), { type: "file", hidden: true,
@@ -432,8 +435,7 @@ function renderIO(body, route, ctx) {
     { header: "Import", rows: [
       { label: "From File", onClick: () => file.click(), icon: rowIcon("fromFile") },
       { label: "From Clipboard", onClick: (e) => importClipboard(e.currentTarget, route, ctx), icon: rowIcon("fromClipboard") },
-    ], footer: `Reads ${NAME}'s export, a list of URLs, AltStore, SideStore and Feather source lists (JSON), `
-      + "Sileo's .sources and Cydia's .list. You see which are new before anything is added." },
+    ], footer: IMPORT_FOOTER },
   ]), file);
 }
 

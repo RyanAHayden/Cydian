@@ -91,8 +91,8 @@ async function readCapped(stream, cap) {
   return out;
 }
 
-// Off unless the deploy sets APPLE_RELAY = "1" (a preview for the sign-in spike): ifizbox.com deploys from main, and
-// the relay mustn't go live there before the free route is decided.
+// Off unless the deploy sets APPLE_RELAY = "1": ifizbox.com (wrangler.ifizbox.toml) and the preview do; a
+// self-hosted Worker stays off until its owner opts in.
 export const relayOn = (env) => String(env?.APPLE_RELAY ?? "") === "1";
 export const STATUS_PATH = "/apple/status";
 

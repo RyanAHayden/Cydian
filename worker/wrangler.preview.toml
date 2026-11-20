@@ -29,5 +29,5 @@ not_found_handling = "none"
 run_worker_first = ["/apple/*", "/healthz"]
 
 [vars]
-APPLE_RELAY = "1"   # the /apple/<host>/<path> relay (src/apple-relay.js); off everywhere else
+APPLE_RELAY = "1"   # the /apple/<host>/<path> relay (src/apple-relay.js); also on for ifizbox.com
 # No KV, D1 or rate limits: the preview is for /apple/* only. The other routes may fail here, and that's fine.

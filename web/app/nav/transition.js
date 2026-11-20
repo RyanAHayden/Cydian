@@ -6,8 +6,9 @@
 // A push runs p 0 -> 1, a pop 1 -> 0, and the edge swipe sets p from the finger, then animates to 0 or back to 1.
 
 import { selectionOpacity } from "./selection.js";
+import { SHEET_IN } from "./motion.js";
 
-export const DURATION = 350; // ms, UINavigationController's push
+export const DURATION = SHEET_IN; // ms, UINavigationController's push (350, as long as a sheet rising)
 export const EASE = "cubic-bezier(.36,.66,.04,1)"; // the iOS navigation curve: quick start, long soft landing
 export const EASE_OUT = "cubic-bezier(.2,.8,.4,1)"; // finishing a swipe: the finger already gave the start
 const PARALLAX = 0.3; // the screen below moves a third as far

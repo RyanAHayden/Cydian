@@ -11,6 +11,7 @@
 
 import { liveText } from "./pagestate.js";
 import { isWatched } from "./slide.js";
+import { EASE, DURATION } from "./motion.js";
 
 export function el(tag, cls, text) {
   const e = document.createElement(tag);
@@ -101,7 +102,7 @@ export function collapse(li) {
   }
   li.remove();
   for (const el of below) {
-    el.animate([{ transform: `translateY(${h}px)` }, { transform: "none" }], { duration: 300, easing: "cubic-bezier(.25,.1,.25,1)" });
+    el.animate([{ transform: `translateY(${h}px)` }, { transform: "none" }], { duration: DURATION, easing: EASE });
   }
 }
 

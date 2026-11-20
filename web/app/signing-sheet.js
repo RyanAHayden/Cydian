@@ -33,18 +33,11 @@ import { keepGuideHref, openAppHelp } from "./screens/guides.js";
 import { tweaksGroup } from "./screens/tweaks.js"; // F288
 import { tweakParams } from "./core/tweaks.js";
 import { toBase64 } from "./core/signing.js";
+import { loadStyle } from "./nav/motion.js";
 
 const ICON_SIZE = 180; // the 60pt @3x icon; the signer writes the same PNG as @2x and @3x
 
-let styled = false;
-function style() {
-  if (styled || typeof document === "undefined") return;
-  styled = true;
-  const link = document.createElement("link");
-  link.rel = "stylesheet";
-  link.href = new URL("./signsheet.css", import.meta.url).href;
-  document.head.append(link);
-}
+function style() { loadStyle("signsheet.css"); }
 
 // An older shell answers "unknown method signing.inspect" (Bridge.swift).
 const unknownMethod = (e) => /unknown method/i.test(String(e?.message ?? e ?? ""));

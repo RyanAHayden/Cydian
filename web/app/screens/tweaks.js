@@ -23,6 +23,7 @@ import { detectMode } from "../core/settings.js"; // F302
 import { debOf, tweakTitle, withTweaksText, tweakSteps, madeFor, tweakUpdates, ipaEncrypted, ENCRYPTED_ALERT, HOW_TO_GET_ONE,
   HOW_TO_TEXT, tweakParams } from "../core/tweaks.js"; // F302a
 import { BUNDLE_ID } from "../brand.js"; // F302a
+import { loadStyle } from "../nav/motion.js";
 
 const DB = "ifizbox-tweaks";
 let storeP = null;
@@ -90,15 +91,7 @@ const FOOTER = "Add .dylib, .deb or zipped .framework tweaks: they go into the a
 const WITH_ELLEKIT = `${ELLEKIT.name} ${ELLEKIT.version} goes in too, for CydiaSubstrate (bundled; BSD licence). `
   + "Add ElleKit's .deb to use another version.";
 
-let styled = false;
-function style() {
-  if (styled || typeof document === "undefined") return;
-  styled = true;
-  const link = document.createElement("link");
-  link.rel = "stylesheet";
-  link.href = new URL("../tweaks.css", import.meta.url).href;
-  document.head.append(link);
-}
+function style() { loadStyle("tweaks.css"); }
 
 // `sources` (F302): whether "Add Tweak from a Source…" shows (a bool or () => bool); the sideload app by default.
 export function tweaksGroup({ bundleId = "", store = tweakStore, alert = showAlert, sheet = showActionSheet, onChange = () => {},

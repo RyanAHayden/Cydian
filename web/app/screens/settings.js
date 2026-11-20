@@ -55,6 +55,7 @@ import { certificateDetail } from "../core/installroute.js";
 import { signedAppRows } from "../core/signing.js";
 import { onPageShow, patchDetails, cellsOf } from "../nav/pagestate.js";
 import { refreshInstallation } from "./installroute.js";
+import { loadStyle, EASE, DURATION } from "../nav/motion.js";
 
 // F284: Installation & Signing's own sub-pages under signing/ (the main page's Signing rows), sideload build only.
 // How Signing Works stays signing/help.
@@ -83,15 +84,7 @@ function mergedNav() {
 export const title = "Settings";
 
 // F134: this page's own stylesheet (settings.css), linked once from this module's folder (no build step).
-let styled = false;
-function style() {
-  if (styled || typeof document === "undefined" || !document.head) return;
-  styled = true;
-  const link = document.createElement("link");
-  link.rel = "stylesheet";
-  link.href = new URL("../settings.css", import.meta.url).href;
-  document.head.append(link);
-}
+function style() { loadStyle("settings.css"); }
 
 // The one store the app uses (both modes and the site read it through here). In the jailbreak app the bridge's
 // helper makes Ignored Upgrades real dpkg holds (F22); the bridge itself is N3's.
@@ -491,7 +484,7 @@ function layoutSplit() {
   box.style.height = tall + "px";
   if (to > from) space.style.height = to + "px";
   const anim = box.animate([{ transform: `translateY(${tall - from}px)` }, { transform: `translateY(${tall - to}px)` }],
-    { duration: 300, easing: "cubic-bezier(.25,.1,.25,1)", fill: "forwards" });
+    { duration: DURATION, easing: EASE, fill: "forwards" });
   split.moving = true;
   anim.finished.catch(() => {}).then(() => {
     split.moving = false;

@@ -31,6 +31,7 @@ import { leaveQuestion, LEAVE } from "../core/installroute.js";
 import { tailscaleVPNOn, installStatus, CHECKING, STATUS_ACTIONS } from "../core/installroute.js";
 import { NAME } from "../brand.js";
 import { showHUD } from "../nav/hud.js";
+import { EASE, DURATION } from "../nav/motion.js";
 
 export const PAGE = "installation";
 // F300: Installation & Signing's main page links to Install Apps With (`with`: the choice and the chosen route's
@@ -375,7 +376,7 @@ export function slideLayout(box, change) {
   const before = new Map(keys().map(([k, g]) => [k, g.getBoundingClientRect().top]));
   slideBelow(box, change);
   if (!before.size) return;
-  const ease = { duration: 300, easing: "cubic-bezier(.25,.1,.25,1)" };
+  const ease = { duration: DURATION, easing: EASE };
   for (const [k, g] of keys()) {
     if (!g.animate) continue;
     if (!before.has(k)) { g.animate([{ opacity: 0, transform: "translateY(-12px)" }, { opacity: 1, transform: "none" }], ease); continue; }
@@ -395,7 +396,7 @@ export function slideBelow(box, change) {
   if (Math.abs(d) < 0.5) return;
   for (let n = box; n && !n.classList?.contains("page-body"); n = n.parentElement) {
     for (let s = n.nextElementSibling; s; s = s.nextElementSibling) {
-      s.animate?.([{ transform: `translateY(${d}px)` }, { transform: "none" }], { duration: 300, easing: "cubic-bezier(.25,.1,.25,1)" });
+      s.animate?.([{ transform: `translateY(${d}px)` }, { transform: "none" }], { duration: DURATION, easing: EASE });
     }
   }
 }

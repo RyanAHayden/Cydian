@@ -49,6 +49,7 @@ import { showSheet } from "./sheet.js";
 import { createFollow, hudLine } from "../core/progress.js";
 import { NAME } from "../brand.js";
 import { FINISH_LABEL } from "../core/queue.js";
+import { EASE, DURATION, SHEET_IN } from "./motion.js";
 import { createLogBuffer, selectionIn } from "../screens/progress.js";
 
 // B67: the plain finish button, Cydia's "Return to Cydia"
@@ -69,7 +70,6 @@ export function openOn(page, seg, count, { logTab = 1 } = {}) {
   return v;
 }
 
-const EASE = "cubic-bezier(.25,.1,.25,1)";
 const MAX_LINES = 1500; // lines kept on screen while it follows; the callers' logs keep everything
 // B49: how long a locked finish keeps Close greyed if iOS never closes iFizBox (no prompt came): then Close works
 // again, so the page can't trap the user. iOS's prompt and the native CloseForUpdate exit normally come in seconds.
@@ -263,7 +263,7 @@ export function openProgress({ title = "Running", onCancel = null } = {}) {
     hide() {
       if (closed || hiddenPage) return;
       hiddenPage = true;
-      sheet.animate([{ transform: "none" }, { transform: "translateY(100%)" }], { duration: 300, easing: EASE, fill: "forwards" })
+      sheet.animate([{ transform: "none" }, { transform: "translateY(100%)" }], { duration: DURATION, easing: EASE, fill: "forwards" })
         .finished.then(() => { if (hiddenPage) sheet.style.visibility = "hidden"; }, () => {});
     },
     show() {
@@ -271,7 +271,7 @@ export function openProgress({ title = "Running", onCancel = null } = {}) {
       hiddenPage = false;
       sheet.style.visibility = "";
       sheet.getAnimations?.().forEach((a) => a.cancel());
-      sheet.animate([{ transform: "translateY(100%)" }, { transform: "none" }], { duration: 350, easing: EASE });
+      sheet.animate([{ transform: "translateY(100%)" }, { transform: "none" }], { duration: SHEET_IN, easing: EASE });
       flush();
       if (follow.shouldScroll()) toBottom();
     },

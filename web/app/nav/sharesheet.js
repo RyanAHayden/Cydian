@@ -16,6 +16,7 @@
 // All text goes in through textContent.
 
 import { el } from "./ui.js";
+import { EASE, DURATION } from "./motion.js";
 
 const PER_PAGE = 9;
 
@@ -95,9 +96,8 @@ export function showShareSheet({ items = [], cancel = "Cancel", title = "Share" 
 
     const onKey = (e) => { if (e.key === "Escape") { e.preventDefault(); close(-1); } };
     document.addEventListener("keydown", onKey);
-    const ease = "cubic-bezier(.25,.1,.25,1)";
-    dim.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 300, easing: "ease-out" });
-    sheet.animate([{ transform: "translateY(100%)" }, { transform: "none" }], { duration: 300, easing: ease });
+    dim.animate([{ opacity: 0 }, { opacity: 1 }], { duration: DURATION, easing: "ease-out" });
+    sheet.animate([{ transform: "translateY(100%)" }, { transform: "none" }], { duration: DURATION, easing: EASE });
     cancelButton.focus({ preventScroll: true });
 
     let done = false;

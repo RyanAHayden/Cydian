@@ -46,6 +46,7 @@ import { takeInstallParam, askFromInstallLink, launchRefresh } from "./websign-g
 import { notIphonePage } from "./core/platform.js";
 import { showNotIphone } from "./screens/notiphone.js";
 import { handoffRecent } from "./handoffclock.js";
+import { navButtons, MOVED_CLASS } from "./nav/navbuttons.js";
 
 // F266: a Mac, PC or Android phone gets the Not-an-iPhone page first, and the app only starts once it's left (Look
 // Around Anyway, or What Is …? onto the FAQ). Decided by user agent before anything is drawn, so an iPhone, an iPad
@@ -126,11 +127,12 @@ function makePage(tab, path) {
   item.className = "nav-item";
   const left = document.createElement("div");
   left.className = "nav-left";
-  if (below) {
+  const bar = navButtons(info, !!below); // B176: a pushed root keeps its Refresh, on the right (nav/navbuttons.js)
+  if (bar.back) {
     const back = button({ label: below.page.back, onClick: () => goBack() }, "bar-button back");
     back.setAttribute("aria-label", "Back to " + below.page.back);
     left.append(back);
-  } else if (info.left) left.append(button(info.left, "bar-button"));
+  } else if (bar.left) left.append(button(bar.left, "bar-button"));
   const h1 = document.createElement("h1");
   h1.className = "nav-title";
   h1.textContent = title;
@@ -138,7 +140,7 @@ function makePage(tab, path) {
   const right = document.createElement("div");
   right.className = "nav-right";
   // `right` may be one button or several side by side (Sources: Add and Manage).
-  for (const b of [info.right].flat().filter(Boolean)) right.append(button(b, "bar-button"));
+  for (const b of bar.right) right.append(button(b, b.moved ? "bar-button " + MOVED_CLASS : "bar-button"));
   item.append(left, h1, right);
   navStacks[tab].append(item);
 

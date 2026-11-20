@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { themeMessage, applyTheme, settings } from "./settings.js";
+import { keepHint } from "./settings.js";
 
 // F230: a localStorage that records what the pages write and remove (before any test opens a theme list, which drops
 // F215's old split key once). The settings store above was made at import, on its own storage.
@@ -530,4 +531,29 @@ test("F230: the split lasts one visit: leave and re-enter -> the peek; nothing s
   const { readFile } = await import("node:fs/promises");
   const src = await readFile(new URL("./settings.js", import.meta.url), "utf8");
   for (const gone of ["savedSplit", "saveSplit", "SPLIT_FLOOR", "setItem(SPLIT_KEY"]) assert.equal(src.includes(gone), false, gone);
+});
+
+// F315: Keep Bundle IDs' group footer by state, one short sentence: what it does while nothing is wrong, the one
+// thing that's wrong otherwise (never two notes joined), with How to Get Notifications in the group only while the
+// ID is kept and the profile can't notify.
+test("F315: Keep Bundle IDs' footer by state, one sentence, the guide row only when it helps", () => {
+  const ADHOC_PUSH = { appId: "com.you.youtube", push: "production", kind: "Ad Hoc", wildcard: false };
+  const ADHOC = { appId: "com.you.youtube", push: null, kind: "Ad Hoc", wildcard: false };
+  const DEV = { appId: "com.you.youtube", push: "development", kind: "Development", wildcard: false };
+  const WILD = { appId: "com.you.*", push: null, kind: "Ad Hoc", wildcard: true };
+  assert.deepEqual(keepHint(null, true), { footer: "Apps keep their own IDs and notifications.", guide: false });
+  assert.deepEqual(keepHint(ADHOC_PUSH, true), { footer: "Apps keep their own IDs and notifications.", guide: false });
+  assert.deepEqual(keepHint(ADHOC, true), { footer: "Your profile has no Push, so kept IDs get no notifications.", guide: true });
+  assert.deepEqual(keepHint(DEV, true), { footer: "Your development profile gets only Apple's test notifications, which apps don't use.", guide: true });
+  assert.deepEqual(keepHint(WILD, true), { footer: "Your wildcard profile can't get notifications for kept IDs.", guide: true });
+  for (const p of [null, ADHOC_PUSH, DEV, WILD]) {
+    assert.deepEqual(keepHint(p, false), { footer: "Off, each app becomes a copy under your ID, without its notifications.", guide: false });
+  }
+  for (const p of [null, ADHOC_PUSH, ADHOC, DEV, WILD]) {
+    for (const keep of [true, false]) {
+      const { footer } = keepHint(p, keep);
+      assert.equal((footer.match(/[.!?](\s|$)/g) ?? []).length, 1, footer);
+      assert.ok(footer.length <= 100, footer);
+    }
+  }
 });

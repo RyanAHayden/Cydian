@@ -123,10 +123,14 @@ enum ASC {
         return "ifizbox.\(team.lowercased())"
     }
     // Cache entries have core/asc.js's shape: the App ID's capabilities under "capabilities".
-    static func remakeReason(_ e: [String: Any]?, udid: String?, capabilities: [String]?, certId: String?, now: Date = Date()) -> String? {
+    // With no UDID, `candidates` (the running app's embedded profile's devices, one of them this iPhone) stand in:
+    // the profile is made again for "device" only when it holds none of them.
+    static func remakeReason(_ e: [String: Any]?, udid: String?, candidates: [String] = [], capabilities: [String]?, certId: String?, now: Date = Date()) -> String? {
         guard let e = e, e["content"] is String else { return "missing" }
         guard let x = (e["expires"] as? String).flatMap({ ISO8601DateFormatter().date(from: $0) }), x.timeIntervalSince(now) > 86400 else { return "expired" }
-        if let u = udid, !((e["udids"] as? [String]) ?? []).map({ $0.uppercased() }).contains(u.uppercased()) { return "device" }
+        let had = Set(((e["udids"] as? [String]) ?? []).map { $0.uppercased() })
+        if let u = udid, !had.contains(u.uppercased()) { return "device" }
+        if udid == nil, !candidates.isEmpty, had.isDisjoint(with: candidates.map { $0.uppercased() }) { return "device" }
         if let c = capabilities, c.sorted() != ((e["capabilities"] as? [String]) ?? []).sorted() { return "capabilities" }
         if let c = certId, let had = e["certId"] as? String, c != had { return "certificate" }
         return nil
@@ -177,19 +181,20 @@ enum ASC {
         guard let bid = bundleIdId, let capList = capsNow else { return nil }
         guard let serial = serialHex(certDER) else { throw SignError("no_cert", "The certificate can't be read.") }
         if let e = entry, e["serial"] as? String != serial { entry?["content"] = nil; log("Profile \(identifier): the certificate changed") }
-        if let e = entry, remakeReason(e, udid: udid, capabilities: capList, certId: nil) == nil,
+        // No UDID: every device in this app's own profile belongs to the team, and this iPhone is one of them.
+        var candidates = [String]()
+        if udid == nil, case .candidates(let c)? = PhoneID.current() { candidates = c }
+        if let e = entry, remakeReason(e, udid: udid, candidates: candidates, capabilities: capList, certId: nil) == nil,
            let c = e["content"] as? String, let d = Data(base64Encoded: c), let p = try? Profile(d) {
             log("Profile \(identifier): made by \(Brand.name), reused")
             return p
         }
-        let reason = remakeReason(entry, udid: udid, capabilities: capList, certId: nil) ?? "missing"
+        let reason = remakeReason(entry, udid: udid, candidates: candidates, capabilities: capList, certId: nil) ?? "missing"
         if let u = udid {
             if list(try request("GET", "/v1/devices" + q(["filter[udid]": u, "limit": "200"]), key: k)).isEmpty {
                 try request("POST", "/v1/devices", ["data": ["type": "devices", "attributes": ["name": "\(Brand.name) iPhone", "udid": u, "platform": "IOS"]]], key: k)
                 log("Registered this iPhone (\(u)) in the developer account")
             }
-        } else {
-            log("This iPhone's UDID isn't known (pair This iPhone in Settings > Installation to register it); the profile gets every enabled iPhone")
         }
         let cert = list(try request("GET", "/v1/certificates" + q(["limit": "200"]), key: k)).first {
             (attr($0, "serialNumber") ?? "").uppercased().drop { $0 == "0" } == serial.drop { $0 == "0" }

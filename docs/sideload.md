@@ -60,8 +60,8 @@ That is AltStore/SideStore's job, and it needs Apple's servers plus an anisette 
 4. Optional dylib injection (`TweakHandler`, can unpack `.deb` tweaks, bundles ElleKit). iFizBox does it too, in both
    signers (Inject Tweaks in the sign options, docs/signing.md "Tweak injection"): `.dylib`, `.deb` and zipped
    `.framework` files into `Frameworks/`, weak load commands and the Frameworks rpath in the main executable, install
-   names pointed at `@rpath`. It doesn't carry ElleKit itself: the user adds ElleKit's `.deb` when a tweak links
-   CydiaSubstrate.
+   names pointed at `@rpath`. It bundles ElleKit too (a pinned, hash-checked 1.2 rootless `.deb`): its
+   `libellekit.dylib` goes in when a tweak links CydiaSubstrate and the user added no ElleKit of their own.
 5. **arm64e fix-up** (`_locateMachosAndFixupArm64eSlice`): rewrites old-ABI arm64e slices so iOS 26 accepts them.
    This is mostly for CydiaSubstrate. iFizBox does it too: an IPA from an AltStore source may carry one.
 6. **Entitlements**. By default zsign takes the profile's `Entitlements` dict as-is

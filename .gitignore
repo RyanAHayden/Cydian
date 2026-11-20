@@ -3,6 +3,7 @@ __pycache__/
 /ref
 *.deb
 !/web/app/core/fixtures/tweaks/*.deb
+!/web/app/vendor/ellekit/*.deb
 *.ipa
 .env
 .venv/

@@ -10,6 +10,9 @@
 //     ElleKit's libellekit.dylib). `files` go into the app (paths under it: Frameworks/…, X.bundle/…); `inject`
 //     is what the main executable gets as LC_LOAD_WEAK_DYLIB. `missing` names what a tweak links that nobody added
 //     (["CydiaSubstrate"]: add ElleKit's .deb); a sign with something missing is refused (tweakProblem).
+//   withElleKit(items, ellekitDeb) -> prepared   prepareTweaks, and when CydiaSubstrate is missing, again with the
+//     bundled ElleKit (ELLEKIT: a pinned .deb in vendor/ellekit, SHA-256 checked by checkElleKit) put first, so its
+//     libellekit.dylib stands in; `bundled` names it ("ElleKit 1.2"), `names` stay the user's.
 //   injectInto(executable, inject) -> executable   adds the weak load commands (and LC_RPATH @executable_path/Frameworks
 //     when the binary lacks it) to every slice, in the room after its load commands; the website's signer does this
 //     before zsign signs, the app's in Swift (native/sign/Tweaks.swift) on the same rules.
@@ -18,6 +21,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { readAr, readTar, readZip, decompress, UnpackError } from "./unpack.js";
+import { sha256Hex } from "./sha256.js";
 
 export { UnpackError };
 export const TWEAK_ACCEPT = ".dylib,.deb,.zip,.framework";
@@ -332,6 +336,47 @@ export function prepareTweaks(items) {
     ignored,
     missing: missingBy.size ? ["CydiaSubstrate"] : [],
     missingBy: [...missingBy],
+  };
+}
+
+// ---- the bundled ElleKit ---------------------------------------------------------------------------------------------
+
+// ElleKit 1.2, rootless, as https://ellekit.space serves it (BSD-3-Clause; source, hash and licence in
+// vendor/ellekit/README.md). `file` is under web/app.
+export const ELLEKIT = Object.freeze({
+  name: "ElleKit",
+  version: "1.2",
+  file: "vendor/ellekit/ellekit_1.2_iphoneos-arm64.deb",
+  source: "https://ellekit.space/pool/ellekit_1.2_iphoneos-arm64.deb",
+  sha256: "e21dc91bdc1be193dc915daecfff45256239b4fe583a36861e662ab1f43906dc",
+  size: 331444,
+  licence: "BSD-3-Clause",
+});
+const ELLEKIT_ITEM = "ellekit_1.2_iphoneos-arm64.deb";
+
+// The bundled .deb's bytes, or a throw with words when they aren't the pinned file.
+export function checkElleKit(data) {
+  const b = data instanceof Uint8Array ? data : new Uint8Array(data ?? []);
+  if (b.length !== ELLEKIT.size || sha256Hex(b) !== ELLEKIT.sha256) {
+    fail(`The bundled ${ELLEKIT.name} isn't the expected file. Add ElleKit's .deb to the tweaks yourself.`);
+  }
+  return b;
+}
+
+export function needsElleKit(prepared) { return Boolean(prepared?.missing?.length); }
+
+// prepareTweaks, with the bundled ElleKit added when a tweak needs CydiaSubstrate and nobody added it. `ellekit` is
+// the checked .deb (checkElleKit), or null to only prepare (missing then stays as it is).
+export function withElleKit(items, ellekit) {
+  const p = prepareTweaks(items);
+  if (!needsElleKit(p) || !ellekit) return { ...p, bundled: [] };
+  // first, so a file of the user's at the same path wins
+  const q = prepareTweaks([{ name: ELLEKIT_ITEM, data: ellekit }, ...(items ?? [])]);
+  return {
+    ...q,
+    names: p.names,
+    ignored: q.ignored.filter((s) => !s.startsWith(`${ELLEKIT_ITEM}: `)),
+    bundled: needsElleKit(q) ? [] : [`${ELLEKIT.name} ${ELLEKIT.version}`],
   };
 }
 

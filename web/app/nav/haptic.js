@@ -21,3 +21,13 @@ export function haptic() {
   label.click();
   label.remove();
 }
+
+// The app's bridge plays haptics (haptic() and hapticTick() reach UIKit); elsewhere only haptic()'s gesture fallbacks.
+export const bridgeHaptics = () => Boolean(globalThis.ifizboxApp && globalThis.webkit?.messageHandlers?.ifizbox);
+
+// The smallest tick there is: the bridge's "haptic.tick" (UISelectionFeedbackGenerator). App only; silent elsewhere,
+// since the browser fallbacks can't play anything lighter than haptic().
+export function hapticTick() {
+  if (!bridgeHaptics()) return;
+  try { globalThis.webkit.messageHandlers.ifizbox.postMessage({ method: "haptic.tick" })?.catch?.(() => {}); } catch { /* none */ }
+}

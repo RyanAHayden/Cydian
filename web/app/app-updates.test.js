@@ -159,3 +159,35 @@ test("F281: dpkg's rows filed by catalog.upgrades stay ignored; an entry the ins
   assert.deepEqual(out.available.map((r) => r.id), ["tweak"]);
   assert.deepEqual(settled, [{ old: "2" }]);
 });
+
+// F285: Settings > Updates > <NAME> Updates off: iFizBox's own entry leaves the lists the background check and the
+// push server follow; on again, the last list goes out again with it.
+test("self-update alerts off: the shell isn't told to follow iFizBox", async () => {
+  const { withoutSelf, selfAlertsChanged } = await import("./app-updates.js");
+  const { SELF_ID } = await import("./core/appupdates.js");
+  const w = { apps: [{ id: SELF_ID, version: "1" }, { id: "delta", version: "1.5" }], known: [`${SELF_ID} 2`] };
+  assert.equal(withoutSelf(w, true), w);
+  assert.deepEqual(withoutSelf(w, false), { apps: [{ id: "delta", version: "1.5" }], known: [`${SELF_ID} 2`] });
+  const data = new Map([["ifizbox.selfUpdateAlerts", "false"]]);
+  const had = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
+  Object.defineProperty(globalThis, "localStorage", { configurable: true, value: { getItem: (k) => data.get(k) ?? null, setItem: (k, v) => data.set(k, String(v)) } });
+  try {
+    const calls = [];
+    const native = { call: async (m, p) => { calls.push([m, p]); return { scheduled: true }; } };
+    const store = async () => memoryAppStore([{ ...self, version: "0.9.1" }, { id: "delta", name: "Delta", version: "1.5", source: SRC, date: 1 }]);
+    const lookup = async (id) => (id === "delta" ? { key: `alt:${SRC}`, stanza: { version: "1.5" }, row: { name: "Delta" } } : null);
+    await withAppUpgrades({ available: [], ignored: [] }, [], { mode: "sideload", native, store, lookup });
+    await new Promise((r) => setTimeout(r, 0));
+    assert.deepEqual(calls.at(-1)[1].apps.map((a) => a.id), ["delta"]);
+    data.set("ifizbox.selfUpdateAlerts", "true");
+    selfAlertsChanged();
+    await new Promise((r) => setTimeout(r, 0));
+    assert.deepEqual(calls.at(-1)[1].apps.map((a) => a.id), [SELF_ID, "delta"]);
+    const n = calls.length;
+    selfAlertsChanged(); // nothing changed: not sent twice
+    await new Promise((r) => setTimeout(r, 0));
+    assert.equal(calls.length, n);
+  } finally {
+    if (had) Object.defineProperty(globalThis, "localStorage", had); else delete globalThis.localStorage;
+  }
+});

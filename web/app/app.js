@@ -514,6 +514,12 @@ if (globalThis.ifizboxNative) {
   const lookForSelf = () => lookForUpdates().catch(() => {});
   setTimeout(lookForSelf, 2000);
   globalThis.addEventListener("ifizbox:reloaded", lookForSelf); // Home's Reload (screens/home.js reloadHome)
+  // F285: Push is on by default in the sideload app, once the signing server can push and nothing blocks it, unless
+  // the user turned it off (core/push.js autoEnablePush). Each launch asks until it's on.
+  if (detectMode() === "sideload") {
+    setTimeout(() => Promise.all([import("./core/push.js"), import("./signing-client.js")])
+      .then(([p, s]) => p.autoEnablePush({ server: s.getServer() })).catch(() => {}), 3000);
+  }
   // The first launch after iFizBox updated itself (iOS closed the old one as it installed this one). F183: no note
   // pops up (the banner went with the update popups); the version line at the bottom of Home and Settings shows it.
   appVersion().then((v) => {

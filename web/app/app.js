@@ -524,6 +524,13 @@ if (globalThis.ifizboxNative) {
   // no wait between checks and never a popup: a newer iFizBox is a row in Changes and its badge (essential-ui.js).
   const lookForSelf = () => lookForUpdates().catch(() => {});
   setTimeout(lookForSelf, 2000);
+  // F291: the jailbreak build offers a listed security patch for this iOS at launch (Install Patch / Later), like
+  // Cydia's Essential upgrade; once dpkg's status is in (screens/safety.js lookForPatch), never installing by itself.
+  if (detectMode() === "jailbreak") {
+    const lookForPatch = () => import("./screens/safety.js").then((m) => m.lookForPatch()).catch(() => {});
+    setTimeout(lookForPatch, 6000);
+    globalThis.addEventListener("ifizbox:reloaded", lookForPatch); // asked once a launch; this catches a late dpkg read
+  }
   globalThis.addEventListener("ifizbox:reloaded", lookForSelf); // Home's Reload (screens/home.js reloadHome)
   // F285: Push is on by default in the sideload app, once the signing server can push and nothing blocks it, unless
   // the user turned it off (core/push.js autoEnablePush). Each launch asks until it's on.

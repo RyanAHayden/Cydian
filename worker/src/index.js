@@ -52,6 +52,7 @@
 import { account, isAccountPath } from "./account.js";
 import { readIpaInfo, IpaError } from "./ipainfo.js";
 import { reviews, isReviewsPath } from "./reviews.js";
+import { reports, isReportsPath } from "./reports.js";
 import { udid, isUdidPath } from "./udid.js";
 import { appleRelay, isApplePath } from "./apple-relay.js";
 import { setup, isSetupPath } from "./setup.js";
@@ -725,6 +726,7 @@ export default {
     const ttl = Math.max(60, Number(env.TTL) || 600);
     if (isAccountPath(u.pathname)) return account(req, env); // F97: iFizBox Account (src/account.js)
     if (isReviewsPath(u.pathname)) return reviews(req, env); // F182: user reviews (src/reviews.js)
+    if (isReportsPath(u.pathname)) return reports(req, env); // F291: Report as Malicious (src/reports.js)
     if (isUdidPath(u.pathname)) return udid(req, env); // F253: this iPhone's UDID via a profile (src/udid.js)
     if (isApplePath(u.pathname)) return appleRelay(req, env); // F251: Apple sign-in relay (src/apple-relay.js)
     if (isPushPath(u.pathname)) return push(req, env); // F280: push notifications (src/push.js)

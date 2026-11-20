@@ -54,6 +54,8 @@ export async function readSelfInfo() {
 // Changes (sideload): the upgrades with iFizBox's own row on top, from what the last check read: its source, or
 // GitHub's release when that is newer (F183).
 export async function upgradesWithSelf(upgrades) {
+  // F291: the jailbreak build's "Security Patch Available" row on top, when one is listed for this iOS (screens/safety.js)
+  if (detectMode() === "jailbreak") return import("./screens/safety.js").then((m) => m.patchUpgrades(upgrades)).catch(() => upgrades);
   if (detectMode() !== "sideload") return upgrades;
   const current = await appVersion();
   const info = selfInfoWith(loadInfo(storage()), newerRelease(storage(), current));

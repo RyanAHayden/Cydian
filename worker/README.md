@@ -63,6 +63,13 @@ Then put that `https://` address in **Settings > Installation & Signing > Signin
 - `TTL`: seconds a held update stays (600), and an app the website signed in the browser.
 - `MAX_UPLOAD_MB`: the largest IPA the website signs in the browser (512): it downloads through `/api/fetch?kind=ipa`
   and comes back signed to `/sign/upload`, in 20 MB parts, for `TTL` seconds. `0` turns website signing off here.
+- `FETCH_RATE`, `HOST_RATE`, `UPLOAD_RATE`: requests per address a minute to `/api/fetch` (300), `POST /sign/host`
+  (10) and `POST /sign/upload` (12: each website install sends 2; its parts aren't counted). More get a 429. With the
+  `FETCH_RATE_LIMIT`, `HOST_RATE_LIMIT` and `UPLOAD_RATE_LIMIT` rate-limit bindings (`[[ratelimits]]`) the count holds
+  across Cloudflare's isolates and the binding's own `limit` applies; without them each isolate counts in memory, as
+  `node.mjs` does. `0` turns that memory count off. `node.mjs` counts the connecting address, or, behind a proxy on
+  the same machine (`tailscale serve`, Caddy, `cloudflared`), the last `X-Forwarded-For` entry; a proxy that sends
+  none puts every visitor in one count.
 - `GITHUB_TOKEN` (optional, a secret: `npx wrangler secret put GITHUB_TOKEN`): a GitHub token with **no permissions**
   (public repositories only). GitHub limits anonymous downloads per address, and a Worker's address is shared with
   other sites, so the website's downloads of IPAs on GitHub releases can get "429". With the token, those retry

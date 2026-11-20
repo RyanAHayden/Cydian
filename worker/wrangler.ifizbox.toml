@@ -62,3 +62,20 @@ crons = ["*/30 * * * *"]
 name = "REVIEW_RATE_LIMIT"
 namespace_id = "9803"
 simple = { limit = 6, period = 60 }
+
+# F312: per-address limits on the fetch proxy and the upload routes (src/limits.js); keep each limit at its
+# FETCH_RATE / HOST_RATE / UPLOAD_RATE default (300, 10, 12 a minute). Without these, each isolate counts in memory.
+[[ratelimits]]
+name = "FETCH_RATE_LIMIT"
+namespace_id = "9804"
+simple = { limit = 300, period = 60 }
+
+[[ratelimits]]
+name = "HOST_RATE_LIMIT"
+namespace_id = "9805"
+simple = { limit = 10, period = 60 }
+
+[[ratelimits]]
+name = "UPLOAD_RATE_LIMIT"
+namespace_id = "9806"
+simple = { limit = 12, period = 60 }

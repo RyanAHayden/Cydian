@@ -2,7 +2,7 @@
 // /api/fetch, /api/applookup, /api/ipainfo and /sign/*. For people who'd rather run it on their own PC or in Docker than on Cloudflare.
 //   node worker/node.mjs            PORT (8787), HOST (0.0.0.0), WEB (../web/app), HOST_IDS, TTL as in wrangler.toml
 //   F187: reviews (/reviews/*) in SQLite at REVIEWS_DB (reviews.db, "off" for none); REVIEWS_ADMIN, REVIEWS_SALT,
-//   REVIEW_DAILY, REPORT_HIDE as the Worker's.
+//   REVIEW_DAILY, REPORT_HIDE as the Worker's. F312: FETCH_RATE, HOST_RATE, UPLOAD_RATE as the Worker's (src/limits.js).
 // iOS takes the install manifest only over HTTPS with a trusted certificate: put it behind Tailscale
 // (`tailscale serve --bg 8787`), a Cloudflare Tunnel or Caddy with a domain (worker/README.md).
 import http from "node:http";
@@ -67,6 +67,17 @@ setInterval(() => { const now = Date.now(); for (const [k, e] of looked) if (e.u
 // B190: every fetch the proxy routes make (/api/fetch, /api/ipainfo, /api/applookup, /api/appreviews) goes through
 // the SSRF guard Cloudflare gives the Worker for free: hosts resolved and checked, redirects followed by hand.
 const env = { FETCH: guardedFetch(), HOSTED, ASSETS, LOOKUP_CACHE, HOST_IDS: process.env.HOST_IDS ?? "*.ifizbox", TTL: process.env.TTL ?? "600", MAX_UPLOAD_MB: process.env.MAX_UPLOAD_MB };
+// F312: the Worker's per-address limits (src/limits.js), counted in memory; FETCH_RATE, HOST_RATE, UPLOAD_RATE as its [vars].
+for (const k of ["FETCH_RATE", "HOST_RATE", "UPLOAD_RATE"]) if (process.env[k] !== undefined) env[k] = process.env[k];
+
+// F312: the address every limit counts, as CF-Connecting-IP (a visitor's own copy of that header is dropped, or it
+// could pick its own bucket): the socket's, or, from a proxy on this machine (tailscale serve, Caddy, a Cloudflare
+// Tunnel's cloudflared), the X-Forwarded-For entry that proxy added (the last one).
+function clientAddress(remote, headers) {
+  const local = /^(::1|127\.|::ffff:127\.)/.test(remote ?? "");
+  const xff = String(headers["x-forwarded-for"] ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+  return local && xff.length ? xff[xff.length - 1] : (remote ?? "?");
+}
 
 // F187: F182's reviews in a SQLite file (node:sqlite, Node 22.5+) with D1's API, kept across restarts. Without
 // node:sqlite, or with REVIEWS_DB=off, /reviews/* answers as a Worker with no D1 binding does.
@@ -83,7 +94,8 @@ const server = http.createServer(async (inc, out) => {
     const proto = inc.headers["x-forwarded-proto"] ?? "http";
     const url = `${proto}://${inc.headers["x-forwarded-host"] ?? inc.headers.host}${inc.url}`;
     const body = ["GET", "HEAD"].includes(inc.method) ? undefined : inc;
-    const req = new Request(url, { method: inc.method, headers: inc.headers, body, duplex: "half" });
+    const headers = { ...inc.headers, "cf-connecting-ip": clientAddress(inc.socket.remoteAddress, inc.headers) };
+    const req = new Request(url, { method: inc.method, headers, body, duplex: "half" });
     const res = await worker.fetch(req, env);
     out.writeHead(res.status, Object.fromEntries(res.headers));
     if (res.body && inc.method !== "HEAD") for await (const chunk of res.body) out.write(chunk);

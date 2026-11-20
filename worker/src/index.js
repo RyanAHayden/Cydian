@@ -47,7 +47,7 @@
 //
 // Settings (wrangler.toml [vars]): HOST_IDS, the bundle IDs /sign/host takes ("*.ifizbox" = any ending in .ifizbox);
 // TTL (seconds, 600); MAX_UPLOAD_MB (512), the largest IPA /sign/upload and kind=ipa take ("0": no uploads). KV
-// namespace binding: HOSTED.
+// namespace binding: HOSTED. F312: FETCH_RATE, HOST_RATE, UPLOAD_RATE, per-address limits a minute (src/limits.js).
 
 import { account, isAccountPath } from "./account.js";
 import { readIpaInfo, IpaError } from "./ipainfo.js";
@@ -60,6 +60,7 @@ import { push, isPushPath, scheduled as pushScheduled } from "./push.js";
 import { NAME, GITHUB_REPO, DOMAIN } from "../../web/app/brand.js";
 import { githubApi, githubApiTarget } from "./github.js"; // F304
 import { blockedHost, REFUSED_CODE } from "./ssrf.js"; // B190
+import { limited } from "./limits.js"; // F312
 
 const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type" };
@@ -767,6 +768,8 @@ export default {
     if (isApplePath(u.pathname)) return appleRelay(req, env); // F251: Apple sign-in relay (src/apple-relay.js)
     if (isPushPath(u.pathname)) return push(req, env); // F280: push notifications (src/push.js)
     if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
+    const over = await limited(req, u.pathname, env, { headers: SAFE }); // F312: /api/fetch, /sign/host, /sign/upload (src/limits.js)
+    if (over) return over;
 
     if (u.pathname === "/api/fetch" && req.method === "GET") return apiFetch(u, uploadCap(env), env.GITHUB_TOKEN ?? null, env, req.headers.get("Range"));
     if (u.pathname === "/api/applookup" && req.method === "GET") return appLookup(u, env, { fetcher: env.FETCH });

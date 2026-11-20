@@ -92,7 +92,7 @@ function updateChrome() {
   const badge = n && !confirm && !running && !appRunning ? "Q'd" : null;
   ctxRef?.setBadge?.("installed", badge);
   updateHint({ queued: n > 0, badge: Boolean(badge), open: () => openConfirm() }); // F272
-  const right = globalThis.document?.querySelector?.('.nav-stack[data-tab="installed"] > .nav-item:first-child .nav-right');
+  const right = installedRoot?.item?.querySelector?.(".nav-right");
   if (!right) return;
   let b = right.querySelector(".queue-button");
   if (n && !b) {
@@ -429,7 +429,17 @@ export function setAppChromeManaging(on) {
   updateAppChrome();
 }
 
-const installedRootLeft = () => globalThis.document?.querySelector?.('.nav-stack[data-tab="installed"] > .nav-item:first-child .nav-left') ?? null;
+// Installed's root page (its nav/go.js pageHandle), from installed.js render each time it draws the root: the Queue
+// button goes on its nav bar (apt's on the right, the IPA queue's on the left). Null until the root is first drawn.
+let installedRoot = null;
+
+export function setInstalledRoot(page) {
+  installedRoot = page ?? null;
+  if (ctxRef) updateChrome();
+  if (appChrome.ctx) updateAppChrome();
+}
+
+const installedRootLeft = () => installedRoot?.left?.() ?? null;
 
 // `left`: the root's left slot (tests pass their own). -> the state drawn.
 export function updateAppChrome({ left, open = () => openAppConfirm(appChrome.queue) } = {}) {

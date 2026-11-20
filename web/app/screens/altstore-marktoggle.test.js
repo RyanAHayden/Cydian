@@ -5,6 +5,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { markToggle, toggleMarked, markToggleApplies, handMarking, MARK_INSTALLED_LABEL, MARK_NOT_INSTALLED_LABEL } from "./altstore.js";
 import { addNavIcon } from "../nav/navbar.js";
+import { pageHandle } from "../nav/go.js";
 import { memoryAppStore, recordInstall, removeInstall } from "../core/installed.js";
 import { BUNDLE_ID, GITHUB_REPO, NAME } from "../brand.js";
 
@@ -125,14 +126,9 @@ test("addNavIcon: after Install in the DOM (setRightLabel still finds Install fi
   const install = fakeElement("button");
   install.className = "bar-button";
   right.append(share, install);
-  const page = fakeElement("section");
-  page.className = "page";
-  const stack = fakeElement("div");
-  stack.dataset.tab = "sources";
-  stack.append(fakeElement("section"), page);
-  stack.children[0].className = "page";
-  const body = { closest: (s) => (s === ".page" ? page : null) };
-  const doc = { createElement: fakeElement, querySelectorAll: (s) => (s === '.nav-stack[data-tab="sources"] > .nav-item' ? [fakeElement("div"), item] : []) };
+  const body = {};
+  pageHandle(item, body); // the page's nav item, as app.js hands it in (navbar.js finds it with handleOf)
+  const doc = { createElement: fakeElement, querySelectorAll: () => { throw new Error("navbar.js looks its nav item up by handle, not by selector"); } };
   await withDocument(doc, () => {
     const icon = fakeElement("button");
     assert.equal(addNavIcon(body, icon, "mark"), true);

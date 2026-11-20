@@ -1,0 +1,11 @@
+[
+  { "eval": "localStorage.setItem('ifizbox.installRoute','iphone'); 'route set'" },
+  { "eval": "(async()=>{ globalThis.__seen=[]; const q=await import('/screens/queue.js'); const jobs=[{id:'alpha',name:'Alpha',mode:'install',url:'https://x.test/alpha.ipa'},{id:'beta',name:'Beta',mode:'install',url:'https://x.test/beta.ipa'}]; const fq={get:(id)=>jobs.find(j=>j.id===id),clear(){},list:()=>jobs}; const t=setInterval(()=>{const s=[...document.querySelectorAll('.qr-status')].map(e=>e.textContent).join(' | ')+' || '+(document.querySelector('.progress-status')?.textContent??''); if(__seen.at(-1)!==s) __seen.push(s);},100); globalThis.__end=q.runAppQueueRun(jobs,{queue:fq,ready:async()=>true,record:async()=>{}}).then(r=>{globalThis.__done=r&&r.ok;}); return 'started'})()" },
+  { "wait": 3200 },
+  { "shot": "route-wait" },
+  { "wait": 1500 },
+  { "shot": "copying" },
+  { "wait": 14000 },
+  { "shot": "end" },
+  { "eval": "JSON.stringify(__seen)" }
+]

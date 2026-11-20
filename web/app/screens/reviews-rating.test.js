@@ -5,40 +5,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { fakeDocument as fakeDom } from "../fakes.test-helper.js";
 
-function fakeDom() {
-  const make = (tag) => {
-    const e = {
-      tagName: String(tag).toUpperCase(), children: [], attrs: {}, listeners: {}, style: {}, dataset: {}, parentNode: null, _text: "",
-      _cls: new Set(), hidden: false, disabled: false, value: "", type: "", placeholder: "", maxLength: -1,
-      get className() { return [...e._cls].join(" "); },
-      set className(v) { e._cls = new Set(String(v).split(/\s+/).filter(Boolean)); },
-      classList: {
-        add: (...c) => c.forEach((x) => e._cls.add(x)), remove: (...c) => c.forEach((x) => e._cls.delete(x)),
-        contains: (c) => e._cls.has(c), toggle: (c, on = !e._cls.has(c)) => { if (on) e._cls.add(c); else e._cls.delete(c); return on; },
-      },
-      get textContent() { return e._text + e.children.map((c) => c.textContent).join(""); },
-      set textContent(v) { e._text = String(v); e.children = []; },
-      setAttribute(k, v) { e.attrs[k] = String(v); }, getAttribute: (k) => e.attrs[k] ?? null,
-      append(...c) {
-        for (const x of c) {
-          if (typeof x === "string") { e.children.push({ textContent: x, children: [], _cls: new Set(), isText: true }); continue; }
-          x.remove?.();
-          x.parentNode = e;
-          e.children.push(x);
-        }
-      },
-      replaceChildren(...c) { for (const k of e.children) k.parentNode = null; e.children = []; e._text = ""; e.append(...c); },
-      remove() { if (e.parentNode) e.parentNode.children = e.parentNode.children.filter((y) => y !== e); e.parentNode = null; },
-      addEventListener(t, f) { (e.listeners[t] ??= []).push(f); },
-      removeEventListener(t, f) { e.listeners[t] = (e.listeners[t] ?? []).filter((g) => g !== f); },
-      fire(t) { return Promise.all((e.listeners[t] ?? []).map((f) => f({ target: e, type: t }))); },
-      click() { return e.fire("click"); },
-    };
-    return e;
-  };
-  return { createElement: make, body: make("body") };
-}
 const target = () => {
   const t = { listeners: {}, addEventListener(k, f) { (t.listeners[k] ??= []).push(f); },
     removeEventListener(k, f) { t.listeners[k] = (t.listeners[k] ?? []).filter((g) => g !== f); },

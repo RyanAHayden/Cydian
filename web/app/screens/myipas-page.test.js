@@ -6,48 +6,7 @@ import assert from "node:assert/strict";
 import { libraryGroup, swipeDelete, deleteMany, selectButton, runManage, signMany, installedOf, paintPrice,
   sharedInstalls, sharedSections, confirmReplace } from "./myipas.js";
 import { priceTap, priceButton, listState, memoryIpaStore, siteEntries } from "../core/myipas.js";
-
-// A fake DOM good enough for nav/ui.js grouped() and the rows' decoration: class selectors only (installed.test.js's).
-function fakeDom() {
-  const matches = (n, sel) => sel.split(".").filter(Boolean).every((c) => n._cls?.has(c));
-  const walk = (n, out = []) => { for (const c of n.children) { out.push(c); walk(c, out); } return out; };
-  const make = (tag, frag = false) => {
-    const e = {
-      tagName: String(tag).toUpperCase(), isFragment: frag, children: [], attrs: {}, listeners: {}, style: {}, dataset: {},
-      parentNode: null, _text: "", _cls: new Set(),
-      get className() { return [...e._cls].join(" "); },
-      set className(v) { e._cls = new Set(String(v).split(/\s+/).filter(Boolean)); },
-      classList: {
-        add: (...c) => c.forEach((x) => e._cls.add(x)), remove: (...c) => c.forEach((x) => e._cls.delete(x)),
-        contains: (c) => e._cls.has(c), toggle: (c, on = !e._cls.has(c)) => { if (on) e._cls.add(c); else e._cls.delete(c); return on; },
-      },
-      get textContent() { return e._text + e.children.map((c) => c.textContent).join(""); },
-      set textContent(v) { e._text = String(v); e.children = []; },
-      setAttribute(k, v) { e.attrs[k] = String(v); }, getAttribute: (k) => e.attrs[k] ?? null,
-      append(...c) {
-        for (const x of c) {
-          if (typeof x === "string") { e._text += x; continue; }
-          if (x.isFragment) { x.children.splice(0).forEach((k) => e.append(k)); continue; }
-          x.parentNode = e;
-          e.children.push(x);
-        }
-      },
-      remove() { if (e.parentNode) e.parentNode.children = e.parentNode.children.filter((y) => y !== e); },
-      contains: (x) => { for (let n = x; n; n = n.parentNode) if (n === e) return true; return false; },
-      closest(sel) { for (const s of sel.split(",").map((x) => x.trim())) for (let n = e; n; n = n.parentNode) if (matches(n, s)) return n; return null; },
-      querySelectorAll(sel) {
-        if (sel.startsWith(":scope > ")) return e.children.filter((c) => matches(c, sel.slice(9)));
-        return walk(e).filter((c) => matches(c, sel));
-      },
-      querySelector: (sel) => e.querySelectorAll(sel)[0] ?? null,
-      addEventListener(t, f) { (e.listeners[t] ??= []).push(f); },
-      fire(t, ev) { for (const f of e.listeners[t] ?? []) f(ev); },
-      click() { e.fire("click", { target: e, preventDefault() {}, stopPropagation() {} }); },
-    };
-    return e;
-  };
-  return { createElement: (t) => make(t), createDocumentFragment: () => make("#fragment", true), body: make("body") };
-}
+import { fakeDocument as fakeDom } from "../fakes.test-helper.js";
 
 function withDom(fn) {
   const had = Object.getOwnPropertyDescriptor(globalThis, "document");

@@ -4,36 +4,13 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { openInGroup, MANAGER_BUNDLES, managersIn, installedManagers } from "./handoff.js";
 import { packageShareItems } from "./browse.js";
+import { fakeDocument as fakeDom } from "../fakes.test-helper.js";
 
 const ORIGIN = "https://ifizbox.com";
 const KEY = "deb:https://repo.example/:./";
 const APT = { key: KEY, uri: "https://repo.example/", dist: "./" };
 const PKG = { id: "com.example.tweak", key: KEY };
 const labels = (items) => items.map((i) => i.label);
-
-// Just enough DOM for nav/ui.js grouped() and its cells.
-function fakeDom() {
-  const node = (tag) => {
-    const e = {
-      tagName: String(tag).toUpperCase(), children: [], attrs: {}, dataset: {}, style: { setProperty() {} }, _text: "",
-      className: "", classList: { add() {}, remove() {}, toggle() {}, contains: () => false },
-      get textContent() { return e._text + e.children.map((c) => c.textContent).join(""); },
-      set textContent(v) { e._text = String(v); e.children = []; },
-      set innerHTML(v) { e._html = v; },
-      setAttribute(k, v) { e.attrs[k] = String(v); }, getAttribute: (k) => e.attrs[k] ?? null, removeAttribute(k) { delete e.attrs[k]; },
-      append(...c) { for (const x of c) if (x && typeof x === "object") e.children.push(...(x.isFragment ? x.children : [x])); },
-      prepend(...c) { e.append(...c); },
-      addEventListener() {},
-    };
-    return e;
-  };
-  return {
-    createElement: node,
-    createElementNS: (_ns, tag) => node(tag),
-    createTextNode: (t) => ({ textContent: String(t), children: [] }),
-    createDocumentFragment: () => Object.assign(node("#fragment"), { isFragment: true }),
-  };
-}
 
 function withDom(fn) {
   const saved = globalThis.document;

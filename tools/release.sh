@@ -10,8 +10,8 @@
 #                                    jailbreak app's built-in source, https://$BRAND_DOMAIN/repo/ (the Worker
 #                                    serves releases/latest/download/ of RyanAHayden/iFizBox without the redirect);
 #                                    B73: Packages also keeps the older releases' .debs, each as <tag>/<asset>
-#   source.json                      F178: the updated AltStore source below, the Worker's fallback for
-#                                    https://$BRAND_DOMAIN/repo/source.json
+#   source.json                      F178: the updated AltStore source below, what
+#                                    https://$BRAND_DOMAIN/repo/source.json serves (the Worker)
 # Then it points iFizBox's AltStore source (web/app/source.json, tools/altsource.py; I7) at the new iFizBox.ipa, the
 # sideload app's and the site's built-in source (F72), versions[] newest first: commit web/app/source.json afterwards.
 # Run it only when a person asks for a release. How to cut one: docs/release.md.
@@ -33,7 +33,7 @@
 #   tools/release.sh --verify-release X.Y.Z   the checks a real run makes after publishing, on their own: the release
 #                 lists iFizBox.ipa/.deb, Packages(.gz), Release and source.json, and (not a draft)
 #                 releases/latest/download/iFizBox.ipa redirects to vX.Y.Z's asset and answers
-#   tools/release.sh --verify-live X.Y.Z      after web/app/source.json is committed and pushed: poll
+#   tools/release.sh --verify-live X.Y.Z      after the release is published: poll
 #                 https://$BRAND_DOMAIN/repo/source.json and /repo/Packages until both list X.Y.Z (15 min), else fail
 #   Publishing is done as the owner of the repo (gh auth token --user <owner>) unless GH_TOKEN is set.
 #   IFIZBOX_RELEASE_REPO  owner/name to publish on (default RyanAHayden/iFizBox)
@@ -119,7 +119,7 @@ verify_release() {
   done
 }
 
-# --verify-live VERSION: after web/app/source.json is committed and pushed (Workers Builds deploys the site on push),
+# --verify-live VERSION: after the release is published (the Worker's /repo/ files read the latest release's assets),
 # wait until https://$BRAND_DOMAIN/repo/source.json lists VERSION for $BRAND_BUNDLE_ID and /repo/Packages has a
 # $BRAND_PACKAGE stanza of VERSION, and fail loudly with what each one says when that doesn't happen in time.
 # IFIZBOX_LIVE_BASE (https://$BRAND_DOMAIN), IFIZBOX_LIVE_TIMEOUT (900 s), IFIZBOX_LIVE_INTERVAL (15 s).
@@ -173,8 +173,8 @@ while True:
     if time.monotonic() >= deadline:
         for s in said:
             print("release: live: " + s, file=sys.stderr)
-        print("release: live: %s is NOT up after %ss: check the Workers Builds deploy of the pushed commit, and that "
-              "web/app/source.json was committed and pushed" % (version, timeout), file=sys.stderr)
+        print("release: live: %s is NOT up after %ss: check that the release is published and marked latest "
+              "(tools/release.sh --verify-release), and the Workers Builds deploy" % (version, timeout), file=sys.stderr)
         sys.exit(1)
     print("release: live: waiting: " + "; ".join(said), file=sys.stderr)
     time.sleep(float(interval))
@@ -347,7 +347,7 @@ fi
 
 altargs=(--notes "$stage/notes.md" ${minimum:+--minimum "$minimum"})
 # F178: the updated AltStore source is an asset too: https://$BRAND_DOMAIN/repo/source.json (the Worker) serves the
-# deployed web/app/source.json, and this release's source.json when the site has none.
+# latest release's source.json, and the deployed web/app/source.json only when GitHub fails.
 cp web/app/source.json "$stage/source.json"
 python3 tools/altsource.py update "$version" "$ipa" "${altargs[@]}" --source "$stage/source.json" >/dev/null ||
   die "couldn't write the AltStore source"

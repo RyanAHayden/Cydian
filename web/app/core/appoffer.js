@@ -16,7 +16,7 @@ export const REPO_URL = `https://github.com/${GITHUB_REPO}`;
 export const APP_IPA_URL = `${REPO_URL}/releases/latest/download/${NAME}.ipa`;
 export const APP_DEB_URL = `${REPO_URL}/releases/latest/download/${NAME}.deb`; // rootless, iphoneos-arm64
 // iFizBox's own AltStore source, kept current with native/VERSION by test_release.py. F178: at the site, beside the
-// APT repo (https://<DOMAIN>/repo/): the Worker's /repo/source.json serves the deployed web/app/source.json.
+// APT repo (https://<DOMAIN>/repo/): the Worker's /repo/source.json serves the latest release's source.json.
 export const APP_SOURCE_URL = `https://${DOMAIN}/repo/source.json`;
 export const APP_APT_REPO = `https://${DOMAIN}/repo/`;
 export const APP_NAME = NAME;

@@ -25,7 +25,7 @@ const SELF_NAME = NAME;
 // F172: brand.js DOMAIN. A phone that still lists the old host's repo keeps it as an ordinary source (it is no longer
 // the built-in, so it can be swiped away); nothing rewrites it (user 2026-11-18: no support for the old name).
 export const SELF_APT_URI = `https://${DOMAIN}/repo/`;
-// F178: the AltStore source at the site too (the Worker's /repo/source.json serves the deployed web/app/source.json).
+// F178: the AltStore source at the site too (the Worker's /repo/source.json serves the latest release's source.json).
 export const SELF_ALT_URL = `https://${DOMAIN}/repo/source.json`;
 export const SELF_SITE = `https://${DOMAIN}/`;
 export const MIN_FIELD = "x-ifizbox-minimum-version"; // the Release field, lower-cased as core/apt.js keeps them

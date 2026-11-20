@@ -41,8 +41,8 @@
 //   GET  /repo/<file>                       B17: iFizBox's own flat APT repo (Release, Packages, Packages.gz, *.deb),
 //                                           the latest release's asset fetched here, redirects followed here
 //   GET  /repo/<tag>/<file>.deb             B73: an older release's .deb (Packages' Filename), from releases/download/<tag>/
-//   GET  /repo/source.json                  F178: iFizBox's AltStore source (the deployed web/app/source.json, else the
-//                                           latest release's source.json asset), the sideload app's built-in source
+//   GET  /repo/source.json                  F178: iFizBox's AltStore source (the latest release's source.json asset,
+//                                           else the deployed web/app/source.json), the sideload app's built-in source
 //   GET  /repo/CydiaIcon.png                B58: the repo's icon (also @2x/@3x): the app icon from ASSETS, kept a week
 //
 // Settings (wrangler.toml [vars]): HOST_IDS, the bundle IDs /sign/host takes ("*.ifizbox" = any ending in .ifizbox);
@@ -188,24 +188,22 @@ export function repoFile(pathname) {
   return DEB_NAME.test(name) ? { name, type: "application/vnd.debian.binary-package" } : null;
 }
 // F178: /repo/source.json, iFizBox's AltStore source beside its APT repo (the sideload app's and the site's built-in
-// source, core/essential.js SELF_ALT_URL): the deployed web/app/source.json (ASSETS, updated by tools/release.sh
-// and committed), else the latest release's source.json asset. JSON with CORS, kept 5 minutes like Release.
+// source, core/essential.js SELF_ALT_URL): the latest release's source.json asset (tools/release.sh uploads it), so
+// a new version shows the moment the release is published, like /repo/Packages; the deployed web/app/source.json
+// (ASSETS, committed after each release) only when GitHub fails. JSON with CORS, kept 5 minutes like Release.
 const SOURCE_HEADERS = { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "public, max-age=300", "X-Content-Type-Options": "nosniff", ...CORS };
 export async function selfSource(req, u, env = {}, { fetcher = fetch, wait } = {}) {
-  if (!["GET", "HEAD"].includes(req.method)) return new Response("Not found\n", { status: 404, headers: { "Content-Type": "text/plain", "Cache-Control": "no-store" } });
+  const none = () => new Response("Not found\n", { status: 404, headers: { "Content-Type": "text/plain", "Cache-Control": "no-store" } });
+  if (!["GET", "HEAD"].includes(req.method)) return none();
+  const name = /^[\w.-]+\/[\w.-]+$/.test(env.IFIZBOX_REPO ?? "") ? env.IFIZBOX_REPO : SELF_REPO;
   let r = null;
-  if (env.ASSETS) {
+  try { r = await upstream(`https://github.com/${name}/releases/latest/download/source.json`, { fetcher, token: env.GITHUB_TOKEN ?? null, ...(wait ? { wait } : {}) }); } catch { r = null; }
+  if (r && !r.ok) { r.body?.cancel?.(); r = null; }
+  if (!r && env.ASSETS) {
     try { r = await env.ASSETS.fetch(new Request(`${u.origin}/source.json`)); } catch { r = null; }
     if (r && !r.ok) { r.body?.cancel?.(); r = null; }
   }
-  if (!r) {
-    const name = /^[\w.-]+\/[\w.-]+$/.test(env.IFIZBOX_REPO ?? "") ? env.IFIZBOX_REPO : SELF_REPO;
-    try { r = await upstream(`https://github.com/${name}/releases/latest/download/source.json`, { fetcher, token: env.GITHUB_TOKEN ?? null, ...(wait ? { wait } : {}) }); } catch { r = null; }
-    if (!r?.ok) {
-      r?.body?.cancel?.();
-      return new Response("Not found\n", { status: 404, headers: { "Content-Type": "text/plain", "Cache-Control": "no-store" } });
-    }
-  }
+  if (!r) return none();
   if (req.method === "HEAD") { r.body?.cancel?.(); return new Response(null, { headers: SOURCE_HEADERS }); }
   return new Response(r.body, { headers: SOURCE_HEADERS });
 }

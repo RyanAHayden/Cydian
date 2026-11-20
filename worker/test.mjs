@@ -876,38 +876,60 @@ import { d1 } from "./src/d1-sqlite.js";
   console.log("worker host status: ok");
 }
 
-// F178: iFizBox's AltStore source at https://<DOMAIN>/repo/source.json: the deployed web/app/source.json (ASSETS),
-// else the latest release's source.json; and the site's proxy answers its own /repo/ URLs without fetching itself.
+// F178/B165: iFizBox's AltStore source at https://<DOMAIN>/repo/source.json: the latest release's source.json
+// (live the moment a release is published), else the deployed web/app/source.json (ASSETS) when GitHub fails; and
+// the site's proxy answers its own /repo/ URLs without fetching itself.
 {
   const { repo, selfSource, ownRepoUrl } = await import("./src/index.js");
   const { DOMAIN } = await import("../web/app/brand.js");
-  const body = '{"name":"iFizBox","apps":[]}';
+  // the deployed copy lags: it still lists 0.14.0 while the release's asset lists 0.15.0
+  const body = '{"name":"iFizBox","apps":[{"version":"0.14.0"}]}';
+  const released = '{"name":"iFizBox","apps":[{"version":"0.15.0"}]}';
   const assetsAsked = [];
   const ASSETS = { fetch: async (req) => { assetsAsked.push(new URL(req.url).pathname); return new Response(body, { headers: { "content-type": "application/json" } }); } };
-  const none = async () => { throw new Error("GitHub must not be asked"); };
+  const none = async () => { throw new Error("GitHub is down"); };
   const at = (path, e = {}, fetcher = none, init) => { const req = new Request(`https://${DOMAIN}${path}`, init); return repo(req, new URL(req.url), e, { fetcher, wait: async () => {} }); };
-  let r = await at("/repo/source.json", { ASSETS });
+  const seen = [];
+  const gh = async (url) => { seen.push(url); return url.endsWith("/source.json") ? new Response(released) : new Response("no", { status: 404 }); };
+  // the release wins over an older deployed copy, and ASSETS isn't asked
+  let r = await at("/repo/source.json", { ASSETS }, gh);
   assert.equal(r.status, 200);
-  assert.equal(await r.text(), body);
+  assert.equal(await r.text(), released);
   assert.equal(r.headers.get("content-type"), "application/json; charset=utf-8");
   assert.equal(r.headers.get("access-control-allow-origin"), "*");
-  assert.deepEqual(assetsAsked, ["/source.json"]);
-  assert.equal((await at("/repo/source.json", { ASSETS }, none, { method: "HEAD" })).status, 200);
-  assert.equal((await at("/repo/source.json", { ASSETS }, none, { method: "POST" })).status, 404);
-  // no ASSETS (or no source.json there): the latest release's asset
-  const seen = [];
-  const gh = async (url) => { seen.push(url); return url.endsWith("/source.json") ? new Response(body) : new Response("no", { status: 404 }); };
-  r = await at("/repo/source.json", {}, gh);
-  assert.equal(await r.text(), body);
+  assert.equal(r.headers.get("cache-control"), "public, max-age=300");
   assert.equal(seen.pop(), "https://github.com/RyanAHayden/iFizBox/releases/latest/download/source.json");
-  const missing = { fetch: async () => new Response("nope", { status: 404 }) };
-  r = await at("/repo/source.json", { ASSETS: missing, IFIZBOX_REPO: "me/fork" }, gh);
+  assert.deepEqual(assetsAsked, []);
+  r = await at("/repo/source.json", {}, gh);
+  assert.equal(await r.text(), released);
+  r = await at("/repo/source.json", { ASSETS, IFIZBOX_REPO: "me/fork" }, gh);
   assert.equal(r.status, 200);
   assert.equal(seen.pop(), "https://github.com/me/fork/releases/latest/download/source.json");
+  assert.equal((await at("/repo/source.json", { ASSETS }, gh, { method: "HEAD" })).status, 200);
+  assert.equal((await at("/repo/source.json", { ASSETS }, gh, { method: "POST" })).status, 404);
+  // GitHub fails (throws, 404, 503 after the retries): the deployed copy
+  r = await at("/repo/source.json", { ASSETS });
+  assert.equal(r.status, 200);
+  assert.equal(await r.text(), body);
+  assert.deepEqual(assetsAsked, ["/source.json"]);
+  r = await at("/repo/source.json", { ASSETS }, async () => new Response("no", { status: 404 }));
+  assert.equal(await r.text(), body);
+  r = await at("/repo/source.json", { ASSETS }, async () => new Response("down", { status: 503 }));
+  assert.equal(r.status, 200);
+  assert.equal(await r.text(), body);
+  assert.equal(r.headers.get("cache-control"), "public, max-age=300");
+  assert.equal((await at("/repo/source.json", { ASSETS }, none, { method: "HEAD" })).status, 200);
+  // neither: 404
+  const missing = { fetch: async () => new Response("nope", { status: 404 }) };
+  assert.equal((await at("/repo/source.json", { ASSETS: missing })).status, 404);
   assert.equal((await at("/repo/source.json", {}, async () => new Response("no", { status: 404 }))).status, 404);
   assert.equal(typeof selfSource, "function");
-  // the whole Worker: /repo/source.json before the website's assets
-  r = await w.fetch(new Request(`https://${DOMAIN}/repo/source.json`), { ...env, ASSETS });
+  // the whole Worker: /repo/source.json before the website's assets (GitHub down here: the deployed copy)
+  {
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = none;
+    try { r = await w.fetch(new Request(`https://${DOMAIN}/repo/source.json`), { ...env, ASSETS }); } finally { globalThis.fetch = realFetch; }
+  }
   assert.equal(r.status, 200);
   assert.equal(await r.text(), body);
   // /api/fetch of the Worker's own /repo/ URL: answered here (a Worker can't fetch its own custom domain)

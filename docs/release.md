@@ -18,7 +18,7 @@ for a release.
   | `com.ryha.ifizbox_<ver>-<build>_iphoneos-arm64.deb` | the same .deb under Debian's name | `debFor`'s exact arch match; the APT repo's `Filename:` |
   | `com.ryha.ifizbox_<ver>-<build>_<arch>.deb` | any other arch build found in `--dist` under that name | its arch, and the APT repo |
   | `Packages`, `Packages.gz`, `Release` | iFizBox's own flat APT repo over the Debian-named .debs (`tools/selfrepo.py`) | the jailbreak app's built-in source |
-  | `source.json` | the updated AltStore source | the Worker's `/repo/source.json` when the deployed copy is missing |
+  | `source.json` | the updated AltStore source | the Worker's `/repo/source.json` (the deployed copy only when GitHub fails) |
 
   The names come from `native/brand.env` (`BRAND_NAME` gives `iFizBox.ipa`, `iFizBox.deb`, `iFizBox.app`;
   `BRAND_PACKAGE` gives the Debian name), in `native/build.sh`, `mkipa.py`/`mkdeb.py`, `release.sh` and
@@ -60,10 +60,12 @@ Like Cydia's apt.saurik.com, iFizBox has a source of its own that is built in an
   offline and lists the new release only, unless `IFIZBOX_RELEASE_HISTORY=DIR` points at a directory laid out as
   `DIR/<tag>/Packages` (which `tools/selfrepo.py fetch OWNER/NAME DIR` fills).
 - **AltStore source** (the sideload app and the site): `web/app/source.json`, served at
-  `https://ifizbox.com/repo/source.json` (the Worker answers with the deployed copy, else the latest release's
-  `source.json` asset), rewritten by
+  `https://ifizbox.com/repo/source.json`, rewritten by
   `tools/altsource.py update`: the new version first in `versions[]`, with its date and the notes' first lines,
-  and the versions already listed kept below it (at most 20). Commit it after the release.
+  and the versions already listed kept below it (at most 20). The Worker answers with the latest release's
+  `source.json` asset, so a new version is listed the moment the release is published (cached 5 minutes), like
+  `/repo/Packages`; the deployed copy of `web/app/source.json` is only the fallback for when GitHub fails. Commit it
+  after the release anyway, so that fallback stays current.
 
 `--minimum X.Y.Z` sets iFizBox's own field in both: `X-iFizBox-Minimum-Version` in the Release (and in iFizBox's
 Packages stanza), `"minimumVersion"` on the app in the AltStore JSON. apt and other AltStore clients ignore it, and
@@ -117,14 +119,15 @@ iOS SDK, which can't go on a hosted runner. The steps below are what it runs.
    because it is never "latest". `tools/release.sh --verify-release X.Y.Z` runs the same checks on their own, e.g.
    after publishing a draft on the site.
 5. Commit `web/app/source.json` (the script rewrote it to name the new IPA) and push it to main.
-6. Verify it is live: `tools/release.sh --verify-live X.Y.Z`. Workers Builds deploys the site on push; this polls
+6. Verify it is live: `tools/release.sh --verify-live X.Y.Z`. This polls
    `https://ifizbox.com/repo/source.json` and `https://ifizbox.com/repo/Packages` every 15 seconds until both list
    X.Y.Z for iFizBox (other apps and packages don't count), and fails loudly after 15 minutes, printing what each
-   one says. If it fails, look at the Workers Builds deploy of the pushed commit.
+   one says. Both read the latest release's assets, so if it fails, check the release is published and latest
+   (`--verify-release`), then the Workers Builds deploy.
 
-The order matters: release (step 4), commit `source.json` (5), push (5), verify live (6). Run before the push,
-`--verify-live` can only time out: `/repo/Packages` follows the release at once, but `/repo/source.json` is the
-deployed copy of `web/app/source.json`.
+Both `/repo/Packages` and `/repo/source.json` read the latest release's assets, so `--verify-live` passes within
+the 5-minute cache of the release (step 4) even before the push; step 5 keeps the Worker's fallback copy (used
+only when GitHub fails) current.
 
 Options:
 

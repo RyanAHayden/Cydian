@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """iFizBox's own AltStore source (I7): web/app/source.json, the package page iFizBox's default sources show for the
 app itself (first in web/app/app-sources.json, as "/repo/source.json"; core/appoffer.js APP_SOURCE_URL). F178: published at
-https://<BRAND_DOMAIN>/repo/source.json (SOURCE_URL; the Worker's /repo route serves the deployed web/app/source.json),
+https://<BRAND_DOMAIN>/repo/source.json (SOURCE_URL; the Worker's /repo route serves the latest release's copy),
 beside iFizBox's APT repo at https://<BRAND_DOMAIN>/repo/.
 
   tools/altsource.py update VERSION IPA [DATE] [--notes FILE] [--minimum X.Y.Z]
@@ -27,7 +27,8 @@ from brand import BRAND, NAME  # noqa: E402  (F170: native/brand.env)
 SOURCE = os.path.join(ROOT, "web", "app", "source.json")
 REPO = f"https://github.com/{BRAND['BRAND_GITHUB_REPO']}"
 # F178: the source and its icon at the site (brand.env BRAND_DOMAIN): the Worker's /repo/source.json answers with the
-# deployed web/app/source.json, and web/app/icons/ are the site's own assets.
+# latest release's source.json (the deployed web/app/source.json when GitHub fails), and web/app/icons/ are the
+# site's own assets.
 SITE = f"https://{BRAND['BRAND_DOMAIN']}"
 SOURCE_URL = f"{SITE}/repo/source.json"
 ICON_URL = f"{SITE}/icons/icon-180.png"

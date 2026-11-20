@@ -135,13 +135,14 @@ export const trustMenuLabel = (source) => (trustOf(source, { trusted: trustedNow
 
 // ---- the app page ----------------------------------------------------------------------------------------------
 
+export const PUBLIC_CODE_FOOTER = "Apps with public source code can be checked by anyone.";
 // github: { owner, repo } (core/previews.js appGithub) when the app's source code is public there.
 export function whereFromGroup({ source = null, sourceName = "", sourceUrl = "", github = null, onSource = null } = {}, { trusted = trustedNow() } = {}) {
   const kind = trustOf(source ?? (sourceUrl ? { uri: sourceUrl } : null), { trusted });
   const owner = github?.owner ?? github?.user;
   const code = owner && github?.repo ? `https://github.com/${owner}/${github.repo}` : null;
-  const rows = [
-    { label: "Source", detail: `${sourceName || "Unknown"}`, ...(onSource ? { onClick: onSource, chevron: true } : {}) },
+  const sourceRow = { label: "Source", detail: `${sourceName || "Unknown"}`, ...(onSource ? { onClick: onSource, chevron: true } : {}) };
+  const rest = [
     code ? { label: "Source Code", detail: "Public on GitHub", onClick: () => window.open(code, "_blank", "noopener"), chevron: true, cls: "where-code-public" }
       : { label: "Source Code", detail: "Not Public", cls: "where-code-hidden" },
     { label: "Reports", detail: "None", cls: "where-reports" },
@@ -149,9 +150,12 @@ export function whereFromGroup({ source = null, sourceName = "", sourceUrl = "",
   const footer = kind === "safe" ? `${sourceName || "This source"} is on the known-safe list.`
     : kind === "trusted" ? `You marked ${sourceName || "this source"} as Trusted.`
       : `${sourceName || "This source"} isn't on the known-safe list. That doesn't make it bad.`;
-  const g = grouped([{ header: "Where It Comes From", rows, footer: `${footer}${code ? " Apps with public source code can be checked by anyone." : ""}` }]);
-  const box = g.firstElementChild;
-  box?.classList.add("where-from");
+  // F314: each hint under the rows it explains (AGENTS.md, Hints): the trust label under Source, the public-code note
+  // under Source Code and Reports; one box (.where-from) holds both groups.
+  const box = document.createElement("div");
+  box.className = "where-from";
+  box.append(grouped([{ header: "Where It Comes From", rows: [sourceRow], footer },
+    { rows: rest, footer: code ? PUBLIC_CODE_FOOTER : null }]));
   const detail = box?.querySelector("li .cell-detail");
   if (detail) { detail.append(kind === "unknown" ? " · " : " "); detail.append(trustPill(kind)); }
   return { node: box, setReports(summary) {

@@ -233,12 +233,14 @@ export function takeWaiters(ids) {
   return out;
 }
 
-// Confirm's Modifications group (`frag`) with the waiters' notes on `ids` as its footer.
+// Confirm's Modifications group (`frag`, grouped()'s one-group fragment) with the waiters' notes on `ids` after it.
+// F314: one note per group (AGENTS.md, Hints: never two hints joined in one footer).
 function withWaitNotes(frag, ids) {
   const notes = [...new Set(ids.flatMap((id) => (waiting.get(id) ?? []).map((x) => x.note).filter(Boolean)))];
-  if (notes.length) frag.querySelector(".group")?.append(el("p", "group-footer", notes.join("\n")));
+  frag.append(waitNoteGroups(notes));
   return frag;
 }
+export const waitNoteGroups = (notes) => grouped(notes.map((note) => ({ footer: note })));
 
 // F131: each install job whose version's Filename is a full URL gets that link as `debUrl` (core/queue.js debUrlOf);
 // the native backend downloads those itself, since apt would join the link to the repo's URL and 404. F133: with the

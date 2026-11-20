@@ -603,9 +603,13 @@ async function drawApp(st, source, base, draw, ctx, box, publish = () => {}) {
   const footer = vendor?.banner && !signedIn ? vendor.banner.message : `Sold by ${name}.`;
   // B183: the price came without this iPhone's UDID (the shell has none yet): say so, as Sign In and Buy need it.
   const udidNote = info.deviceError ? ` ${info.deviceError.replace(/^device:\s*/, "").replace(/^./, (c) => c.toUpperCase()).replace(/([^.])$/, "$1.")}` : "";
-  draw([{ header: "Purchase", rows, footer: footer + udidNote }]);
+  // F314: the UDID note is a second hint: its own group (AGENTS.md, Hints), never joined to the seller's footer
+  draw(purchaseSections(rows, footer, udidNote.trim()));
   publish(nav);
 }
+
+export const purchaseSections = (rows, footer, note = "") =>
+  [{ header: "Purchase", rows, footer }, ...(note ? [{ footer: note }] : [])];
 
 // B11: true when `st` is a paid package on a source whose vendor sells it (payment_endpoint): apt can't fetch it.
 export async function soldByVendor(st, source) {

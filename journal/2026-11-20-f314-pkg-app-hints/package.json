@@ -1,0 +1,10 @@
+[
+  { "wait": 2000 },
+  { "eval": "localStorage.setItem('ifizbox.autoInstall','marked'); 'ok'" },
+  { "nav": "#/installed", "ms": 6000 },
+  { "clicktext": "Example Tweak", "ms": 4000 },
+  { "eval": "location.hash + '\\n' + [...document.querySelectorAll('.page.is-top .group-header, .page.is-top .group li, .page.is-top .group-footer')].map(e => e.className.split(' ')[0] + ': ' + e.textContent.trim().replace(/\\s+/g, ' ').slice(0, 120)).join('\\n')" },
+  { "eval": "(() => { const b = document.querySelector('.page.is-top .page-body'); b.scrollTop = b.scrollHeight; return b.scrollTop; })()" },
+  { "wait": 800 },
+  { "shot": "package" }
+]

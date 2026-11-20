@@ -421,6 +421,12 @@ cross-compiled into the app; this way neither. It writes what Apple's `codesign`
   and keychain group. The old way, a wildcard profile keeps the app's ID (a `com.you.*` one moves it under the prefix
   if it doesn't fit), an explicit one renames the app and **leaves out its extensions and Watch apps** (one profile,
   one app ID), and says which in `removed`. Extensions' IDs follow the app's;
+- an app already on the phone keeps the `application-identifier` it was installed with (installd refuses an update
+  that changes it: `MismatchedApplicationIdentifierEntitlement`). The installed one comes from the signed record, else
+  from installd through the pairing (installation_proxy Browse); a profile that can give it signs (an explicit one
+  only its own ID, a wildcard its pattern as written or any ID under its prefix). When none can, signing stops first
+  with `appid_mismatch` and plain words: import the profile it was installed with, or delete the app and install it
+  again (its data is lost). `native/sign/AppIDMatch.swift`;
 - zip to zip: the IPA is read once to hash every file and is never unpacked to disk; untouched entries are copied
   still compressed, only signed binaries, changed Info.plists and the new files are deflated. ZIP64 is read and
   written.

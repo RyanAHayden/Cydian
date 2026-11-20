@@ -10,7 +10,8 @@ row each time. The Why tile went away as F306 intends, and everything under it m
 
 | where | engine | result |
 | --- | --- | --- |
-| web/app served locally, sideload fake bridge, dark (`probe.mjs`) | Chromium | all rows drawn |
+| web/app served locally (`serve.mjs`) as the Lite app (fake bridge with `mode: "sideload"`, every call answers null), dark (`probe.mjs`) | Chromium | all rows drawn |
+| web/app as the website (`probe.mjs … site`), dark, both before install (locked Home) and with `FIRST=later` (unlocked) | Chromium | all rows drawn (the site keeps the Why tile, as `showsWhyTile` intends) |
 | concept built from this checkout, Lite, Dark Gunmetal (`probe-concept.mjs`) | Chromium | all rows drawn |
 | **the artifact the user saw** (version 1795212284-9446, saved from Artifact read), Lite, Dark Gunmetal | Chromium | all rows drawn |
 | the same artifact: Home scrolled 150 px first (`HOMESCROLL=150`), Why scrolled to its end (`SCROLL=1`), Home tab tapped mid-push (`WAIT=150`), the "Before (main)" build (`BEFORE=1`) | Chromium | all rows drawn |
@@ -26,8 +27,9 @@ removes or empties the rows under them.
 
 - `tools/concept/check.mjs`: a new step in every run (`homeRetap`). It taps the Home tab and notes Home's rows. Then
   it opens a page pushed on Home: Why while its tile shows, otherwise the first link in Home's list. It taps the Home
-  tab again and checks that every row from before is still there, has a height, and is what `elementFromPoint` hits
-  at its centre (nothing blank over it). The Why tile may go (F306).
+  tab again and checks that every row from before is still there, has a height, is not `visibility: hidden` or
+  at opacity 0 (rows below the screen included), and, while on screen, is what `elementFromPoint` hits at its centre
+  (nothing blank over it). The Why tile may go (F306).
   Checked both ways. It passes on this checkout in all three modes, and it fails on a scratch copy of web/app where
   `onHash` hides the rows under the Why tile on return (the reported symptom):
   `FAIL … draws all 12 rows again (12; covered home-row.pair, home-row.stack.browse, …)`.
@@ -45,7 +47,7 @@ No change to `web/app/screens/home.js`: I found nothing to fix there.
   showed `IDBFactory.open() called in an invalid security context`, and Home's green tile said Add a Source. The
   concept shell (`tools/concept/shell.js`) stands in for localStorage but not for IndexedDB. Whether the real
   Artifact viewer's frame refuses IndexedDB the same way is unknown. Headless Chromium on http, as check.mjs runs
-  it, allows it, so check.mjs can't see this. Home itself still drew all its rows there.
+  it, allows it, so check.mjs can't see this. Home itself still drew all its rows there. Filed as B222 (low).
 
 ## Tried and failed
 
@@ -64,7 +66,9 @@ No change to `web/app/screens/home.js`: I found nothing to fix there.
   scroll). Asked under Needs you (CONFIRM). In every setup I could run, it doesn't happen.
 - The claude.ai Artifact viewer itself: I tested the artifact's saved HTML in Chromium (plain and sandboxed) and in
   iPhone Safari, not inside claude.ai's own frame, which I can't drive from here.
-- The new check in its full default matrix (two devices × two themes, with the drag checks). I ran it at
-  iphone-16 × dark:gunmetal × all three modes, with `--drag-route none`.
+- (Checked after review: the new check passes in check.mjs's full default matrix, iphone-se and iphone-17-pro-max ×
+  light:classic and dark:gunmetal × all three modes, with the drag checks: 278 ok, "all clean".)
+- `homeRetap` is not part of `tools/check.sh`. The gate has no browser, and check.mjs needs Chromium, like the rest of
+  the concept checks.
 - Side effect on the iPhone 15 Pro: opening Why there set `ifizbox.whyOpened`, so its Home no longer shows the Why
   tile. That's what normal use does (F306); I left it as is.

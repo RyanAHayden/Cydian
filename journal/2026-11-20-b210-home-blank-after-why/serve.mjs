@@ -1,5 +1,5 @@
-// B148's Chromium check: web/app as static files plus /api/account/<id> kept in memory (the Worker's GET/PUT/DELETE
-// with ETag versions), so Settings > iFizBox Account > Create Account works without the real site.
+// Copied from B148's journal: serves web/app as static files for probe.mjs (the app and website runs). It also keeps
+// /api/account/<id> in memory (the Worker's GET/PUT/DELETE with ETag versions), which B210 doesn't need.
 //   node serve.mjs <web/app dir> <port>
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";

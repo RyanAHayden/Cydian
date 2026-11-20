@@ -119,7 +119,8 @@ const HOME_ROWS = `const home = d.querySelector(".page.is-top .home"); if (!home
     .map((c) => { const r = c.getBoundingClientRect(), y = r.top + Math.min(r.height / 2, 10);
       const onScreen = r.top >= box.top && y < box.bottom - 60; // above the tab bar
       const hit = onScreen ? d.elementFromPoint(r.left + r.width / 2, y) : null;
-      return { cls: String(c.className).split(" ").slice(0, 3).join("."), h: Math.round(r.height), onScreen, painted: !onScreen || c.contains(hit) }; });`;
+      const cs = w.getComputedStyle(c), seen = cs.visibility !== "hidden" && Number(cs.opacity) > 0; // below the screen too
+      return { cls: String(c.className).split(" ").slice(0, 3).join("."), h: Math.round(r.height), onScreen, painted: seen && (!onScreen || c.contains(hit)) }; });`;
 async function homeRetap(name) {
   const HOME_TAB = 'a.tab[data-tab="home"]';
   await tap(HOME_TAB);

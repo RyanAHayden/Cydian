@@ -117,3 +117,54 @@ test("B33: every row hidden draws no Other Sources group at all", async () => {
   const t = await otherSources(true, [mixed[1]]);
   assert.deepEqual(t, []);
 });
+
+// F319: signed out, a FREE package the vendor calls purchased (Chariz betterAlarm) installs without Sign In: a
+// tokenless authorize_download first, Sign In offered on any refusal.
+import { paidNav, authorizeFree, freeSignedOut } from "./extras.js";
+
+const freeInfo = { price: "FREE", purchased: true, available: true };
+const navCbs = { vendorName: "Chariz", signIn: () => "signIn", buy: () => "buy", install: () => "install", freeInstall: () => "free" };
+
+test("F319: signed out, free and purchased: Install on the button, Download & Install first, Sign In kept", () => {
+  const n = paidNav(freeInfo, false, navCbs);
+  assert.equal(n.label, "Install");
+  assert.equal(n.install, navCbs.freeInstall);
+  assert.deepEqual(n.actions.map((a) => a.label), ["Download & Install", "Sign In to Chariz"]);
+  assert.equal(n.actions[0].run, navCbs.freeInstall);
+  assert.equal(n.note, null);
+});
+
+test("F319: only a free, purchased, available package skips Sign In; signed in it is the usual install", () => {
+  assert.equal(freeSignedOut(freeInfo), true);
+  for (const info of [{ ...freeInfo, price: "$1.99" }, { ...freeInfo, purchased: false }, { ...freeInfo, available: false }, null]) {
+    assert.equal(freeSignedOut(info), false);
+    const n = paidNav(info, false, navCbs);
+    assert.ok(!n.actions.some((a) => a.label === "Download & Install"), JSON.stringify(info));
+  }
+  assert.equal(paidNav(freeInfo, true, navCbs).install, navCbs.install);
+});
+
+test("F319: authorizeFree asks without a token and answers the URL", async () => {
+  const asked = [];
+  const client = { authorizeDownload: async (id, opts) => { asked.push([id, opts]); return "https://dl.example/once"; } };
+  const alerts = [];
+  const url = await authorizeFree(client, "com.x.alarm", { version: "1.0", repo: "https://repo.chariz.com/", architecture: "iphoneos-arm64" },
+    { alert: async (o) => { alerts.push(o); return { index: 0 }; } });
+  assert.equal(url, "https://dl.example/once");
+  assert.deepEqual(asked, [["com.x.alarm", { version: "1.0", repo: "https://repo.chariz.com/", architecture: "iphoneos-arm64", tokenless: true }]]);
+  assert.deepEqual(alerts, []);
+});
+
+test("F319: any refusal offers Sign In: Sign In runs it, Cancel does nothing; no URL either way", async () => {
+  const client = { authorizeDownload: async () => { throw new Error("401"); } };
+  for (const [index, want] of [[1, 1], [0, 0]]) {
+    let signedIn = 0;
+    const alerts = [];
+    const url = await authorizeFree(client, "com.x.alarm", {}, { vendorName: "Chariz",
+      signIn: async () => { signedIn++; }, alert: async (o) => { alerts.push(o); return { index }; } });
+    assert.equal(url, null);
+    assert.equal(signedIn, want);
+    assert.deepEqual(alerts.map((a) => a.buttons), [["Cancel", "Sign In"]]);
+    assert.match(alerts[0].message, /Chariz/);
+  }
+});

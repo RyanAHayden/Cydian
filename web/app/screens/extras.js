@@ -501,12 +501,17 @@ export function paidStateOf(box) {
 // row: Sign In, Buy, or Download & Install), `install` set only once the vendor lets this account download it.
 // `info` null: the vendor couldn't be asked; nothing to offer, and `note` says why.
 export function paidNav(info, signedIn, { vendorName = "the vendor", signIn = null, buy = null, install = null,
-  signInLabel = null, note = null } = {}) {
+  signInLabel = null, note = null, freeInstall = null } = {}) {
   const price = info?.price ?? null;
   const priced = price && !isFreePrice(price);
   if (!info) return { label: "Install", purchased: false, install: null, actions: [], note: note ?? null };
   if (!info.available) return { label: priced ? price : "Install", purchased: false, install: null, actions: [],
     note: `Not available to buy from ${vendorName}.` };
+  // F319: signed out, a FREE package the vendor calls purchased (Chariz's betterAlarm) installs without Sign In
+  // (`freeInstall`: a tokenless authorize_download that falls back to Sign In); Sign In stays on offer below it.
+  if (!signedIn && freeInstall && freeSignedOut(info)) return { label: "Install", purchased: true, install: freeInstall,
+    actions: [{ label: "Download & Install", run: freeInstall },
+      ...(signIn ? [{ label: signInLabel || `Sign In to ${vendorName}`, run: signIn }] : [])], note: null };
   if (!signedIn) return { label: priced ? price : "Install", purchased: false, install: null,
     actions: signIn ? [{ label: signInLabel || `Sign In to ${vendorName}`, run: signIn }] : [], note: `Sold by ${vendorName}. Sign in to buy or install it.` };
   if (!info.purchased) return { label: priced ? price : "Install", purchased: false, install: null,
@@ -515,7 +520,23 @@ export function paidNav(info, signedIn, { vendorName = "the vendor", signIn = nu
     actions: install ? [{ label: "Download & Install", run: install }] : [], note: null };
 }
 
-const buyLabel = (price) => `Buy${price ? ` for ${isFreePrice(price) ? "Free" : price}` : ""}`;
+// F319: the vendor gives this package away and says so without a token: {price FREE, purchased true, available}.
+export const freeSignedOut = (info) => !!(info?.available && info.purchased && isFreePrice(info.price));
+
+// F319: the one-time URL for a signed-out free package: authorize_download without a token (core/payment.js F318).
+// Any refusal offers Sign In instead (an alert: Cancel / Sign In); answers the URL, or null when there is none.
+export async function authorizeFree(client, id, ask, { signIn, alert = showAlert, vendorName = "the vendor" } = {}) {
+  try {
+    return await client.authorizeDownload(id, { ...ask, tokenless: true });
+  } catch {
+    const { index } = await alert({ title: "Download & Install",
+      message: `${vendorName} wants you to sign in before it hands out this package.`, buttons: ["Cancel", "Sign In"] });
+    if (index === 1) await signIn?.();
+    return null;
+  }
+}
+
+const buyLabel = (price) =>`Buy${price ? ` for ${isFreePrice(price) ? "Free" : price}` : ""}`;
 
 async function drawSite(st, source, base, draw) {
   const host = new URL(base).hostname.replace(/^www\./, "");
@@ -596,8 +617,10 @@ async function drawApp(st, source, base, draw, ctx, box, publish = () => {}) {
     else if (r.status !== "done") throw new Error("The purchase did not go through.");
   });
   const install = () => downloadAndInstall(st, source, client, box, ctx, fail);
+  const freeInstall = () => downloadAndInstall(st, source, client, box, ctx, fail, { free: { signIn, vendorName: name } });
   // B11: the nav bar button offers the same step as the row below (paidNav), so both stay in step.
-  const nav = paidNav(info, signedIn, { vendorName: name, signIn, buy, install, signInLabel: vendor?.banner?.button || null });
+  const nav = paidNav(info, signedIn, { vendorName: name, signIn, buy, install, freeInstall,
+    signInLabel: vendor?.banner?.button || null });
   if (!info.available) rows.push({ label: "Not available to buy" });
   for (const a of nav.actions) rows.push({ label: a.label, onClick: a.run });
   if (signedIn) rows.push({ label: `Sign Out of ${name}`, onClick: busy("Signing Out", () => client.signOut()) });
@@ -633,16 +656,26 @@ export async function vendorSoldIds(rows = [], sources = [], { sells = (s) => ve
 // F74: authorize (under a HUD: the vendor can refuse), then paid.install in the install queue's console, streamed
 // (Paid.swift's dlstatus/pmstatus lines). The one-time URL expires in a minute or two, so the console opens at once.
 // After the run dpkg status is read again and the package page drawn again: Installed, and Modify > Remove works.
-async function downloadAndInstall(st, source, client, box, ctx, fail) {
+// F319: `free` ({ signIn, vendorName }) asks without a token (authorizeFree); a refusal offers Sign In, no error.
+async function downloadAndInstall(st, source, client, box, ctx, fail, { free = null } = {}) {
   const id = st.package;
   // The page the row is on, and its route (the top page's: the console is modal, so it stays on top).
   const body = box.closest(".page-body");
   const route = parse(location.hash);
   const hide = (ctx?.showHUD ?? showHUD)("Authorizing");
+  const ask = { version: st.version, repo: source.uri, architecture: st.architecture || getArch() };
   let url;
-  try { url = await client.authorizeDownload(id, { version: st.version, repo: source.uri,
-    architecture: st.architecture || getArch() }); } catch (e) { hide(); await fail(e); return; }
-  hide();
+  if (free) {
+    let hidden = false;
+    const hideOnce = () => { if (!hidden) { hidden = true; hide(); } };
+    url = await authorizeFree(client, id, ask, { ...free,
+      alert: (opts) => { hideOnce(); return showAlert(opts); } });
+    hideOnce();
+    if (!url) return;
+  } else {
+    try { url = await client.authorizeDownload(id, ask); } catch (e) { hide(); await fail(e); return; }
+    hide();
+  }
   const run = runPaidInstall({ id, version: st.version, name: st.name || "",
     run: (onEvent) => shell("paid.install", { url, package: id, version: st.version, stream: true }, onEvent) });
   if (!run) {

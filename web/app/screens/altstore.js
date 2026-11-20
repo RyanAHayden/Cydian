@@ -50,6 +50,7 @@ import { haptic } from "../nav/haptic.js";
 import { showHUD } from "../nav/hud.js";
 import { showUndoBar } from "../nav/undobar.js"; // F242a
 import { APP_MODE_LABEL } from "../core/appqueue.js"; // F242a
+import { installedOnPhone } from "../core/appqueue.js"; // B136
 
 function img(url, cls) {
   const src = mediaUrl(url);
@@ -1242,12 +1243,24 @@ function fadeIn(node) {
 // The job the app page's Install would queue (appPageAction: appJob with the installed record from the apps store),
 // for browse.js's row swipe and hold menu. -> { job, installed, newest } (job null: nothing to sign here: no IPA, a
 // source-signed link), or null when it isn't an app or this isn't the sideload build (F89: the website queues nothing).
-export async function rowAppJob(pkg, source, { store = apps, mode = detectMode() } = {}) {
+// B136: a record is checked against the phone's own app list (`onPhone(bundleId)` -> true | false | null, apps.isInstalled
+// asked fresh): a record left by an install iOS never finished doesn't count (core/appqueue.js installedOnPhone).
+export async function rowAppJob(pkg, source, { store = apps, mode = detectMode(), onPhone = appOnPhone } = {}) {
   const app = pkg?.stanza?.ipa;
   if (mode !== "sideload" || !app) return null;
   let rec = null;
   try { rec = (await (await store()).all()).find((r) => r.id === app.bundleIdentifier) ?? null; } catch { /* no store */ }
-  const installed = rec ? rec.version || "" : null;
-  const job = appJob(pkg, { installed: rec ? rec.version || null : null, source: source ? displayName(source) : null });
+  let phone;
+  if (rec && !rec.self) { try { phone = await onPhone(app.bundleIdentifier); } catch { phone = null; } }
+  const installed = installedOnPhone(rec, phone);
+  const job = appJob(pkg, { installed: installed || null, source: source ? displayName(source) : null });
   return { job, installed, newest: app.versions?.[0]?.version ?? null };
+}
+
+// B136: whether iOS has the app now (the shell's apps.isInstalled, not backend-native's session cache: an install
+// can land or fail within a session). null where it can't be asked (the website, an older shell).
+export async function appOnPhone(bundleId, native = globalThis.ifizboxNative) {
+  if (!native?.call || !bundleId) return null;
+  const v = (await native.call("apps.isInstalled", { bundleIds: [bundleId] }))?.installed?.[bundleId];
+  return typeof v === "boolean" ? v : null;
 }

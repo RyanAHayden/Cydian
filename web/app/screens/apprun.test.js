@@ -426,3 +426,42 @@ test("B85: openPrepared passes the shell's dismissed; repromptPrepared asks sign
   const sc = { repromptPrepared: async (row, n) => [row.id, n === native] };
   assert.deepEqual(await phoneLanes(sc, { native }).reprompt({ id: "a" }), ["a", true]);
 });
+
+// B136: an install iOS never fetched (B128's ECONNREFUSED, handed off while iFizBox was away) ends "Sent to iOS" but
+// isn't recorded as installed while iOS says it doesn't have the app; once iOS has it, it is.
+test("B136: a Sent to iOS row is recorded only once iOS has the app", () => withDom(async () => {
+  const s = setup([app("a", "Alpha"), app("b", "Beta")]);
+  const doc = fakeDoc();
+  let has = { a: false }; // ({} would be "iOS gave no answer": recorded as sent)
+  const isInstalled = async () => has;
+  s.l.install = (r, { progress }) => new Promise((resolve) => {
+    s.l.calls.install.push(r.id);
+    progress("asking", 0);
+    s.l.waits.set(r.id, () => resolve(r.id === "a" ? { installed: false } : { installed: true }));
+  });
+  const done = runAppRun(s.queue.list(), { queue: s.queue, lanes: s.l, record: async (j) => s.recorded.push(j.id), open: () => s.page, doc, isInstalled });
+  await settle();
+  doc.set("hidden");
+  await s.l.release("a");
+  doc.set("visible"); // iOS hasn't got Alpha
+  await s.l.release("b");
+  await done;
+  await settle();
+  assert.equal(statusOf(rowsOf(s.page)[0]), "Sent to iOS");
+  assert.deepEqual(s.recorded, ["b"]); // the failed handoff isn't recorded
+  has = { a: false };
+  doc.set("hidden");
+  doc.set("visible");
+  await settle();
+  assert.deepEqual(s.recorded, ["b"]);
+  has = { a: true };
+  doc.set("hidden");
+  doc.set("visible");
+  await settle();
+  assert.deepEqual(s.recorded, ["b", "a"]);
+  doc.set("hidden");
+  doc.set("visible");
+  await settle();
+  assert.deepEqual(s.recorded, ["b", "a"]); // once
+  s.page.close();
+}));

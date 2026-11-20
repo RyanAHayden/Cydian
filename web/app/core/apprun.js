@@ -57,7 +57,20 @@ import { runOrder, sizeText, SELF_ID } from "./appqueue.js";
 import { VPN_WAIT } from "./installroute.js";
 import { NAME } from "../brand.js";
 
-export const APP_STATES = ["waiting", "downloading", "signing", "signed", "asking", "installing", "installed", "failed", "cancelled"];
+// B136: an install that failed must not leave the app recorded as installed (Installed's record decides the Search
+// row's swipe: a recorded, up-to-date app has none). recordWhen(row, onPhone) says when a row's app goes into that
+// record: "now" for an install iOS confirmed (and for rows iOS can't be asked about: re-signs, removes, iFizBox
+// itself, rows with no bundle ID, and an `onPhone` of null: apps.isInstalled had no answer); "wait" for a "Sent to
+// iOS" row iOS hasn't confirmed (onPhone undefined: not asked yet, or false: iOS doesn't have it, which is how an
+// install looks that iOS never fetched, B128's ECONNREFUSED); "never" for a row that didn't end installed.
+export function recordWhen(row, onPhone) {
+  if (row?.state !== "installed") return "never";
+  if (!row.unsure || row.mode === "resign" || row.mode === "remove" || !row.bundleId || isSelf(row)) return "now";
+  if (onPhone === true || onPhone === null) return "now";
+  return "wait";
+}
+
+export const APP_STATES = ["waiting","downloading", "signing", "signed", "asking", "installing", "installed", "failed", "cancelled"];
 const ENDED = new Set(["installed", "failed", "cancelled"]);
 export const ended = (row) => ENDED.has(row?.state);
 const SIGNING = new Set(["downloading", "signing"]);

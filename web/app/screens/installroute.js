@@ -22,6 +22,7 @@ import { ROUTE_KEY, ROUTE_OPTIONS, VPNS, VPN_POLL, vpnList, vpnOn, IPHONE_INTRO,
   CONNECT_OPTIONS, connectFooter, tailscaleFooter, tailscaleTestResult } from "../core/installroute.js";
 import { ringStyle, vpnWaitText } from "../core/installroute.js";
 import { developerModeInfo, canReadDeveloperMode } from "../core/installroute.js";
+import { leaveQuestion, LEAVE } from "../core/installroute.js";
 import { NAME } from "../brand.js";
 import { showHUD } from "../nav/hud.js";
 
@@ -376,14 +377,87 @@ async function reread() {
   if (now && pairing) { pairing = now; redraw(); } // not active: idevice.pair's reply settles it
 }
 export function leave() { // also for tests: ends a visit (its VPN poll) without a hashchange
+  const was = visit;
   if (visit?.poll) clearInterval(visit.poll);
   visit = null;
-  if (pairing && shown) call(shown.native, "idevice.pairCancel").catch(() => {});
+  if (was && pairing && shown) call(shown.native, "idevice.pairCancel").catch(() => {}); // once, not again on the hashchange after Leave
 }
+
+// B134: leaving the page while a step runs asks first (core leaveQuestion): "pairing" while idevice.pair waits (the
+// code coming or being typed), "checking" while the page's spinner waits on idevice.status; null otherwise (paired,
+// waiting for the VPN to come on, Try Again: nothing runs that leaving would stop). Tailscale's sign-in isn't asked:
+// its Safari sheet covers the app while it runs, and the bridge has no call to stop it.
+export function pendingStep(onPage = onPairPage()) {
+  if (!visit || !onPage) return null;
+  if (pairing) return "pairing";
+  return visit.checking ? "checking" : null;
+}
+
+// Asks "Stop Setting Up?"; true when the step is gone (it ended while asking, or Leave: the visit ends and the pairing
+// is cancelled, as a plain leave() does). The page itself is left by the caller.
+let asking = null;
+export function askLeave(alert = showAlert, onPage) {
+  const q = leaveQuestion(pendingStep(onPage));
+  if (!q) return Promise.resolve(true);
+  asking ??= Promise.resolve(alert(q)).then((r) => {
+    asking = null;
+    if ((r?.index ?? q.cancel) !== LEAVE) return false;
+    leave();
+    return true;
+  }, () => { asking = null; return false; });
+  return asking;
+}
+
+// The guard sits in the capture phase on the document, ahead of app.js's own handlers: a tap on the nav bar's Back or
+// on a tab bar item is held back while asking and replayed (the same element clicked again) after Leave; an edge
+// swipe never starts (its pointerdown stops here) and asks once the finger has moved right as a swipe would, then
+// Leave taps the top page's Back. Any other way off the page (a link from a notification, another app opening a URL)
+// still ends the visit and cancels the pairing through the hashchange below.
+export const guardHooks = { alert: (q) => showAlert(q) };
+let replaying = false;
+const EDGE = 24, SLOP = 10; // nav/swipe.js's
+export function guardTap(e) {
+  if (replaying || !pendingStep()) return;
+  const t = e.target?.closest?.(".bar-button.back, #tabbar a.tab");
+  if (!t) return;
+  e.preventDefault();
+  e.stopImmediatePropagation();
+  askLeave(guardHooks.alert).then((go) => {
+    if (!go || !t.isConnected) return;
+    replaying = true;
+    try { t.click(); } finally { replaying = false; }
+  });
+}
+let edge = null; // { id, x0, y0 } of a held-back edge swipe
+export function guardSwipe(e, doc = document) {
+  if (e.type === "pointerdown") {
+    edge = null;
+    if (!pendingStep() || !e.target?.closest?.(".edge-swipe") || e.clientX > EDGE) return;
+    e.stopImmediatePropagation();
+    edge = { id: e.pointerId, x0: e.clientX, y0: e.clientY };
+    return;
+  }
+  if (!edge || e.pointerId !== edge.id) return;
+  e.stopImmediatePropagation();
+  if (e.type !== "pointermove") { edge = null; return; }
+  const dx = e.clientX - edge.x0, dy = e.clientY - edge.y0;
+  if (Math.abs(dy) > SLOP && Math.abs(dy) > Math.abs(dx)) { edge = null; return; } // a scroll
+  if (dx <= SLOP || dx <= Math.abs(dy)) return;
+  edge = null;
+  askLeave(guardHooks.alert).then((go) => {
+    const back = go && doc.querySelector?.(".nav-item.is-top .bar-button.back");
+    if (!back) return;
+    replaying = true;
+    try { back.click(); } finally { replaying = false; }
+  });
+}
+
 if (typeof document !== "undefined" && typeof window !== "undefined") {
   document.addEventListener("visibilitychange", reread);
   window.addEventListener("pageshow", reread);
   window.addEventListener("hashchange", () => { if (!onPairPage()) leave(); });
+  document.addEventListener("click", (e) => guardTap(e), true);
+  for (const t of ["pointerdown", "pointermove", "pointerup", "pointercancel"]) document.addEventListener(t, (e) => guardSwipe(e), true);
 }
 
 async function vpnApps(native) { try { return await call(native, "idevice.vpnApps"); } catch { return null; } }
@@ -393,10 +467,11 @@ async function drawPair(box, { store, native, alert, redraw }) {
   visit ??= { started: false, asked: false, failed: false, poll: null };
   const v = visit;
   // B120: the page draws at once, a spinner while idevice.status answers (a redraw keeps what is on screen).
-  if (!pairing && !box.firstChild) box.replaceChildren(pairSections(setupGroups("checking")));
+  if (!pairing && !box.firstChild) { box.replaceChildren(pairSections(setupGroups("checking"))); v.checking = true; } // B134: asked before leaving
   // In pairing mode the page draws from `pairing` alone, without waiting on idevice.status.
   const [st, apps] = pairing ? [null, null] : await Promise.all([status(native), vpnApps(native)]);
   if (v !== visit) return; // left while idevice.status answered
+  v.checking = false;
   const state = setupState(st, pairing);
   if (state !== "connect" && v.poll) { clearInterval(v.poll); v.poll = null; }
   const connect = st?.tailscale?.connect ?? "auto";

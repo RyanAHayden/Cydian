@@ -72,3 +72,7 @@
   pointer-events: none; }
 /* Paired: the check sits on its own row. */
 .pair-done .cell-label { font-weight: bold; }
+/* Installation & Signing's nav title (screens/settings.js mergedNav): as wide as a nav title may be beside the back
+   button, its font shrinking from 20px so the 22 characters fit (17px at 375pt) instead of ending in "…". */
+.nav-title-fit { display: block; max-width: calc(100vw - 180px); overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+  font-size: min(20px, calc((100vw - 180px) / 11.4)); line-height: 44px; }

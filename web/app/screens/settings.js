@@ -1,5 +1,6 @@
 // Settings (F13; at the bottom of Home since F123), laid out like iOS 6's Settings app (F128, docs/settings.md):
-// the root is one list of short rows (iFizBox Account; General, Theme, Updates; Signing; Console Logs), each
+// the root is one list of short rows (iFizBox Account; General, Theme, Updates; Signing, in the sideload build
+// Installation & Signing (F271); Console Logs), each
 // opening its own page. The settings' rows come from core/settings.js (which ones this mode shows, defaults,
 // storage, which page they're on); this file only draws them:
 //   choice  one row per option, the chosen one checked
@@ -43,6 +44,26 @@ import { profileNotes, keepOn, GUIDE_LINK } from "../core/keepid.js";
 import { keepGuideHref } from "./guides.js";
 import { rowIcon, SETTING_ICONS, PAGE_ICONS } from "../icons/rowicons.js";
 import { drawInstallation, PAGE as INSTALLATION, SUB_TITLES as INSTALLATION_TITLES } from "./installroute.js";
+import { installationBlock } from "./installroute.js";
+
+// F271: the sideload build has one Installation & Signing page (Install Apps With and This iPhone's groups on top,
+// the Certificate and Provisioning Profile below) in place of Installation and Signing; #settings/installation and
+// #settings/signing both open it, installation/pair and signing/help stay sub-pages. Other builds keep "Signing".
+export const MERGED_TITLE = "Installation & Signing";
+const merged = () => localSigning() && settings.isShown("installRoute");
+// Pure, for the tests: whether `path` opens the merged page.
+export const opensMerged = ([first, second] = [], on = true) => on && !second && (first === "signing" || first === INSTALLATION);
+// The title is wider than the nav bar leaves at 375pt beside "Settings": it shrinks to fit (settings.css
+// .nav-title-fit) instead of ending in "…", and the pages above it (This iPhone, How Signing Works) say Back, as iOS
+// does for a title too long for the back button.
+function mergedNav() {
+  const info = { title: MERGED_TITLE, back: "Back" };
+  if (typeof document === "undefined") return info;
+  const span = document.createElement("span");
+  span.className = "nav-title-fit";
+  span.textContent = MERGED_TITLE;
+  return { ...info, titleView: span };
+}
 
 export const title = "Settings";
 
@@ -78,6 +99,7 @@ const pathOf = (route) => { const [first, second] = route.path; return [OLD_PAGE
 export function nav(route) {
   const [first, second] = pathOf(route);
   if (first === LOGS) return { title: logsTitle(second) }; // N4: Console Logs
+  if (opensMerged([first, second], merged())) return mergedNav(); // F271
   if (first === "signing" && second === HELP) return { title: HELP_TITLE }; // F134: the walkthrough
   if (first === INSTALLATION && INSTALLATION_TITLES[second]) return { title: INSTALLATION_TITLES[second] };
   const key = second ?? first;
@@ -123,6 +145,7 @@ function draw({ el, route }) {
   else if ((second ?? first) === "holds") el.replaceChildren(holdsPage());
   else if ((second ?? first) === "blocked") el.replaceChildren(blockedPage()); // F226
   else if (first === "signing" && second === HELP) drawSigningHelp(el); // F134
+  else if (opensMerged([first, second], merged())) drawSigning(el); // F271: Installation & Signing
   else if (first === INSTALLATION && settings.isShown("installRoute")) drawInstallation(el, second, { store: settings }); // sideload
   else if (second) el.replaceChildren(listPage(second));
   else if (first === "signing") drawSigning(el);
@@ -135,7 +158,8 @@ function draw({ el, route }) {
 // The root, like iOS 6's: short rows, each opening a page; no footers. F183: Home's version line at the bottom.
 function rootPage() {
   const frag = document.createDocumentFragment();
-  const pageRows = settings.pages().filter((p) => p.id !== "signing")
+  // F271: in the sideload build Installation lives on the Signing row's page (Installation & Signing)
+  const pageRows = settings.pages().filter((p) => p.id !== "signing" && !(p.id === INSTALLATION && merged()))
     .map((p) => ({ label: p.title, href: format(settingsRoute([p.id])), ...(PAGE_ICONS[p.id] ? { icon: rowIcon(PAGE_ICONS[p.id]) } : {}) }));
   frag.append(accountSection(), grouped([{ rows: pageRows }]), signingSection(), openInAppSection(), ipaSection(),
     logsSection(detectMode()), ...versionLines());
@@ -1057,7 +1081,10 @@ function browseButton(accept, multiple, onFiles) {
 // the phone; the server sees the app's ID, version and name).
 
 // F128: the root's Signing row, the certificate as its detail (the page explains the rest).
-const signingRow = (box, detail) => box.replaceChildren(grouped([{ rows: [{ label: "Signing", detail, href: format(settingsRoute(["signing"])), icon: rowIcon("signing") }] }]));
+// F271: named Installation & Signing where it opens the merged page, without the certificate as its detail (beside
+// the longer name it left "Installatio…" at 375pt; the page shows the certificate first thing).
+const signingRow = (box, detail) => box.replaceChildren(grouped([{ rows: [{ label: merged() ? MERGED_TITLE : "Signing", detail: merged() ? "" : detail,
+  href: format(settingsRoute(["signing"])), icon: rowIcon("signing") }] }]));
 function deviceSigningSection(box) {
   const fill = (detail) => signingRow(box, detail);
   fill("");
@@ -1203,9 +1230,10 @@ async function drawDeviceSigning(el) {
     status: () => signingExtras({ identity: kept, redraw: redrawAll, dates: settings.get("showExpiry") }),
     remove: () => grouped([{ rows: [{ label: "Remove Certificate", onClick: () => removeDeviceCertificate() }] }]),
     help: () => helpGroup(),
+    install: () => installationBlock({ store: settings }), // F271: Install Apps With and This iPhone's groups
   };
-  showSigningPage(el, signingLayout({ mode: "sideload", certificate: Boolean(kept), staged, profile: split.profile.length > 0,
-    options: settings.sections().some((s) => s.page === "signing") }), parts);
+  showSigningPage(el, mergedLayout(signingLayout({ mode: "sideload", certificate: Boolean(kept), staged, profile: split.profile.length > 0,
+    options: settings.sections().some((s) => s.page === "signing") }), merged()), parts);
   offerInstall(missingStep(status, getServer()) == null); // F177: Install sent the user here: Install Now once ready
 }
 
@@ -1267,6 +1295,10 @@ export function signingLayout({ mode, certificate = false, staged = false, profi
   };
   return SIGNING_GROUPS.filter((g) => on[g]);
 }
+
+// F271: Installation & Signing's order: the "install" part (Install Apps With, then This iPhone's Pairing, Connect
+// With and Tailscale when it's chosen) above signingLayout's groups. Pure, for the tests.
+export const mergedLayout = (layout, on = true) => (on ? ["install", ...layout] : layout);
 
 // F134: core/signing.js summary()/deviceSummary() rows, split into the Certificate group (Name, Team, Expires) and
 // the Provisioning Profile group (Name, Expires, Devices, App ID). Long values go under the label, where they wrap.

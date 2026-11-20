@@ -1,6 +1,7 @@
-// Settings > Installation (sideload build, docs/settings.md): Install Apps With Signing Server / This iPhone, and the
-// This iPhone route's page (core/installroute.js holds the rules and texts):
-//   installation       the choice, then (This iPhone) Pairing and the VPN's state
+// Settings > Installation & Signing's top half (sideload build, docs/settings.md): Install Apps With Signing Server /
+// This iPhone, and the This iPhone route's page (core/installroute.js holds the rules and texts):
+//   installation       the merged page (screens/settings.js draws it, with installationBlock below at its top):
+//                      the choice, then (This iPhone) Pairing and the VPN's state
 //   installation/pair  This iPhone, one page that runs by itself (core setupState): one sentence on what it gives,
 //                      then the VPN check (Turn On … with Open LocalDevVPN, rechecked when the app comes back), then
 //                      pairing starts on its own: the 6-digit code big at the top and where to type it, a line and a
@@ -80,6 +81,20 @@ export function installationGroups(choice, st, { pick = () => {}, openVPN = () =
 export async function drawInstallation(el, sub, { store, native = globalThis.ifizboxNative, alert = showAlert } = {}) {
   const redraw = () => drawInstallation(el, sub, { store, native, alert });
   if (sub === "pair") return drawPair(el, { store, native, alert, redraw });
+  return paintInstallation(el, { store, native, alert, redraw });
+}
+
+// F271: the choice and This iPhone's groups as a box of their own, for the top of Settings > Installation & Signing
+// (screens/settings.js puts it above the Certificate and Provisioning Profile groups). It repaints only itself.
+export function installationBlock({ store, native = globalThis.ifizboxNative, alert = showAlert } = {}) {
+  const box = document.createElement("div");
+  box.className = "install-route";
+  const redraw = () => paintInstallation(box, { store, native, alert, redraw });
+  redraw();
+  return box;
+}
+
+async function paintInstallation(el, { store, native, alert, redraw }) {
   const choice = store.get(ROUTE_KEY);
   const paint = (st) => el.replaceChildren(grouped(installationGroups(choice, st, {
     pick: async (v) => {

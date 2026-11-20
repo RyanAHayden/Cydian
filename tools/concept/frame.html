@@ -249,8 +249,7 @@ select { font: inherit; color: var(--ink); background: var(--panel); border: 1px
   function paintBars() {
     var d = deviceOf(), site = state.mode === "site", dark = tone() === "dark";
     $("strip").style.background = stripColor;
-    // dark glyphs over a light bar: Safari's strip on the site, the app's own bar in the apps (iOS 7's White)
-    var darkText = lum(stripColor) > 0.6;
+    var darkText = site && lum(stripColor) > 0.6;
     $("sb").classList.toggle("dark-text", darkText);
     $("safari").classList.toggle("dark", dark);
     // over the app's black tab bar the bar is light; over Safari's light bar, dark

@@ -13,10 +13,12 @@
   and `check.mjs --themes light:classic` still work; another era's values are `era:tone:theme`
   (`ios7:light:white`). The app's storage is seeded as the app stores it: `ifizbox.style` (theme-boot.js puts it on
   `html[data-style]`), `ifizbox.appearance`, and the tone's pick only in an era that uses the lists.
-- The frame's status bar glyphs are now dark over any light bar colour, in the apps too (before: only the site's
-  Safari strip). Without it iOS 7 White showed white glyphs on #f7f7f7. Brushed Metal's bar (#9aa0a9) now also gets
-  dark glyphs in the apps. The real app has the same problem on White (B221, open); the concept shows the intended look.
+- Tried and reverted (spec review: not asked): dark status-bar glyphs over any light bar in the apps (iOS 7 White
+  shows white glyphs on #f7f7f7 in the frame's Jailbroken/Lite modes). Filed as B225; the real app's own status
+  bar on White is B221.
 - `tools/concept/check.mjs`: `--themes` takes `era:tone:theme`; each run checks `data-style/data-theme:data-palette`.
+  The default era's long form (`ios6:light:classic`) maps to the menu's `light:classic`; a value the menu hasn't got
+  fails ("the Theme menu has …") instead of quietly testing the fallback theme.
 - `tools/concept/test_concept.py` `test_lists_the_eras_of_core_settings`: loads `core/settings.js` in the vm and
   compares `STYLES`, `STYLE_DEFAULT`, `STYLE_PALETTES` with the page's era list; checks the frame seeds `ifizbox.style`.
 - `.claude/skills/concept/SKILL.md`: the eras in the Theme menu, the `--themes` era form, the seeded keys.
@@ -27,7 +29,9 @@
 - A copy of settings.js with a made-up `ios8` era (own themes white/graphite) gives a third era with no tool change.
 - `check.mjs --modes jailbreak,sideload,site --themes light:classic,dark:gunmetal,ios7:light:white,ios7:dark:oled`
   at iphone-se and iphone-17-pro-max (the default two devices): all clean (482 checks, 24 runs), the app's
-  `data-style` was `ios7` on the iOS 7 runs. Shots looked at: iOS 7 White in the apps with dark status-bar glyphs.
+  `data-style` was `ios7` on the iOS 7 runs (that run had the status-bar change since reverted; it only paints the
+  frame's glyphs). After the review: `--themes ios6:light:classic,ios7:dark:oled,nope:light:x --drag-route none` at
+  both devices: the first two clean, `nope` failed as it should.
 
 ## Not verified
 

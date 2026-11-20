@@ -236,7 +236,13 @@ for (const mode of MODES) {
       errors = [];
       stray.length = 0;
       await set("device", device);
-      await set("theme", theme); // reloads the app
+      // the default era's menu values have no era in front: "ios6:light:classic" is the menu's "light:classic"; a
+      // value the menu hasn't got fails here rather than testing the theme the frame falls back to
+      const value = await ev(`(() => { const o = [...document.getElementById("theme").options].map((x) => x.value), v = ${JSON.stringify(theme)};
+        const short = v.split(":").slice(1).join(":"), def = (JSON.parse(document.getElementById("concept-meta").textContent).palettes.styles || []).find((x) => x.default);
+        return o.includes(v) ? v : def && v.startsWith(def.value + ":") && o.includes(short) ? short : null; })()`);
+      if (!check(value, `the Theme menu has ${theme}`)) continue;
+      await set("theme", value); // reloads the app
       await ev(`document.getElementById("startpage").click()`); // from the concept's start page
       await sleep(300);
       const name = `${mode}-${device}-${theme.replaceAll(":", "-")}${VERSION === "before" ? "-before" : ""}`;

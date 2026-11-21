@@ -83,6 +83,7 @@ import { rowAppJob, queueOriginalCheck } from "./altstore.js";
 import { queueApp } from "./queue.js";
 import { worksInGroup, addToApp, addableTweakRows, checkTweakRows } from "./tweaks.js"; // F302
 import { installWhichVersion, INSTALL_WHICH_TITLE } from "./altstore.js"; // F346: a hold on Install
+import { loadRowsIndex } from "./tweaks.js"; // F344
 
 // B269: in the sideload build a Tweak Source's list leaves out the tweaks already checked and refused on this device.
 export const sideloadListRows = (rows, mode = detectMode()) => (mode === "sideload" ? addableTweakRows(rows) : rows);
@@ -851,7 +852,7 @@ function maybeHint(listEl, queued = () => installQueue.size, apps = false, actio
 // B269: a sideload Tweak Source's list checks the tweaks not checked yet (screens/tweaks.js checkTweakRows) and
 // drops each refused one, so no row is left that only leads to "can't go into an app".
 function dropRefusedTweaks(body, list, rows) {
-  checkTweakRows(rows, { stop: () => !list.el.isConnected,
+  checkTweakRows(rows, { stop: () => !list.el.isConnected, index: loadRowsIndex, // F344: the shared index first
     onRefused: (ids) => { const out = new Set(ids); list.setItems(withLetterHeaders(rows.filter((r) => !out.has(r.id)), (r) => indexLetter(r.name))); } });
 }
 

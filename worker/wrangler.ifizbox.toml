@@ -54,6 +54,12 @@ database_name = "ifizbox-reviews"
 binding = "PUSH"
 database_name = "ifizbox-push"
 
+# F344: the tweak index (src/tweakindex.js, GET /api/tweaks) in its own D1 database (made on the first deploy); the
+# cron below also works through it, TWEAK_INDEX_PER_RUN .debs a run (default 20).
+[[d1_databases]]
+binding = "TWEAKS"
+database_name = "ifizbox-tweaks"
+
 [triggers]
 crons = ["*/30 * * * *"]
 

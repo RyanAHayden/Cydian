@@ -43,7 +43,14 @@ database_name = "ifizbox-reviews"
 binding = "PUSH"
 database_name = "ifizbox-push"
 
-# F280: the push check runs every 30 minutes (it does nothing without an APNs key).
+# F344: the tweak index (src/tweakindex.js, GET /api/tweaks): which app each Tweak Source's tweaks are for, in its own
+# D1 database (made on the first deploy, like REVIEWS). Without it /api/tweaks answers {enabled: false} and the app
+# checks tweaks on the phone. TWEAK_INDEX_PER_RUN ([vars], default 20) caps the .debs one cron run downloads.
+[[d1_databases]]
+binding = "TWEAKS"
+database_name = "ifizbox-tweaks"
+
+# F280: the push check runs every 30 minutes (it does nothing without an APNs key). F344: the tweak index too.
 [triggers]
 crons = ["*/30 * * * *"]
 

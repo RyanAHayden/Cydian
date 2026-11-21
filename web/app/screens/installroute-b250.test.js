@@ -61,6 +61,39 @@ test("main page: a certificate imported later turns the cell back to Ready to In
   assert.equal(page.status().title, "Ready to Install");
 });
 
+test("main page, Signing Server: no Ready to Install before signing.status first answers", async () => {
+  forgetStatus();
+  let answer;
+  const page = mainPage({ store: store("server"), native: bridge({}), links: LINKS,
+    signing: () => new Promise((r) => { answer = r; }) });
+  const done = page.refresh();
+  assert.equal(page.status().state, "checking");
+  assert.equal(page.status().subtitle, "Your certificate.");
+  await new Promise((r) => setTimeout(r, 0));
+  assert.equal(page.status().state, "checking", "still waiting on signing.status");
+  answer({ certificate: { text: "300 days left" }, ready: true });
+  await done;
+  assert.equal(page.status().title, "Ready to Install");
+  // a failed read (no `ready`) is unknown: the route's answer, never Import Your Certificate
+  const failed = mainPage({ store: store("server"), native: bridge({}), links: LINKS, signing: async () => ({ certificate: { text: "Unknown" } }) });
+  await failed.refresh();
+  assert.equal(failed.status().state, "server");
+});
+
+test("main page, This iPhone: signing answers before idevice.status: Import, and it stays when the status lands", async () => {
+  forgetStatus();
+  let answer;
+  const slow = mainPage({ store: store("iphone"), native: { call: () => new Promise((r) => { answer = r; }) }, links: LINKS,
+    signing: async () => ({ certificate: { text: "None" }, ready: false }) });
+  const done = slow.refresh();
+  await new Promise((r) => setTimeout(r, 0));
+  assert.equal(slow.status().state, "certificate", "known before idevice.status answers");
+  answer(PAIRED_ON);
+  await done;
+  assert.equal(slow.status().state, "certificate");
+  forgetStatus();
+});
+
 test("main page, This iPhone: no certificate wins over Ready; a failed signing read leaves the route's answer", async () => {
   forgetStatus();
   const page = mainPage({ store: store("iphone"), native: bridge({ "idevice.status": PAIRED_ON }), links: LINKS,

@@ -98,6 +98,8 @@ export const CHECKING = { state: "checking", title: "Checking…", subtitle: "Pa
 // Certificate on either route, since every install stops at Set Up Signing without one (signing/device.js
 // firstInstallCheck); undefined (not read yet, or the read failed) leaves the route's own answer.
 export const NO_CERTIFICATE = { state: "certificate", title: "Import Your Certificate", subtitle: "Installs need your certificate and its profile first.", action: "certificate", tone: "warn", local: false };
+// The Signing Server route before signing.status first answers: no Ready to Install until the certificate is known.
+export const CHECKING_SERVER = { ...CHECKING, subtitle: "Your certificate." };
 export function installStatus(choice, st, { host = DOMAIN, certificate } = {}) {
   if (certificate === false) return NO_CERTIFICATE;
   if (choice !== "iphone") return { state: "server", title: "Ready to Install", subtitle: `Through the Signing Server, ${host}.`, action: "checkServer", tone: "ok", local: false };

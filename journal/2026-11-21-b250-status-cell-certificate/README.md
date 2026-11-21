@@ -21,8 +21,13 @@ Decision (unattended): the action row's label is "Import Certificate" (the title
 Certificate, the Signing walkthrough's step name); it goes to the Certificate page rather than the walkthrough,
 since that page holds the import.
 
-The first visit on the Signing Server route still paints Ready to Install for the moment signing.status takes to
-answer (the cell had no wait state for the server route); later refreshes use the remembered answer.
+Spec review: the first draft still painted Ready to Install on the Signing Server route for the moment
+signing.status took on the first visit. Now that route shows Checking… ("Your certificate.", `CHECKING_SERVER`, action
+dimmed) until signing() first answers; a failed read then gives the route's own answer. Also added a test for
+signing answering before idevice.status on This iPhone. Kept, as the review flagged it as extra: the rule on This
+iPhone too (queue.js runs firstInstallCheck for every local-signing install, whichever route), and the action row's
+new action (the row is always there and needs one). `ready` is `Boolean(kept)`, which is statusReady, the same rule
+firstInstallCheck's missingStep uses.
 
 ## Not verified
 

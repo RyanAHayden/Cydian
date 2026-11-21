@@ -29,6 +29,19 @@ The task offered "record on a fetched-in-full install" or "confirm through signi
 first: it needs no native change, the shell already tells the page about the fetch, and installd isn't reachable
 from Lite without LocalDevVPN (the This iPhone route already reports `installed` directly).
 
+## Spec review
+
+A fresh review raised these points, and none needed a code change:
+- "A false still waits; does iOS 27 send false?" No. `apps.isInstalled` answers through `Workspace.isInstalled`
+  (Sideload.swift), which returns nil when `seesInstalls` is off, so iOS 27 always gives null. The watch's own
+  "installed false" never reaches `recordWhen`, because the run reads `handedOff` there.
+- "handedOff only means served, but that isn't checked": grep shows `handedOff` is set only in
+  `signing/queue.js` openPrepared's `SENT` branch (the `{served: true}` event). That file is outside this task's files.
+- "Each entry point isn't tested": app page Install / Downgrade, Change Installed Version and Version History all
+  queue jobs into the same `runAppRun`, which the new tests drive.
+- "Fetched and then refused gets recorded": this is the trade-off the task asked for ("record on a fetched-in-full
+  install"). It is listed below.
+
 ## Not verified
 
 - On the iPhone 15 Pro (iOS 27): not run. It needs a Lite IPA built from this branch and a full install through

@@ -24,7 +24,7 @@ html[data-theme="dark"] .home {
 /* ==== } look-only ==== */
 
 /* Icon and welcome: a 57px icon (Cydia's, 4S shot halved) 16px in from the tiles, the words beside it. */
-.home-head { margin: 0 10px; display: flex; align-items: center; gap: 22px; padding: 11px 0 11px 16px; }
+.home-head { margin: 0 var(--home-inset); display: flex; align-items: center; gap: 22px; padding: 11px 0 11px 16px; }
 .home-icon { flex: none; width: 57px; height: 57px; }
 .home-icon.tappable { cursor: pointer; }
 .home-words { min-width: 0; }
@@ -44,12 +44,12 @@ html[data-theme="dark"] .home {
 /* ==== } look-only ==== */
 
 /* Tile rows: 43px tiles, 10px apart; two halves 9px apart, or one outlined pair split by a line. */
-.home-row { margin: 0 10px; display: flex; gap: 9px; }
+.home-row { margin: 0 var(--home-inset); display: flex; gap: 9px; }
 .home-row + .home-row { margin-top: 10px; }
 .home-row > .table { flex: 1; min-width: 0; overflow: hidden; }
 .home-row.pair > .table { display: flex; }
 .home-pair > .cell { flex: 1; min-width: 0; }
-.home-tile { padding: 0 10px 0 6px; gap: 8px; }
+.home-tile { padding: var(--home-tile-pad); gap: 8px; }
 .home-tile .cell-label { flex: 1; min-width: 0; }
 /* ==== look-only { ==== the tiles and their glyphs */
 .home-row > .table {
@@ -189,7 +189,7 @@ html[data-theme="dark"] .home { --tile-purple: var(--dk-lavender); --tile-purple
 
 /* F135/F159: Home's Settings row, a tile (grey square, white gear) with the tiles' inset and gap, so its icon
    and label line up with the tiles above. */
-.home-settings-row > .cell-inner { padding: 0 10px 0 6px; gap: 8px; }
+.home-settings-row > .cell-inner { padding: var(--home-tile-pad); gap: 8px; }
 /* Settings | Theme: one grouped table split in two halves (.home-pair's cells and divider, above). */
 .home-links > .table.home-pair { display: flex; }
 /* F223: the Settings half draws Settings > General's tile (icons/rowicons.js rowIcon, a .row-icon <img>); the row's own

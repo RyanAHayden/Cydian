@@ -121,10 +121,16 @@ the app supports iOS 15.0, so cascade layers are out.
 | `--hud-w`, `--hud-pad` | 180px, 28px 12px 22px | the HUD |
 | `--callout-h` | 38px | the menu callout and the queue hint |
 | `--banner-pad` | 6px 12px 7px | the notification banner |
+| `--sw-w`, `--sw-h`, `--sw-knob-size`, `--sw-travel` | 77px, 27px, 27px, 50px | the switch's box, its knob and the knob's travel (`ios6.css`'s on `--x`; `nav/switch.js` reads it when a drag starts) |
+| `--settings-seg-margin` | 0 | Settings > Theme's Mode, inside its group (`settings.css`) |
+| `--home-inset`, `--home-tile-pad` | 10px, 0 10px 0 6px | Home's head and tile rows from the screen's sides, and a tile's padding (`home.css`) |
 
-No hook yet, on purpose: the switch (`nav/switch.js` moves the knob 50px from JS, so its 77x27 box can't change
-from CSS alone), the reload and undo bars' 44pt, the share sheet's grid, the pull area and the placeholders.
-`packages.css` and the other component stylesheets keep their layout in their own rules and have no hooks.
+A hook never reuses a look token's name (`ios6-css.test.js` checks the switch, Mode and Home hooks): the knob's size is
+`--sw-knob-size` because `--sw-knob` is the knob's paint.
+
+No hook yet, on purpose: the reload and undo bars' 44pt, the share sheet's grid, the pull area and the placeholders.
+`packages.css` and the other component stylesheets keep their layout in their own rules; only Home's and Theme's
+Mode take the hooks above.
 
 The bars' own heights (`--nav-h`, `--tab-h`) are layout that every screen depends on; an era that changes them
 (large titles, a floating tab bar) does it through a nav hook, not by setting them.

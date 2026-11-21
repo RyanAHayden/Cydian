@@ -19,7 +19,17 @@ html[data-style="ios7"] {
   --group-margin: 35px 0 0; --group-gap: 35px; --group-first-head: 0px;
   --group-head-margin: 0 15px 7px; --group-foot-margin: 7px 15px 0;
   --cell-min-h: 44px; --cell-pad: 0 15px;
+  --sw-w: 51px; --sw-h: 31px; --sw-knob-size: 31px; --sw-travel: 20px;  /* the kit's 51 x 31 switch, its knob the track's height */
+  --settings-seg-margin: 0 15px;                                   /* Theme's Mode, inset like a label */
+  --home-inset: 0px; --home-tile-pad: 0 15px;                      /* Home's tiles edge to edge, content 15pt in */
 }
+/* Home's tiles take the tables' flat edges: square, the table hairline (Home sets these on .home). */
+html[data-style="ios7"] .home { --tile-radius: 0; --tile-edge: var(--table-edge); }
+html[data-style="ios7"] .home-row > .table { border-width: .5px; }
+html[data-style="ios7"] .home-row > .table:only-child { border-width: .5px 0; }
+/* side by side: no row separator (the .home-row outweighs the grouped separator rules further down) */
+html[data-style="ios7"] .home-row .home-pair > .cell + .cell,
+html[data-style="ios7"] .home-links .home-pair > .cell + .cell { border-left-width: .5px; background: none; }
 
 /* ---- White ---- */
 html[data-style="ios7"][data-theme="light"] {
@@ -194,6 +204,16 @@ html[data-style="ios7"] .grouped .cell + .cell {
   background: linear-gradient(var(--divider), var(--divider)) 15px 0 / calc(100% - 15px) .5px no-repeat;
 }
 html[data-style="ios7"] .grouped .cell + .cell > .cell-inner { box-shadow: none; }
+/* On a row with an icon the separator starts where the label does: the 15pt inset, the 29pt tile and the cell's gap
+   (a row tile's -3 / +3pt margins cancel), or the 24pt theme swatch. */
+html[data-style="ios7"] .grouped .cell + .cell:has(> .cell-inner > .cell-icon) {
+  background-position: calc(15px + 29px + var(--cell-gap)) 0;
+  background-size: calc(100% - 15px - 29px - var(--cell-gap)) .5px;
+}
+html[data-style="ios7"] .grouped .cell + .cell:has(> .cell-inner > .cell-icon.theme-swatch) {
+  background-position: calc(15px + 24px + var(--cell-gap)) 0;
+  background-size: calc(100% - 15px - 24px - var(--cell-gap)) .5px;
+}
 html[data-style="ios7"] .cell-label { font-size: 17px; font-weight: 400; }
 html[data-style="ios7"] .cell-count { font-weight: 400; }
 html[data-style="ios7"] .cell-check::after { font-weight: 400; color: var(--i7-tint); }
@@ -206,10 +226,10 @@ html[data-style="ios7"] .cell-inner.chevron.is-pressed::after { background-image
 /* Plain tables: the flat grey section bar. */
 html[data-style="ios7"] .section-header { font-size: 15px; font-weight: 600; color: var(--i7-label); text-shadow: none; }
 
-/* Switch: flat, the kit's green with a white knob and no ON / OFF (iOS 6's 77 x 27 box: its size is not a hook yet). */
+/* Switch: flat, the kit's green with a white knob and no ON / OFF, in its 51 x 31 box (the hooks above). */
 html[data-style="ios7"] .sw-track,
 html[data-style="ios7"][data-theme] .sw-track {
-  border: 1.5px solid var(--i7-sw-edge); background: var(--i7-sw-track); box-shadow: none;
+  border: 1.5px solid var(--i7-sw-edge); border-radius: 15.5px; background: var(--i7-sw-track); box-shadow: none;
 }
 html[data-style="ios7"] .switch[aria-checked="true"] .sw-track { border-color: var(--i7-green); }
 html[data-style="ios7"] .sw-track::before,
@@ -236,8 +256,7 @@ html[data-style="ios7"][data-theme] .store-segment:not(.selected) {
 html[data-style="ios7"] .store-segment + .store-segment,
 html[data-style="ios7"] .store-segment.selected + .store-segment,
 html[data-style="ios7"] .store-segment + .store-segment.selected { border-left-color: var(--i7-tint); }
-html[data-style="ios7"] .store-segment:active:not(.selected) { background: var(--i7-seg-pressed); }
-html[data-style="ios7"] .store-segment.selected,
+html[data-style="ios7"] .store-segment:active:not(.selected) { background: var(--i7-seg-pressed); }html[data-style="ios7"] .store-segment.selected,
 html[data-style="ios7"][data-theme] .store-segment.selected { color: var(--i7-tint-text); background: var(--i7-tint); }
 
 /* Scope bar (Changes' All / Installed, Installed's title, Search's scopes): the same tinted outline control. The

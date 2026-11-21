@@ -174,8 +174,12 @@ export function findSameSource(list, want, { except = null } = {}) {
 // the first listed. The others' keys are returned; the one kept keeps its own key and settings. Only URL spellings
 // count here, not a shared identifier: this removes records without asking, and a fork of a source often keeps the
 // original's identifier while listing other apps (Add Source and Recommended, which the user sees, do count it).
+// The built-in source (core/essential.js SELF_APT_URI / SELF_ALT_URL, repeated here: essential.js imports
+// altstore.js, which imports this file) under its own URL always stays, loaded or not: removeSource refuses it.
+const BUILTIN_URIS = new Set([`https://${DOMAIN}/repo/`, `https://${DOMAIN}/repo/source.json`]);
 export function duplicateSources(list) {
   const all = (list ?? []).filter((s) => s?.key);
+  const builtin = (s) => BUILTIN_URIS.has(s.uri);
   const loaded = (s) => s.updated != null && !s.error;
   const same = (a, b) => { const k = sourceMatchKey(a.uri, a.dist); return Boolean(k) && k === sourceMatchKey(b.uri, b.dist); };
   const drop = new Set();
@@ -184,7 +188,7 @@ export function duplicateSources(list) {
     const group = all.filter((s, j) => j >= i && !drop.has(s.key) && s.key !== all[i].key && same(all[i], s));
     if (!group.length) continue;
     const members = [all[i], ...group];
-    const keep = members.find(loaded) ?? members[0];
+    const keep = members.find(builtin) ?? members.find(loaded) ?? members[0];
     for (const s of members) if (s !== keep) drop.add(s.key);
   }
   return [...drop];

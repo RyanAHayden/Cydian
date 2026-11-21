@@ -43,6 +43,17 @@ seed it as `…/raw/main/flycast-ios.json`. Keys are `alt:<url>` with the URL as
 Tests: `web/app/core/samesource.test.js` (the Flycast spellings through the match key, Recommended rows, Import,
 Add Source before and after the fetch, Edit's replaces, the merge in a stored list).
 
+## Spec review
+
+- Fixed: the merge removes extras through the wrapped calls, below essential.js's built-in guard, so iFizBox's own
+  source could be removed when it was also listed under another spelling and hadn't loaded. `duplicateSources` now
+  always keeps the record under the built-in's own URL.
+- Kept as decided above: the keys are unchanged (matching beside them), and the merge counts URL spellings only.
+- Left: a removal that fails is still left out of `sources()` for the rest of the session (tried once). The record
+  is a duplicate either way; the next session tries again.
+- Left: Canister's `normalRepo` (Find More Sources' tweak repos) doesn't drop a leading `www.`; the rest (scheme,
+  case, trailing slash) it already ignored. Not filed: it is a minor gap for APT repo hosts.
+
 ## Mistakes
 
 - Made three one-line wrapper edits (essential.js, backend-native.js, add.js) with a python heredoc instead of the

@@ -8,6 +8,7 @@ import { altKey, withAltSources } from "./altstore.js";
 import { recommendedRows, reviewImport } from "./sourcelist.js";
 import { RECOMMENDED_SOURCES } from "./recommended.js";
 import { fakeIndexedDB } from "../fakes.test-helper.js";
+import { SELF_ALT_URL } from "./essential.js";
 
 const FLYCAST = "https://github.com/chachillie/Flycast-iOS/raw/refs/heads/main/flycast-ios.json";
 const FLYCAST_SPELLINGS = [
@@ -99,6 +100,10 @@ test("duplicateSources keeps one: a loaded one first, else the first listed", ()
   const fork = { key: altKey("https://fork.example/x.json"), uri: "https://fork.example/x.json", identifier: "com.chachirie.source" };
   assert.deepEqual(duplicateSources([{ ...b, identifier: "com.chachirie.source" }, fork]), [],
     "a shared identifier alone is never merged away");
+  // The built-in under its own URL stays even before it has loaded; the other spelling goes.
+  const builtin = { key: altKey(SELF_ALT_URL), uri: SELF_ALT_URL, updated: null, error: null };
+  const http = { key: altKey(SELF_ALT_URL.replace("https:", "http:")), uri: SELF_ALT_URL.replace("https:", "http:"), updated: 4, error: null };
+  assert.deepEqual(duplicateSources([http, builtin]), [http.key]);
 });
 
 // ---- Add Source and the stored list ------------------------------------------------------------------------

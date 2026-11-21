@@ -489,4 +489,56 @@ test("This iPhone: a second look while installd is quiet (B251)") {
     check(HereRecheck.SecondLook.ends(.installed), "the new copy listed: installed")
 }
 
+test("the IPA kept for Re-sign (F343)") {
+    let dir = work.appendingPathComponent("kept-ipas", isDirectory: true)
+    try? FileManager.default.removeItem(at: dir)
+    // which apps keep one
+    check(OriginalIPA.keeps(source: "https://x.example/a.ipa", bundleID: "com.a", originalBundleID: "com.a", own: "com.me"), "a download keeps it")
+    check(OriginalIPA.keeps(source: "HTTP://x.example/a.ipa", bundleID: "com.a", originalBundleID: "com.a", own: nil), "plain http too")
+    check(!OriginalIPA.keeps(source: "library:a.ipa", bundleID: "com.a", originalBundleID: "com.a", own: "com.me"), "My IPAs has its own copy")
+    check(!OriginalIPA.keeps(source: SelfIPA.url, bundleID: "com.me", originalBundleID: "com.me", own: "com.me"), "iFizBox from its bundle")
+    check(!OriginalIPA.keeps(source: "https://x.example/me.ipa", bundleID: "com.me", originalBundleID: "com.me", own: "com.me"), "iFizBox itself")
+    check(!OriginalIPA.keeps(source: "https://x.example/me.ipa", bundleID: "T.com.me", originalBundleID: "com.me", own: "com.me"), "iFizBox under another ID")
+    check(OriginalIPA.url("../etc", in: dir) == nil && OriginalIPA.url("a/b", in: dir) == nil && OriginalIPA.url("", in: dir) == nil, "no path tricks")
+    check(OriginalIPA.url("com.a", in: dir)?.lastPathComponent == "com.a.ipa", "Caches/<bundle ID>.ipa")
+
+    // kept, taken back only when it matches the record
+    let hashOf = { (u: URL) -> String? in (try? Data(contentsOf: u)).map { IPALibrary.hex(sha256($0)) } }
+    let input = work.appendingPathComponent("kept-in.ipa")
+    try Data("original".utf8).write(to: input)
+    let sha = hashOf(input)!
+    check(OriginalIPA.keep(input, bundleID: "com.a", in: dir), "kept")
+    check(!FileManager.default.fileExists(atPath: input.path), "moved, not copied")
+    let out = work.appendingPathComponent("kept-out.ipa")
+    check(OriginalIPA.take("com.a", sha256: sha.uppercased(), to: out, in: dir, hash: hashOf) == .file(out), "matching: taken")
+    check((try? Data(contentsOf: out)) == Data("original".utf8), "the same bytes")
+    try FileManager.default.removeItem(at: out)
+    check(FileManager.default.fileExists(atPath: OriginalIPA.url("com.a", in: dir)!.path), "the kept one stays after the signer deletes its copy")
+    check(OriginalIPA.take("com.a", sha256: nil, to: out, in: dir, hash: hashOf) == .unknown, "a record from before: no hash to check")
+    check(OriginalIPA.take("com.b", sha256: sha, to: out, in: dir, hash: hashOf) == .missing, "never kept (or purged)")
+    check(OriginalIPA.take("com.a", sha256: String(repeating: "0", count: 64), to: out, in: dir, hash: hashOf) == .mismatch, "another IPA")
+    check(!FileManager.default.fileExists(atPath: OriginalIPA.url("com.a", in: dir)!.path), "a mismatch goes")
+
+    // replaced on upgrade
+    try Data("v1".utf8).write(to: input)
+    OriginalIPA.keep(input, bundleID: "com.a", in: dir)
+    try Data("v2".utf8).write(to: input)
+    OriginalIPA.keep(input, bundleID: "com.a", in: dir)
+    check((try? Data(contentsOf: OriginalIPA.url("com.a", in: dir)!)) == Data("v2".utf8), "the newer one replaces it")
+
+    // removed with the record
+    func rec(_ bid: String, _ sha: String?) -> SignedRecord {
+        SignedRecord(bundleID: bid, originalBundleID: bid, name: bid, version: "1", url: "https://x.example/\(bid).ipa", signed: Date(),
+                     expires: nil, options: .init(name: nil, bundleID: nil, icon: nil, removeExtensions: [], fixArm64e: false), sha256: sha)
+    }
+    let old = [rec("com.a", "aa"), rec("com.b", "bb"), rec("com.c", "cc"), rec("com.d", nil)]
+    let new = [rec("com.b", "b2"), rec("com.c", nil)]
+    check(OriginalIPA.dropped(old: old, new: new) == ["com.a", "com.c"], "forgotten, or now from My IPAs: \(OriginalIPA.dropped(old: old, new: new))")
+    check(OriginalIPA.dropped(old: old, new: old).isEmpty, "nothing changed")
+    // the hash survives the record file
+    let back = SignedRecords.decode(try SignedRecords.encode([rec("com.a", "aa")]))
+    check(back.first?.sha256 == "aa", "sha256 stored")
+    check(SignedRecords.decode(Data(#"[{"bundleID":"x","originalBundleID":"x","name":"x","version":"1","url":"u","signed":"2026-01-01T00:00:00Z","options":{"removeExtensions":[],"fixArm64e":false}}]"#.utf8)).first?.sha256 == nil, "an older record reads with none")
+}
+
 if failures == 0 { print("all passed") } else { print("\(failures) failed"); exit(1) }

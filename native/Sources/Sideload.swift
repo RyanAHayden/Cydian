@@ -268,7 +268,8 @@ enum Sideload {
                 }
                 log("Using the IPA downloaded for the look-first sheet (\(p.url))")
                 guard hashed(p.file) else { return }
-                signAndOpen(p.file, url: p.url, id: id, profile: profile, options: options, servers: servers, emit: emit, log: log, job: job, opened: finish, step: step)
+                signAndOpen(p.file, url: p.url, id: id, profile: profile, options: options, servers: servers, emit: emit, log: log, job: job, opened: finish, step: step,
+                            sha256: ipaSha) // F343
             }
             return
         }
@@ -281,7 +282,8 @@ enum Sideload {
             case .success(let file):
                 log(Sideload.downloaded(file, since: started))
                 guard hashed(file) else { return }
-                signAndOpen(file, url: url.absoluteString, id: id, profile: profile, options: options, servers: servers, emit: emit, log: log, job: job, opened: finish, step: step)
+                signAndOpen(file, url: url.absoluteString, id: id, profile: profile, options: options, servers: servers, emit: emit, log: log, job: job, opened: finish, step: step,
+                            sha256: ipaSha) // F343
             }
         }
         job.onCancel { d.cancel() }
@@ -474,7 +476,7 @@ enum Sideload {
     static func signAndOpen(_ input: URL, url: String, id: SecIdentity, profile: Profile, options: SignOptions, servers: Servers,
                             emit: @escaping (String, Double) -> Void, log: ((String) -> Void)? = nil, job: SignJob? = nil,
                             opened: @escaping (Result<(SignedApp, SignedRecord), Error>) -> Void,
-                            served: ((Bool) -> Void)? = nil, step: ((String, Double) -> Void)? = nil) {
+                            served: ((Bool) -> Void)? = nil, step: ((String, Double) -> Void)? = nil, sha256: String? = nil) {
         let tok = SignBridge.token()
         let output = SignBridge.work.appendingPathComponent("\(tok).ipa")
         defer { try? FileManager.default.removeItem(at: input) }
@@ -510,18 +512,24 @@ enum Sideload {
         let record = SignedRecord(bundleID: app.bundleID, originalBundleID: app.originalBundleID, name: app.name,
                                   version: app.version, url: url, signed: Date(),
                                   expires: profile.signatureExpiry(certificate: identity.certificate), options: options.stored,
-                                  appID: app.appID, signer: app.stamp) // B259
+                                  appID: app.appID, signer: app.stamp, // B259
+                                  sha256: keepOriginal(input, app: app, source: url, sha256: sha256, log: log)) // F343
+        // F343: an install that fails takes back the IPA just kept, unless a record already has that very file
+        let answered = { (r: Result<(SignedApp, SignedRecord), Error>) in
+            if case .failure = r { SignBridge.queue.async { dropOriginal(app.bundleID, sha256: record.sha256) } }
+            opened(r)
+        }
         if servers.local { // "Installing on this iPhone" (phase "here"), not iOS's own install
-            installHere(output, app: app, record: record, emit: emit, log: log, job: job, opened: opened, served: served, step: step)
+            installHere(output, app: app, record: record, emit: emit, log: log, job: job, opened: answered, served: served, step: step)
             return
         }
         emit("installing", 0)
         if let host = servers.host { // B64: this call's own choice, made when it started
             log?("Uploading to \(host)/sign/host (\(app.name) replaces this app, so iOS installs it from the server)")
-            hostAndOpen(output, server: host, app: app, record: record, job: job, log: log, opened: opened, served: served)
+            hostAndOpen(output, server: host, app: app, record: record, job: job, log: log, opened: answered, served: served)
             return
         }
-        serveAndOpen(output, server: servers.manifest, app: app, record: record, log: log, job: job, opened: opened, served: served)
+        serveAndOpen(output, server: servers.manifest, app: app, record: record, log: log, job: job, opened: answered, served: served)
     }
 
     // The "This iPhone" route (Servers.local): `output` (deleted after) goes to installd over LocalDevVPN, AFC upload then
@@ -986,8 +994,8 @@ enum Sideload {
         DispatchQueue.main.async(execute: tick)
     }
 
-    // ---- Re-sign All: each recorded app downloaded again from its URL, signed as before, installed one by one (the
-    // next starts once iOS has fetched the previous IPA, or that link expired).
+    // ---- Re-sign All: each recorded app from the IPA kept at install (F343), else downloaded again from its URL, signed
+    // as before, installed one by one (the next starts once iOS has fetched the previous IPA, or that link expired).
 
     static func resignAll(_ c: Bridge.Call) { resign(c, allowHost: false) { $0 } }
 
@@ -1029,7 +1037,7 @@ enum Sideload {
                     failed.append(["bundleId": r.bundleID, "name": r.name,
                                    "error": (e as? Failed)?.text ?? SignBridge.text(e)])
                 }
-                let signThat = { (file: URL) in
+                let signThat = { (file: URL, sha: String?) in
                     signAndOpen(file, url: r.url, id: id, profile: profile, options: SignOptions(r.options), servers: servers, emit: emit,
                                 log: log, job: job,
                                 opened: { if case .failure(let e) = $0 { SignBridge.queue.async { fail(e) } } },
@@ -1041,12 +1049,12 @@ enum Sideload {
                                         }
                                         next()
                                     }
-                                })
+                                }, sha256: sha) // F343
                 }
                 // F329a: iFizBox signed from its own bundle (your own icon) signs from it again; the bundle keeps the picture
                 if r.url == SelfIPA.url {
                     let out = SignBridge.work.appendingPathComponent("\(SignBridge.token())-self.ipa")
-                    do { try SelfIPA.make(app: Bundle.main.bundleURL, to: out) { job.cancelled }; return signThat(out) } catch {
+                    do { try SelfIPA.make(app: Bundle.main.bundleURL, to: out) { job.cancelled }; return signThat(out, nil) } catch {
                         try? FileManager.default.removeItem(at: out)
                         fail(error); return next()
                     }
@@ -1054,16 +1062,18 @@ enum Sideload {
                 // F77: an app installed from My IPAs signs from the library's file, not a download.
                 if MyIPAs.fileOf(r.url) != nil {
                     do {
-                        if let file = try MyIPAs.copyForResign(r.url) { return signThat(file) }
+                        if let file = try MyIPAs.copyForResign(r.url) { return signThat(file, nil) }
                     } catch { fail(Failed(text: "gone: \(r.name) isn't in My IPAs any more")); return next() }
                 }
                 guard let url = Apt.httpURL(r.url) else { fail(Failed(text: "bad_url: \(r.url)")); return next() }
+                // F343: the IPA kept at install, when it is still there and the one the record was signed from
+                if let file = takeOriginal(r, log: log) { return signThat(file, r.sha256) }
                 log("Downloading \(url.absoluteString)")
                 let started = Date()
                 let d = download(url, http: .fallback, emit: emit) { res in // B104: its http link was let through at install
                     switch res {
                     case .failure(let e): fail(e); next()
-                    case .success(let file): log(Sideload.downloaded(file, since: started)); signThat(file)
+                    case .success(let file): log(Sideload.downloaded(file, since: started)); signThat(file, nil)
                     }
                 }
                 job.onCancel { d.cancel() }
@@ -1077,7 +1087,43 @@ enum Sideload {
     static var recordsURL: URL { SignStore.dir.appendingPathComponent("signed.json") }
     static func records() -> [SignedRecord] { (try? Data(contentsOf: recordsURL)).map(SignedRecords.decode) ?? [] }
     static func saveRecords(_ list: [SignedRecord]) {
+        let before = records()
         try? SignedRecords.encode(list).write(to: recordsURL, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+        for bid in OriginalIPA.dropped(old: before, new: list) { OriginalIPA.remove(bid) } // F343: removed with the record
+    }
+
+    // ---- F343: the IPA each app was signed from, kept for Re-sign (native/sign/OriginalIPA.swift)
+
+    // Once `input` is signed as `app` from `source`: moves it into Caches when that app keeps one. -> the record's
+    // sha256 (`sha256`, or hashed here); nil when nothing is kept (`input` stays for signAndOpen to delete).
+    static func keepOriginal(_ input: URL, app: SignedApp, source: String, sha256: String?, log: ((String) -> Void)?) -> String? {
+        guard OriginalIPA.keeps(source: source, bundleID: app.bundleID, originalBundleID: app.originalBundleID,
+                                own: Bundle.main.bundleIdentifier),
+              let sha = sha256?.lowercased() ?? IPAHash.of(input), OriginalIPA.keep(input, bundleID: app.bundleID) else { return nil }
+        log?("Kept the IPA for Re-sign (Caches/\(app.bundleID).ipa)")
+        return sha
+    }
+
+    // keepOriginal undone for an install that didn't happen: the file goes unless a record of the app has that hash.
+    static func dropOriginal(_ bid: String, sha256: String?) {
+        guard let s = sha256, !records().contains(where: { $0.bundleID == bid && $0.sha256 == s }) else { return }
+        OriginalIPA.remove(bid)
+    }
+
+    // Re-sign's input: a copy of the IPA kept for `r` when it is there and its SHA-256 is the record's; nil: download it.
+    static func takeOriginal(_ r: SignedRecord, log: (String) -> Void) -> URL? {
+        guard OriginalIPA.keeps(source: r.url, bundleID: r.bundleID, originalBundleID: r.originalBundleID,
+                                own: Bundle.main.bundleIdentifier) else { return nil }
+        let to = SignBridge.work.appendingPathComponent("\(SignBridge.token())-kept.ipa")
+        switch OriginalIPA.take(r.bundleID, sha256: r.sha256, to: to, hash: IPAHash.of) {
+        case .file(let u):
+            log("Signing from the IPA kept at install (\(size(u))), no download")
+            return u
+        case .mismatch: log("The kept IPA isn't the one \(r.shownName) was signed from: it goes, and is downloaded again")
+        case .missing: if r.sha256 != nil { log("The kept IPA is gone (iOS clears caches when storage runs low): downloading it again") }
+        case .unknown: break // signed before IPAs were kept
+        }
+        return nil
     }
 
     // B138: the application-identifier the installed app `bid` carries, so an update keeps it (IPASigner): our record of

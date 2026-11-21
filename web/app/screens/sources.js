@@ -164,7 +164,7 @@ setSourceErrorHooks({
     return ok;
   },
   edit: (ctx, s) => manage.addSource(ctx ?? state.ctx, { url: s.uri, dist: s.dist && s.dist !== "./" ? s.dist : null,
-    components: s.components }, { title: "Edit Source", button: "Save" }),
+    components: s.components }, { title: "Edit Source", button: "Save", replaces: s.key }),
   removed(ctx, key) {
     if (state.sources) state.sources = state.sources.filter((s) => s.key !== key);
     state.rows?.retry?.(key); // no stale failure count for a source that is gone...

@@ -37,6 +37,7 @@ function ipaRecord(url, format, parsed, reason = null) {
   const rec = {
     key: altKey(url), kind: "altstore", format, uri: url, name: parsed?.name || null, iconURL: parsed?.iconURL ?? null,
     tintColor: parsed?.tintColor ?? null, count: parsed ? parsed.apps.length : null, updated: Date.now(), error: null,
+    identifier: parsed?.identifier || null, // B273: tells a source added twice under two URLs
   };
   if (reason) rec.unsupported = reason;
   return rec;

@@ -80,7 +80,7 @@ export function withBuiltins(calls, builtins) {
   const mark = (s) => (s && keys().has(s.key) ? { ...s, name: s.name || SELF_NAME, builtin: true } : s);
   return {
     sources: async () => withBuiltinRecords(await calls.sources(), get()),
-    addSource: async (input) => mark(await calls.addSource(input)),
+    addSource: async (input, opts) => mark(await calls.addSource(input, opts)),
     async removeSource(key) {
       if (keys().has(key)) throw new BuiltinError();
       return calls.removeSource(key);

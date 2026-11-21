@@ -124,6 +124,72 @@ export function sourceKey({ uri, dist }) {
   return `deb:${uri}:${dist || "./"}`;
 }
 
+// ---- B273: one source, whatever spelling it was added under ---------------------------------------------------
+//
+//   sourceMatchKey(uri, dist)        -> what two source URLs are compared by, or null for no http(s) URL. Keys
+//                                      (sourceKey, altKey) keep the spelling the source was added under, since stored
+//                                      records and settings are filed by them; this only says when two are one source.
+//   sameSource(a, b)                 -> true when two records ({ uri, dist, identifier }) are one source
+//   findSameSource(list, want, opts) -> the listed record `want` already is, or null; opts.except: a key to skip
+//   duplicateSources(list)           -> keys of the records that repeat another's URL (the ones to merge away)
+//
+// Ignored: http vs https, case and a leading www. in the host, trailing slashes, and GitHub's raw spellings, which
+// all serve one file: github.com/<o>/<r>/raw/<ref>/<path>, raw.githubusercontent.com/<o>/<r>/<ref>/<path>, either
+// with refs/heads/<branch> for <ref> (owner and repo without case, as GitHub reads them). A dist repo's suite counts.
+// An app source's identifier (its JSON's `identifier`) also makes two records one source.
+export function sourceMatchKey(uri, dist) {
+  let u;
+  try { u = new URL(String(uri ?? "").trim()); } catch { return null; }
+  if (!/^https?:$/.test(u.protocol)) return null;
+  let host = u.hostname.toLowerCase().replace(/^www\./, "");
+  let parts = u.pathname.split("/").filter(Boolean);
+  let rest = null;
+  if (host === "github.com" && parts.length > 4 && parts[2] === "raw") rest = parts.slice(3);
+  else if (host === "raw.githubusercontent.com" && parts.length > 3) rest = parts.slice(2);
+  if (rest) {
+    if (rest[0] === "refs" && rest[1] === "heads" && rest.length > 3) rest = rest.slice(2);
+    host = "raw.githubusercontent.com";
+    parts = [parts[0].toLowerCase(), parts[1].toLowerCase(), ...rest];
+  }
+  const port = u.port && !["80", "443"].includes(u.port) ? `:${u.port}` : "";
+  const suite = dist && dist !== "./" && !String(dist).endsWith("/") ? ` ${dist}` : "";
+  return `${host}${port}/${parts.join("/")}${u.search}${suite}`;
+}
+
+const identifierOf = (s) => (typeof s?.identifier === "string" ? s.identifier.trim() : "");
+
+export function sameSource(a, b) {
+  if (!a || !b) return false;
+  const ka = sourceMatchKey(a.uri, a.dist);
+  if (ka && ka === sourceMatchKey(b.uri, b.dist)) return true;
+  const ia = identifierOf(a);
+  return Boolean(ia) && ia === identifierOf(b);
+}
+
+export function findSameSource(list, want, { except = null } = {}) {
+  return (list ?? []).find((s) => s && s.key !== except && sameSource(s, want)) ?? null;
+}
+
+// Which record of a repeated source stays: one that has loaded (read without an error) before one that hasn't, else
+// the first listed. The others' keys are returned; the one kept keeps its own key and settings. Only URL spellings
+// count here, not a shared identifier: this removes records without asking, and a fork of a source often keeps the
+// original's identifier while listing other apps (Add Source and Recommended, which the user sees, do count it).
+export function duplicateSources(list) {
+  const all = (list ?? []).filter((s) => s?.key);
+  const loaded = (s) => s.updated != null && !s.error;
+  const same = (a, b) => { const k = sourceMatchKey(a.uri, a.dist); return Boolean(k) && k === sourceMatchKey(b.uri, b.dist); };
+  const drop = new Set();
+  for (let i = 0; i < all.length; i++) {
+    if (drop.has(all[i].key)) continue;
+    const group = all.filter((s, j) => j >= i && !drop.has(s.key) && s.key !== all[i].key && same(all[i], s));
+    if (!group.length) continue;
+    const members = [all[i], ...group];
+    const keep = members.find(loaded) ?? members[0];
+    for (const s of members) if (s !== keep) drop.add(s.key);
+  }
+  return [...drop];
+}
+
 // Cydia's alert wording (its Localizable.strings INVALID_URL_EX, NOT_REPOSITORY_EX). `kind`: invalid_url, not_repository, verification.
 const ALERTS = {
   invalid_url: ["Invalid URL", "That is not a valid source URL. Please check it and try again."],

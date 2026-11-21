@@ -374,8 +374,10 @@ test("F16a: a GBox source is added and loaded as GBox; an encrypted one is kept 
   now = (await s.sources()).find((x) => x.key === locked.key);
   assert.equal(now.unsupported, null);
   assert.equal(now.count, want.apps.length);
-  // Re-adding it as readable drops the mark entirely.
-  assert.equal("unsupported" in (await s.addSource(enc)), false);
+  // B273: re-adding it saves nothing (Already Added) and hands back the listed record, readable since the refresh.
+  const again = await s.addSource(enc);
+  assert.equal(again.alreadyAdded, true);
+  assert.equal(again.unsupported ?? null, null);
 });
 
 test("F16a: an APT repo found by detection goes to the wrapped calls; dist repos as { uri, dist, components }", async () => {

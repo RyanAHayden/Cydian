@@ -2,8 +2,10 @@
 // page lists sources; a recommended game is a package and belongs on Home's Browse/Featured. This is the
 // one place the list lives: add, drop or reword an entry here and nothing else changes.
 //
-//   source: { kind: "source", url, name, why, jailbreak?, for? }   jailbreak: an APT repo (hidden on Not Jailbroken);
-//                                                                 for: the jailbreaks it suits (F19)
+//   source: { kind: "source", url, name, why, jailbreak?, for?, identifier? }   jailbreak: an APT repo (hidden on Not
+//                                                                 Jailbroken); for: the jailbreaks it suits (F19)
+//   identifier   B273: an AltStore source's own `identifier`, read from its JSON (2026-11-21), so the row shows Added
+//                when the list has that source under another URL; none where the JSON has none (Manic EMU)
 //   tag: "dev" | "modded"   F327: every AltStore source says which More Sources group it goes in: From the Developer
 //                           (the app's own makers, or a team's pick of open-source apps) or Modded Apps (a store app
 //                           with a tweak built in, from that mod's own maintainer). Never a source of cracked or
@@ -26,7 +28,7 @@ import { NAME } from "../brand.js";
 export const CHECKED = "2026-11-18";
 
 export const RECOMMENDED_SOURCES = [
-  { kind: "source", name: "FIZL0", tag: "dev", url: "https://fizl0.github.io/apps/source.json", own: true,
+  { kind: "source", name: "FIZL0", tag: "dev", url: "https://fizl0.github.io/apps/source.json", own: true, identifier: "io.github.fizl0",
     why: `openMX, OpenTennis and Party Board in one source: the games ${NAME}'s default list is built around.` },
   // ---- APT repos: the jailbreak build ----
   { kind: "source", name: "Havoc", url: "https://havoc.app/", jailbreak: true, for: ["dopamine", "palera1n", "nathanlr"],
@@ -40,38 +42,38 @@ export const RECOMMENDED_SOURCES = [
   { kind: "source", name: "Zebra", url: "https://getzbra.com/repo/", jailbreak: true, for: ["dopamine", "palera1n", "nathanlr"],
     why: "Zebra: only the Zebra package manager itself, from its own developers." },
   // ---- AltStore sources: the sideload IPA and the website ----
-  { kind: "source", name: "AltStore", tag: "dev", url: "https://apps.altstore.io/",
+  { kind: "source", name: "AltStore", tag: "dev", url: "https://apps.altstore.io/", identifier: "com.rileytestut.AltStore",
     why: "AltStore: AltStore, the Delta game emulator and the Clip clipboard manager, each with a beta, iOS 16+." },
-  { kind: "source", name: "SideStore", tag: "dev", url: "https://sidestore.io/apps-v2.json/",
+  { kind: "source", name: "SideStore", tag: "dev", url: "https://sidestore.io/apps-v2.json/", identifier: "com.SideStore.SideStore",
     why: "SideStore: the SideStore app, an AltStore that refreshes its apps on the phone without a computer." },
-  { kind: "source", name: "Feather", tag: "dev", url: "https://raw.githubusercontent.com/claration/Feather/refs/heads/main/app-repo.json",
+  { kind: "source", name: "Feather", tag: "dev", url: "https://raw.githubusercontent.com/claration/Feather/refs/heads/main/app-repo.json", identifier: "kh.crysalis.feather-repo",
     why: "Feather: the Feather on-device IPA signer and installer." },
-  { kind: "source", name: "SideStore Team Picks", tag: "dev", url: "https://community-apps.sidestore.io/sidecommunity.json",
+  { kind: "source", name: "SideStore Team Picks", tag: "dev", url: "https://community-apps.sidestore.io/sidecommunity.json", identifier: "com.sidestoreapps.community",
     why: "Over 20 apps SideStore's team picked: RetroArch, PPSSPP, Play!, MAME4iOS, ScummVM, iSH, iTorrent and more." },
-  { kind: "source", name: "StikDebug", tag: "dev", url: "https://stikdebug.xyz/index.json",
+  { kind: "source", name: "StikDebug", tag: "dev", url: "https://stikdebug.xyz/index.json", identifier: "com.stik.stikdebug",
     why: "StikDebug and StikPair: turn on JIT for emulators on the phone, no computer needed." },
-  { kind: "source", name: "LiveContainer", tag: "dev", url: "https://github.com/LiveContainer/LiveContainer/releases/download/1.0/apps.json",
+  { kind: "source", name: "LiveContainer", tag: "dev", url: "https://github.com/LiveContainer/LiveContainer/releases/download/1.0/apps.json", identifier: "com.livecontainer.source",
     why: "LiveContainer: runs other IPAs inside one app, past the free account's three-app limit." },
-  { kind: "source", name: "Provenance", tag: "dev", url: "https://provenance-emu.com/apps.json",
+  { kind: "source", name: "Provenance", tag: "dev", url: "https://provenance-emu.com/apps.json", identifier: "com.provenance-emu.provenance.altstore",
     why: "Provenance and its alpha builds, plus iCube (GameCube and Wii) and iFly (Dreamcast): retro emulators." },
   { kind: "source", name: "Manic EMU", tag: "dev", url: "https://apps.manicemu.site/altstore",
     why: "Manic EMU: an all-in-one emulator, from NES and Game Boy to 3DS, GameCube and Wii, iOS 15+." },
-  { kind: "source", name: "DolphiniOS", tag: "dev", url: "https://altstore.oatmealdome.me/",
+  { kind: "source", name: "DolphiniOS", tag: "dev", url: "https://altstore.oatmealdome.me/", identifier: "me.oatmealdome.altstore",
     why: "DolphiniOS and its public beta: the Dolphin GameCube and Wii emulator for iPhone." },
-  { kind: "source", name: "Flycast", tag: "dev", url: "https://github.com/chachillie/Flycast-iOS/raw/refs/heads/main/flycast-ios.json",
+  { kind: "source", name: "Flycast", tag: "dev", url: "https://github.com/chachillie/Flycast-iOS/raw/refs/heads/main/flycast-ios.json", identifier: "com.chachirie.source",
     why: "Flycast: the Sega Dreamcast, Naomi and Atomiswave emulator." },
-  { kind: "source", name: "UTM", tag: "dev", url: "https://alt.getutm.app",
+  { kind: "source", name: "UTM", tag: "dev", url: "https://alt.getutm.app", identifier: "com.utmapp.repos.UTM",
     why: "UTM and UTM SE: virtual machines on the iPhone, for Windows, Linux and classic Mac OS." },
-  { kind: "source", name: "Amethyst", tag: "dev", url: "https://alt.crystall1ne.dev",
+  { kind: "source", name: "Amethyst", tag: "dev", url: "https://alt.crystall1ne.dev", identifier: "dev.crystall1ne.alt",
     why: "Angel Aura Amethyst and PojavLauncher: launchers that run Minecraft: Java Edition." },
   // Asked for by the user (2026-11-18): tweaked-app sources, each from the app's own maintainer or its README.
-  { kind: "source", name: "YouMod", tag: "modded", url: "https://raw.githubusercontent.com/MountainofPenguin/Altstore-Repository/main/apps.json",
+  { kind: "source", name: "YouMod", tag: "modded", url: "https://raw.githubusercontent.com/MountainofPenguin/Altstore-Repository/main/apps.json", identifier: "com.MountainofPenguin.org",
     why: "YouMod: YouTube with ad blocking, background play, Return YouTube Dislike and YTUHD built in." },
-  { kind: "source", name: "Unbound", tag: "modded", url: "https://repo.unbound.rip/app-repo.json",
+  { kind: "source", name: "Unbound", tag: "modded", url: "https://repo.unbound.rip/app-repo.json", identifier: "app.unbound.ios.repo",
     why: "Unbound: a Discord client mod with plugins and themes, plus its TestFlight builds." },
-  { kind: "source", name: "RyukGram", tag: "modded", url: "https://source.ryuksign.com/",
+  { kind: "source", name: "RyukGram", tag: "modded", url: "https://source.ryuksign.com/", identifier: "com.ryuksign.source",
     why: "RyukGram: Instagram with downloads, a built-in gallery and privacy options, with no-plugin builds too." },
-  { kind: "source", name: "PokeMMO", tag: "dev", url: "https://pokemmo.com/altstore",
+  { kind: "source", name: "PokeMMO", tag: "dev", url: "https://pokemmo.com/altstore", identifier: "eu.pokemmo.altstore",
     why: "PokeMMO: a free-to-play online multiplayer monster-catching RPG." },
 ];
 

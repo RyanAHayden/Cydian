@@ -109,10 +109,12 @@ export function normalizeAltUrl(input) {
 // Worth trying as AltStore before APT: a .json file, or a sideloader link.
 export const looksLikeAltUrl = (input) => /^(altstore|sidestore|feather):\/\//i.test(str(input)) || /\.json([?#]|$)/i.test(str(input));
 
-// The record the source list keeps: { key, kind: "altstore", uri, name, iconURL, tintColor, count, updated, error }.
+// The record the source list keeps: { key, kind: "altstore", uri, name, iconURL, tintColor, count, updated, error,
+// identifier }. B273: `identifier` (the JSON's own, null when it has none) tells a source added twice under two URLs.
 export function altRecord(url, parsed) {
   return { key: altKey(url), kind: "altstore", uri: url, name: parsed.name || null, iconURL: parsed.iconURL,
-    tintColor: parsed.tintColor, count: parsed.apps.length, updated: Date.now(), error: null };
+    tintColor: parsed.tintColor, count: parsed.apps.length, updated: Date.now(), error: null,
+    identifier: parsed.identifier || null };
 }
 
 // F16a: an IPA source's JSON (text or parsed) by its record's `format` (none: AltStore, the records from before
@@ -287,18 +289,54 @@ export function withAltSources(calls, backend, opts = {}) {
     const arch = value(opts.arch);
     return { ...(arch ? { arch } : {}), ...(opts.count ? { count: opts.count } : {}), dists };
   }
+  // B273: a source saved twice under two spellings (core/sources.js duplicateSources) is merged as the list is read:
+  // the one kept stays, the others are removed (each tried once a session, so a removal that fails isn't retried on
+  // every read; it is left out of the list all the same).
+  const merged = new Set();
+  async function mergeDuplicates(list) {
+    const { duplicateSources } = await import("./sources.js");
+    const drop = new Set(duplicateSources(list));
+    if (!drop.size) return list;
+    for (const key of drop) {
+      if (merged.has(key)) continue;
+      merged.add(key);
+      try {
+        if (isAltKey(key)) await (await store()).remove(key);
+        else await calls.removeSource(key);
+      } catch { /* left out of the list below anyway */ }
+    }
+    return list.filter((s) => !drop.has(s?.key));
+  }
+  async function listAll() {
+    const [apt, alt] = await Promise.all([aptList(), store().then((db) => db.list()).catch(() => [])]);
+    return mergeDuplicates([...apt, ...alt]);
+  }
+  // B273: Add Source on a source the list has under any spelling (or, once read, the same app source identifier)
+  // saves nothing and hands back the listed record marked `alreadyAdded` (screens say Already Added). opts.replaces:
+  // the key an Edit Source is replacing, which doesn't count.
+  const already = (rec) => (rec ? { ...rec, alreadyAdded: true } : null);
+  async function listedAs(want, opts) {
+    const { findSameSource } = await import("./sources.js");
+    return already(findSameSource(await listAll(), want, { except: opts?.replaces ?? null }));
+  }
   return {
     async sources() {
-      const [apt, alt] = await Promise.all([aptList(), store().then((db) => db.list()).catch(() => [])]);
-      return sort([...apt, ...alt]);
+      return sort(await listAll());
     },
-    async addSource(input) {
+    async addSource(input, opts = {}) {
       if (input && typeof input === "object") {
         if (!aptOk()) throw jailbreakSourceError(); // a dist repo ({ uri, dist, components }) is always APT
-        return calls.addSource(input);
+        return (await listedAs(input, opts)) ?? calls.addSource(input);
       }
+      const typed = normalizeAltUrl(input);
+      const before = typed ? await listedAs({ uri: typed }, opts) : null;
+      if (before) return before;
       const { detectSource } = await import("./sources/add.js");
       const found = await detectSource(backend, input, await detectOpts());
+      for (const read of [found.source, found.app]) {
+        const after = read ? await listedAs(read, opts) : null;
+        if (after) return after;
+      }
       if (found.kind === "github") return addGithub(found);
       if (found.kind === "ipa") return saveAlt(found.source);
       if (!aptOk()) throw jailbreakSourceError();

@@ -346,8 +346,12 @@ export async function addSource(ctx, prefill = null, edit = null) {
   let error = null;
   let saved = null;
   try {
-    saved = await addSecure(input, { backend: getBackend(), showHUD: ctx.showHUD });
+    saved = await addSecure(input, { backend: getBackend(), showHUD: ctx.showHUD, replaces: edit?.replaces ?? null });
     if (!saved) return null; // F220: Cancel
+    if (saved.alreadyAdded) { // B273: in the list already, under this or another spelling: nothing saved
+      await showAlert(alreadyAddedAlert(saved));
+      return null;
+    }
     if (unknown.trust) markTrusted(saved.uri ? saved : input);
   } catch (e) {
     error = e;
@@ -362,6 +366,13 @@ export async function addSource(ctx, prefill = null, edit = null) {
   return saved;
 }
 
+// B273: Add Source on a source the list has already (any spelling of its URL, or the same app source identifier).
+export const alreadyAddedAlert = (source) => ({
+  title: "Already Added",
+  message: `${displayName(source)} is in your sources already.`,
+  buttons: ["OK"],
+});
+
 // F220: Zebra's warning for an http: source, the iOS 6 way. Cancel is the safe choice, so it gets the darker
 // "Button (Cancel)" look and Escape.
 export const INSECURE_ALERT = {
@@ -374,18 +385,19 @@ export const INSECURE_ALERT = {
 // F220: adds `input` under the Verifying URL HUD. An http:// one is tried over https:// first: if that answers, the
 // https source is added and nothing is said; otherwise INSECURE_ALERT asks before the http one is added. Resolves
 // to the saved record, or null on Cancel; throws the backend's error (SourceError) when the add fails.
-export async function addSecure(input, { backend, showHUD = () => () => {}, alert = showAlert } = {}) {
+export async function addSecure(input, { backend, showHUD = () => () => {}, alert = showAlert, replaces = null } = {}) {
+  const opts = replaces ? [{ replaces }] : []; // B273: Edit Source's old key doesn't count as Already Added
   const https = httpsInput(input);
   if (https) {
     const hide = showHUD("Verifying URL");
     let saved = null, ok = false;
-    try { saved = await backend.addSource(https); ok = true; } catch { /* no https twin: ask */ } finally { hide(); }
+    try { saved = await backend.addSource(https, ...opts); ok = true; } catch { /* no https twin: ask */ } finally { hide(); }
     if (ok) return saved ?? { input: https };
     if ((await alert(INSECURE_ALERT)).index !== 1) return null;
   }
   const hide = showHUD("Verifying URL");
   try {
-    return (await backend.addSource(input)) ?? { input };
+    return (await backend.addSource(input, ...opts)) ?? { input };
   } finally {
     hide();
   }

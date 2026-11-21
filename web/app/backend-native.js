@@ -260,7 +260,7 @@ export function createNativeBackend({ native = globalThis.ifizboxNative, sourceO
   const sources = withAltSources(aptCalls, backend, opts);
   if (cf) {
     const add = sources.addSource;
-    sources.addSource = async (input) => { await cf.ready(); return add(input); };
+    sources.addSource = async (input, opts) => { await cf.ready(); return add(input, opts); };
   }
   // F182: user reviews on the app's server (core/reviews.js), straight from the web view (CORS), as Account does.
   backend.reviews = reviewsApi({ base: reviewsBase("app") });

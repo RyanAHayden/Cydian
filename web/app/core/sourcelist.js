@@ -12,7 +12,7 @@
 // A dist repo (`deb uri 1800 main`) gets `{ uri, dist, components }` as its input (F48): addSource checks its
 // Release under dists/<dist>/ (core/sources.js verifyDistSource). "unsupported" is left for an entry with no input.
 import { parseListFile, parseDeb822File } from "./aptsources.js";
-import { normalizeSourceUrl, sourceKey, sourceIcons, sourceSubtitle } from "./sources.js";
+import { normalizeSourceUrl, sourceKey, sourceIcons, sourceSubtitle, findSameSource } from "./sources.js";
 import { sourceWarning } from "./warnings.js";
 import { description, matchesArch, compareVersions } from "./apt.js";
 import { sectionName, isVisible, compareNames } from "./catalog.js";
@@ -152,13 +152,15 @@ export function entryKeys(e) {
 
 // Which entries the list already has. A source in the list under an AltStore key also matches a trailing-slash
 // twin, since a pasted list may carry either.
+// B273: and any other spelling of its URL (core/sources.js sameSource: http/https, GitHub's raw forms).
 export function reviewImport(entries, sources) {
   const have = new Set((sources ?? []).map((s) => s.key));
   const slashless = (k) => k.replace(/\/$/, "");
   const haveLoose = new Set([...have].map(slashless));
   return (entries ?? []).map((e) => {
     const keys = entryKeys(e);
-    const listed = keys.some((k) => have.has(k) || haveLoose.has(slashless(k)));
+    const listed = keys.some((k) => have.has(k) || haveLoose.has(slashless(k)))
+      || Boolean(findSameSource(sources, { uri: e.uri, dist: e.kind === "apt" ? e.dist : null }));
     const status = listed ? "listed" : e.input ? "new" : "unsupported";
     // F19: a new source on the Source Warning list (core/warnings.js) carries the entry, so Import leaves it unticked.
     const warning = status === "new" ? sourceWarning(e.uri) : null;
@@ -228,20 +230,25 @@ export function recommendedSeed(rec) {
 // What Add Source gets: an APT URL, or an AltStore link so it isn't tried as an APT repo first.
 export const recommendedInput = (rec) => (rec.jailbreak ? rec.url : altLink(normalizeAltUrl(rec.url)));
 
-// The listed source an entry already is, or null (a trailing-slash twin counts, as in reviewImport).
-export function listedSource(rec, sources) {
+// The listed source an entry already is, or null (a trailing-slash twin counts, as in reviewImport). B273: so does any
+// other spelling of its URL, and a listed app source with the entry's identifier (recommended.js `identifier`, or
+// `preview`'s, what a fetch read from the URL).
+export function listedSource(rec, sources, preview = null) {
   const seed = recommendedSeed(rec);
   const entry = rec.jailbreak ? parseImport(rec.url).entries[0] : null;
   const keys = entry ? entryKeys(entry) : [seed.key];
   const slashless = (k) => String(k).replace(/\/$/, "");
   const want = new Set(keys.map(slashless));
-  return (sources ?? []).find((s) => want.has(slashless(s.key))) ?? null;
+  const exact = (sources ?? []).find((s) => want.has(slashless(s.key)));
+  if (exact) return exact;
+  const identifier = rec.jailbreak ? null : rec.identifier || preview?.identifier || null;
+  return findSameSource(sources, { uri: seed.uri, dist: seed.dist ?? null, identifier });
 }
 
 export function recommendedRows(recs, sources, { jailbroken = true, previews = new Map() } = {}) {
   return (recs ?? []).filter((r) => jailbroken || !r.jailbreak).map((rec) => {
     const seed = recommendedSeed(rec);
-    const listed = listedSource(rec, sources);
+    const listed = listedSource(rec, sources, previews.get(seed.key));
     const record = listed ? { ...seed, ...listed } : { ...seed, ...(previews.get(seed.key) ?? {}) };
     return {
       rec, key: record.key, record, label: rec.name, subtitle: sourceSubtitle(record), icons: sourceIcons(record),

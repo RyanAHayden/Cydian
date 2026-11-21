@@ -194,6 +194,7 @@ enum Keychain {
     static func get(_ key: String, prompt: String) throws -> String? {
         var q = query(key)
         q[kSecReturnData as String] = true
+        q[kSecReturnAttributes as String] = true
         q[kSecMatchLimit as String] = kSecMatchLimitOne
         let ctx = LAContext()
         ctx.localizedReason = prompt
@@ -202,8 +203,11 @@ enum Keychain {
         let st = SecItemCopyMatching(q as CFDictionary, &out)
         switch st {
         case errSecSuccess:
-            guard let d = out as? Data else { return nil }
-            return String(decoding: d, as: UTF8.self)
+            guard let item = out as? [String: Any], let d = item[kSecValueData as String] as? Data else { return nil }
+            let value = String(decoding: d, as: UTF8.self)
+            // OwnKeychain: one written before into a group other apps share moves to ours, now that it's been read
+            if let g = OwnKeychain.group, item[kSecAttrAccessGroup as String] as? String != g { try? set(key, value) }
+            return value
         case errSecItemNotFound: return nil
         case errSecUserCanceled, errSecAuthFailed: throw BridgeError("keychain", "cancelled: the passcode or Face ID check didn't pass")
         default: throw BridgeError("keychain", "the Keychain refused (\(st))")
@@ -212,7 +216,7 @@ enum Keychain {
 
     static func set(_ key: String, _ value: String) throws {
         try remove(key)
-        var add = query(key)
+        var add = OwnKeychain.scoped(query(key))
         add[kSecValueData as String] = Data(value.utf8)
         // Behind the passcode / Face ID when the phone has a passcode. Without one, .userPresence items can't be
         // added at all: keep it to this device, unlocked only, so buying still works.

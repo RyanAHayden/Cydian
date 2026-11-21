@@ -49,7 +49,7 @@ enum AccountKey {
 
     static func set(_ key: String) throws {
         try remove()
-        var add = query
+        var add = OwnKeychain.scoped(query)
         add[kSecValueData as String] = Data(key.utf8)
         add[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
         let st = SecItemAdd(add as CFDictionary, nil)
@@ -100,7 +100,7 @@ enum ReviewToken {
     static func set(_ token: String) throws {
         let st0 = SecItemDelete(query as CFDictionary)
         guard st0 == errSecSuccess || st0 == errSecItemNotFound else { throw BridgeError("keychain", "the Keychain refused (\(st0))") }
-        var add = query
+        var add = OwnKeychain.scoped(query)
         add[kSecValueData as String] = Data(token.utf8)
         add[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
         let st = SecItemAdd(add as CFDictionary, nil)

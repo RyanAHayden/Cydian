@@ -336,6 +336,29 @@ class Plists(unittest.TestCase):
         with open(os.path.join(HERE, "Info.plist"), "rb") as f:
             self.assertIn("Face ID", plistlib.load(f)["NSFaceIDUsageDescription"])
 
+    def test_own_keychain_group(self):
+        """B233: every secret iFizBox adds to the Keychain goes in its own group (OwnKeychain.scoped), and the stores
+        read without a prompt are moved there at launch (OwnKeychain.moveAll)."""
+        src = os.path.join(HERE, "Sources")
+        for name in ("SignStore.swift", "ASC.swift", "Account.swift", "Paid.swift", "SignBridge.swift"):
+            with open(os.path.join(src, name)) as f:
+                text = f.read()
+            adds = re.findall(r"SecItemAdd\(([^\n]*)", text)
+            self.assertTrue(adds, name)
+            for a in adds:
+                self.assertTrue(a.startswith("add as") or a.startswith("OwnKeychain.scoped("), f"{name}: SecItemAdd({a}")
+            for m in re.finditer(r"var add = (.*)\n", text):
+                self.assertTrue(m.group(1).startswith("OwnKeychain.scoped("), f"{name}: var add = {m.group(1)}")
+            for m in re.finditer(r"let add = (.*)\n", text):
+                self.assertTrue(m.group(1).startswith("OwnKeychain.scoped("), f"{name}: let add = {m.group(1)}")
+        with open(os.path.join(src, "OwnKeychain.swift")) as f:
+            own = f.read()
+        body = own[own.index("static func moveAll()"):own.index("static func entitlement(")]
+        for q in ("SignStore.p12Query", "SignStore.identityQueries()", "ASC.query", "AccountKey.query", "ReviewToken.query"):
+            self.assertIn(q, body)
+        with open(os.path.join(src, "SignBridge.swift")) as f:
+            self.assertIn("OwnKeychain.moveAll()", f.read())
+
     def test_daemon_entitlements(self):
         with open(os.path.join(HERE, "daemon/entitlements.plist"), "rb") as f:
             e = plistlib.load(f)

@@ -1199,3 +1199,7 @@ html[data-theme="dark"] .dep-piracy .dep-review-title { color: var(--dk-bad); }
 .cell-inner.has-change .cell-detail { margin-right: 10px; }
 .cy-change { flex: none; }
 .cy-desc-full .cy-desc-text { max-height: none; -webkit-line-clamp: unset; display: block; }
+.cy-head .cy-app-icon { width: 64px; height: 64px; border-radius: 12px; flex: none; }
+.cy-notes .cell-label { white-space: pre-wrap; font-weight: normal; font-size: 15px; }
+.cy-notes .cell-inner { padding-top: 10px; padding-bottom: 10px; height: auto; }
+.cy-notes .cell-label { overflow: visible; text-overflow: clip; line-height: 1.25; }

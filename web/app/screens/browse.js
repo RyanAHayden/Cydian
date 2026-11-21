@@ -37,7 +37,7 @@ import { renderAltSource, renderApp, installRows, appBundleId, formatDate, osRan
 import { linksGroup, previewSlot } from "./altstore.js";
 import { jailbreakModify } from "./altstore.js"; // B69
 import { descriptionGroup } from "./description.js";
-import { packageLinks, packageGithub, aptShots, sileoShots, sileoRatings, sileoWhatsNew } from "../core/previews.js";
+import { packageLinks, packageGithub, aptShots, sileoShots, sileoRatings, sileoWhatsNew, altShots, appGithub, appLinks } from "../core/previews.js";
 import { storeHeader, headerLine, storeTabs, tileRow, worksOnTile, sizeTile, sectionTile, ratingTile, whatsNewGroup } from "./storepage.js";
 import { reviewsTab } from "./reviews.js";
 import { reviewsApi, reviewsBase, mergeReviews } from "../core/reviews.js";
@@ -83,7 +83,7 @@ import { appQueue } from "../app-queue.js"; // F213: the sideload build's rows q
 import { APP_MODE_LABEL } from "../core/appqueue.js";
 import { rowAppJob, queueOriginalCheck } from "./altstore.js";
 import { queueApp } from "./queue.js";
-import { worksInGroup, addToApp, addableTweakRows, checkTweakRows } from "./tweaks.js"; // F302
+import { worksInGroup, addToApp, addableTweakRows, checkTweakRows, addTweaksGroup } from "./tweaks.js"; // F302
 import { installWhichVersion, INSTALL_WHICH_TITLE } from "./altstore.js"; // F346: a hold on Install
 import { loadRowsIndex } from "./tweaks.js"; // F344
 
@@ -1310,7 +1310,7 @@ async function renderDetails(body, route, key, id, ctx) {
   } catch (e) { body.replaceChildren(note(e.message)); return; }
   if (!pkg) { body.replaceChildren(grouped([{ rows: [{ label: "Package not found" }], footer: id }])); return; }
   const st = pkg.stanza;
-  if (st.kind === "ipa" && st.ipa) return renderPackage(body, route, key, id, ctx);
+  if (st.kind === "ipa" && st.ipa) return renderAppDetails(body, route, key, id, pkg, sources);
   const source = sources.find((s) => s.key === pkg.key);
   const sourceName = source ? displayName(source) : "";
   const name = st.name || st.package;
@@ -1416,11 +1416,114 @@ async function renderDetails(body, route, key, id, ctx) {
   rememberPackage(body, route, { id, key, pkg, source, history, payBox });
 }
 
+// Concept v3: an AltStore app's Details, the same Cydia layout as a package's: header, Developer, Add Tweaks (Lite),
+// screenshots, the dashed description, More Information (the whole text, What's New, Permissions), Version with
+// CHANGE and Version History, Information with icons and Reviews, Links, Wish List.
+async function renderAppDetails(body, route, key, id, pkg, sources) {
+  const st = pkg.stanza;
+  const app = st.ipa;
+  const v = app.versions[0] ?? {};
+  const source = sources.find((s) => s.key === pkg.key);
+  names.set(id, app.name);
+  const head = el("div", "cy-head");
+  const icon = el("span", "pkg-icon large alt-app-icon cy-app-icon");
+  icon.append(el("span", "pkg-letter", app.name.charAt(0).toUpperCase()));
+  if (app.iconURL) { const im = el("img"); im.alt = ""; im.onload = () => im.classList.add("loaded"); im.onerror = () => im.remove(); im.src = mediaUrl(app.iconURL) || app.iconURL; icon.append(im); }
+  const words = el("div", "cy-head-text");
+  words.append(el("div", "cy-name", app.name), el("div", "cy-version", `${v.version ?? ""}${v.buildVersion ? ` (${v.buildVersion})` : ""}`));
+  head.append(icon, words);
+  const size = formatSize(v.size);
+  if (size) head.append(el("div", "cy-size", size));
+  const nodes = [head];
+
+  const top = [];
+  if (app.developerName) top.push({ label: "Developer", detail: app.developerName, icon: rowIcon("pkgAuthor") });
+  if (top.length) nodes.push(grouped([{ rows: top }]));
+  if (detectMode() === "sideload" && app.bundleIdentifier) {
+    const tw = addTweaksGroup({ bundleId: app.bundleIdentifier, name: app.name }).el;
+    const c = tw.querySelector?.(".cell-inner");
+    if (c) { const i = el("span", "cell-icon row-icon"); const im = el("img"); im.alt = ""; im.src = rowIcon("pkgTweaks").src; im.onload = () => im.classList.add("loaded"); i.append(im); c.prepend(i); }
+    nodes.push(tw);
+  }
+  const shots = altShots(app);
+  if (shots.length) nodes.push(previewSlot(`app:${pkg.key}:${pkg.row?.id ?? app.bundleIdentifier}`, { shots, gh: appGithub(app) }));
+
+  const text = app.localizedDescription || "";
+  if (text) {
+    const box = el("div", "group cy-desc-group");
+    const d = el("div", "cy-desc");
+    d.append(el("div", "cy-desc-text", text));
+    box.append(d);
+    nodes.push(box);
+  }
+  const perm = app.permissions ?? { privacy: [], entitlements: [] };
+  const nPerm = perm.privacy.length + perm.entitlements.length;
+  if (text.split("\n").length > 6 || text.length > 260 || v.localizedDescription || nPerm) {
+    nodes.push(grouped([{ rows: [{ label: "More Information", icon: rowIcon("pkgMore"), href: deeper(route, token("info", id)) }] }]));
+  }
+
+  const vg = grouped([{ header: "Version", rows: [
+    { label: "Version", detail: v.version ?? "", icon: rowIcon("pkgVersion"), cls: "cy-version-row" },
+    { label: "Version History", detail: app.versions.length === 1 ? "1 version" : `${app.versions.length} versions`, icon: rowIcon("pkgHistory"), href: deeper(route, `versions:${pkg.row.id}`) },
+  ], footer: v.date ? `Updated ${formatDate(v.date)}` : null }]);
+  const vcell = vg.querySelector(".cy-version-row .cell-inner");
+  if (vcell) {
+    loadStyle("myipas.css");
+    const b = el("button", "price-btn cy-change", "CHANGE");
+    b.type = "button";
+    b.addEventListener("click", () => installVersionHold(route).catch(() => {}));
+    vcell.append(b);
+    vcell.classList.add("has-change");
+  }
+  nodes.push(vg);
+
+  const fit = compat(st, currentDevice());
+  const info = [
+    { label: "Source", detail: source ? displayName(source) : "Unknown", icon: rowIcon("sources"), href: format({ tab: "sources", path: [pkg.key] }) },
+    { label: "Category", detail: pkg.row.section || "App", icon: rowIcon("pkgSection") },
+    { label: "Works On", detail: osRange(v) || fit.range || "Any iOS", icon: rowIcon("worksOnMyPhone") },
+    ...(size ? [{ label: "Size", detail: size, icon: rowIcon("pkgSize") }] : []),
+    { label: "Bundle ID", detail: app.bundleIdentifier, icon: rowIcon("pkgVersion"), cls: "store-info-long" },
+    { label: "Reviews", detail: "No Ratings", icon: rowIcon("pkgReviews"), href: deeper(route, token("reviews", appBundleId(app, pkg.row?.id))) },
+  ];
+  nodes.push(grouped([{ header: "Information", rows: info }]));
+  const links = appLinks(app);
+  if (links.length) nodes.push(grouped([{ header: "Links", rows: links.map((l) => ({ label: l.label, icon: rowIcon("pkgLink"), href: l.url })) }]));
+  const wish = grouped([{ rows: [{ label: wishLabel(wishlist().has(id)), icon: rowIcon("pkgWish"), onClick: () => {
+    wishlist().set(id, !wishlist().has(id));
+    wish.querySelector?.(".cell-label")?.replaceChildren(wishLabel(wishlist().has(id)));
+  } }] }]);
+  nodes.push(wish);
+  nodes.push(grouped([{ footer: `${app.bundleIdentifier}\n· ${source ? displayName(source) : ""}` }]));
+  body.replaceChildren(...nodes);
+  rememberPackage(body, route, { id, key, pkg, source, history: await catalog.history(id, key).catch(() => null) });
+}
+
+// Concept v3: an app's More Information: the whole description, What's New, and Permissions.
+function appInfoNodes(app) {
+  const v = app.versions[0] ?? {};
+  const out = [];
+  if (app.localizedDescription) {
+    const box = el("div", "group cy-desc-group");
+    const d = el("div", "cy-desc cy-desc-full");
+    d.append(el("div", "cy-desc-text", app.localizedDescription));
+    box.append(d);
+    out.push(box);
+  }
+  if (v.localizedDescription) out.push(grouped([{ header: `What's New in ${v.version}`, rows: [{ label: v.localizedDescription, cls: "cy-notes" }] }]));
+  const perm = app.permissions ?? { privacy: [], entitlements: [] };
+  const rows = [...perm.privacy.map((p) => ({ label: p.name, subtitle: p.description || null })),
+    ...perm.entitlements.map((e) => ({ label: e.name, subtitle: e.description || null }))];
+  if (rows.length) out.push(grouped([{ header: "Permissions", rows, footer: "What this app asks for, as its source lists it." }]));
+  return out;
+}
+
 // Concept v2: More Information: the whole description, or the depiction (Sileo drawn natively, else the HTML one).
 async function renderInfo(body, route, key, id) {
   const pkg = await catalog.package(id, key).catch(() => null);
   if (!pkg) { body.replaceChildren(note("Package not found")); return; }
   const st = pkg.stanza;
+  if (st.kind === "ipa" && st.ipa) { body.replaceChildren(...appInfoNodes(st.ipa)); return; }
   const desc = description(st);
   const text = desc.long || desc.short || "";
   const sources = await getBackend().sources().catch(() => []);

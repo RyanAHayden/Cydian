@@ -128,7 +128,7 @@ export const ROW_ICONS = {
   otherLinks: [C.purple, "link"], lockHome: [C.dark, "lock"], websiteApps: [C.blue, "apps"],
   pkgSettings: [C.dark, "gear"], pkgAuthor: [C.dark, "envelope"], pkgMore: [C.purple, "laptop"],
   pkgVersion: [C.grey, "badge"], pkgFiles: [C.orange, "folder"], pkgHistory: [C.indigo, "clock"],
-  pkgSection: [C.brown, "apps"], pkgBlock: [C.red, "minusCircle"], pkgSize: [C.teal, "download"], pkgDepends: [C.purple, "link"], pkgReviews: [C.gold, "star"],
+  pkgSection: [C.brown, "apps"], pkgBlock: [C.red, "minusCircle"], pkgTweaks: [C.green, "bolt"], pkgWish: [C.pink, "plus"], pkgSize: [C.teal, "download"], pkgDepends: [C.purple, "link"], pkgReviews: [C.gold, "star"],
   pkgLink: [C.blue, "globe"],
   help: [C.blue, "question"], server: [C.teal, "globe"], checkServer: [C.green, "pulse"], runYourOwn: [C.orange, "cloud"],
   shareCert: [C.green, "personPlus"], // Share Your Certificate (SideDrop)

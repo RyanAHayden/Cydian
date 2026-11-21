@@ -156,3 +156,21 @@ deleted from the app's container. Screenshots: `ref/15/screens/b246-*.png` (main
   version; Browse does return `Path`, and each install got a new bundle folder (runs 6-7), which is what the rule
   relies on.
 - **LocalDevVPN route**: not installed on the 15 Pro; only the Tailscale route was run.
+
+## Spec review (fresh subagent, diff + brief only) and what changed after it
+
+- Fixed: `cannotTell` (this version listed, nothing to tell it from the earlier copy) counted as installed on the first
+  poll; now only once it has held for 30 s (`HereRecheck.settle`), or at the deadline.
+- Fixed: the version match took CFBundleVersion or CFBundleShortVersionString, so an old build number equal to the
+  new short version read as installed; now it uses the same order as the signer (short version, else build number).
+- Fixed: the 180 s asking window restarted on every reconnect; now one deadline per install (`HereRun.askUntil`).
+- Fixed: a drop with no version to compare left the install to throw at once; such an install now fails as before
+  instead of pretending to ask (installHere always passes both).
+- Reverted (not asked): sending the install again when iOS still lists the earlier copy at the deadline; it now fails
+  saying iOS may still be installing it. The speed figures on the progress page: back to "Copied N MB to iOS"; the
+  speeds stay in the log. The README's example numbers are now the measured ones.
+- Answered: "no run left the app during the install": in runs 6 and 7 iOS Settings was in front from before installd
+  started ("the app went to the background" at 23:41:50, installd from 23:41:53), so the app was in the background
+  for the whole install and the drop. The background slowdown's cause on the user's phone stays open (R53).
+- Phone runs above used the build before these review fixes; the fixes are covered by the Linux tests and
+  `native/build.sh`, not re-run on the 15 Pro (each after-install drop run takes ~4 minutes of the phone).

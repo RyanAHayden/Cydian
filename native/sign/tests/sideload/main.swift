@@ -410,7 +410,12 @@ test("This iPhone: a dropped connection is not a failed install (B246)") {
     let new = HereRecheck.AppState(path: "/private/var/containers/Bundle/Application/B/X.app", version: "384", shortVersion: "384.0")
     check(HereRecheck.verdict(version: "384.0", before: .absent, now: nil) == .notYet, "not listed: not yet")
     check(HereRecheck.verdict(version: "384.0", before: .absent, now: new) == .installed, "new app listed with its version: installed")
-    check(HereRecheck.verdict(version: "384", before: .absent, now: new) == .installed, "CFBundleVersion matches too")
+    check(HereRecheck.verdict(version: "384", before: .absent, now: new) == .notYet, "the build number isn't the version")
+    var noShort = new; noShort.shortVersion = nil
+    check(HereRecheck.verdict(version: "384", before: .absent, now: noShort) == .installed, "no short version: CFBundleVersion is the version")
+    // the old copy's build number equal to the new short version must not read as the update
+    let oldBuild = HereRecheck.AppState(path: old.path, version: "384.0", shortVersion: "383.0")
+    check(HereRecheck.verdict(version: "384.0", before: .present(oldBuild), now: oldBuild) == .notYet, "an old build number never matches the new version")
     check(HereRecheck.verdict(version: "384.0", before: .present(old), now: old) == .notYet, "still the old version: not yet")
     check(HereRecheck.verdict(version: "384.0", before: .present(old), now: new) == .installed, "an update listed: installed")
     var same = old; same.path = old.path

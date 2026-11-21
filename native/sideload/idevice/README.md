@@ -45,12 +45,14 @@ that fails while it is connecting again counts as one of the tries:
 - **During the copy**: it carries on from the end of iOS's file in `PublicStaging` (a whole 1 MB chunk back).
 - **After the install was sent**: installd goes on without us, so it asks installation_proxy (Browse by bundle ID:
   versions and `Path`) for up to 3 minutes and reports installed when iOS lists the new copy: a new app, a new
-  version, or the same version in a new bundle folder. Still the earlier copy at the end: it sends the install once
-  more if the IPA is still staged, else fails.
+  version, or the same version in a new bundle folder. The same version with nothing to tell it from the earlier
+  copy counts once it has held for 30 s. Still the earlier copy at the end (one 3-minute deadline per install, however
+  often it connects again): it fails and says iOS may still be installing it.
 
 Only installd's own error codes fail an install. A wait that ran far past its 0.5 s tick means iOS suspended the
-app; the step's time limit then starts again. The copy's speed in front and in the background goes to the log and
-the progress page ("Copied 383.7 MB to iOS in 61 s (9.8 MB/s in front, 0.6 MB/s in the background)").
+app; the step's time limit then starts again. The copy's speed in front and in the background goes to the log
+(`AFC: copied 351.5 MB in 20.1 s: 18.2 MB/s in front, 17.3 MB/s in the background`, measured on an iPhone 15 Pro
+over Tailscale).
 
 ## Building
 

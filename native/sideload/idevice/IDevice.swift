@@ -467,7 +467,7 @@ enum IDevice {
         var speed = HereRecheck.CopySpeed()
         var copyStart: Date?
         var installSent = false // installation_proxy got the install
-        var installResent = false
+        var askUntil: Date?     // after a drop, how long to keep asking iOS for the app (one deadline per install)
         init(ipa: URL, size: Int, remote: String, bundleID: String?, version: String?) {
             self.ipa = ipa; self.size = size; self.remote = remote; self.bundleID = bundleID; self.version = version
         }
@@ -936,13 +936,8 @@ enum IDevice {
                 progress(.install(1))
                 return
             }
-            // iOS still lists what it had: send the install again once, if the IPA is still staged
-            guard !run.installResent, staged(run.remote, session: s, watch: w) else {
-                removeStaged(run.remote, session: s, watch: w)
-                throw Failure(code: "install_failed", text: "lost the connection to iOS while it was installing, and iOS doesn't list \(run.bundleID ?? "the app") \(run.version ?? "") after \(Int(HereRecheck.askFor)) s")
-            }
-            run.installResent = true
-            note("iOS doesn't list the new copy: asking it to install the copied IPA again")
+            removeStaged(run.remote, session: s, watch: w)
+            throw Failure(code: "install_failed", text: "lost the connection to iOS while it was installing, and iOS doesn't list \(run.bundleID ?? "the app") \(run.version ?? "") after \(Int(HereRecheck.askFor)) s. It may still be installing it: look on the Home Screen")
         }
         w.begin("iOS installing the app (installd)", Limit.install)
         note("iOS is installing it")
@@ -961,7 +956,7 @@ enum IDevice {
         let err = installation_proxy_install_with_callback(ip, run.remote, nil, cb, box.toOpaque())
         do {
             try check(err, "install_failed")
-        } catch let f as Failure where f.dropped && run.bundleID != nil {
+        } catch let f as Failure where f.dropped && run.bundleID != nil && run.version != nil {
             throw f // install() connects again and asks iOS; the staged IPA stays for a second try
         } catch {
             removeStaged(run.remote, session: s, watch: w)
@@ -980,22 +975,27 @@ enum IDevice {
             throw Failure(code: "install_failed", text: "lost the connection to iOS while it was installing, and can't ask it for the app")
         }
         note("Asking iOS whether it installed \(bid) \(version)")
-        let until = Date().addingTimeInterval(HereRecheck.askFor)
+        // one deadline for the whole install, however many times it connects again
+        if run.askUntil == nil { run.askUntil = Date().addingTimeInterval(HereRecheck.askFor) }
+        let until = run.askUntil!
         var said = ""
+        var unsureSince: Date?
         while true {
             let now = try appState(ip, bid, watch: w)
             let v = HereRecheck.verdict(version: version, before: run.before ?? .unknown, now: now)
             ilog("iOS lists \(bid): \(now.map(describe) ?? "nothing") -> \(v)")
+            if v != .cannotTell { unsureSince = nil }
             switch v {
             case .installed:
                 note("iOS lists \(bid) \(version): installed")
                 return true
-            case .cannotTell:
+            case .cannotTell where Date().timeIntervalSince(unsureSince ?? Date()) >= HereRecheck.settle:
                 note("iOS lists \(bid) \(version); nothing tells it from the copy that was there, so it counts as installed")
                 return true
-            case .notYet, .sameAsBefore:
-                if Date() >= until { return false }
-                let line = v == .notYet ? "not yet" : "still the earlier copy"
+            case .cannotTell, .notYet, .sameAsBefore:
+                if v == .cannotTell, unsureSince == nil { unsureSince = Date() }
+                if Date() >= until { return v == .cannotTell }
+                let line = v == .notYet ? "not yet" : v == .sameAsBefore ? "still the earlier copy" : "this version, nothing to tell it from the earlier copy"
                 if line != said { said = line; note("iOS doesn't list the new copy yet (\(line)); asking again") }
                 w.begin("waiting for iOS to list \(bid) \(version)", HereRecheck.askEvery + Limit.service)
                 Thread.sleep(forTimeInterval: HereRecheck.askEvery)
@@ -1043,17 +1043,6 @@ enum IDevice {
         "\(s.shortVersion ?? "?") (\(s.version ?? "?")) in \(s.path.map { (($0 as NSString).deletingLastPathComponent as NSString).lastPathComponent } ?? "?")"
     }
 
-    /// Whether the IPA is still in PublicStaging (installd may have taken it).
-    private static func staged(_ remote: String, session s: Session, watch w: Watch) -> Bool {
-        guard let afc = try? s.afc() else { return false }
-        defer { afc_client_free(afc) }
-        w.begin("looking for the staged IPA", Limit.afcStep)
-        var info = AfcFileInfo()
-        guard afc_get_file_info(afc, remote, &info).map({ idevice_error_free($0) }) == nil else { return false }
-        defer { afc_file_info_free(&info) }
-        return info.size > 0
-    }
-
     private static func removeStaged(_ remote: String, session s: Session, watch w: Watch) {
         guard let afc = try? s.afc() else { return }
         w.begin("removing the staged IPA", Limit.afcStep)
@@ -1066,7 +1055,7 @@ enum IDevice {
 
     /// Copies the IPA to PublicStaging. B246: after a drop it carries on from the end of iOS's file (a whole chunk
     /// back, HereRecheck.resumeAt) instead of starting over, and the speed in front and in the background goes to the
-    /// log and the page, for telling a slow copy in the background from a slow route.
+    /// log, for telling a slow copy in the background from a slow route.
     private static func upload(_ run: HereRun, session s: Session, watch w: Watch,
                                note: (String) -> Void, progress: (Step) -> Void) throws {
         let total = run.size, remote = run.remote
@@ -1129,6 +1118,6 @@ enum IDevice {
         try check(afc_file_close(file), "upload_failed")
         let secs = Date().timeIntervalSince(run.copyStart ?? t0)
         ilog("AFC: copied \(mb(sent)) in \(String(format: "%.1f", secs)) s: \(run.speed.summary)")
-        note("Copied \(mb(sent)) to iOS in \(Int(secs.rounded())) s (\(run.speed.summary))")
+        note("Copied \(mb(sent)) to iOS")
     }
 }

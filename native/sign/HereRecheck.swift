@@ -15,6 +15,9 @@ enum HereRecheck {
     /// How long to keep asking iOS for the app after a drop, and how often.
     static let askFor: TimeInterval = 180
     static let askEvery: TimeInterval = 3
+    /// `cannotTell` (this version listed, nothing to tell it from the earlier copy) counts as installed only once it
+    /// has held this long: installd replacing the copy changes the folder or version well within it.
+    static let settle: TimeInterval = 30
 
     /// idevice error codes for a connection that went away, not an answer from iOS: Socket (1, UnexpectedEof, reset,
     /// refused), SessionInactive (17), NoEstablishedConnection (19), CdTunnel (101), RemotePairing (103),
@@ -41,7 +44,9 @@ enum HereRecheck {
         var version: String?       // CFBundleVersion
         var shortVersion: String?  // CFBundleShortVersionString
 
-        func has(_ v: String) -> Bool { version == v || shortVersion == v }
+        /// The signed app's version is its CFBundleShortVersionString, else its CFBundleVersion: the same order here,
+        /// so an old build number never reads as the new version.
+        func has(_ v: String) -> Bool { (shortVersion ?? version) == v }
     }
 
     /// What iOS listed before the install started.
@@ -75,7 +80,7 @@ enum HereRecheck {
         return chunk > 0 ? have / chunk * chunk : have
     }
 
-    /// "Copied 383.7 MB in 61 s: 9.8 MB/s in front, 0.6 MB/s in the background", for the log and the page.
+    /// "18.2 MB/s in front, 17.3 MB/s in the background", for the log.
     struct CopySpeed {
         private(set) var frontBytes = 0, backBytes = 0
         private(set) var frontSecs: TimeInterval = 0, backSecs: TimeInterval = 0

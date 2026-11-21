@@ -29,6 +29,15 @@
   where a signed record with no stamp counts as older): on the website nothing tells a signed install from a Mark as
   Installed, so listing them would ask to re-sign apps the website never signed.
 
+## Spec review fixes
+
+- `siteSignerNow` no longer caches a failed dylib fetch (it would have hidden older group fix stamps for the session).
+- `recordInstall` with no note keeps the stored record's signature when the version is the same (account sync, a
+  repeat mark): otherwise those writes dropped the app out of Needs Re-sign.
+- A record dated before the note (account sync passes the record's old date) doesn't take the note.
+- First run of the full suite failed `module-graph.test.js` (startup closure 120 > 117, core/tweaks.js at startup via
+  groupfix.js): `siteSignerNow` now imports groupfix.js and websign.js dynamically.
+
 ## Not verified
 
 - A real website install in Safari on a phone (record gets `expires`/`signer`, Installed pill, Changes row): no

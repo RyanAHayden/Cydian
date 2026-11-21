@@ -114,7 +114,9 @@ export function appRecord(app, now = Date.now()) {
 }
 
 export async function recordInstall(store, app, now = Date.now()) {
-  const sig = takeSiteSignature(app?.id, now); // F342: the website's sign of this app, just before
+  // F342: the website's sign of this app, just before; else the same version written again (account sync, a repeat
+  // mark) keeps the signature its record had
+  const sig = takeSiteSignature(app?.id, now) ?? (await keptSignature(store, app));
   const rec = appRecord(sig ? { ...app, ...sig } : app, now);
   await store.put(rec);
   for (const f of appListeners) f();
@@ -154,11 +156,21 @@ export function noteSiteSignature(ids, sig, now = Date.now()) {
 
 export function takeSiteSignature(id, now = Date.now()) {
   const note = id ? siteSignatures.get(text(id)) : null;
-  if (!note) return null;
+  if (!note || now < note.at) return null; // a record dated before the sign (account sync's) leaves it for the install
   for (const [k, n] of siteSignatures) if (n === note) siteSignatures.delete(k);
   if (now - note.at > SITE_SIGNATURE_WAIT) return null;
   const { at, ...sig } = note; // eslint-disable-line no-unused-vars
   return sig;
+}
+
+// The signature of the stored record for `app`'s id when it is the same version and `app` brings none; else null.
+async function keptSignature(store, app) {
+  const id = text(app?.id);
+  if (!id || Object.keys(signatureOf(app)).length || typeof store?.all !== "function") return null;
+  let had = null;
+  try { had = (await store.all()).find((r) => r?.id === id) ?? null; } catch { return null; }
+  const sig = had && text(had.version) === text(app.version) ? signatureOf(had) : {};
+  return Object.keys(sig).length ? sig : null;
 }
 
 export function siteSignedApps(records, current = null) {
@@ -182,6 +194,7 @@ export function siteSignerNow({ fetcher = globalThis.fetch } = {}) {
       const r = await fetcher(new URL(`../${GROUPFIX.file}`, import.meta.url));
       if (r.ok) hash = await groupFixHash(new Uint8Array(await r.arrayBuffer()));
     } catch { /* no dylib: the version alone decides */ }
+    if (!hash) signerNow = null; // asked again next time, not kept for the session
     return webSignerStamp(hash);
   })();
   return signerNow;

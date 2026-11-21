@@ -78,8 +78,14 @@ test("recordInstall takes the website's note for that app once, within the wait"
   assert.equal(rec.expires, "2026-12-01T00:00:00.000Z");
   assert.deepEqual(rec.signer, { version: 1, groupFix: null });
   assert.equal(takeSiteSignature("com.you.orig", 2000), null, "used once, under every ID");
-  const mark = await recordInstall(store, { id: "com.x.orig", name: "X", version: "1" }, 3000);
-  assert.equal("expires" in mark, false, "a later Mark as Installed knows no signature");
+  const again = await recordInstall(store, { id: "com.x.orig", name: "X", version: "1" }, 3000);
+  assert.equal(again.expires, rec.expires, "the same version written again (account sync) keeps it");
+  const mark = await recordInstall(store, { id: "com.x.orig", name: "X", version: "2" }, 4000);
+  assert.equal("expires" in mark, false, "another version marked as installed knows no signature");
+  noteSiteSignature("synced", { expires: "2026-12-01T00:00:00Z" }, 5000);
+  const synced = await recordInstall(store, { id: "synced", version: "1" }, 10);
+  assert.equal("expires" in synced, false, "a record dated before the sign doesn't take it");
+  assert.equal((await recordInstall(store, { id: "synced", version: "1" }, 6000)).expires, "2026-12-01T00:00:00.000Z");
   noteSiteSignature("late", { expires: "2026-12-01T00:00:00Z" }, 0);
   assert.equal(takeSiteSignature("late", SITE_SIGNATURE_WAIT + 1), null, "too old");
   noteSiteSignature("none", { expires: null }, 0);

@@ -112,6 +112,12 @@
 .value-slot { display: inline-grid; align-items: center; justify-items: end; }
 .cell-label.value-slot, .cell-subtitle.value-slot { display: grid; justify-items: start; }
 .value-slot > * { grid-area: 1 / 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; transition: opacity .2s ease; }
+/* B277: a value wider than its slot ends in an ellipsis instead of losing its first letters (end-aligned, it ran out
+   of the cell's left edge: "his iPhone · Not Paired"), and a row's value takes the room its label leaves rather
+   than half the row: the label stays whole. */
+.value-slot > * { max-width: 100%; }
+.install-main .cell-inner:has(> .cell-detail.value-slot) > .cell-text { flex: 1 0 auto; }
+.install-main .cell-detail.value-slot { flex: 0 1 auto; max-width: none; min-width: 0; }
 @media (prefers-reduced-motion: reduce) { .value-slot > * { transition: none; } }
 /* The status cell: a 29pt tile (green check, red !, grey while checking), the state in bold and two lines under it,
    always two lines tall so a longer or shorter answer never moves the rows below. */

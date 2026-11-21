@@ -688,7 +688,7 @@ export function setupGroups(state, st, p, { openVPN = () => {}, retry = () => {}
     const waitFor = vpn === "localdevvpn" ? VPN : vpn === "tailscale" && st?.tailscale?.signedIn && !busy ? "Tailscale" : null;
     return [intro, ...connectGroups(vpn, st, { openVPN, choose, signIn, openTailscale, install, installTailscale, busy }), ...(waitFor ? [{ spinner: vpnWaitText(waitFor) }] : [])];
   }
-  const conn = { rows: [{ label: VPN, detail: "On" }] };
+  const conn = { rows: [{ label: st ? verifyVPN(st) : VPN, detail: "On" }] }; // B277: the VPN that's on (Tailscale's too)
   const line = failed && !p ? `Pairing stopped.` : p ? pairFooter(p) : "Starting…";
   // B133: while idevice.pair runs, the code's place spins until the code comes, and the step line spins with it
   // (waiting for the iPhone to connect, pairing) unless a try failed (then it waits on a tap on the iPhone).

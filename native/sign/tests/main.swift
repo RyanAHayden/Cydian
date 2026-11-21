@@ -693,6 +693,38 @@ test("F243: My IPAs' Sign follows Keep Bundle IDs") {
     try lib.delete(a)
 }
 
+// B229: the IPA queue signs a My IPAs file into a copy of its own (SignAhead.swift); keepSigned makes it the file's
+// signed copy when it was signed the way a sign here would, so the row reads Signed after that install.
+test("B229: My IPAs keeps the queue's signed copy") {
+    let lib = IPALibrary(root: work.appendingPathComponent("lib229/Documents"), store: work.appendingPathComponent("lib229/Store"))
+    let a = try lib.add(fixtures.appendingPathComponent("rich.ipa"), name: "Rich.ipa", move: false)
+    let cert = identity.certificate
+    let profile = try Profile(try fixture("profile.mobileprovision"))
+    let out = work.appendingPathComponent("b229-ahead.ipa")
+    let signer = IPASigner(profile: profile, identity: identity)
+    signer.options = lib.options(a, keep: nil)
+    let app = try signer.sign(lib.root.appendingPathComponent(a), to: out)
+    var other = SignOptions()
+    other.name = "Elsewhere"
+    check(try !lib.keepSigned(a, from: out, app: app, options: other, certificate: cert, signed: Date(), expires: nil),
+          "other options: not kept")
+    check(lib.signed(a, certificate: cert) == nil, "still not signed")
+    check(try lib.keepSigned(a, from: out, app: app, options: signer.options, certificate: cert, signed: Date(), expires: nil),
+          "its own options: kept")
+    check(FileManager.default.fileExists(atPath: out.path), "the queue's copy stays where it is")
+    let s = lib.signed(a, certificate: cert)
+    check(s?.bundleID == app.bundleID, "signed as \(s?.bundleID ?? "nil")")
+    check(lib.json(a, certificate: cert)["signed"] is [String: Any], "json: signed")
+    check(try entries(lib.signedURL(a)) == entries(out), "the same IPA")
+    check(lib.signed(a, certificate: cert, keep: false) == nil, "Keep Bundle IDs off: that copy doesn't count")
+    check(try !lib.keepSigned(a, from: out, app: app, options: signer.options, certificate: cert, signed: Date(), expires: nil, keep: false),
+          "signed with the setting on, kept with it off: not kept")
+    try FileManager.default.removeItem(at: out)
+    try lib.delete(a)
+    lib.sweep()
+    check(((try? FileManager.default.contentsOfDirectory(atPath: lib.store.path)) ?? ["x"]).isEmpty, "nothing left behind")
+}
+
 // F236: this iPhone in the profile (DeviceCheck.swift; core/signing.js deviceCheck is the same check).
 test("device check") {
     func prof(_ extra: String) -> Data {

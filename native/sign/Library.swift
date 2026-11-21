@@ -219,6 +219,29 @@ struct IPALibrary {
         return s
     }
 
+    // B229: an IPA the IPA queue signed from this file (SignAhead's signing.prepare {library}) kept as its signed copy,
+    // so a row installed that way reads Signed and Install doesn't sign it again. Only a copy signed with the options a
+    // sign here would use (options(_:keep:)) is kept; the rest are left alone. `from` is copied, not moved (the queue
+    // still serves it). -> whether it was kept.
+    @discardableResult
+    func keepSigned(_ file: String, from: URL, app: SignedApp, options: SignOptions, certificate: Data, signed: Date,
+                    expires: Date?, keep: Bool? = nil) throws -> Bool {
+        let u = try url(file)
+        guard options.stored == self.options(file, keep: keep).stored else { return false }
+        let (size, modified) = stat(u)
+        let tmp = store.appendingPathComponent(".\(UUID().uuidString).keep")
+        defer { try? FileManager.default.removeItem(at: tmp) }
+        try FileManager.default.createDirectory(at: store, withIntermediateDirectories: true)
+        try FileManager.default.copyItem(at: from, to: tmp)
+        let s = Signed(sourceSize: size, sourceModified: modified, certificate: IPALibrary.hex(sha1(certificate)),
+                       options: options.stored, bundleID: app.bundleID, originalBundleID: app.originalBundleID, name: app.name,
+                       version: app.version, removed: app.removed, fixedArm64e: app.fixedArm64e, signed: signed, expires: expires)
+        dropSigned(file)
+        try FileManager.default.moveItem(at: tmp, to: signedURL(file))
+        try IPALibrary.encoder.encode(s).write(to: side(file, ".signed.json"), options: .atomic)
+        return true
+    }
+
     // ---- adding and deleting
 
     // Puts `from` into the library as (a free version of) `name`; moved when `move`, else copied. Answers the name.

@@ -90,6 +90,7 @@ enum SignAhead {
                             throw error
                         }
                         let (app, record, output) = try sign(file, url: source, id: id, profile: profile, options: options, emit: emit, log: log, job: job)
+                        keepInLibrary(c, output: output, app: app, record: record, options: options, id: id, log: log) // B229
                         let tok = SignBridge.token()
                         kept[tok] = Kept(output: output, app: app, record: record)
                         SignBridge.queue.asyncAfter(deadline: .now() + life) { forget(tok) }
@@ -124,6 +125,19 @@ enum SignAhead {
             }
             job.onCancel { d.cancel() }
         }
+    }
+
+    // B229: a My IPAs file signed for the queue ({library}) keeps that signed copy in My IPAs too, as library.sign
+    // would (IPALibrary.keepSigned: only when it was signed with the IPA's own Sign Options), so its row reads Signed.
+    private static func keepInLibrary(_ c: Bridge.Call, output: URL, app: SignedApp, record: SignedRecord, options: SignOptions,
+                                      id: SecIdentity, log: (String) -> Void) {
+        guard let f = c.params["library"] as? String, !f.isEmpty, let cert = try? KeychainIdentity(id).certificate else { return }
+        do {
+            if try MyIPAs.library.keepSigned(f, from: output, app: app, options: options, certificate: cert, signed: record.signed,
+                                             expires: record.expires, keep: MyIPAs.keep(c)) {
+                log("Kept the signed copy in My IPAs")
+            }
+        } catch { log("Couldn't keep the signed copy in My IPAs: \(error.localizedDescription)") }
     }
 
     // signAndOpen's first half (Sideload.swift): the same checks, logs and signer. `input` is deleted after.

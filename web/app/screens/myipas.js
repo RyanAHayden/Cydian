@@ -198,9 +198,24 @@ async function refreshInstalled(list, seq) {
   if (!same) redraw();
 }
 
+// B229: back in front (iOS's install prompt, another app): the library again too, since a row's install through the
+// IPA queue keeps its signed copy there (SignAhead.swift), then which IPAs iOS has; redrawn only when it changed.
+async function recheck() {
+  const seq = view.seq;
+  let r = null;
+  try { r = await entries(); } catch { /* the list as it is */ }
+  if (seq !== view.seq || !view.body?.isConnected) return;
+  if (Array.isArray(r?.ipas) && JSON.stringify(r.ipas) !== JSON.stringify(lib.list)) { remember(r.ipas); draw(r.ipas); }
+  refreshInstalled(lib.list, seq);
+}
+
 // F224: { bundleId: true } for the IPAs whose app is on the phone. The apps (both builds): the shell's apps.isInstalled
 // (every build, F219); an id it can't answer, and the website, go by Installed's records (recordInstall, F30).
-export async function installedOf(list, { mode = listMode(), native = globalThis.ifizboxNative, records = async () => (await apps()).all() } = {}) {
+// B229: in the sideload app such an id also counts when the shell's own record of signing it says so
+// (signing.installed: kept from when iOS was handed the IPA): on iOS 27 apps.isInstalled can't tell (null for every
+// app), and a row's install through the IPA queue writes Installed's record only once iOS confirms, which it never does.
+export async function installedOf(list, { mode = listMode(), native = globalThis.ifizboxNative, records = async () => (await apps()).all(),
+  signed = async () => (await native.call("signing.installed", {}))?.apps ?? [] } = {}) {
   const ids = [...new Set((list ?? []).filter((e) => e && !e.error).map(installedIdOf).filter(Boolean))];
   const out = {};
   if (!ids.length) return out;
@@ -209,10 +224,15 @@ export async function installedOf(list, { mode = listMode(), native = globalThis
     try { answer = (await native.call("apps.isInstalled", { bundleIds: ids }))?.installed ?? {}; } catch { answer = {}; }
   }
   let recorded = null;
+  let shell = null;
   for (const id of ids) {
     if (typeof answer[id] === "boolean") { if (answer[id]) out[id] = true; continue; }
     recorded ??= new Set(((await Promise.resolve().then(records).catch(() => [])) ?? []).map((r) => r?.id));
-    if (recorded.has(id)) out[id] = true;
+    if (recorded.has(id)) { out[id] = true; continue; }
+    if (mode !== "sideload" || typeof native?.call !== "function") continue;
+    // by the installed ID or the IPA's own (an old-way copy, Keep Bundle IDs off, is installed under the profile's)
+    shell ??= new Set(((await Promise.resolve().then(signed).catch(() => [])) ?? []).flatMap((r) => [r?.bundleId, r?.originalBundleId]));
+    if (shell.has(id)) out[id] = true;
   }
   return out;
 }
@@ -568,7 +588,7 @@ function syncToolbar() {
 if (typeof window !== "undefined") {
   window.addEventListener("hashchange", () => { if (lib.state.editing && !listShown()) setManaging(false); });
   // Back from iOS's install prompt or another app: which IPAs are installed may have changed.
-  document.addEventListener?.("visibilitychange", () => { if (document.visibilityState === "visible" && listShown()) refreshInstalled(lib.list, view.seq); });
+  document.addEventListener?.("visibilitychange", () => { if (document.visibilityState === "visible" && listShown()) recheck(); });
   // A tap anywhere but a green INSTALL puts it back to SIGN (as the App Store's confirm button).
   document.addEventListener?.("pointerdown", (e) => {
     if (!lib.price.armed || e.target?.closest?.(".price-btn")) return;

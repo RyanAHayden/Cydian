@@ -26,6 +26,19 @@ iOS 6 is unchanged (test "F332: iOS 6's tiles are as they were"; `ios6-settings.
   `shots/beside-kit.png`: the kit's Settings rows and tab bar beside ours.
 - `tools/check.sh` via `run done`.
 
+## Spec review, fixed
+
+- Chosen Search and Installed tabs were thicker outlines, not filled: now a filled lens and a filled arrow.
+- The filled Changes tab used an SVG `<mask>` inside the CSS mask image (unchecked in WebKit): now an even-odd path.
+  The test fails if a chosen glyph's root is `fill='none'` or uses `<mask>`.
+- iOS 6's purple and indigo both became #5856d6: purple is now #c86edf, and the test checks the 13 colours map
+  one-to-one.
+- The Linux guide tile kept iOS 6's filled penguin: redrawn in lines. Its first colour, #1c1c1e, vanished on OLED
+  Black's #1c1c1e table (seen in `oled-computer.png`'s first shot); now #48484a.
+- Shots of every chosen tab: `shots/tabs-chosen.png` (from `steps-tabs.json`), and `white/oled-computer.png`.
+- Not changed: the outline tab glyphs are F201's (drawn after this kit already), moved into the map as they were.
+  The kit has no Home screen, so Home's shots stand alone (Home's own tiles: F339).
+
 ## Found, filed
 
 - F339: Home's own tiles (home.css `.glyph-*`: Browse, Install, GitHub, Discord, …) still draw iOS 6 glyphs and
@@ -37,7 +50,5 @@ iOS 6 is unchanged (test "F332: iOS 6's tiles are as they were"; `ios6-settings.
 
 ## Not verified
 
-- On a phone: no iOS 7-era build on a device in this run. The filled Changes tab uses an SVG `<mask>` inside a
-  CSS mask image; Chromium draws it, WebKit on iOS 15 not checked.
-- The chosen Sources / Changes / Installed / Search tab filled: only the Home tab is chosen in the shots (no tab tap
-  step); the shapes are checked by the test text, not by eye.
+- On a phone: no iOS 7-era build on a device in this run; every shot is headless Chromium, not WebKit.
+- The Settings tab's filled glyph: the web tab bar in the shots has no Settings tab, so it was not seen.

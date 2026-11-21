@@ -139,7 +139,10 @@ test("F332: iOS 7 redraws every row tile: kit corners (6.5pt), iOS 7 colours, th
   const { ICON_SETS } = await import("./rowicons.js");
   const s7 = ICON_SETS.ios7;
   const palette = new Set(["#8e8e93", "#007aff", "#34aadc", "#4cd964", "#ff3b30", "#ff9500", "#5856d6", "#4a4a4f",
-    "#5ac8fa", "#ffcc00", "#a2845e", "#ff2d55"]);
+    "#5ac8fa", "#ffcc00", "#a2845e", "#ff2d55", "#c86edf"]);
+  const { TO_C7 } = await import("./rowicons.js");
+  assert.equal(Object.keys(TO_C7).length, 13, "iOS 6's 13 tile colours, each its own hex");
+  assert.equal(new Set(Object.values(TO_C7)).size, 13, "and each its own iOS 7 colour");
   assert.deepEqual(Object.keys(s7.rows), Object.keys(ROW_ICONS), "every row has its iOS 7 tile");
   assert.deepEqual(Object.keys(s7.glyphs).sort(), Object.keys(GLYPHS).sort(), "every glyph redrawn");
   for (const [name, [colour, glyph]] of Object.entries(s7.rows)) {
@@ -168,7 +171,7 @@ test("F332: iOS 7's Copying Files and Why tiles are its own, flat", async () => 
   for (const id of GUIDE_TILE_NAMES) {
     const svg = guideSvg(id, "ios7");
     assert.match(svg, new RegExp(`<rect width='58' height='58' fill='${ICON_SETS.ios7.guides[id][1]}'/>`), id);
-    if (id !== "linux") assert.notEqual(svg, guideSvg(id, "ios6"), id);
+    assert.notEqual(svg, guideSvg(id, "ios6"), id);
   }
   const why = homeTileCss("why", "ios7");
   assert.match(why, /^background-color: #ff9500; .*linear-gradient\(#ff9500, #ff9500\);$/, "flat: one colour");
@@ -183,6 +186,11 @@ test("F332: ios7.css carries iOS 7's tab glyphs, outline and (chosen) filled, fr
     assert.deepEqual(Object.keys(ICON_SETS.ios7[kind]), Object.keys(ICON_SETS.ios6.tabs), kind);
   }
   for (const svg of Object.values(ICON_SETS.ios7.tabs)) assert.match(svg, /fill='none'/, "outline");
+  // filled: the root paints black (no fill='none' on it), and nothing leans on an SVG <mask>
+  for (const [tab, svg] of Object.entries(ICON_SETS.ios7.tabsSelected)) {
+    assert.doesNotMatch(svg.match(/^<svg[^>]*>/)[0], /fill='none'/, `${tab}: filled`);
+    assert.doesNotMatch(svg, /<mask/, tab);
+  }
   assert.doesNotMatch(css, /:not\(\.active\) \{ --glyph/, "one glyph rule per tab and state");
   assert.throws(() => tabGlyphTokens("ios6", "tabsSelected"), "iOS 6 draws no separate chosen glyph");
 });

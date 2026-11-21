@@ -179,10 +179,11 @@ const TAB_GLYPHS = {
 // Our own drawings, never Apple's glyphs. Row names, glyph names and tab names are iOS 6's; only the art changes.
 const C7 = {
   grey: "#8e8e93", blue: "#007aff", sky: "#34aadc", green: "#4cd964", red: "#ff3b30", orange: "#ff9500",
-  purple: "#5856d6", indigo: "#5856d6", dark: "#4a4a4f", teal: "#5ac8fa", gold: "#ffcc00", brown: "#a2845e",
+  purple: "#c86edf", indigo: "#5856d6", dark: "#4a4a4f", teal: "#5ac8fa", gold: "#ffcc00", brown: "#a2845e",
   pink: "#ff2d55",
 };
-const TO_C7 = Object.fromEntries(Object.keys(C).map((k) => [C[k], C7[k]]));
+// Keyed by iOS 6's hex, which is unique per name (rowicons.test.js), so no two iOS 6 colours collide here.
+export const TO_C7 = Object.fromEntries(Object.keys(C).map((k) => [C[k], C7[k]]));
 // Every row keeps its glyph and takes the iOS 7 colour of its iOS 6 colour.
 const ROW_ICONS_7 = Object.fromEntries(Object.entries(ROW_ICONS).map(([name, [colour, glyph]]) => [name, [TO_C7[colour], glyph]]));
 
@@ -253,7 +254,7 @@ const GLYPHS_7 = {
   plus: [ln("M12 4.5v15M4.5 12h15", 2)],
 };
 
-// Copying Files' tiles in iOS 7's colours, the glyphs drawn as 2.6-unit lines (the penguin stays a filled shape).
+// Copying Files' tiles in iOS 7's colours, the glyphs drawn as 2.6-unit lines.
 const G7 = "<g fill='none' stroke='#fff' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'>";
 const GUIDE_TILES_7 = {
   files: ["#5ac8fa", "#007aff", `${G7}<path d='M12 18h12l4 4h18v22H12z'/><path d='M12 26h34'/></g>`],
@@ -262,7 +263,7 @@ const GUIDE_TILES_7 = {
   pairdrop: ["#b9b8f0", "#5856d6", `${G7}<rect x='10' y='15' width='14' height='28' rx='3'/><rect x='34' y='15' width='14' height='28' rx='3'/><path d='M27 29h4'/></g><circle cx='17' cy='38' r='1.6'/><circle cx='41' cy='38' r='1.6'/>`],
   mac: ["#e5e5ea", "#8e8e93", `${G7}<rect x='9' y='12' width='40' height='27' rx='3'/><path d='M24 39l-2 7h14l-2-7M18 46.5h22'/></g>`],
   windows: ["#5ac8fa", "#007aff", `${G7}<rect x='9' y='13' width='40' height='32' rx='3'/><path d='M9 20h40M29 24v17M13 32.5h32'/></g>`],
-  linux: ["#636366", "#1c1c1e", GUIDE_TILES.linux[2]],
+  linux: ["#8e8e93", "#48484a", `${G7}<ellipse cx='29' cy='35' rx='12' ry='13.5'/><circle cx='29' cy='19' r='8'/><path d='M17 48h9M32 48h9'/></g><circle cx='26' cy='18' r='1.5'/><circle cx='32' cy='18' r='1.5'/><path d='M26 22h6l-3 3z'/>`],
   filza: ["#ffe066", "#ff9500", `${G7}<path d='M11 16h12l4 4h20v24H11z'/><path d='M23 26v12'/><path d='M23 30h4M23 34h4'/></g>`],
 };
 
@@ -284,14 +285,15 @@ const TAB_GLYPHS_7 = {
   settings: `${T7} fill='none' stroke='#000'><circle cx='14' cy='14' r='4.2' stroke-width='1.6'/><circle cx='14' cy='14' r='9' stroke-width='1.6'/><circle cx='14' cy='14' r='11.3' stroke-width='2.6' stroke-dasharray='3.6 5.27'/></svg>`,
 };
 // Filled: the outline's shapes painted solid; lines inside a solid shape (the clock's hands, the gear's hole) cut
-// out with an even-odd path or the SVG's own mask, since the tab paints only where the glyph is opaque.
+// out with an even-odd path (no SVG <mask>: WebKit's support for one inside a CSS mask image is unchecked), since
+// the tab paints only where the glyph is opaque.
 const TAB_GLYPHS_SELECTED_7 = {
   home: `${T7} stroke='#000' stroke-width='1.6' stroke-linejoin='round'><path d='M3.5 13.5 14 4l10.5 9.5z'/><path d='M6.5 11v14h5.5v-7h4v7h5.5V11z'/></svg>`,
   sources: `${T7} stroke='#000' stroke-width='1.6'><rect x='3.8' y='3.8' width='20.4' height='4.9' rx='1.6'/><rect x='3.8' y='11.55' width='20.4' height='4.9' rx='1.6'/><rect x='3.8' y='19.3' width='20.4' height='4.9' rx='1.6'/></svg>`,
-  changes: `${T7}><mask id='h'><rect width='28' height='28' fill='#fff'/><path d='M14 7.5V14l4.6 3.3' fill='none' stroke='#000' stroke-width='1.8'/></mask><circle cx='14' cy='14' r='12' mask='url(#h)'/></svg>`,
-  installed: `${T7} stroke='#000' stroke-linejoin='round'><path d='M14 2.5v13M9 10.5l5 5 5-5' fill='none' stroke-width='2.4'/><path d='M2.8 17.8h5.4l2 3h7.6l2-3h5.4v7.4H2.8z' stroke-width='1.6'/></svg>`,
-  search: `${T7} fill='none' stroke='#000'><circle cx='11.5' cy='11.5' r='8' stroke-width='2.6'/><path d='m17.4 17.4 7.6 7.6' stroke-width='3'/></svg>`,
-  settings: `${T7}><path fill-rule='evenodd' d='M14 4.4a9.6 9.6 0 1 1 0 19.2a9.6 9.6 0 0 1 0-19.2zM14 9.8a4.2 4.2 0 1 0 0 8.4a4.2 4.2 0 0 0 0-8.4z'/><circle cx='14' cy='14' r='11.3' fill='none' stroke='#000' stroke-width='2.6' stroke-dasharray='3.6 5.27'/></svg>`,
+  changes: `${T7}><path fill-rule='evenodd' d='M14 2a12 12 0 1 1 0 24a12 12 0 0 1 0-24zM13.1 7.5h1.8v6.04l4.22 3.03-1.05 1.46-4.97-3.57z'/></svg>`,
+  installed: `${T7} stroke='#000' stroke-width='1.6' stroke-linejoin='round'><path d='M12.6 2.5h2.8v8.6h3.9L14 16.6l-5.3-5.5h3.9z'/><path d='M2.8 17.8h5.4l2 3h7.6l2-3h5.4v7.4H2.8z'/></svg>`,
+  search: `${T7}><circle cx='11.5' cy='11.5' r='9'/><path d='m17.4 17.4 7.6 7.6' stroke='#000' stroke-width='3' stroke-linecap='round'/></svg>`,
+  settings: `${T7}><path fill-rule='evenodd' d='M14 3.8a10.2 10.2 0 1 1 0 20.4a10.2 10.2 0 0 1 0-20.4zM14 9.8a4.2 4.2 0 1 0 0 8.4a4.2 4.2 0 0 0 0-8.4z'/><circle cx='14' cy='14' r='11.3' fill='none' stroke='#000' stroke-width='2.6' stroke-dasharray='3.6 5.27'/></svg>`,
 };
 
 // C51: the per-style icon map (docs/eras.md, "Icon map"). Every inline SVG the screens draw from JS comes from here,

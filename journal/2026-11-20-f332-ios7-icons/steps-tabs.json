@@ -1,0 +1,98 @@
+[
+{
+"eval": "(()=>{localStorage.clear();localStorage.setItem('ifizbox.firstVisit','later');localStorage.setItem('ifizbox.device','iphoneos-arm64');localStorage.setItem('ifizbox.style','ios7');localStorage.setItem('ifizbox.appearance','light');localStorage.setItem('ifizbox.darkTheme','oled');return 1})()"
+},
+{
+"nav": "#/home",
+"ms": 4000
+},
+{
+"nav": "#/sources",
+"ms": 2500
+},
+{
+"shot": "white-tab-sources"
+},
+{
+"nav": "#/changes",
+"ms": 2500
+},
+{
+"shot": "white-tab-changes"
+},
+{
+"nav": "#/installed",
+"ms": 2500
+},
+{
+"shot": "white-tab-installed"
+},
+{
+"nav": "#/search",
+"ms": 2500
+},
+{
+"shot": "white-tab-search"
+},
+{
+"nav": "#/home/guides/copying",
+"ms": 3000
+},
+{
+"clicktext": "Computer"
+},
+{
+"wait": 1500
+},
+{
+"shot": "white-computer"
+},
+{
+"eval": "(()=>{localStorage.clear();localStorage.setItem('ifizbox.firstVisit','later');localStorage.setItem('ifizbox.device','iphoneos-arm64');localStorage.setItem('ifizbox.style','ios7');localStorage.setItem('ifizbox.appearance','dark');localStorage.setItem('ifizbox.darkTheme','oled');return 1})()"
+},
+{
+"nav": "#/home",
+"ms": 4000
+},
+{
+"nav": "#/sources",
+"ms": 2500
+},
+{
+"shot": "oled-tab-sources"
+},
+{
+"nav": "#/changes",
+"ms": 2500
+},
+{
+"shot": "oled-tab-changes"
+},
+{
+"nav": "#/installed",
+"ms": 2500
+},
+{
+"shot": "oled-tab-installed"
+},
+{
+"nav": "#/search",
+"ms": 2500
+},
+{
+"shot": "oled-tab-search"
+},
+{
+"nav": "#/home/guides/copying",
+"ms": 3000
+},
+{
+"clicktext": "Computer"
+},
+{
+"wait": 1500
+},
+{
+"shot": "oled-computer"
+}
+]

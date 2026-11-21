@@ -209,7 +209,8 @@ test("sideload: Cancel while signing.install runs asks the shell to stop, ends a
   await tick();
   x.tap();
   assert.equal(await run, false);
-  assert.deepEqual(native.calls, ["signing.install", "signing.cancel"]);
+  // B252: the page's hold from Confirm, let go once the install ended (Cancel)
+  assert.deepEqual(native.calls, ["signing.hold", "signing.install", "signing.cancel", "signing.hold"]);
   assert.deepEqual(alerts, []);
   // the one-install lock came free: a second Install starts
   const y = hudWithPage();

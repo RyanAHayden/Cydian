@@ -15,6 +15,9 @@
 //   signing.cancel              F196: the progress page's Cancel stops the running signing.install, library.sign or
 //                               library.install (download, signing, serving the IPA to iOS; SignJob) and any
 //                               signing.progress watch -> {cancelled: bool} (false: nothing was running)
+//   signing.hold {on}           B252: the page keeps the app running in the background (KeepAlive) from Confirm,
+//                               through the route check, until its signing.install answered -> {held: bool}; it
+//                               lets go by itself after 10 minutes (Sideload.hold)
 //
 // F75: the old local HTTPS mode (signing.trust, resetTrust, testServer, its CA) is gone: installs always take the
 // manifest from the Signing Server (manifestServer), and without one signing.install answers no_server.
@@ -54,6 +57,7 @@ enum SignBridge {
         b.on("signing.remove") { c in run(c) { SignStore.removeIdentity(); return status() } }
         b.on("signing.install") { c in Sideload.install(c) } // F14: with the user's edits, keep-alive and a record
         b.on("signing.cancel") { c in Sideload.cancel(c) } // F196: the progress page's Cancel
+        b.on("signing.hold") { c in Sideload.hold(c) } // B252: KeepAlive from Confirm until signing.install answers
         Sideload.register(b) // F14: inspect, progress, installed, forget, resignAll, checkCertificate, remind
         MyIPAs.register(b) // F77: library.*, My IPAs under Installed (MyIPAs.swift)
         SignAhead.register(b) // F235: signing.prepare / open / discard, the IPA queue's sign-ahead run

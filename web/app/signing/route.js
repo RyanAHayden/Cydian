@@ -111,7 +111,17 @@ let installing = false; // one install at a time: a second tap (or a doubled han
 export async function installOnDevice(opts, deps) {
   if (installing) return false;
   installing = true;
-  try { return await installOnDeviceOnce(opts, deps); } finally { installing = false; }
+  // B252: the app keeps running in the background from Confirm on (the route check, then the signing), not only
+  // once the IPA downloads or copies; signing.install holds it too while it runs, so this ends with the call
+  const keep = deps?.keep ?? holdApp;
+  keep(deps?.native, true);
+  try { return await installOnDeviceOnce(opts, deps); } finally { installing = false; keep(deps?.native, false); }
+}
+
+// B252: signing.hold {on} (Sideload.hold): KeepAlive for the page's install, from Confirm until it ends. Not waited
+// for; an older shell without the call refuses it and the install goes on as before.
+export function holdApp(native, on) {
+  try { Promise.resolve(bridge(native).call("signing.hold", { on })).catch(() => {}); } catch { /* no bridge */ }
 }
 
 async function installOnDeviceOnce({ url, name = "", onInstalled = () => {}, params = null, after = null, host = false },

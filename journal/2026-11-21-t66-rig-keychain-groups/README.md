@@ -10,7 +10,10 @@ Now `install` writes `$XDG_RUNTIME_DIR/ifizbox-15/entitlements.plist` (`keychain
 passes it to zsign with `-e`. It mirrors `Profile.entitlements(for:keptID:)` with the bundle ID kept: the
 profile's entitlements, with `keychain-access-groups` = `[TEAM.<Info.plist ID>, TEAM.<App ID>]` (the first only
 when the profile's groups allow it), `application-identifier` = `TEAM.<App ID>` and `get-task-allow` false. With
-a wildcard profile, the App ID is the app's own ID. The bundle ID comes from `Payload/*.app/Info.plist` in the IPA
+a wildcard profile, the App ID follows `Profile.bundleID(for:)`: under `*`, it's the app's own ID. Under `prefix.*`,
+it's the app's own ID if that has the prefix, else the prefix plus the last part of the app's ID. The team is the
+entitlements' team ID, falling back to `TeamIdentifier`, as in Profile.swift. Spec review found that the first
+version treated every `*` suffix like a bare `*` and failed when the team key was missing. Both are fixed. The bundle ID comes from `Payload/*.app/Info.plist` in the IPA
 (binary or XML, via plistlib), and the entitlements from the profile via `openssl smime -verify -noverify`.
 docs/iphone15.md says what the groups are and that an `--as-is` install can still lose the items.
 
@@ -23,6 +26,8 @@ extensions the same `entitlements(for: entID, keptID: newID)` when it keeps the 
 Tried and failed: nothing.
 
 **Not verified**
+- The wildcard-profile and missing-team paths: the rig only has the explicit profile. They were reviewed against
+  Profile.swift, not run.
 - An install on the iPhone 15 Pro and a self-update after it, keeping Certificate and Paired. I left the shared test
   phone's state alone: it has an imported identity and a pairing, which took a person's help to set up
   (`iphone15-tailscale-login-needs-owner`). If this rig install got the groups wrong, it would lose both again.

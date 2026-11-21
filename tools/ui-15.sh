@@ -90,18 +90,23 @@ pt() { python3 -c "print(round($1/3))"; }  # screenshot pixels -> points (3x)
 keychain_entitlements() {
   openssl smime -inform der -verify -noverify -in "$2" 2>/dev/null | python3 -c '
 import plistlib, re, sys, zipfile
-e = plistlib.loads(sys.stdin.buffer.read())["Entitlements"]
+p = plistlib.loads(sys.stdin.buffer.read())
+e = p["Entitlements"]
 with zipfile.ZipFile(sys.argv[1]) as z:
     info = next(n for n in z.namelist() if re.fullmatch(r"Payload/[^/]+\.app/Info\.plist", n))
     kept = plistlib.loads(z.read(info))["CFBundleIdentifier"]
-team = e["com.apple.developer.team-identifier"]
-app = e["application-identifier"].split(".", 1)[1]
-app = kept if app.endswith("*") else app  # a wildcard profile signs under the app'"'"'s own ID
-if "keychain-access-groups" in e:
-    own, mine = team + "." + kept, team + "." + app
-    ok = any(g == own or (g.endswith("*") and own.startswith(g[:-1])) for g in e["keychain-access-groups"])
-    e["keychain-access-groups"] = [own, mine] if own != mine and ok else [mine]
-e["application-identifier"] = team + "." + app
+team = e.get("com.apple.developer.team-identifier") or (p.get("TeamIdentifier") or [""])[0]
+app = e["application-identifier"].split(".", 1)[1]  # Profile.bundleID(for:)
+if app == "*":
+    app = kept
+elif app.endswith(".*"):
+    app = kept if kept.startswith(app[:-1]) else app[:-1] + kept.split(".")[-1]
+if team:
+    if "keychain-access-groups" in e:
+        own, mine = team + "." + kept, team + "." + app
+        ok = any(g == own or (g.endswith("*") and own.startswith(g[:-1])) for g in e["keychain-access-groups"])
+        e["keychain-access-groups"] = [own, mine] if own != mine and ok else [mine]
+    e["application-identifier"] = team + "." + app
 e["get-task-allow"] = False
 sys.stdout.buffer.write(plistlib.dumps(e))' "$1"
 }

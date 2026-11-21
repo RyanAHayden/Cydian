@@ -467,6 +467,26 @@ test("This iPhone: a dropped connection is not a failed install (B246)") {
     check(fr.summary == "5.0 MB/s in front", "front only: \(fr.summary)")
 }
 
+test("Download progress once a second (B262)") {
+    let mb = Int64(1 << 20)
+    let t0 = Date(timeIntervalSince1970: 1_000_000)
+    var m = DownloadMeter()
+    check(m.add(0, of: 300 * mb, at: t0) == nil, "the first call only starts the clock")
+    check(m.add(10 * mb, of: 300 * mb, at: t0.addingTimeInterval(0.5)) == nil, "nothing before a second")
+    let a = m.add(30 * mb, of: 300 * mb, at: t0.addingTimeInterval(1))
+    check(a?.line == "Downloaded 30.0 of 300.0 MB (10%), 30.0 MB/s", "line: \(a?.line ?? "nil")")
+    check(a?.event["bytes"] as? Int64 == 30 * mb && a?.event["total"] as? Int64 == 300 * mb, "event's bytes and total")
+    check(a?.event["phase"] as? String == "downloading", "event's phase")
+    let b = m.add(40 * mb, of: 300 * mb, at: t0.addingTimeInterval(3))
+    check(b?.line == "Downloaded 40.0 of 300.0 MB (13%), 5.0 MB/s", "the last interval's rate: \(b?.line ?? "nil")")
+    check(m.add(1 * mb, of: 300 * mb, at: t0.addingTimeInterval(5)) == nil, "started again: the count starts again")
+    var u = DownloadMeter()
+    _ = u.add(0, of: -1, at: t0)
+    let c = u.add(5 * mb, of: -1, at: t0.addingTimeInterval(2))
+    check(c?.line == "Downloaded 5.0 MB, 2.5 MB/s", "no length: \(c?.line ?? "nil")")
+    check(c?.total == 0 && c?.fraction == 0, "no length: total 0")
+}
+
 test("This iPhone: a second look while installd is quiet (B251)") {
     let after = HereRecheck.lookAfter, every = HereRecheck.lookEvery
     check(after < 180 && every < 180, "looks come well before installd's 180 s limit")

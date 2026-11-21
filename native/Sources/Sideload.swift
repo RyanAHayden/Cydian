@@ -275,7 +275,8 @@ enum Sideload {
         guard let url = Apt.httpURL(c.params["url"]) else { job.end(); released(); return Apt.reply(c, nil, "bad_url: not an http(s) URL") }
         log("Downloading \(url.absoluteString)")
         let started = Date()
-        let d = download(url, http: httpPolicy(c), emit: emit) { res in
+        let d = download(url, http: httpPolicy(c), emit: emit,
+                         bytes: downloadTicks(log: log, event: { c.emitOnMain([$0]) })) { res in // B262
             switch res {
             case .failure(let e): finish(.failure(e))
             case .success(let file):
@@ -394,9 +395,24 @@ enum Sideload {
         func cancel() { lock.lock(); cancelled = true; let d = current; lock.unlock(); d?.cancel() }
     }
 
+    // B262: the download's bytes once a second: a Log line ("Downloaded 120.3 of 312.0 MB (38%), 21.4 MB/s") through
+    // `log` and the row's {phase: "downloading", progress, bytes, total, rate} through `event`, for download's `bytes`.
+    static func downloadTicks(log: ((String) -> Void)?, event: (([String: Any]) -> Void)?) -> (Int64, Int64) -> Void {
+        var meter = DownloadMeter()
+        let lock = NSLock()
+        return { n, total in
+            lock.lock()
+            let tick = meter.add(n, of: total)
+            lock.unlock()
+            guard let t = tick else { return }
+            log?(t.line)
+            event?(t.event)
+        }
+    }
+
     @discardableResult
     static func download(_ url: URL, http: HTTPPolicy = .ask, emit: @escaping (String, Double) -> Void,
-                         done: @escaping (Result<URL, Error>) -> Void) -> DebFetch {
+                         bytes: ((Int64, Int64) -> Void)? = nil, done: @escaping (Result<URL, Error>) -> Void) -> DebFetch {
         let file = SignBridge.work.appendingPathComponent("\(SignBridge.token())-in.ipa")
         let progress = { (p: Double) in emit("downloading", p) }
         // R49: KeepAlive (silent audio, mixed with others) while the IPA downloads. Without it iOS 27 suspended
@@ -410,21 +426,21 @@ enum Sideload {
             SignBridge.queue.async { done(.success(file)) }
         }
         guard let twin = httpsTwin(url) else {
-            return Download.start(url, to: file, max: SignBridge.maxIPA, progress: progress, done: finished)
+            return Download.start(url, to: file, max: SignBridge.maxIPA, progress: progress, bytes: bytes, done: finished)
         }
         if http == .allow {
             DeviceLog.say("[sideload] plain http download (Install Anyway): " + url.absoluteString)
-            return PlainDownload.start(url, to: file, max: SignBridge.maxIPA, progress: progress, done: finished)
+            return PlainDownload.start(url, to: file, max: SignBridge.maxIPA, progress: progress, bytes: bytes, done: finished)
         }
         let chain = HTTPChain()
-        chain.set(Download.start(twin, to: file, max: SignBridge.maxIPA, timeout: twinTimeout, progress: progress) { err in
+        chain.set(Download.start(twin, to: file, max: SignBridge.maxIPA, timeout: twinTimeout, progress: progress, bytes: bytes) { err in
             guard let e = err else { return finished(nil) }
             if chain.cancelled || !twinMissing(e) { return finished(e) }
             DeviceLog.say("[sideload] no https twin for \(url.absoluteString) (\(e))")
             guard http == .fallback else {
                 return finished("insecure: \(url.host ?? url.absoluteString) offers this IPA only over plain http, without encryption")
             }
-            chain.set(PlainDownload.start(url, to: file, max: SignBridge.maxIPA, progress: progress, done: finished))
+            chain.set(PlainDownload.start(url, to: file, max: SignBridge.maxIPA, progress: progress, bytes: bytes, done: finished))
         })
         return chain
     }
@@ -1060,7 +1076,8 @@ enum Sideload {
                 guard let url = Apt.httpURL(r.url) else { fail(Failed(text: "bad_url: \(r.url)")); return next() }
                 log("Downloading \(url.absoluteString)")
                 let started = Date()
-                let d = download(url, http: .fallback, emit: emit) { res in // B104: its http link was let through at install
+                // B104: its http link was let through at install; B262: the download's Log line once a second
+                let d = download(url, http: .fallback, emit: emit, bytes: downloadTicks(log: log, event: nil)) { res in
                     switch res {
                     case .failure(let e): fail(e); next()
                     case .success(let file): log(Sideload.downloaded(file, since: started)); signThat(file)

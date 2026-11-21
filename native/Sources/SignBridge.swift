@@ -236,6 +236,7 @@ final class Download: NSObject, URLSessionDownloadDelegate {
     private let dest: URL, max: Int64
     private let progress: (Double) -> Void
     private let done: (String?) -> Void
+    var bytes: ((Int64, Int64) -> Void)? // B262: (written, expected; 0 when unknown), each write, for DownloadMeter
     private var finished = false
     private var session: URLSession?
 
@@ -245,8 +246,9 @@ final class Download: NSObject, URLSessionDownloadDelegate {
 
     @discardableResult
     static func start(_ url: URL, to dest: URL, max: Int64, timeout: TimeInterval = 60, progress: @escaping (Double) -> Void,
-                      done: @escaping (String?) -> Void) -> Download {
+                      bytes: ((Int64, Int64) -> Void)? = nil, done: @escaping (String?) -> Void) -> Download {
         let d = Download(dest, max, progress, done)
+        d.bytes = bytes
         let cfg = URLSessionConfiguration.default
         cfg.timeoutIntervalForRequest = timeout
         cfg.timeoutIntervalForResource = 60 * 60
@@ -279,6 +281,7 @@ final class Download: NSObject, URLSessionDownloadDelegate {
             return finish("too_large: the IPA is bigger than \(max >> 30) GB")
         }
         if totalBytesExpectedToWrite > 0 { progress(Double(totalBytesWritten) / Double(totalBytesExpectedToWrite)) }
+        bytes?(totalBytesWritten, Swift.max(totalBytesExpectedToWrite, 0))
     }
 
     func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {

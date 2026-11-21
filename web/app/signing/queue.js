@@ -75,7 +75,9 @@ export async function prepareOnDevice(job, { tag, signal = null, progress = () =
     const r = await askInsecure((extra) => abortable(native, "signing.prepare", { ...params, ...refusing(), ...extra }, (ev) => {
       if (ev?.log) { log(ev.log); return; }
       // B152: the signer's own phase (reading, signing) goes along, so the run gives each its share of Signing
-      if (ev?.phase) progress(ev.phase === "downloading" ? "downloading" : "signing", Number(ev.progress) || 0, ev.phase);
+      // B262: the download's once-a-second {bytes, total, rate} go along too, for the row's MB of MB and MB/s
+      const info = ev?.phase === "downloading" && ev.bytes != null ? { bytes: ev.bytes, total: ev.total, rate: ev.rate } : null;
+      if (ev?.phase) progress(ev.phase === "downloading" ? "downloading" : "signing", Number(ev.progress) || 0, ev.phase, ...(info ? [info] : []));
     }, { tag, signal }), { alert, url: params?.url ?? null });
     keepIpaHash(storageOf(), r, { bundleId: job?.bundleId ?? (typeof job?.id === "string" && !job.id.startsWith("library:") ? job.id : null), version: job?.version ?? null }); // F292
     return r;

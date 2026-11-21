@@ -72,6 +72,7 @@ import { runOrder, sizeText, SELF_ID } from "./appqueue.js";
 import { VPN_WAIT } from "./installroute.js";
 import { NAME } from "../brand.js";
 import { isNewer } from "./selfupdate.js"; // B159: staleSelf
+import { rateText } from "./downloadmeter.js"; // B262
 
 // B136: an install that failed must not leave the app recorded as installed (Installed's record decides the Search
 // row's swipe: a recorded, up-to-date app has none). recordWhen(row, onPhone) says when a row's app goes into that
@@ -230,7 +231,8 @@ export function createAppRun({ rows, sign, install, discard = () => {}, reprompt
 
   // One phase's progress: a new phase gets its log line once; a percent only moves the bar. B152: `step` is the
   // shell's own phase under "signing" (the signer reads the IPA 0..1, then signs it 0..1): each gets its half.
-  const progressOf = (r, f) => (phase, fraction = 0, step = null) => {
+  // B262: `info` ({ bytes, total, rate }, the shell's once-a-second download numbers) goes on the row for its MB/s.
+  const progressOf = (r, f) => (phase, fraction = 0, step = null, info = null) => {
     if (f.ctl.signal.aborted || ended(r)) return;
     const first = r.phase !== phase;
     if (first && helperRow(r)) { // B71a: the jailbreak app's helper: one step per app, no signing, no iOS prompt
@@ -250,7 +252,8 @@ export function createAppRun({ rows, sign, install, discard = () => {}, reprompt
     const state = phase === "copying" ? "installing" : SIGNING.has(phase) || WITH_IOS.has(phase) ? phase : r.state;
     let frac = Math.max(0, Math.min(1, Number(fraction) || 0));
     if (phase === "signing" && SIGN_STEPS[step]) frac = SIGN_STEPS[step][0] + (SIGN_STEPS[step][1] - SIGN_STEPS[step][0]) * frac;
-    set(r, { phase, state, here, fraction: frac });
+    const dl = phase === "downloading" && info ? { bytes: Number(info.bytes) || 0, total: Number(info.total) || 0, rate: Number(info.rate) || 0 } : {};
+    set(r, { phase, state, here, fraction: frac, ...dl });
     if (SIGNING.has(phase)) arm(r, f);
   };
 
@@ -300,7 +303,7 @@ export function createAppRun({ rows, sign, install, discard = () => {}, reprompt
 
   async function startSign(r) {
     const f = fly(r);
-    set(r, { state: "downloading", phase: null, fraction: 0, error: null, progress: 0 });
+    set(r, { state: "downloading", phase: null, fraction: 0, error: null, progress: 0, bytes: 0, total: 0, rate: 0 });
     arm(r, f);
     let res;
     try {
@@ -546,9 +549,14 @@ export function rowStatus(row, opts = {}) {
   if (helperRow(row)) { const h = helperStatus(row); if (h != null) return h; }
   switch (row.state) {
     case "waiting": return "Waiting";
-    case "downloading":
-      if (row.size && row.fraction > 0) return `Downloading ${mb(row.size * row.fraction)} of ${mb(row.size)} MB`;
+    case "downloading": {
+      // B262: the shell's own total (and bytes, when it knows no total) before the queue's listed size; its MB/s after
+      const total = row.total > 0 ? row.total : row.size;
+      const speed = row.rate > 0 ? `, ${rateText(row.rate)}` : "";
+      if (total && row.fraction > 0) return `Downloading ${mb(total * row.fraction)} of ${mb(total)} MB${speed}`;
+      if (row.bytes > 0) return `Downloading ${mb(row.bytes)} MB${speed}`;
       return p > 0 ? `Downloading ${p}%` : "Downloading";
+    }
     case "signing": return p > 0 && p < 100 ? `Signing ${p}%` : "Signing";
     case "signed": return "Signed";
     case "asking":

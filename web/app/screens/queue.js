@@ -539,7 +539,8 @@ export function siteInstallArgs(job) {
 // while fresh, else the url, and the edits), then iOS's progress on the HUD as the sheet did (signing-sheet.js
 // followInstall). The token is spent by the try, so a failed run that keeps the job queued downloads it again next time.
 export async function installCustom(job, { sc, follow = null, now = Date.now(), native = nativeBridge() } = {}) {
-  const params = customParams(job, now);
+  const credit = (await import("../core/installed.js")).sourceCredit(job); // B247: the source's app, kept on the signed record
+  const params = { ...customParams(job, now), ...(credit ? { credit } : {}) };
   if (params.token) job.options.token = null;
   const after = follow ?? (async (result, h) => (await import("../signing-sheet.js")).followInstall(native, result?.bundleId || job.options.signsAs || "", h));
   return sc.installOnDevice({ url: job.url, name: job.options.name || job.name || "", params,

@@ -96,7 +96,7 @@ enum SignAhead {
                         SignBridge.queue.asyncAfter(deadline: .now() + life) { forget(tok) }
                         job.end()
                         var j: [String: Any] = ["token": tok, "bundleId": app.bundleID, "originalBundleId": app.originalBundleID,
-                                                "name": app.name, "version": app.version]
+                                                "name": options.shownName(app.name), "version": app.version] // B247
                         if let x = record.expires { j["expires"] = ISO8601DateFormatter().string(from: x) }
                         j["device"] = PhoneID.check(profile).json
                         if let s = sha { j["sha256"] = s } // F292
@@ -160,7 +160,7 @@ enum SignAhead {
             let nslog = signer.log
             signer.log = { nslog($0); log($0) }
             let app = try signer.sign(input, to: output) { emit($0, $1) }
-            log("Signed \(app.name) \(app.version) as \(app.bundleID), \(Sideload.size(output))")
+            log("Signed \(options.shownName(app.name)) \(app.version) as \(app.bundleID), \(Sideload.size(output))")
             try job.check()
             let record = SignedRecord(bundleID: app.bundleID, originalBundleID: app.originalBundleID, name: app.name,
                                       version: app.version, url: url, signed: Date(),

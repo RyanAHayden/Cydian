@@ -72,6 +72,7 @@ import { apps, appRows, appUpgrades, removeInstall, onAppsChange, MODES, MODE_LA
   manageToolbar, pruneSelection, SELECT } from "../core/installed.js";
 import { signedAppsNamed } from "../core/installed.js"; // B150
 import { recordInstall, unrecordedSigned, sourceRecordFor } from "../core/installed.js"; // B156
+import { creditedRecords, recreditedRecords, urlCredit, recordWithCredit } from "../core/installed.js"; // B247
 import { mediaUrl } from "./depiction.js";
 import { rememberedApps } from "../app-updates.js";
 import { signatureState, signedIndex, resignWindow } from "../core/signing.js";
@@ -605,11 +606,13 @@ function chooseStatus() {
 
 // ---- F30: the apps recorded on this device -------------------------------------------------------------------
 
-// The newest version of each app on any source, from the catalog (null where no source has it any more).
+// The newest version of each app on any source, from the catalog (null where no source has it any more). B247: on the
+// source it was installed from first (the record's key), so RyukGram isn't offered AppTesters' Instagram as its upgrade.
 async function candidates(rows) {
   const out = new Map();
   await Promise.all(rows.map(async (r) => {
-    const p = await catalog.package(r.id, ALL).catch(() => null);
+    const own = r.key && r.key !== ALL ? await catalog.package(r.id, r.key).catch(() => null) : null;
+    const p = own?.key && own.stanza?.version ? own : await catalog.package(r.id, ALL).catch(() => null);
     if (p?.key && p.stanza?.version) out.set(r.id, { version: p.stanza.version, key: p.key, pkg: p }); // F222: pkg for Manage's jobs
   }));
   return out;
@@ -675,6 +678,29 @@ export async function restoreSourceRecords(signed, records, { pkgsOf = catalogPk
   }
   return out;
 }
+// B247: records that name another source's app than the one a signed app was installed from are written again, their
+// dates kept, with that entry's icon: by the shell's credit (core/installed.js recreditedRecords), else, for an app
+// signed before the shell kept one, by the source entry offering its IPA's url (urlCredit). -> the records written
+export async function recreditRecords(signed, records, { pkgsOf = catalogPkgs, record = async (rec) => recordInstall(await apps(), rec, rec.date) } = {}) {
+  const fixes = recreditedRecords(records, signed);
+  const byId = new Map((records ?? []).filter((r) => r?.id && !r.self).map((r) => [r.id, r]));
+  const pkgsFor = async (a) => (await Promise.all([...new Set([a.originalBundleId, a.bundleId].filter(Boolean))]
+    .map((id) => pkgsOf(id).catch(() => [])))).flat();
+  for (const a of Array.isArray(signed?.apps) ? signed.apps : []) {
+    const rec = byId.get(a?.bundleId) ?? byId.get(a?.originalBundleId);
+    if (!rec || !a.url || a.credit || fixes.some((f) => f.id === rec.id)) continue;
+    const c = urlCredit(a, await pkgsFor(a), rec);
+    const fix = c ? recordWithCredit(rec, c) : null;
+    if (fix) fixes.push(fix);
+  }
+  const out = [];
+  for (const rec of fixes) {
+    const pkg = rec.key ? (await pkgsOf(rec.id).catch(() => [])).find((p) => p?.key === rec.key) : null;
+    const icon = pkg?.stanza?.ipa?.iconURL;
+    try { out.push(await record(icon ? { ...rec, icon } : rec)); } catch { /* no store: the list still shows the credit */ }
+  }
+  return out;
+}
 async function catalogPkgs(id) {
   const first = await catalog.package(id, ALL);
   if (!first?.stanza?.ipa) return [];
@@ -702,6 +728,10 @@ async function loadApps(appView) {
   if (seq !== appView.seq) return;
   if (!recordsApps()) rows = rows.filter((r) => !r?.self); // iFizBox's own row is dpkg's there
   appView.signed = signed; // F91
+  if (signed && recordsApps()) {
+    recreditRecords(signed, rows).catch(() => {}); // B247: written back, so Changes and the app pages follow
+    rows = creditedRecords(rows, signed); // B247: the source's app it was signed from names it, not the last record by ID
+  }
   if (signed && recordsApps()) restoreSourceRecords(signed, rows).catch(() => {}); // B156
   if (signed && recordsApps()) loadTweakUpdates(appView, signed, seq); // F302a
   drawApps(appView, appListRows(rows, () => null), new Map(), site, hasStatus);

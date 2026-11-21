@@ -160,16 +160,74 @@ export function appUpgrades(rows, candidateOf) {
 // install iFizBox made on this phone under that ID (a reinstall replaces it), not a source lookup by bundle ID, so
 // RyukGram variants and real Instagram, which share com.burbn.instagram, never borrow each other's names.
 // -> the same object with `apps` renamed (the input untouched); anything else comes back as it is.
+// B247: the shell's signed record keeps the source's app it was signed from (`credit`, below), and that comes first:
+// the device record is matched by bundle ID only, and the last Install from any source sharing the ID wrote it.
 export function withSourceNames(installed, records) {
   if (!Array.isArray(installed?.apps)) return installed;
   const named = new Map();
   for (const r of records ?? []) if (r?.id && r.source && !r.self && text(r.name)) named.set(r.id, text(r.name));
-  if (!named.size) return installed;
+  if (!named.size && !installed.apps.some((a) => creditOf(a))) return installed;
   const apps = installed.apps.map((a) => {
-    const name = named.get(a?.bundleId) ?? (a?.originalBundleId ? named.get(a.originalBundleId) : undefined);
+    const name = creditOf(a)?.name ?? named.get(a?.bundleId) ?? (a?.originalBundleId ? named.get(a.originalBundleId) : undefined);
     return name && a.name !== name ? { ...a, name } : a;
   });
   return { ...installed, apps };
+}
+
+// ---- B247: the source's app a signed app was installed from ----------------------------------------------------
+// Several sources can list apps under one bundle ID (RyukGram's source and AppTesters' Instagram both list
+// com.burbn.instagram), so the bundle ID can't say which one is on the phone. Signing from a source (its app page,
+// the queue) sends the source's app with the IPA (`credit` on signing.prepare and signing.install); the shell keeps it
+// on its signed record (native/sign/SignOptions.swift SourceCredit), signing.installed hands it back on each app, and
+// Re-sign keeps it. The lists match on it first and fall back to the bundle ID for apps signed without one.
+//
+//   sourceCredit(job)                    -> { name, source, sourceName, key } for a job from a source (core/appqueue.js
+//                                           appJob: source = the source's URL, key its catalog key), else null
+//   creditOf(app)                        -> a signed app's credit ({ name, source, sourceName, key }), or null
+//   creditedRecords(records, installed)  -> the records, each one a credited signed app stands for (by bundle ID or
+//                                           original ID) named and sourced by that credit; the rest as they are
+//   recreditedRecords(records, installed) -> just the records creditedRecords changed (to write back), as records
+export function sourceCredit(job) {
+  const source = httpHref(job?.source);
+  const name = text(job?.name);
+  if (!source || !name) return null;
+  return { name, source, sourceName: text(job.sourceName) || null, key: text(job.key) || null };
+}
+
+export function creditOf(app) {
+  const c = app?.credit;
+  const name = text(c?.name);
+  if (!name) return null;
+  return { name, source: text(c.source) || null, sourceName: text(c.sourceName) || null, key: text(c.key) || null };
+}
+
+function creditIndex(installed) {
+  const out = new Map();
+  for (const a of Array.isArray(installed?.apps) ? installed.apps : []) {
+    const c = creditOf(a);
+    if (!c) continue;
+    for (const id of [a.bundleId, a.originalBundleId]) if (id && !out.has(id)) out.set(id, c);
+  }
+  return out;
+}
+
+function credited(r, c) {
+  const next = { name: c.name, source: c.source ?? r.source ?? null, sourceName: c.sourceName ?? r.sourceName ?? null, key: c.key ?? r.key ?? null };
+  return Object.keys(next).every((k) => (r[k] ?? null) === next[k]) ? r : { ...r, ...next };
+}
+
+export function creditedRecords(records, installed) {
+  const index = creditIndex(installed);
+  if (!index.size) return records ?? [];
+  return (records ?? []).map((r) => {
+    const c = r?.id && !r.self ? index.get(r.id) : null;
+    return c ? credited(r, c) : r;
+  });
+}
+
+export function recreditedRecords(records, installed) {
+  const before = records ?? [];
+  return creditedRecords(before, installed).filter((r, i) => r !== before[i]).map((r) => appRecord(r, r.date ?? Date.now()));
 }
 
 // B156: an app installed from a source whose Installed record never got written (Install records it only once iOS
@@ -188,22 +246,51 @@ export function unrecordedSigned(installed, records) {
   const ids = new Set((records ?? []).map((r) => r?.id).filter(Boolean));
   return installed.apps.filter((a) => a?.bundleId && !ids.has(a.bundleId) && !(a.originalBundleId && ids.has(a.originalBundleId)));
 }
-export function sourceRecordFor(app, pkgs, now = Date.now()) {
+const offersUrl = (p, want) => {
+  const ipa = p?.stanza?.ipa;
+  if (!ipa || !want) return false;
+  return [p.stanza.downloadURL, ipa.downloadURL, ...(ipa.versions ?? []).map((v) => v?.downloadURL)].some((u) => httpHref(u) === want);
+};
+
+// B247: a signed app with no credit (signed before the shell kept one) whose record names a source entry that doesn't
+// offer its IPA, while another entry does: that entry's credit, to write on the record (creditedRecords' rule). Null
+// when the record's own entry offers it, or none does: the bundle ID's record stands.
+export function urlCredit(app, pkgs, record) {
   const want = httpHref(app?.url);
-  if (!want || !app?.bundleId) return null;
+  if (!want || creditOf(app)) return null;
+  const offering = (pkgs ?? []).filter((p) => offersUrl(p, want));
+  if (!offering.length || offering.some((p) => record?.key && p.key === record.key)) return null;
+  const ipa = offering[0].stanza.ipa;
+  return creditOf({ credit: { name: ipa.name || app.name, source: ipa.sourceUrl, sourceName: ipa.sourceName, key: offering[0].key } });
+}
+
+export function sourceRecordFor(app, pkgs, now = Date.now()) {
+  if (!app?.bundleId) return null;
+  const signedAt = Date.parse(app.signed);
+  const c = creditOf(app); // B247: the source's app it was signed from, when the shell kept it, names it first
+  if (c?.source) {
+    const ipa = (pkgs ?? []).find((p) => p?.stanza?.ipa && c.key && p.key === c.key)?.stanza.ipa;
+    return appRecord({ id: app.bundleId, name: c.name, version: app.version, key: c.key, source: c.source,
+      sourceName: c.sourceName, icon: ipa?.iconURL ?? null }, Number.isFinite(signedAt) ? signedAt : now);
+  }
+  const want = httpHref(app?.url);
+  if (!want) return null;
   for (const p of pkgs ?? []) {
-    const ipa = p?.stanza?.ipa;
-    if (!ipa) continue;
-    const offers = [p.stanza.downloadURL, ipa.downloadURL, ...(ipa.versions ?? []).map((v) => v?.downloadURL)];
-    if (!offers.some((u) => httpHref(u) === want)) continue;
-    const signed = Date.parse(app.signed);
+    if (!offersUrl(p, want)) continue;
+    const ipa = p.stanza.ipa;
     return appRecord({ id: app.bundleId, name: text(ipa.name) || app.name, version: app.version, key: p.key ?? null,
-      source: ipa.sourceUrl, sourceName: ipa.sourceName, icon: ipa.iconURL ?? null }, Number.isFinite(signed) ? signed : now);
+      source: ipa.sourceUrl, sourceName: ipa.sourceName, icon: ipa.iconURL ?? null }, Number.isFinite(signedAt) ? signedAt : now);
   }
   return null;
 }
 
-// signing.installed through the bridge, renamed by the device's records (withSourceNames). Throws as the call does.
+// B247: `record` with `credit` (creditOf's) written on it, as creditedRecords would: an appRecord to store.
+export function recordWithCredit(record, credit) {
+  const r = credited(record, credit);
+  return r === record ? null : appRecord(r, r.date ?? Date.now());
+}
+
+// signing.installed through the bridge, renamed by its credits and the device's records (withSourceNames). Throws as the call does.
 export async function signedAppsNamed(native = nativeBridge(), { store = apps } = {}) {
   const [installed, records] = await Promise.all([native.call("signing.installed", {}), store().then((s) => s.all()).catch(() => [])]);
   return withSourceNames(installed, records);

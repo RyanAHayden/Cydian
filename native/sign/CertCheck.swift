@@ -135,6 +135,9 @@ struct SignedRecord: Codable, Equatable {
         // Re-sign keeps doing so, so it replaces the app it installed.
         var keepBundleID: Bool? = nil
         var tweaks: TweakSet? = nil // F288: kept so Re-sign injects the same tweaks
+        // B247: the source's app it was signed from (SignOptions.credit), so Re-sign keeps it. Left out of ==: it
+        // changes nothing in the signed IPA (My IPAs' "signed with its own options" check compares these).
+        var credit: SourceCredit? = nil
 
         static func == (a: StoredOptions, b: StoredOptions) -> Bool {
             a.name == b.name && a.bundleID == b.bundleID && a.icon == b.icon && a.removeExtensions == b.removeExtensions
@@ -147,20 +150,25 @@ struct SignedRecord: Codable, Equatable {
                                 "url": url, "signed": ISO8601DateFormatter().string(from: signed)]
         if let x = expires { j["expires"] = ISO8601DateFormatter().string(from: x) }
         if let t = options.tweaks, !t.names.isEmpty { j["tweaks"] = t.names } // F302a: Installed's "N Tweaks"
+        if let c = options.credit { j["credit"] = c.json } // B247: core/installed.js matches on it first
         return j
     }
+
+    // B247: the name iFizBox shows for it (the reminder, Re-sign's log): the source's name unless the user renamed it.
+    var shownName: String { options.name == nil ? options.credit?.name ?? name : name }
 }
 
 extension SignOptions {
     var stored: SignedRecord.StoredOptions {
         .init(name: name, bundleID: bundleID, icon: icon, removeExtensions: removeExtensions, fixArm64e: fixArm64e,
-              keepBundleID: keepBundleID, tweaks: tweaks)
+              keepBundleID: keepBundleID, tweaks: tweaks, credit: credit)
     }
     init(_ s: SignedRecord.StoredOptions) {
         self.init()
         name = s.name; bundleID = s.bundleID; icon = s.icon; removeExtensions = s.removeExtensions; fixArm64e = s.fixArm64e
         keepBundleID = s.keepBundleID ?? false
         tweaks = s.tweaks
+        credit = s.credit
     }
 }
 
@@ -193,7 +201,7 @@ enum SignedRecords {
     // The earliest expiry of the apps, and their names, for the reminder.
     static func nextExpiry(_ list: [SignedRecord]) -> (Date, [String])? {
         guard let first = list.compactMap(\.expires).min() else { return nil }
-        let names = list.filter { $0.expires.map { abs($0.timeIntervalSince(first)) < 86400 } ?? false }.map(\.name)
+        let names = list.filter { $0.expires.map { abs($0.timeIntervalSince(first)) < 86400 } ?? false }.map(\.shownName)
         return (first, names)
     }
 }

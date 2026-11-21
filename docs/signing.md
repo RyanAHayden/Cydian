@@ -544,6 +544,13 @@ Plus the arm64e fix-up, the user's edits and tweak injection (below).
   current certificate and the same edits, and installs them one after another (the next once iOS has fetched the
   previous IPA, or its link expired), answering which worked and which didn't. `signing.installed` lists the
   records; `signing.forget {bundleId}` drops one.
+- **Which source's app it is.** Several sources can list apps under one bundle ID (RyukGram and Instagram share
+  `com.burbn.instagram`), and an IPA's Info.plist may name a variant after the app it changes. So signing from a
+  source sends `credit: {name, source, sourceName, key}` (the source's app: its name there, the source's URL and name,
+  its catalog key) with `signing.prepare` and `signing.install`. The record keeps it (Re-sign too), `signing.installed`
+  hands it back on each app, and the sign log, the reminder, Installed, Signed Apps and Needs Re-sign name the app by
+  it. An app signed without one (My IPAs, an older record) goes by its Installed record, matched by bundle ID, or by
+  the source entry that offers its IPA's URL when the record's entry doesn't (`core/installed.js`).
 - **Revoked?** `signing.checkCertificate` asks the OCSP responder in the certificate's AIA extension (Apple's
   `ocsp.apple.com`), over plain HTTP as OCSP is, with a request naming the certificate by its issuer (Apple's WWDR
   intermediate from `certs/`) and serial: no nonce, unsigned. The answer is `good`, `revoked` (with `revokedAt`) or

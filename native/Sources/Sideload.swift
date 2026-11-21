@@ -221,7 +221,7 @@ enum Sideload {
                 // Failed carries its own code ("offline: …", This iPhone's "timeout: …"), as MyIPAs replies it
                 Apt.reply(c, nil, job.cancelled ? SignBridge.text(SignJob.cancelledError) : (e as? Failed)?.text ?? SignBridge.text(e))
             case .success(let (app, rec)):
-                var j: [String: Any] = ["bundleId": app.bundleID, "originalBundleId": app.originalBundleID, "name": app.name,
+                var j: [String: Any] = ["bundleId": app.bundleID, "originalBundleId": app.originalBundleID, "name": options.shownName(app.name), // B247
                                         "version": app.version, "removed": app.removed, "fixedArm64e": app.fixedArm64e]
                 if let x = rec.expires { j["expires"] = ISO8601DateFormatter().string(from: x) }
                 j["device"] = PhoneID.check(profile).json // F236: "unknown" makes a missing app name the likely cause
@@ -458,7 +458,7 @@ enum Sideload {
             if servers.host != nil { signer.level = 6 } // R41: uploaded to the server: small beats fast
             signer.installedAppID = { installedAppID($0, log: log) } // B138: an update keeps its App ID
             app = try signer.sign(input, to: output) { emit($0, $1) }
-            log?("Signed \(app.name) \(app.version) as \(app.bundleID), \(Sideload.size(output))")
+            log?("Signed \(options.shownName(app.name)) \(app.version) as \(app.bundleID), \(Sideload.size(output))")
             try job?.check()
         } catch {
             try? FileManager.default.removeItem(at: output)
@@ -975,7 +975,7 @@ enum Sideload {
                 let r = list[i]
                 let job = SignJob.begin() // B65: what signing.cancel stops, one app at a time
                 let next = { job.end(); if job.cancelled { stopped = true }; step(i + 1) }
-                log("Re-signing \(r.name) (\(r.bundleID))")
+                log("Re-signing \(r.shownName) (\(r.bundleID))")
                 let throttle = Throttle()
                 let emit = { (phase: String, p: Double) in
                     if throttle.pass(phase, p) {

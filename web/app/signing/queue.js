@@ -21,6 +21,7 @@
 // Errors come as deviceError's message (core/signing.js), so a row's "Failed: ..." reads as the alerts do.
 import { deviceError } from "../core/signing.js";
 import { withKeep } from "../core/keepid.js";
+import { sourceCredit } from "../core/installed.js";
 import { recordSelfUpdate } from "../core/selfupdate.js";
 import { showAlert } from "../nav/alert.js";
 import { askInsecure, bridge, keepIpaHash, refusing, storageOf } from "./common.js";
@@ -39,7 +40,8 @@ export function prepareParams(job) {
   delete edits.url;
   // F237: Keep Bundle IDs off goes with the job, unless its Custom Install chose (edits.keepBundleId)
   if (job.library) return withKeep({ library: job.library, ...edits });
-  return withKeep({ url: job.url, ...edits });
+  const credit = sourceCredit(job); // B247: the source's app it is, kept on the shell's signed record
+  return withKeep({ url: job.url, ...edits, ...(credit ? { credit } : {}) });
 }
 
 // native.call that rejects with code "cancelled" the moment `signal` aborts, after asking the shell to stop `tag`.

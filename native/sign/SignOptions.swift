@@ -25,6 +25,14 @@ struct SignOptions {
         name.range(of: "^IconOwn[A-Z][0-9]{1,3}x[0-9]{1,3}@[23]x\\.png$", options: .regularExpression) != nil
     }
 
+    // B247: the source entry this IPA was picked from (a source's app page or the queue): iFizBox's own labels (the sign
+    // log, the signed record) name the app by it, since an IPA's Info.plist can name a variant after the app it changes
+    // (RyukGram's says "Instagram"). Changes nothing in the IPA.
+    var credit: SourceCredit?
+
+    // The name iFizBox shows for the signed app: the user's rename, else the source's name for it, else the IPA's.
+    func shownName(_ signedName: String) -> String { name == nil ? credit?.name ?? signedName : signedName }
+
     init() {}
 
     // F237: whether this app keeps its ID. F280: iFizBox's own IPA too, whatever ID the running copy has: APNs
@@ -53,6 +61,7 @@ struct SignOptions {
         if let f = p["fixArm64e"] as? Bool { fixArm64e = f }
         if let k = p["keepBundleId"] as? Bool { keepBundleID = k } // F237: absent keeps it (the default)
         tweaks = try TweakSet(json: p["tweaks"]) // F288
+        credit = SourceCredit(json: p["credit"]) // B247
     }
 
     static func validBundleID(_ s: String) -> Bool {
@@ -168,6 +177,34 @@ struct SignOptions {
             i += 1
             out[k] = v
         }
+    }
+}
+
+// B247: a source's app an IPA was signed from: {name, source, sourceName, key} from the page (core/installed.js
+// sourceCredit). `name` is the app's name on that source; `source` its URL; `key` the catalog entry. Several sources
+// can list apps with one bundle ID (RyukGram and Instagram), so this, not the ID, says which one was installed.
+struct SourceCredit: Codable, Equatable {
+    var name: String
+    var source: String?
+    var sourceName: String?
+    var key: String?
+
+    init?(json: Any?) {
+        guard let p = json as? [String: Any] else { return nil }
+        func text(_ k: String) -> String? {
+            let s = (p[k] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            return s.isEmpty ? nil : String(s.prefix(500))
+        }
+        guard let n = text("name") else { return nil }
+        name = n; source = text("source"); sourceName = text("sourceName"); key = text("key")
+    }
+
+    var json: [String: Any] {
+        var j: [String: Any] = ["name": name]
+        if let s = source { j["source"] = s }
+        if let s = sourceName { j["sourceName"] = s }
+        if let k = key { j["key"] = k }
+        return j
     }
 }
 

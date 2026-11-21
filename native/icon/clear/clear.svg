@@ -34,7 +34,9 @@
   <rect width="1024" height="1024" fill="url(#shine)"/>
   <!-- the glass's lit edge, just inside the corner mask iOS puts on it -->
   <rect x="7" y="7" width="1010" height="1010" rx="222" fill="none" stroke="url(#rim)" stroke-width="12"/>
-  <!-- the globe: a soft shadow under the ring, the frosted ring with a grey edge, the smoked sphere, the lines -->
+  <!-- the globe: a soft shadow under the ring, the frosted ring with a grey edge, the smoked sphere, the lines;
+       1.2x the real icon's globe, so it fills more of the 20 pt square -->
+  <g transform="translate(512 512) scale(1.2) translate(-512 -512)">
   <circle cx="512" cy="530" r="302" fill="#4a5466" opacity=".35" filter="url(#soft)"/>
   <circle cx="512" cy="512" r="300" fill="url(#ring)" stroke="#9aa3b0" stroke-width="8"/>
   <circle cx="512" cy="512" r="236" fill="url(#sphere)"/>
@@ -47,4 +49,5 @@
   <!-- the sphere's glassy top highlight and its dark edge -->
   <ellipse cx="512" cy="392" rx="190" ry="112" fill="url(#gloss)" clip-path="url(#gclip)"/>
   <circle cx="512" cy="512" r="236" fill="none" stroke="#3c4757" stroke-width="10"/>
+  </g>
 </svg>

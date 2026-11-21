@@ -8,7 +8,9 @@ faint grey grid: the same look as iOS's blank icon placeholder.
 
 - `clear.svg` redrawn, same glass background and lit edge: the globe now sits in a frosted ring with a grey edge
   over a soft shadow, the sphere is smoked slate glass (radial gradient, dark edge, glossy top highlight), and the
-  white meridian and parallels are 34 units wide (were 22, white on near-white). Same globe geometry as before.
+  white meridian and parallels are 34 units wide (were 22, white on near-white). The whole globe is drawn 1.2x the
+  real icon's (ring radius 360 of 1024), after the spec review noted that at 40 px the first redraw's globe was only
+  ~18 px across and the square stayed mostly pale.
 - `alternates.py render` rerendered every `icon/clear/*.png` (Lite copies the plain ones, as before).
 - `Assets.car` / `AssetsLite.car` recompiled on the MBA (Xcode actool), `assets.sources` updated.
 - `preview.png`: the new 1024 px master, then 20pt@3x, 20pt@2x and 29pt@3x at true pixel size on a dark ground,
@@ -35,4 +37,7 @@ not have helped.
   build with this catalog installed, Clear picked in Theme > App Icon, and a restart (iOS caches notification icons
   until a restart, B238). Judged from the rendered PNGs at true pixel size instead.
 - `glass.py`'s Clear colours (iOS 26+ Liquid Glass documents) still describe white lines on white glass. No set is
-  compiled from them today (`CAR_SETS` is empty), so nothing ships from them; glass.py is outside this task's files.
+  compiled from them today (`CAR_SETS` is empty), so nothing ships from them; glass.py is outside this task's files:
+  filed B249.
+- That the hand-compiled .car files hold the new Clear pictures was not dumped with `assetutil`; actool compiled
+  them from catalogs holding the new PNGs, and `native/test_icons.py` (sources digests) passes.

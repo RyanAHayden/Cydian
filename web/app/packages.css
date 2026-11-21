@@ -1089,7 +1089,7 @@ html[data-theme="dark"] .store-review-response { background: var(--dk-inset-box)
    (sources.css .del-toggle), slid in with the row's content. Sampled from the 4S's UIRemoveControlMulti* art (29pt
    images, the circle 23pt): not picked, a 2pt ring of 10% black; picked, a 2pt white rim round a red disc, its top
    half a gloss (#bb646e to #a4313e), the bottom flat #900413, a soft shadow below, and a white tick. A picked row is
-   UITableView's pale blue multi-select fill (as My IPAs' Edit, myipas.css). */
+   UITableView's pale blue multi-select fill (My IPAs' Edit rows wear .manage-row and share it). */
 .manage-check {
   position: absolute; left: 10px; top: 50%; width: 23px; height: 23px; margin-top: -11.5px; box-sizing: border-box;
   pointer-events: none; transform: translateX(-40px); transition: transform .3s ease-in-out;

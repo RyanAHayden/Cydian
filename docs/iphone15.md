@@ -36,6 +36,10 @@ In `$IFIZBOX_15_RIG` (default `~/.local/share/ifizbox-rig/`), never in the repo:
   `app.mobileprovision`: links to the team's distribution cert and the explicit ad hoc profile that lists this
   phone). `install` signs every IPA with these, keeping its bundle ID, as the app's own signer does: the explicit
   profile carries app groups and push, which the wildcard development profile can't. `--as-is` skips signing.
+  The Keychain groups are the ones the app's own signer writes, not the profile's `[TEAM.*, com.apple.token]`:
+  `TEAM.<Info.plist ID>` first, then `TEAM.<App ID>`. Keychain items written under a rig-installed build (the
+  imported signing identity, the RemotePairing record) then stay readable after an in-app self-update or re-sign.
+  An IPA installed with `--as-is`, or by any other signer, can still lose them: re-import the identity and re-pair.
 - `ca-bundle.pem`: the system CA bundle plus Apple Root CA (https://www.apple.com/appleca/AppleIncRootCertificate.cer).
   gs.apple.com's chain ends at Apple's own root, which Linux doesn't trust.
 

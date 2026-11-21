@@ -10,7 +10,8 @@
 #   tools/ui-15.sh ME open URL        open a URL, e.g. ifizbox://sources
 #   tools/ui-15.sh ME launch BUNDLE   launch (or bring forward) an app; the brand's ID if BUNDLE is omitted
 #   tools/ui-15.sh ME install IPA [--as-is]  sign an .ipa for this phone (zsign, the team's ad hoc profile; keeps
-#                                     its bundle ID, like the app's own signer) and install it; --as-is: no signing
+#                                     its bundle ID and Keychain groups, like the app's own signer) and install it;
+#                                     --as-is: no signing
 #   tools/ui-15.sh ME home            Home
 #   tools/ui-15.sh ME lock-button     lock the screen;  ME wake: wake and unlock it (no passcode on this phone)
 #   tools/ui-15.sh ME reboot          restart the phone, wait for it, bring WDA back and unlock it (about a minute)
@@ -81,6 +82,34 @@ post() {  # post PATH JSON: under the session; prints WDA's error, if any, and f
     python3 -c 'import json,sys; v=json.load(sys.stdin).get("value"); e=isinstance(v,dict) and v.get("error"); sys.exit(e and print(e, v.get("message",""), file=sys.stderr) or 0)'
 }
 pt() { python3 -c "print(round($1/3))"; }  # screenshot pixels -> points (3x)
+# keychain_entitlements IPA PROFILE: the profile's entitlements the way the app's own signer writes them
+# (native/sign/Profile.swift entitlements(for:keptID:)), so Keychain items written under a rig-installed build (the
+# imported identity, the RemotePairing record) are still there after an in-app self-update or re-sign: keychain
+# groups [TEAM.<Info.plist ID>, TEAM.<App ID>] (the first only when the profile's groups allow it),
+# application-identifier TEAM.<App ID>, get-task-allow false. zsign alone would keep the profile's [TEAM.*, ...].
+keychain_entitlements() {
+  openssl smime -inform der -verify -noverify -in "$2" 2>/dev/null | python3 -c '
+import plistlib, re, sys, zipfile
+p = plistlib.loads(sys.stdin.buffer.read())
+e = p["Entitlements"]
+with zipfile.ZipFile(sys.argv[1]) as z:
+    info = next(n for n in z.namelist() if re.fullmatch(r"Payload/[^/]+\.app/Info\.plist", n))
+    kept = plistlib.loads(z.read(info))["CFBundleIdentifier"]
+team = e.get("com.apple.developer.team-identifier") or (p.get("TeamIdentifier") or [""])[0]
+app = e["application-identifier"].split(".", 1)[1]  # Profile.bundleID(for:)
+if app == "*":
+    app = kept
+elif app.endswith(".*"):
+    app = kept if kept.startswith(app[:-1]) else app[:-1] + kept.split(".")[-1]
+if team:
+    if "keychain-access-groups" in e:
+        own, mine = team + "." + kept, team + "." + app
+        ok = any(g == own or (g.endswith("*") and own.startswith(g[:-1])) for g in e["keychain-access-groups"])
+        e["keychain-access-groups"] = [own, mine] if own != mine and ok else [mine]
+    e["application-identifier"] = team + "." + app
+e["get-task-allow"] = False
+sys.stdout.buffer.write(plistlib.dumps(e))' "$1"
+}
 
 case $cmd in
   up) up ;;
@@ -102,8 +131,10 @@ case $cmd in
     ipa=$1
     if [ "${2:-}" != --as-is ]; then
       ipa=$run/signed.ipa
+      keychain_entitlements "$1" "$rig/sign/app.mobileprovision" > "$run/entitlements.plist" ||
+        { echo "couldn't read the bundle ID of $1 or the profile's entitlements" >&2; exit 1; }
       "$rig/zsign" -q -z 1 -k "$rig/sign/key.pem" -c "$rig/sign/cert.pem" -m "$rig/sign/app.mobileprovision" \
-        -o "$ipa" "$1" || { echo "zsign failed on $1" >&2; exit 1; }
+        -e "$run/entitlements.plist" -o "$ipa" "$1" || { echo "zsign failed on $1" >&2; exit 1; }
     fi
     gi install --path="$ipa" >/dev/null || { echo "install failed: $run/ios.log" >&2; exit 1; }
     echo "installed $1" ;;

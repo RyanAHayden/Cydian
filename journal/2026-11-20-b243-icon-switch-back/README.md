@@ -19,7 +19,7 @@ unless `alternateIconName` is already nil. No alert means that call never ran or
 ## What changed
 
 - `native/Sources/AppIcon.swift`: `switchTo` runs one switch at a time; a call that comes during one waits, only
-  the latest waiting one runs, and the one it replaces answers unchanged. A 15 s guard frees the line if a
+  the latest waiting one runs, and the one it replaces answers unchanged. A 60 s guard frees the line if a
   completion never comes. Both app.icon paths (theme icons and own icons) use it.
 - `web/app/appicon.js`: a reply of `failed: …` (iOS refused the switch) is sent again after 1 s, 3 s and 10 s; a
   newer change cancels the wait (it sends its own), and a stale reply no longer clears `lastSent` for a newer send.

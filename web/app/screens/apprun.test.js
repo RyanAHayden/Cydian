@@ -236,6 +236,23 @@ test("runAppQueueRun: the Signing walkthrough first; then the queued jobs to the
   assert.equal(appQueueRunning(), false);
 });
 
+test("B257: runAppQueueRun holds the app awake from Confirm; the run's lanes keep it; the page's close lets go", async () => {
+  const { runAppQueueRun } = await import("./queue.js");
+  const q = createAppQueue();
+  q.add(app("a", "Alpha"));
+  const sent = [];
+  const keep = (_n, on) => sent.push(on);
+  assert.equal(await runAppQueueRun(q.list(), { queue: q, ready: async () => false, lanes: {}, keep, run: async () => assert.fail("ran") }), null);
+  assert.deepEqual(sent, []); // the walkthrough opened: nothing held
+  let deps = null;
+  await runAppQueueRun(q.list(), { queue: q, ready: async () => true, keep,
+    lanes: { sign: async () => ({ token: "t" }), install: async () => ({ installed: true }) },
+    run: async (js, d) => { deps = d; await d.lanes.sign({ id: "a" }, {}); await d.lanes.install({ id: "a" }, {}); return { ok: true }; } });
+  assert.deepEqual(sent, [true, true, true]); // Confirm, then each lane's start
+  deps.onClose();
+  assert.deepEqual(sent, [true, true, true, false]);
+});
+
 test("F247: a one-app run opens on the Log; two apps open on the Apps list", () => withDom(async () => {
   const one = setup([app("a", "Alpha")]);
   const doneOne = runAppRun(one.queue.list(), { queue: one.queue, lanes: one.l, open: () => one.page });

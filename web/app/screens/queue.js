@@ -646,21 +646,31 @@ async function useAppRun() {
 // each waiting for iOS to install the one before. A failure or a row's stop ends that app only; Cancel abandons the
 // rest and reopens Confirm with what finished cleared. -> the run's first end ({ ok, stopped, rows, installed }), or
 // null when the Signing walkthrough opened instead.
-export async function runAppQueueRun(jobs, { queue = appQueue, record = recordApp, ready = readyToInstall, run = null, lanes = null } = {}) {
+// B257: from Confirm (once the safety nets and the Signing walkthrough have let it run) the app is kept running in the
+// background (signing.hold) while any app signs or installs, and let go once none does or the page closes
+// (signing/queue.js heldLanes); `keep` stands in for holdApp (tests).
+export async function runAppQueueRun(jobs, { queue = appQueue, record = recordApp, ready = readyToInstall, run = null, lanes = null, keep = null } = {}) {
   if (appRunning) return null;
   appRunning = true;
   updateAppChrome();
+  let held = null;
   try {
     if (!(await ready(jobs))) { appRunning = false; updateAppChrome(); return null; }
-    const sc = lanes ? null : await import("../signing-client.js");
+    const sc = await import("../signing-client.js");
+    const hold = keep ?? sc.holdApp;
+    hold(undefined, true); // Confirm
+    held = { release: () => hold(undefined, false) }; // until the lanes below take it over
     const { runAppRun, phoneLanes } = await import("./apprun.js");
+    // B137: on Settings > Installation's This iPhone route the rows say Installing, not Tap Install (no iOS prompt)
+    held = sc.heldLanes(lanes ?? { ...phoneLanes(sc), local: () => storedRoute() === "iphone" }, { keep: hold });
+    const lanesHeld = held;
     return await (run ?? runAppRun)(jobs.filter((j) => queue.get(j.id)), {
-      // B137: on Settings > Installation's This iPhone route the rows say Installing, not Tap Install (no iOS prompt)
-      queue, record, lanes: lanes ?? { ...phoneLanes(sc), local: () => storedRoute() === "iphone" },
-      onClose: () => { appRunning = false; updateAppChrome(); },
+      queue, record, lanes: lanesHeld,
+      onClose: () => { lanesHeld.release(); appRunning = false; updateAppChrome(); },
       reopenConfirm: (footer) => { appRunning = false; openAppConfirm(queue, { footer }); },
     });
   } catch (e) {
+    held?.release();
     appRunning = false;
     updateAppChrome();
     throw e;

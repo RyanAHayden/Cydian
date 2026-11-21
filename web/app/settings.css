@@ -27,11 +27,21 @@
 .theme-preview-space { height: 100px; }
 /* F215: the divider on top of the preview, dragged to move the split (screens/settings.js dragSplit). The strip is
    taller than it looks to the finger: 12px more above it. */
+/* concept: the top bar (divider, nav bar, search bar) drags the split; the sample under it scrolls and works */
+.theme-preview-top { flex: none; touch-action: none; cursor: row-resize; }
+.theme-preview-top .search-field, .theme-preview-top input { pointer-events: none; }
+.theme-preview-home { padding-top: 12px; }
+.theme-preview-body { scrollbar-width: none; }
+.theme-preview-buttons > button { font-family: inherit; cursor: pointer; }
+.theme-preview-buttons > button.store-btn:active { background: linear-gradient(#d6dbe3, #eceff3); background-origin: border-box; box-shadow: inset 0 1px 2px rgba(0,0,0,.25); }
 .theme-preview-grip { position: relative; flex: none; height: 25px; touch-action: none; cursor: row-resize; }
+.theme-preview-colours { margin-top: 10px; }
 .theme-preview-grip::before { content: ""; position: absolute; left: 0; right: 0; top: -12px; bottom: 0; }
 .theme-preview-grip::after { content: ""; position: absolute; left: calc(50% - 21.5px); top: 0; width: 43px; height: 17px; }
 .theme-preview-bar { position: relative; display: flex; align-items: center; justify-content: space-between; height: 44px; padding: 0 5px; }
 .theme-preview-bar .nav-title { flex: 1; }
+/* concept: no status-bar strip over the sample bar (.navbar::before covered it and the icon under it) */
+.theme-preview .navbar.theme-preview-bar::before { content: none; }
 .theme-preview-seg { margin: 10px; }
 .theme-preview-buttons { display: flex; align-items: center; gap: 10px; padding: 0 10px; }
 /* ==== look-only { ==== Signing's warning, Theme's Mode and swatches, the theme preview and its grip */
@@ -63,6 +73,16 @@
   --preview-grip-radius: 0 0 3px 3px;
 }
 .theme-preview { background: var(--preview-ground); box-shadow: var(--preview-shadow); }
+/* concept: the divider's strip as dark as its tab (the tab's own #333435 under a lighter top row) */
+.theme-preview-grip { background: linear-gradient(#5a5b5d, #333435 2px, #2a2b2c); box-shadow: inset 0 -1px #121212; }
+/* concept: a green bar button, .bar-button.done's gloss in the kit's green (Add Icon (green): #51b14f -> #3ba739);
+   UIKit has no green nav bar art to sample */
+.bar-button.green:not(.back):not(.done), html[data-theme="dark"] .bar-button.green:not(.back):not(.done) {
+  border-color: #1d6a1c; border-top-color: #30363e; color: #fff;
+  background: linear-gradient(#8fd68d, #51b14f 49%, #3ba739 51%, #3ca83a); background-origin: border-box; }
+/* pressed: darkened by the same steps as .bar-button.done's pressed blue */
+.bar-button.green:not(.back):not(.done):is(:active, .is-pressed), html[data-theme="dark"] .bar-button.green:not(.back):not(.done):is(:active, .is-pressed) {
+  background: linear-gradient(#72b870, #3d9a3b 49%, #2a8a28 51%, #2b8b29); background-origin: border-box; }
 .theme-preview-grip::after {
   border-radius: var(--preview-grip-radius); box-shadow: var(--preview-grip-edge);
   background: var(--preview-grip);

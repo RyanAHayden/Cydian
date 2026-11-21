@@ -347,6 +347,16 @@ stripes are one point tall. `test_native.py` keeps the images' total far under t
 - **Sideload IPA:** the signed bundle can't change, so its splash is neutral: `Info-sideload.plist` sets an empty
   `UILaunchScreen` (iOS's own background, white or black with the iPhone's appearance, no bars) and drops
   `UILaunchStoryboardName` (`mkipa.py`'s `IFIZBOX_REMOVE_KEYS`).
+- **Snapshots (the IPA, and the jailbreak build on iOS 16+, which no longer copies the bundle there):** iOS keeps
+  the splash it draws as files in the app's own `Library/SplashBoard/Snapshots/<bundle ID> - {DEFAULT GROUP}/*.ktx`
+  (one per appearance, Apple's ATX texture format at the screen's pixel size, no status bar) and reads them again at
+  every launch. On iOS 26 a bundle copy there gets the app denylisted (a black splash) or waits for a respring. On
+  every `app.theme`, `Snapshot.follow` renders the theme's frame (the cover's storyboard, laid out on the window and
+  taken off before it shows) and writes it over those files with ImageIO's `com.apple.atx`; the next launch opens
+  on it. Which file is light and which is dark iOS doesn't say: a file iOS drew is plain white or plain black in the
+  IPA, and that tone is remembered per file (UserDefaults `ifizbox.splashSnapshots`). A file whose tone can't be
+  told gets the theme of the iPhone's appearance at the time. Files that already hold the theme are left alone. After
+  an install or update iOS draws new files, so that first launch shows iOS's own splash again.
 - **Both:** the cover is the theme's frame, `LaunchThemes/<key>/` loaded as a bundle of its own
   (`Splash.cover`); with that set missing (a palette this build doesn't know) there is no cover and nothing is
   copied, never another theme's bars. The IPA therefore goes from the plain fill to the theme's bars, which fade

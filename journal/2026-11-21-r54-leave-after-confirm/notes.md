@@ -6,12 +6,20 @@ page's route check wait for the app to come back (WebKit suspending the web cont
 
 ## Answer
 
-**It goes on. The route check doesn't wait.** In all 4 runs that reached the phone (runs 2-5 below), with iOS Settings in
-front less than 1 s after the tap, the download, the signing, the page's route check, This iPhone's copy and installd
-all ran with the app in the background. iOS installed the app 24-55 s after the tap, and the app never came back to
-the front. WebKit logged `WebProcess::prepareToSuspend: Process is ready to suspend` over and over. That didn't
-stop the page: the route check (page JS: `chooseRoute` → `idevice.status` → `signing.open`) ran each time between
-the signing's answer and the copy's first line. The web content process was never suspended while the app ran.
+**It goes on. The route check doesn't wait.** In the 4 runs with a working pairing (runs 2-5 below), the app was
+in the background 0.9-1.3 s after the tap. The download, the signing, the page's route check, This iPhone's copy
+and installd all ran with the app in the background, and iOS installed the app 35-60 s after the tap. The app never
+came back to the front.
+
+How the route check is known to have run, since `idevice.status` writes no log line of its own: on this path the
+page sends `signing.open` only after `signing.prepare` has answered and `chooseRoute` has had `idevice.status`'s
+answer (`signing/queue.js openPrepared`). Its result was the This iPhone route, and `installHere`'s first line
+("This iPhone: com.ryha.r54test …") comes from that `signing.open`. A held route (`ROUTE_HOLD`, 60 s) can't explain
+it: each run came more than 3 minutes after the last route check. So the page JS answered `prepare`, called
+`idevice.status`, got the answer and sent `signing.open`, all with iOS Settings in front.
+
+WebKit logged `WebProcess::prepareToSuspend: Process is ready to suspend` 305 times during run 2 alone (excerpt:
+`run2-webkit.txt`). That never stopped the page: the content process stayed running while the app process ran.
 No B filed for the route check.
 
 **But B252's holds are not on the path Confirm takes.** In Lite, Confirm (the queue's Confirm sheet) and Installed
@@ -24,12 +32,14 @@ staged `…-ahead.ipa`. B252 put its holds on `signing.install` (`Sideload.insta
 - This iPhone's copy and installd (`installHere`), taken when `signing.open` starts.
 
 In between, nothing holds the app: the signing inside `signing.prepare` and the page's route check before
-`signing.open`. My runs got through only because that gap was short (about 3 s on the A17 Pro for these IPAs, about
-12 s after leaving in runs 1-2, where the download was fast). When nothing holds it, iOS suspended the app about 5 s
-later every time (after each install: 00:53:52→00:53:57, 00:57:14→00:57:19, 01:01:12→01:01:17, 01:04:54→01:04:59,
-`Sending stop command … because client is background suspended`, `taskState: Suspended`). So a signing that runs past
-that point with the app in the background will pause until the app is back. That fits B246's stalled run ("the IPA
-not signed yet", waited 2.5 min, before B252, same sign-ahead path). Filed as a B (below).
+`signing.open`. My runs got through while that gap was short: about 3 s on the A17 Pro for these IPAs, and 11-12.5 s
+after leaving in runs 1-3, where the download was fast too. After a hold ended with the app idle, iOS suspended it
+about 5 s later each time (after each install: 00:53:52→00:53:57, 00:57:14→00:57:19, 01:01:12→01:01:17,
+01:04:54→01:04:59; `Sending stop command … because client is background suspended`, `taskState: Suspended`). Those
+are idle cases. No run caught iOS suspending the app in the middle of unheld work. So it is likely, not shown, that a
+signing that runs past that point in the background pauses until the app is back. B246's stalled run ("the IPA not
+signed yet", waited 2.5 min, on the build before B252) may be this. Its journal says "Confirm", but its test IPAs went in
+through the app's Documents (Install IPAs, the My IPAs path), so which path it took is not certain. Filed as a B (below), as a separate finding from the route check.
 
 ## Runs (iPhone 15 Pro, iOS 27.0.1, Lite 0.18.2 build 3447 = main at b0462936, Tailscale route)
 
@@ -38,8 +48,9 @@ and installed it with `tools/ui-15.sh R54 install`. Test app `com.ryha.r54test`:
 padding, versions 1.0-5.0, never launched. It was published as a local AltStore source over `tailscale serve` (the
 app's ATS refuses plain http for a source: "Verification Error … App Transport Security"). The source → app page →
 Install → Confirm path is the one the brief means. Every run: tap Confirm (or Update App), then
-`ui-15.sh launch com.apple.Preferences` right away (iOS Settings in front 0.3-0.8 s after the tap). The timings come
-from the os_log lines (`phone-log.txt`, trimmed from `pymobiledevice3 syslog live`).
+`ui-15.sh launch com.apple.Preferences` right away. The app logged "went to the background" 0.9-1.3 s after the tap
+command started. The timings come from the os_log lines (`phone-log.txt`, trimmed from `pymobiledevice3 syslog
+live`: the app's `iFizBox install:` lines, SpringBoard's process state and audiomxd's stop commands).
 
 | Run | Path | Tap → in background | Download + signing + route check done | Copy | Installed | App in front again? |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -83,8 +94,19 @@ Phone left as: B252's build (3447) installed, re-paired (RemotePairing works ove
 identity still there (Certificate 341 days). R54 Test uninstalled, its IPA removed from Documents, the test source
 deleted. Screens `r54-*.png` are in the worktree's ignored `ref/15/screens/` (not committed).
 
+## Spec review (fresh subagent, diff + brief only)
+
+- Fixed: wrong ranges (installed 35-60 s after the tap, not 24-55; in the background 0.9-1.3 s, not "under 1 s");
+  "runs 1-2" → runs 1-3. Added how the route check is known to have run (no `idevice.status` log line exists) and
+  the WebKit lines (`run2-webkit.txt`). The 5 s suspension and the B246 link are now marked as likely, not shown.
+- Kept: B257 and B258 are findings from this run, filed as follow-ups as the run rules ask. They are not the brief's
+  "file a B if the route check waits", which didn't happen. `plan/TODO.md` was changed by `run plan add` / `plan
+  note`, not by hand.
+
 ## Not verified
 
+- **The route check as its own log line**: `idevice.status` logs nothing. That it ran is inferred from the order the
+  page sends calls in (above).
 - **A signing that runs longer than ~5 s after the last hold ends, with the app in the background**: not
   reproduced. The A17 Pro signed every test IPA in about 3 s. The stall is inferred: no hold in the code, plus iOS
   suspending the app about 5 s after each hold ended (4 times here). That inference is why the B is filed. Other

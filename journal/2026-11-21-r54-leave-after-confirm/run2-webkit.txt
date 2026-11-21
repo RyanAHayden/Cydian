@@ -1,0 +1,20 @@
+2026-11-21 00:53:17.476681 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: the app went to the background
+2026-11-21 00:53:17.518623 SpringBoard{SpringBoard}[37] <NOTICE>: Application process state changed for com.ryha.ifizbox: <SBApplicationProcessState: 0x7740725400; pid: 1044; taskState: Running; visib
+2026-11-21 00:53:17.617814 iFizBox{WebKit}[1044] <NOTICE>: WebContent[1046]: [sessionID=1] WebProcess::prepareToSuspend: Process is ready to suspend
+2026-11-21 00:53:29.065831 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: This iPhone: com.ryha.r54test 2.0, 326.6 MB
+2026-11-21 00:53:29.067236 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: installing 74bfc838f46d7798bf77f1aa22a9a56f-ahead.ipa (311.5 MB) as com.ryha.r54test 2.0
+2026-11-21 00:53:29.074133 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: step: starting Tailscale (limit 30 s)
+2026-11-21 00:53:29.130593 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: step: finding RemotePairing's port through Tailscale (limit 30 s)
+2026-11-21 00:53:29.131223 iFizBox{WebKit}[1044] <NOTICE>: WebContent[1046]: [sessionID=1] WebProcess::prepareToSuspend: Process is ready to suspend
+2026-11-21 00:53:30.206811 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: step: connecting to iOS at 127.0.0.1:52286 through Tailscale (RemotePairing tunnel, RSD) (limit 30 s)
+2026-11-21 00:53:30.461477 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: tunnel and RSD up in 0.25 s: RSD 737a8efe-cff1-47a2-bab5-74df5eecf24e, 76 services, AFC on 52344, installation_proxy on 523
+2026-11-21 00:53:30.461497 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: step: connecting to installation_proxy (limit 20 s)
+2026-11-21 00:53:30.471359 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: installation_proxy connected
+2026-11-21 00:53:30.474569 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: step: asking installation_proxy for com.ryha.r54test (limit 20 s)
+2026-11-21 00:53:30.492559 iFizBox{WebKit}[1044] <NOTICE>: WebContent[1046]: [sessionID=1] WebProcess::prepareToSuspend: Process is ready to suspend
+2026-11-21 00:53:30.523794 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: before the install, iOS lists com.ryha.r54test: nothing
+2026-11-21 00:53:30.523945 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: step: connecting to AFC (limit 20 s)
+2026-11-21 00:53:30.526556 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: AFC connected
+2026-11-21 00:53:30.526585 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: step: opening /PublicStaging/C704A83E-AB82-45BE-A7D2-300BEC45C62C.ipa on iOS (AFC) (limit 20 s)
+2026-11-21 00:53:30.531351 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: step: copying the IPA to iOS (AFC) (limit 30 s)
+2026-11-21 00:53:30.540350 iFizBox{WebKit}[1044] <NOTICE>: WebContent[1046]: [sessionID=1] WebProcess::prepareToSuspend: Process is ready to suspend

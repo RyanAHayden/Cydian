@@ -107,6 +107,8 @@ html[data-style="ios13"][data-theme="light"] {
   --sig-pill: #34c759; --sig-pill-soon: #ff9500; --sig-pill-expired: #ff3b30; --sig-pill-unknown: #8e8e93;
   --sig-pill-shadow: none;
   --tweak-pill: #8e8e93; --tweak-pill-up: #34c759; --tweak-pill-shadow: none;
+  /* packages.css .row-failed-badge (Sources' failed row), flat systemRed */
+  --row-failed-badge: #ff3b30; --row-failed-badge-shadow: none;
   /* the notification banner (nav/banner.js), flat: the bars' #f9f9f9 over a hairline, black text, no embosses */
   --banner: #f9f9f9; --banner-shadow: none; --banner-edge: var(--i13-hairline); --banner-icon-shadow: none;
   --banner-emboss: none; --banner-title: #000; --banner-text: #000; --banner-timer: rgba(0,0,0,.2);
@@ -172,6 +174,7 @@ html[data-style="ios13"][data-theme="dark"] {
   --sig-pill: #30d158; --sig-pill-soon: #ff9f0a; --sig-pill-expired: #ff453a; --sig-pill-unknown: #8e8e93;
   --sig-pill-shadow: none;
   --tweak-pill: #8e8e93; --tweak-pill-up: #30d158; --tweak-pill-shadow: none;
+  --row-failed-badge: #ff453a; --row-failed-badge-shadow: none;
   --banner: #1c1c1e; --banner-shadow: none; --banner-edge: var(--i13-hairline); --banner-icon-shadow: none;
   --banner-emboss: none; --banner-title: #fff; --banner-text: #fff; --banner-timer: rgba(255,255,255,.3);
   --reload-bar: linear-gradient(var(--i13-hairline), var(--i13-hairline)) top / 100% .5px no-repeat, #000;

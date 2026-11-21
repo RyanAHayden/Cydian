@@ -1162,8 +1162,14 @@ html[data-theme="dark"] .dep-piracy .dep-review-title { color: var(--dk-bad); }
 .source-row.is-failed .cell-count.row-failed-badge { min-width: 20px; padding: 0 6px; }
 /* ==== look-only { ==== Sources' refresh, one row per source */
 .row-waiting { font-size: 14px; color: var(--subtitle); }
+/* B242: the fill and the shadow are tokens, like the signature pills' (--sig-pill*), so an era (ios13.css) draws its
+   own badge without rules of its own. */
+:root {
+  --row-failed-badge: linear-gradient(#f7b3b7, #e92d35 48.8%, #e70f19 50.5%, #c50103);
+  --row-failed-badge-shadow: 0 1px 1.5px rgba(0,0,0,.45);
+}
 .source-row.is-failed .cell-count.row-failed-badge {
-  font-size: 13px; letter-spacing: -.02em; background: linear-gradient(#f7b3b7, #e92d35 48.8%, #e70f19 50.5%, #c50103);
-  box-shadow: 0 1px 1.5px rgba(0,0,0,.45);
+  font-size: 13px; letter-spacing: -.02em; background: var(--row-failed-badge);
+  box-shadow: var(--row-failed-badge-shadow);
 }
 /* ==== } look-only ==== */

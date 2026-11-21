@@ -36,6 +36,7 @@ export async function chooseRoute({ native, alert = showAlert, storage = storage
 export const forgetRoute = () => { heldRoute = null; };
 import { showBanner } from "../nav/banner.js";
 import { phaseLabel, deviceError } from "../core/signing.js";
+import { rateText } from "../core/downloadmeter.js"; // B262
 import { IFIZBOX_ID } from "../core/websign.js";
 import { withKeep } from "../core/keepid.js";
 import { progressHUD, RESTART_BY_HAND, RETURN_LABEL, lockSelfUpdate, WAITING_LABEL } from "../nav/progress.js";
@@ -135,6 +136,7 @@ async function installOnDeviceOnce({ url, name = "", onInstalled = () => {}, par
   const h = hud("Downloading");
   h.onCancel?.(() => stopNative(native));
   let lastHere = null;
+  let rate = 0; // B262
   let result;
   try {
     // manifestServer: the signing server hands iOS the manifest while iFizBox serves the IPA over plain HTTP at
@@ -153,7 +155,9 @@ async function installOnDeviceOnce({ url, name = "", onInstalled = () => {}, par
       }
       if (route.route && lastHere && ev?.phase === "here") return; // a newer shell sends both: {here} wins
       const t = phaseLabel(ev);
-      if (t) h.set(t);
+      // B262: the download's last MB/s (the shell's once-a-second {rate}) stays on the label between its ticks
+      if (ev?.phase === "downloading" && ev.rate != null) rate = Number(ev.rate) || 0;
+      if (t) h.set(ev?.phase === "downloading" && rate > 0 ? `${t}, ${rateText(rate)}` : t);
     }), { alert, url: params ? null : url }));
   } catch (e) {
     if (h.cancelled) return false;

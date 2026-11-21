@@ -1,8 +1,8 @@
 // B262: an IPA's download shows its bytes, percent and MB/s: the shell's once-a-second numbers reach the run's row
-// (signing/queue.js prepareOnDevice), and the website's fetch puts them on its progress page's label and Log.
+// (signing/queue.js prepareOnDevice) and Install's progress page (signing/route.js), and the website's fetch puts them on its progress page's label and Log.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { downloadIpa, prepareOnDevice, signInBrowser } from "./signing-client.js";
+import { downloadIpa, installOnDevice, prepareOnDevice, signInBrowser } from "./signing-client.js";
 
 const MB = 1048576;
 
@@ -23,6 +23,32 @@ test("prepareOnDevice: the shell's download numbers go to the row, its lines to 
   assert.deepEqual(seen, [["downloading", 0.1, "downloading"],
     ["downloading", 0.1, "downloading", { bytes: 30 * MB, total: 300 * MB, rate: 21 * MB }]]);
   assert.deepEqual(lines, ["Downloading https://a.example/x.ipa", "Downloaded 30.0 of 300.0 MB (10%), 21.0 MB/s"]);
+});
+
+test("Install's progress page: the download's MB/s stays on the label between the shell's ticks", async () => {
+  const saved = globalThis.ifizboxNative;
+  const labels = [], raws = [];
+  const native = {
+    mode: "sideload",
+    async call(m, params, onEvent) {
+      if (m !== "signing.install") return null;
+      onEvent({ phase: "downloading", progress: 0.1 });
+      onEvent({ phase: "downloading", progress: 0.1, bytes: 30 * MB, total: 300 * MB, rate: 21 * MB });
+      onEvent({ log: "Downloaded 30.0 of 300.0 MB (10%), 21.0 MB/s" });
+      onEvent({ phase: "downloading", progress: 0.11 });
+      onEvent({ phase: "signing", progress: 0.5 });
+      return { bundleId: "com.x", name: "X", version: "1", removed: [] };
+    },
+  };
+  try {
+    globalThis.ifizboxNative = native;
+    await installOnDevice({ url: "https://e.example/x.ipa", name: "X" }, {
+      native, alert: async () => ({ index: 0 }), go: () => {}, later: () => {}, follow: () => {},
+      hud: (t) => { labels.push(t); return { set: (x) => labels.push(x), hide() {}, page: { raw: (l) => raws.push(l) } }; },
+    });
+  } finally { globalThis.ifizboxNative = saved; }
+  assert.deepEqual(labels.slice(0, 5), ["Downloading", "Downloading 10%", "Downloading 10%, 21.0 MB/s", "Downloading 11%, 21.0 MB/s", "Signing 50%"]);
+  assert.deepEqual(raws, ["Downloaded 30.0 of 300.0 MB (10%), 21.0 MB/s"]);
 });
 
 // A body of `parts` pieces of `size` bytes, the length in X-IPA-Length; `step` moves the fake clock per piece read.

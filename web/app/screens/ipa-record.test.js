@@ -41,3 +41,17 @@ test("rememberIpa: keeps a record from the app's source page; nothing without a 
   assert.equal(await rememberIpa({ bundleId: "" }, "x", { store: async () => s }), null);
   assert.equal(await rememberIpa({ bundleId: "a.b" }, "x", { store: async () => { throw new Error("no store"); } }), null);
 });
+
+test("rememberIpa: a My IPAs record (library: key, no source) gives way to the URL install's", async () => {
+  const s = memoryAppStore([{ id: "com.example.app", name: "Example", version: "2.0", key: "library:Example.ipa", source: null,
+    sourceName: "My IPAs", date: 1 }]);
+  const rec = await rememberIpa({ ok: true, bundleId: "com.example.app" }, "Example.ipa", { store: async () => s });
+  assert.equal(rec.name, "Example");
+  const [kept] = await s.all();
+  assert.equal(kept.key, null);
+  assert.equal(kept.sourceName, null);
+  assert.equal(kept.version, "");
+  // a library: key that also names a source is a source page's record: kept
+  const t = memoryAppStore([{ id: "com.example.app", name: "Example", version: "2.0", key: "library:x", source: "https://s", date: 1 }]);
+  assert.equal(await rememberIpa({ bundleId: "com.example.app" }, "x", { store: async () => t }), null);
+});

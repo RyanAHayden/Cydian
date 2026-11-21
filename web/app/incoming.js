@@ -227,7 +227,8 @@ async function handleOtherLink(u, other, { native, alert, hud, add, install, on,
 // B281: once the run ends, Installed loads the signed records again (screens/installed.js reloadSigned): this install
 // writes no record of its own, so its list row and the app's page would keep the record from before.
 // B283: when the install lands, the app's My IPAs record goes (screens/installed.js dropMyIpasRecord), from the
-// install's own answer, so a run that waits for a connection (rememberInstall) drops it too when it ends.
+// install's own answer, so a run that waits for a connection (rememberInstall) drops it too when it ends. The
+// jailbreak build keeps no signed record, so there the drop does nothing: rememberIpa replaces the record instead.
 async function confirmInstall(url, name, message, { alert, install, open, reload = reloadInstalled, drop = dropMyIpas }) {
   open(format({ tab: "installed", path: ["myipas"] }));
   const { index } = await alert({ title: "Install IPA", message, buttons: ["Cancel", "Install"], cancel: 0 });

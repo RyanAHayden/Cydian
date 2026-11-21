@@ -36,6 +36,7 @@ import { appJob, appNavLabel, modifyActions, resignJob, MARK_NOT_INSTALLED, dest
 import { markedVersionOnSource, markedResignJob } from "../core/appqueue.js"; // F221
 import { signatureState, signedIndex, resignWindow } from "../core/signing.js";
 import { compareVersions } from "../core/apt.js";
+import { altVersionList } from "../core/catalog.js"; // B232: Install Which Version? offers what Version History does
 import { ignoreVersionLabel, withVersionButton, versionToStore, IGNORE_VERSION } from "../core/appupdates.js"; // F281
 import { queueApp } from "./queue.js";
 import { descriptionGroup } from "./description.js";
@@ -282,7 +283,7 @@ function trackingSection(app, pkg, source, body = null) {
     const rows = rec
       ? [{ label: "Installed Version", detail: rec.version || "Unknown" },
         // B232: installs another of the source's versions (Install Which Version?), as Version History does
-        ...(byHand && versions.length > 1 ? [{ label: "Change Installed Version", onClick: () => installWhichVersion(app, pkg, source, { installed: rec.version || "" }) }] : []),
+        ...(byHand && installWhichButtons(app, rec.version || "", currentDevice().ios ?? null).versions.some(Boolean) ? [{ label: "Change Installed Version", onClick: () => installWhichVersion(app, pkg, source, { installed: rec.version || "" }).catch(() => {}) }] : []),
         ...(byHand ? [{ label: MARK_NOT_INSTALLED_LABEL, onClick: () => apps().then((store) => removeInstall(store, app.bundleIdentifier)).then(draw, () => {}) }] : [])]
       : byHand ? [{ label: MARK_INSTALLED_LABEL, onClick: () => (versions.length > 1 ? pick() : mark(versions[0] ?? "")) }] : [];
     // The nav bar's button says what it will do, as Cydia's does: Upgrade when a newer version is out than the one
@@ -328,9 +329,10 @@ export const INSTALL_WHICH_TITLE = "Install Which Version?";
 export const MARK_WHICH_TITLE = "Which Version Did You Install?";
 
 // -> { buttons, versions } : the sheet's labels and, at the same index, the version entry a tap installs (null for the
-// installed one). Versions without a number are left out; the order is newest first.
-export function installWhichButtons(app, installed = "") {
-  const list = (app?.versions ?? []).filter((x) => x?.version);
+// installed one). As Version History greys them, versions that don't run on this iOS (`ios`; null: unknown, all run)
+// or have nothing to install from are left out, and so are numberless ones; the order is newest first.
+export function installWhichButtons(app, installed = "", ios = null) {
+  const list = altVersionList(app, ios).filter((x) => x?.version && ((x.runs && x.installable) || (installed && x.version === installed)));
   const sorted = list.map((x, i) => [x, i]).sort((a, b) => compareVersions(b[0].version, a[0].version) || a[1] - b[1]).map(([x]) => x);
   return {
     buttons: sorted.map((x) => (installed && x.version === installed ? `${x.version} (Installed)` : x.version)),
@@ -339,14 +341,16 @@ export function installWhichButtons(app, installed = "") {
 }
 
 // The sheet and the install. -> the version entry installed (queued or signed), or null (Cancel, the installed row).
-export async function installWhichVersion(app, pkg, source, { installed = "", ask = showActionSheet, mode = detectMode(),
+// Sideload: the version's job is queued (Confirm); when nothing could be queued, the install rows' first one runs, as
+// Version History falls back to its rows (siteInstallVersion picks the same first row).
+export async function installWhichVersion(app, pkg, source, { installed = "", ask = showActionSheet, mode = detectMode(), ios = currentDevice().ios ?? null,
   queueVersion = (v) => appPageAction(pkg, source, { version: v.version }), siteInstall = (v) => siteInstallVersion(pkg, v, source) } = {}) {
-  const { buttons, versions } = installWhichButtons(app, installed);
-  if (!buttons.length) return null;
+  const { buttons, versions } = installWhichButtons(app, installed, ios);
+  if (!versions.some(Boolean)) return null;
   const i = await ask({ title: INSTALL_WHICH_TITLE, buttons });
   const v = i >= 0 ? versions[i] : null;
   if (!v) return null;
-  if (mode === "sideload") await queueVersion(v);
+  if (mode === "sideload") { if (!(await queueVersion(v))) await siteInstall(v); }
   else if (mode === "site") await siteInstall(v);
   else return null;
   return v;

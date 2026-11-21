@@ -24,9 +24,31 @@ test("installWhichButtons: newest first, the installed one marked with nothing t
   assert.deepEqual(installWhichButtons({ versions: [] }, "1").buttons, []);
 });
 
+test("installWhichButtons: as Version History, no version without a download or that this iOS can't run", () => {
+  const app = { versions: [{ version: "3.0", downloadURL: "https://s/a3.ipa", minOSVersion: "28.0" }, { version: "2.5" },
+    { version: "2.1", downloadURL: "https://s/a21.ipa" }, { version: "2.0", downloadURL: "https://s/a20.ipa" }] };
+  assert.deepEqual(installWhichButtons(app, "2.0", "27.0").buttons, ["2.1", "2.0 (Installed)"]);
+  // the installed one stays listed (marked) even when it couldn't be installed from here
+  assert.deepEqual(installWhichButtons(app, "2.5", "27.0").buttons, ["2.5 (Installed)", "2.1", "2.0"]);
+});
+
+test("installWhichVersion (sideload): nothing queued (no job, not ready): the install row runs instead", async () => {
+  const r = rig((b) => b.indexOf("2.0"), "sideload");
+  r.opts.queueVersion = async (v) => { r.queued.push(v.version); return false; };
+  assert.equal((await installWhichVersion(APP, PKG, null, r.opts)).version, "2.0");
+  assert.deepEqual(r.queued, ["2.0"]);
+  assert.deepEqual(r.signed, ["2.0"]);
+});
+
+test("installWhichVersion: only the installed one to offer: no sheet", async () => {
+  const r = rig(() => 0, "sideload");
+  assert.equal(await installWhichVersion({ versions: [{ version: "1", downloadURL: "https://s/1.ipa" }] }, PKG, null, { ...r.opts, installed: "1" }), null);
+  assert.equal(r.asked.length, 0);
+});
+
 function rig(pick, mode) {
   const asked = [], queued = [], signed = [];
-  const opts = { installed: "2.1", mode, ask: async (o) => { asked.push(o); return pick(o.buttons); },
+  const opts = { installed: "2.1", mode, ios: null, ask: async (o) => { asked.push(o); return pick(o.buttons); },
     queueVersion: async (v) => { queued.push(v.version); return true; }, siteInstall: async (v) => { signed.push(v.version); } };
   return { asked, queued, signed, opts };
 }

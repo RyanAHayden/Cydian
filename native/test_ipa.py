@@ -201,6 +201,23 @@ class SideloadPlists(unittest.TestCase):
         self.assertEqual(info["LSApplicationQueriesSchemes"], ["apple-magnifier", "localdevvpn", "tailscale"])
         self.assertNotIn("UIBackgroundModes", plistlib.loads(plist()))  # the jailbreak build stays as it was
 
+    def test_splash_status_bar_reads_on_white_and_black(self):
+        # The neutral splash is white in light mode: LightContent would put a white status bar on it.
+        tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp)
+        base, out = os.path.join(tmp, "base.plist"), os.path.join(tmp, "out.plist")
+        with open(base, "wb") as f:
+            f.write(plist())
+        mkipa.merge_plist(base, os.path.join(HERE, "Info-sideload.plist"), out)
+        with open(out, "rb") as f:
+            info = plistlib.load(f)
+        self.assertEqual(info["UILaunchScreen"], {})
+        self.assertEqual(info["UIStatusBarStyle"], "UIStatusBarStyleDefault")
+        # view-controller-based appearance stays on, so App.swift's per-controller style applies after launch
+        self.assertTrue(info.get("UIViewControllerBasedStatusBarAppearance", True))
+        jailbreak = plistlib.loads(plist())
+        self.assertEqual(jailbreak["UIStatusBarStyle"], "UIStatusBarStyleLightContent")  # its splash has the blue bar
+
 
 if __name__ == "__main__":
     unittest.main()

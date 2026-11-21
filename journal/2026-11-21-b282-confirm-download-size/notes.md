@@ -23,3 +23,9 @@
 
 - On the iPhone 15 Pro (Confirm for a My IPAs Reinstall shows no Downloading row): not done, the run is
   unattended and the change is a pure-JS count covered by the unit tests above.
+
+## Review
+
+- Spec review: dropped an extra `op !== "remove"` check (a Remove has no url, so it never counted), made the comment
+  say the test is the url alone, and wrote down why a dependency counts without a url (dependencies carry only a
+  size; none are made yet).

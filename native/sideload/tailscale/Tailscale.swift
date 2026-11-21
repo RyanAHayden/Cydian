@@ -12,12 +12,15 @@
 //   tailscale.signInCancel ends a running tailscale.signIn (it replies "canceled: ..."); the page asks it when it's left
 //                         while the sign-in starts or waits for approval
 //   tailscale.test        RemotePairing's handshake to this phone through the tailnet: {ok, code, detail, peer, ms}
-//   tailscale.signOut     logs the node out and deletes its state -> status
+//   tailscale.signOut     logs the node out and deletes its state (the Keychain's copy too) -> status
+//   tailscale.keepRoute   {value: "iphone"|"server"}: B218, Install Apps With kept in the Keychain beside the node
+//   tailscale.keptRoute   -> the kept Install Apps With, or null (core/installroute.js keepRoute takes it on a fresh start)
 import Darwin
 import Foundation
 import IDeviceFFI
 import os
 import SafariServices
+import Security
 import TailscaleFFI
 import UIKit
 
@@ -86,6 +89,7 @@ enum Tailscale {
 
     /// Starts the node (or reads it, if it runs): {running, state, authURL, name, ips, keyExpiry, expired, error}.
     static func start() -> [String: Any] {
+        TailscaleKeep.restoreState()
         let dir = strdup(stateDir.path), host = strdup(hostname)
         defer { free(dir); free(host) }
         let t0 = Date()
@@ -101,11 +105,15 @@ enum Tailscale {
         var n: [String: Any] = ["name": st["name"] as? String ?? hostname]
         if let k = st["keyExpiry"] as? String, !k.isEmpty { n["keyExpiry"] = k }
         UserDefaults.standard.set(n, forKey: nodeKey)
+        TailscaleKeep.keepNode(n)
+        TailscaleKeep.keepState()
     }
 
+    /// Only an explicit Sign Out comes here: the node's state goes, in the container and in the Keychain.
     static func forget() {
         UserDefaults.standard.removeObject(forKey: nodeKey)
         try? FileManager.default.removeItem(at: stateDir)
+        TailscaleKeep.forgetNode()
     }
 
     // ---- Installing (IDevice.Session, on IDevice.queue's thread)
@@ -172,12 +180,30 @@ enum Tailscale {
 enum TailscaleBridge {
     static func register(_ b: Bridge) {
         Tailscale.deviceName = UIDevice.current.name
+        TailscaleKeep.restoreDefaults()
         b.on("tailscale.status") { c in IDeviceBridge.quick(c) { Tailscale.status() } }
         b.on("tailscale.setConnect") { c in
             IDeviceBridge.quick(c) {
                 let v = c.params["value"] as? String ?? "auto"
-                UserDefaults.standard.set(["auto", "localdevvpn", "tailscale"].contains(v) ? v : "auto", forKey: Tailscale.connectKey)
+                let value = ["auto", "localdevvpn", "tailscale"].contains(v) ? v : "auto"
+                UserDefaults.standard.set(value, forKey: Tailscale.connectKey)
+                TailscaleKeep.write(TailscaleKeep.connectAccount, Data(value.utf8))
                 return Tailscale.status()
+            }
+        }
+        b.on("tailscale.keepRoute") { c in
+            let v = c.params["value"] as? String ?? ""
+            guard ["iphone", "server"].contains(v) else { return Apt.reply(c, nil, "bad_params: value is iphone or server") }
+            IDeviceBridge.quick(c) {
+                TailscaleKeep.write(TailscaleKeep.routeAccount, Data(v.utf8))
+                return true
+            }
+        }
+        b.on("tailscale.keptRoute") { c in
+            IDeviceBridge.quick(c) {
+                guard let d = TailscaleKeep.read(TailscaleKeep.routeAccount), let v = String(data: d, encoding: .utf8),
+                      ["iphone", "server"].contains(v) else { return NSNull() }
+                return v
             }
         }
         b.on("tailscale.signIn") { c in
@@ -291,5 +317,85 @@ enum TailscaleBridge {
         r["name"] = st["name"] ?? NSNull()
         Tailscale.log("test \(own):\(port): \(r)")
         return r
+    }
+}
+
+/// B218: This iPhone's setup kept in the Keychain, so a reinstall, a re-sign or a fresh container (an account sign-in
+/// after one) comes back as it was: the node's state file (its machine and node keys: the same device returns to the
+/// tailnet instead of a new one each time), {name, keyExpiry}, Connect With and Install Apps With. This device only,
+/// never in a backup, readable after the first unlock, as the account key (Account.swift). The Keychain outlives the
+/// app's container while the signing team stays the same. Only Sign Out deletes the node's part.
+enum TailscaleKeep {
+    static let service = "com.ryha.ifizbox.tailscale"
+    static let stateAccount = "state", nodeAccount = "node", connectAccount = "connect", routeAccount = "route"
+    static let stateFile = "tailscaled.state" // tsnet's FileStore in Server.Dir
+
+    private static func query(_ account: String) -> [String: Any] {
+        [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service, kSecAttrAccount as String: account]
+    }
+
+    static func read(_ account: String) -> Data? {
+        var q = query(account)
+        q[kSecReturnData as String] = true
+        q[kSecMatchLimit as String] = kSecMatchLimitOne
+        var out: CFTypeRef?
+        guard SecItemCopyMatching(q as CFDictionary, &out) == errSecSuccess else { return nil }
+        return out as? Data
+    }
+
+    /// nil deletes it. A failure is logged, never thrown: the container's copy still works until the next reinstall.
+    static func write(_ account: String, _ data: Data?) {
+        let q = query(account)
+        guard let data = data else { SecItemDelete(q as CFDictionary); return }
+        if read(account) == data { return }
+        var st = SecItemUpdate(q as CFDictionary, [kSecValueData as String: data] as CFDictionary)
+        if st == errSecItemNotFound {
+            var add = q
+            add[kSecValueData as String] = data
+            add[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+            st = SecItemAdd(add as CFDictionary, nil)
+        }
+        if st != errSecSuccess { Tailscale.log("keychain refused \(account) (\(st))") }
+    }
+
+    static var stateURL: URL { Tailscale.stateDir.appendingPathComponent(stateFile) }
+
+    /// After the node runs signed in: its state file (keys rotate on a new login) into the Keychain.
+    static func keepState() {
+        guard let d = try? Data(contentsOf: stateURL), !d.isEmpty else { return }
+        write(stateAccount, d)
+    }
+
+    /// Before the node starts: no state file in the container (reinstalled, re-signed) but one kept, so it goes back.
+    static func restoreState() {
+        let url = stateURL
+        guard !FileManager.default.fileExists(atPath: url.path), let d = read(stateAccount) else { return }
+        do {
+            try d.write(to: url, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+            Tailscale.log("node state restored from the keychain")
+        } catch { Tailscale.log("node state not restored: \(error)") }
+    }
+
+    static func keepNode(_ n: [String: Any]) {
+        write(nodeAccount, try? JSONSerialization.data(withJSONObject: n))
+    }
+
+    /// At launch: {name, keyExpiry} and Connect With back into UserDefaults when the container lost them.
+    static func restoreDefaults() {
+        let ud = UserDefaults.standard
+        if ud.dictionary(forKey: Tailscale.nodeKey) == nil, read(stateAccount) != nil, let d = read(nodeAccount),
+           let n = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any], n["name"] is String {
+            ud.set(n, forKey: Tailscale.nodeKey)
+            Tailscale.log("signed-in node restored from the keychain")
+        }
+        if ud.string(forKey: Tailscale.connectKey) == nil, let d = read(connectAccount), let v = String(data: d, encoding: .utf8),
+           ["auto", "localdevvpn", "tailscale"].contains(v) {
+            ud.set(v, forKey: Tailscale.connectKey)
+        }
+    }
+
+    static func forgetNode() {
+        write(stateAccount, nil)
+        write(nodeAccount, nil)
     }
 }

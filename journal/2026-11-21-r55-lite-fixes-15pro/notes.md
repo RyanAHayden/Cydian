@@ -7,7 +7,8 @@ Keychain groups), driven with `tools/ui-15.sh` under its lock. Proof from the ph
 Inspector (`pymobiledevice3 webinspector cdp`, `ifizboxNative.call(...)`).
 
 Test IPA: `com.ryha.r55test` ("R55 Test", not iFizBox's ID), the Tiny fixture's executable plus 340 MB of random
-padding, 356.5 MB, versions 2.0-7.0 (one per run, so each is an update). Built in the scratchpad, put in the app's
+padding, 356.5 MB, versions 2.0-7.0 (a version other than the installed one each run: mostly updates, run 6 put
+4.0 over 7.0, a downgrade iOS accepts for ad hoc apps). Built in the scratchpad, put in the app's
 Documents with `afcclient --container com.ryha.ifizbox`, never launched.
 
 ## State before
@@ -15,7 +16,7 @@ Documents with `afcclient --container com.ryha.ifizbox`, never launched.
 - `tailscale status` on this desktop, before anything: `ifizbox-on-iphone` (offline 1d), `-1` (offline 1d), `-2`
   (offline 9h), `-3` (offline, last seen 1m ago), `-4` 100.81.244.3 (offline 29m). Five nodes.
 - The app (`tailscale.status`): signed in, node `ifizbox-on-iphone-4.beetal-ling.ts.net`, connect auto, key expires
-  2027-05-20; `tailscale.keptRoute` = `iphone`; `idevice.status`: paired `rp`, iOS 27.0; signing identity: the team's
+  2027-05-20; `tailscale.keptRoute` = `iphone`; `idevice.status`: paired `rp`, iOS "27.0" (the bridge's short form; Settings shows iOS 27.0.1); signing identity: the team's
   Apple Distribution cert + `com.ryha.*` ad hoc profile. iFizBox Account: Off (no account sign-in in play).
 
 ## (1) This iPhone route over Tailscale (B246 / B251 / B252)
@@ -65,9 +66,9 @@ switch's pixel.
 | 1 | 2.0 (new) | Home 5 s into the copy | copy 340 MB in 19.9 s: 17.7 MB/s in front, 16.8 in the background; installd 3 s | installed in 24.9 s |
 | 2 | 3.0 | locked the phone 5 s into the copy | copy 20.1 s: 18.0 MB/s in front, 16.4 locked; installd 3 s | installed |
 | 3 | 5.0 | VPN off 6 s into the copy, on again ~15 s later | drop noticed 12 s after VPN off (`upload_failed: Socket(Kind(TimedOut))` at 138 MB, "try 1 of 4"); try 2 "Tailscale isn't back on yet"; try 3 3 s after the VPN came back: node 1.3 s, tunnel 0.23 s, "carrying on from 138.0 MB"; copy 41.0 s in all | installed (connection 3) |
-| 4 | 6.0 | VPN off the moment installd started (~2 s in, no installd progress arrived), on again 22 s later | B251: "installd quiet for 30 s: asking iOS … on a second connection" at +30 s; the second look got a tunnel (remotepairingd let it in beside the first), saw 6.0 in a new bundle folder, ended the wait | installed at +31 s (B246 alone waited the 180 s limit) |
-| 5 | 7.0 (unsigned) | iOS Settings in front 1 s after Confirm | the IPA had been signed ahead; the route was chosen 0.2 s before the app went to the background; the whole copy ran in the background at 16.5 MB/s | installed in 25.9 s |
-| 6 | 4.0 (unsigned) | Home right after the Confirm tap | B252: the app was in the background 1.2 s **before** "This iPhone: … 4.0" (the route decision and signing.install ran with the app away); copy 16.6 MB/s in the background | installed |
+| 4 | 6.0 | VPN off the moment installd started (~2 s in, no installd progress arrived), on again 22 s later | B251: "installd quiet for 30 s: asking iOS … on a second connection" at +30 s; the second look got a tunnel (remotepairingd let it in beside the first), saw 6.0 in a new bundle folder, ended the wait | installed at +31 s (B246's own run 7, the same case before B251, ended only at the 180 s limit) |
+| 5 | 7.0 (row showed SIGN; signed ahead when armed) | iOS Settings in front 1 s after Confirm | the IPA had been signed ahead; the route was chosen 0.2 s before the app went to the background; the whole copy ran in the background at 16.5 MB/s | installed in 25.9 s |
+| 6 | 4.0 (row showed SIGN; signed ahead when armed) | Home right after the Confirm tap | B252: the app was in the background 1.2 s **before** "This iPhone: … 4.0" (the route decision and signing.install ran with the app away); copy 16.6 MB/s in the background | installed |
 
 No run after the re-pair ended in "failed"; every progress page closed itself on success (the queue badge cleared).
 The drop was noticed in 12 s during the copy and in 30 s during installd. KeepAlive held the app every time (no "the
@@ -87,8 +88,16 @@ The app was already signed in (node `-4`), so no owner login was needed. Each ca
 | Delete + reinstall (`ios uninstall`, `ui-15.sh install`: fresh container) | `-4`, signed in (from the Keychain) | none | This iPhone | kept, verify ok | 5, `-4` online |
 
 Node list before and after, identical: `ifizbox-on-iphone`, `-1`, `-2`, `-3`, `-4`. Nothing was deleted. **R50
-passes** (ticked, with a note). The `-3` "last seen 1m ago" at the start isn't this phone's app (this app is `-4`
-throughout); probably another device or an older build.
+passes** (ticked, with a note). `-3` (seen "1m ago" at the start) is not a new node: `tailscale status --json`
+gives it Created 2026-11-20T23:24Z, before `-4` (Created 2026-11-21T03:49Z), and LastSeen 06:50Z, while this
+phone's app was running as `-4` (07:20Z). It is another device's iFizBox (likely the user's own phone, B246's
+reporter); no node was created during this task (newest Created is `-4`'s).
+
+R50 is ticked on this check, as the brief asked ("close R50 if it passes"); its "sign in twice with a brand-new
+login" part needs the owner and is filed separately (see Follow-ups).
+
+The delete + reinstall went beyond "reinstall the Lite IPA" on purpose: an over-install keeps the container, so it
+can't show B218's Keychain restore. The cost was the container's test data (restored in part, below).
 
 The re-sign: Installed > iFizBox > Modify > Re-sign failed at once with **"iFizBox: Not an http(s) URL", "1 failed"**.
 A bridge trace showed the queue sending `signing.prepare {record: "com.ryha.ifizbox"}` (sign-ahead), which answers
@@ -128,6 +137,7 @@ shows Ready to Install, This iPhone · Paired, Certificate 341 days left. My IPA
   `early eof` and "1 failed" instead of Pair Again.
 - B275 (normal): Modify > Re-sign on iFizBox's own row fails "Not an http(s) URL" (sign-ahead can't read `self:bundle`).
 - B276 (low): a delete + reinstall forgets the signing identity though the .p12 is in the Keychain.
+- R57 (low): R50's brand-new-login-twice check, which needs the owner's Tailscale account.
 - B277 (low): small UI slips (clipped "his iPhone · Not Paired", "LocalDevVPN: On" for Tailscale's VPN, stale IPA
   page/list after an install from the IPA's page, "Reinstall" for an update).
 

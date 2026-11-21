@@ -23,7 +23,7 @@
 //   p.close() / p.closed / p.onClose(fn)
 //   F234, the queue run's page (screens/queuerun.js):
 //   p.line(kind, text, pkg)                a line that knows its package; p.filter(pkg | null) shows only its lines
-//   p.segmented(labels, onPick)            a segmented control in place of the title -> { select(i) }
+//   p.segmented(labels, onPick)            a segmented control on a band under the nav bar -> { select(i) }
 //   p.pane(node) / p.view("pane" | "log")  another view in the body (the Packages list) in place of the log
 //   openOn(page, seg, count)               F247: a run of one item opens on the Log tab, two or more on the rows list
 //   p.bar({ left, right })                 the caller's own bar buttons in place of Cancel / Close from now on
@@ -172,8 +172,7 @@ export function openProgress({ title = "Running", onCancel = null } = {}) {
   let paneNode = null;     // F234: page.pane's view
   let hiddenPage = false;  // F234: page.hide
   const closers = [];
-  // F234: a segmented title (page.segmented) stays; the page's label still follows
-  const setTitle = (t) => { if (!h1.classList.contains("has-seg")) h1.textContent = t; sheet.setAttribute("aria-label", t); };
+  const setTitle = (t) => { h1.textContent = t; sheet.setAttribute("aria-label", t); };
   const setProgress = (pct) => { fill.style.transform = `scaleX(${Math.max(0, Math.min(100, Number(pct) || 0)) / 100})`; };
   setProgress(0);
 
@@ -217,7 +216,8 @@ export function openProgress({ title = "Running", onCancel = null } = {}) {
       toBottom();
     },
     get filtered() { return filterPkg; },
-    // A segmented control in place of the title: labels, onPick(index). -> { select(index) }
+    // A segmented control on a black band under the nav bar (B224: the nav bar keeps Cydia's "Running" / "Complete"
+    // title, as on the 4S): labels, onPick(index). -> { select(index) }
     segmented(labels, onPick) {
       const seg = el("div", "progress-seg");
       seg.setAttribute("role", "tablist");
@@ -231,8 +231,10 @@ export function openProgress({ title = "Running", onCancel = null } = {}) {
       });
       const select = (i) => buttons.forEach((b, j) => { b.classList.toggle("selected", i === j); b.setAttribute("aria-selected", String(i === j)); });
       select(0);
-      h1.replaceChildren(seg);
-      h1.classList.add("has-seg");
+      const band = el("div", "progress-seg-band");
+      band.append(seg);
+      body.insertBefore(band, body.firstChild);
+      sheet.classList.add("has-seg-band");
       return { select };
     },
     // Another view in the page's body (the Packages list), shown in place of the log by view("pane").

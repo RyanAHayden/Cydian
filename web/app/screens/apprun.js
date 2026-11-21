@@ -18,9 +18,10 @@
 //   Log: one line per phase per app (Downloading Delta 48 MB, Signed Delta, Asked iOS to install Delta, Installed
 //     Delta / the reason it failed) with the shell's own lines grey under its app. Percents only move the rows' bars
 //     and the bottom status.
-//   Top right, as F234's: the red Cancel while it runs (every app not finished is abandoned; then the app Confirm
+//   The nav bar, as F234's (B224: Cydia's on the 4S, "Running" then "Complete", plain buttons; Apps | Log on a band
+//     under it): Cancel at the top left while it runs (every app not finished is abandoned; then the app Confirm
 //     again with what finished cleared and the footer "Stopped. N installed and cleared from the queue."), Retry All
-//     after failures (Close at the top left), Done when clean. A pass that starts after the run ended (Retry All, a
+//     at the top right after failures (Close at the top left), Close at the top right when clean. A pass that starts after the run ended (Retry All, a
 //     row's retry, Try Again) empties the Log first: the last pass's lines belong to it only (B153).
 //   The bottom: the status and the bar while it runs, then Return to iFizBox. When iFizBox's own IPA went to iOS
 //     (B123, followSelf): locked on "Waiting for iOS" while the shell waits for iOS to download it, "Closing iFizBox"
@@ -336,10 +337,10 @@ export async function runAppRun(jobs, deps) {
   };
 
   // ---- the bar ----
-  const cancel = barButton("Cancel", "red");
+  const cancel = barButton("Cancel"); // B224: Cydia's plain Cancel at the top left, not red
   const closeB = barButton("Close");
   const retryAll = barButton("Retry All");
-  const done = barButton("Done", "done");
+  const done = barButton("Close");
   let cancelled = false;
   cancel.addEventListener("click", () => {
     if (cancel.disabled) return;
@@ -361,7 +362,7 @@ export async function runAppRun(jobs, deps) {
     page.reopen({ title: "Running", status: runStatus(rows) });
     cancel.disabled = false;
     summary.hidden = true;
-    page.bar({ right: cancel });
+    page.bar({ left: cancel });
     for (const r of rows) draw(r);
     await promise;
     return end(cancelled);

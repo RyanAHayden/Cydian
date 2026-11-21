@@ -41,6 +41,17 @@ enum AppIcon {
 
     static var variants: Bool { if #available(iOS 18.0, *) { return true } else { return false } }
 
+    // B256: the set on screen. iOS 27 reads alternateIconName as nil right after a switch to a set, so whenever iOS
+    // reads nil it's the last set the shell switched to (kept in UserDefaults by apply, "" for the primary). Every
+    // reading of the set on screen goes through here (apply's unchanged check, OwnIcons.pick's current).
+    static let shownKey = "ifizbox.appIcon.shown"
+    static func shown(ios: String?, kept: String?) -> String? { ios ?? kept.flatMap { $0.isEmpty ? nil : $0 } }
+    // On the main queue.
+    static var onScreen: String? {
+        shown(ios: UIApplication.shared.alternateIconName, kept: UserDefaults.standard.string(forKey: shownKey))
+    }
+    static func keepShown(_ name: String?) { UserDefaults.standard.set(name ?? "", forKey: shownKey) }
+
     static func register(_ b: Bridge) {
         OwnIcons.register(b) // F329
         b.on("app.icon") { c in
@@ -123,12 +134,16 @@ enum AppIcon {
     static func apply(_ name: String?, done: @escaping (Bool, Bool, String?) -> Void) {
         let app = UIApplication.shared
         guard app.supportsAlternateIcons else { return done(false, false, "this iPhone doesn't switch app icons") }
-        if app.alternateIconName == name { return done(false, false, nil) }
-        let quietly = AppMode.current == .jailbreak && quiet(name) { e in
-            DispatchQueue.main.async { done(e == nil, true, e?.localizedDescription) }
+        if onScreen == name { return done(false, false, nil) }
+        let finish = { (e: Error?, quiet: Bool) in
+            DispatchQueue.main.async {
+                if e == nil { keepShown(name) }
+                done(e == nil, quiet, e?.localizedDescription)
+            }
         }
+        let quietly = AppMode.current == .jailbreak && quiet(name) { e in finish(e, true) }
         if quietly { return }
-        app.setAlternateIconName(name) { e in DispatchQueue.main.async { done(e == nil, false, e?.localizedDescription) } }
+        app.setAlternateIconName(name) { e in finish(e, false) }
     }
 
     // -[UIApplication _setAlternateIconName:completionHandler:]: the public call without its alert. false when this
@@ -300,7 +315,7 @@ enum OwnIcons {
             guard let n = c.params["name"] as? String, isOwn(n) else { return c.reply(nil, "bad_params: name is an own icon") }
             if AppMode.current == .jailbreak { return c.reply(["ready": true, "canResign": false], nil) }
             DispatchQueue.main.async {
-                let current = UIApplication.shared.alternateIconName
+                let current = AppIcon.onScreen
                 DispatchQueue.global(qos: .userInitiated).async {
                     lock.lock(); defer { lock.unlock() }
                     do {
@@ -401,7 +416,7 @@ enum OwnIcons {
 
     // F329a: the Lite app's re-sign of itself with `name`: an IPA of the running bundle (deleted by the signer's
     // caller) and the own-set files to put in it (SignOptions.ownIconFiles). `current`: the set on screen (main queue's
-    // alternateIconName). Off the main queue.
+    // AppIcon.onScreen). Off the main queue.
     static func selfSource(_ name: String, current: String?, stop: () -> Bool = { false }) throws -> (ipa: URL, files: [String: Data]) {
         lock.lock(); defer { lock.unlock() }
         let p: (slot: String, write: Bool, pngs: [Data])
@@ -442,7 +457,7 @@ enum OwnIcons {
         }
         guard FileManager.default.fileExists(atPath: file(shown).path) else { return c.reply(nil, "missing: that icon isn't kept any more") }
         DispatchQueue.main.async {
-            let current = UIApplication.shared.alternateIconName
+            let current = AppIcon.onScreen
             DispatchQueue.global(qos: .userInitiated).async {
                 lock.lock(); defer { lock.unlock() }
                 do {

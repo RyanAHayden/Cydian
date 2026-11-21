@@ -246,7 +246,7 @@ enum Sideload {
         if let own = c.params["selfIcon"] as? String {
             guard OwnIcons.isOwn(own) else { job.end(); released(); return Apt.reply(c, nil, "bad_params: selfIcon is an own icon") }
             DispatchQueue.main.async {
-                let current = UIApplication.shared.alternateIconName
+                let current = AppIcon.onScreen
                 SignBridge.queue.async {
                     log("Making an IPA of this app (\(Brand.name) \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?")) with your icon")
                     do {

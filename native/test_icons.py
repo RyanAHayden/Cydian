@@ -241,6 +241,23 @@ class Alternates(unittest.TestCase):
         self.assertEqual(alternates.set_name("sepia", "nord"), "Icon-sepia-nord")
         self.assertEqual(alternates.set_name("clear"), "Icon-clear")
 
+    def test_set_on_screen_read_through_on_screen(self):
+        """iOS 27 reads alternateIconName as nil after a switch: every reading goes through AppIcon.onScreen, which
+        falls back to the set the shell last switched to, and apply keeps that set once iOS switched."""
+        sources = os.path.join(HERE, "Sources")
+        for name in sorted(os.listdir(sources)):
+            if not name.endswith(".swift"):
+                continue
+            with open(os.path.join(sources, name)) as f:
+                for n, line in enumerate(f, 1):
+                    if "UIApplication.shared.alternateIconName" in line or "app.alternateIconName" in line:
+                        self.assertIn("shown(ios: UIApplication.shared.alternateIconName", line,
+                                      "%s:%d reads alternateIconName; use AppIcon.onScreen" % (name, n))
+        with open(os.path.join(sources, "AppIcon.swift")) as f:
+            swift = f.read()
+        self.assertIn("if onScreen == name { return done(false, false, nil) }", swift)
+        self.assertIn("if e == nil { keepShown(name) }", swift)
+
     def test_thumbs(self):
         import tempfile
         with tempfile.TemporaryDirectory() as d:

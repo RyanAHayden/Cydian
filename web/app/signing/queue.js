@@ -193,7 +193,6 @@ export function heldLanes(lanes, { native, keep = holdApp, idleMs = HOLD_IDLE, l
   idle(); // held from Confirm: lets go if no lane starts
   const out = { ...lanes, release: off };
   for (const k of ["sign", "install"]) if (typeof lanes?.[k] === "function") out[k] = wrap(lanes[k]);
-  out.during = wrap((p) => p); // B264: during(promise): held until it settles, as a lane (the badge's recount)
   return out;
 }
 

@@ -113,6 +113,12 @@ class Wiring(unittest.TestCase):
         body = body[:body.index("\n    }\n")]
         self.assertIn("UpdateCheck.afterHandOff(", body)
         self.assertIn("Notifications.setIcon(", body)
+        # and the push server's copy of the list follows, from the registration the page handed over
+        self.assertIn("pushHandedOff(ids: ids, version: version)", body)
+        self.assertIn('b.on("push.registered")', bg)
+        self.assertIn("UpdateCheck.pushAfterHandOff(", bg)
+        with open(os.path.join(HERE, "..", "web", "app", "core", "push.js")) as f:
+            self.assertIn('"push.registered"', f.read())
         with open(os.path.join(HERE, "..", "web", "app", "screens", "changes.js")) as f:
             changes = f.read()
         self.assertIn('"updates.resigns"', changes)

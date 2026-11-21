@@ -63,18 +63,3 @@ test("heldLanes: a failed lane still counts down; release lets go at once; nothi
   c2.fire();
   assert.deepEqual(sent2, [false]); // Confirm's {on} let go: no lane ever ran
 });
-
-test("B264: heldLanes.during(promise) holds like a lane until it settles (the badge's recount after an app ends)", async () => {
-  const c = clock();
-  const sent = [];
-  const h = heldLanes({}, { keep: (_n, on) => sent.push(on), later: c.later, clear: c.clear });
-  let done = null;
-  const p = h.during(new Promise((f) => { done = f; }));
-  assert.deepEqual(sent, [true]);
-  assert.equal(c.pending, 0); // held: no let-go pending while the count runs
-  done(3);
-  assert.equal(await p, 3);
-  await settle();
-  c.fire();
-  assert.deepEqual(sent, [true, false]);
-});

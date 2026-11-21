@@ -670,8 +670,10 @@ export async function runAppQueueRun(jobs, { queue = appQueue, record = recordAp
     const lanesHeld = held;
     return await (run ?? runAppRun)(jobs.filter((j) => queue.get(j.id)), {
       queue, record, lanes: lanesHeld,
-      // B264: each app's end counts the badge again, iFizBox kept running (in the background too) until it is set
-      onAppEnd: (r, recorded) => lanesHeld.during?.(Promise.resolve(recorded).catch(() => {}).then(() => recount())),
+      // B264: each app's end counts the badge again once its record is written. Not held: in the background the page
+      // can sleep mid-count, and a hold would keep the shell's silent audio going until then; the shell drops the
+      // app's row from the icon itself at the hand-off (BackgroundCheck.appHandedOff).
+      onAppEnd: (r, recorded) => Promise.resolve(recorded).catch(() => {}).then(() => recount()),
       onClose: () => { lanesHeld.release(); appRunning = false; updateAppChrome(); },
       reopenConfirm: (footer) => { appRunning = false; openAppConfirm(queue, { footer }); },
     });

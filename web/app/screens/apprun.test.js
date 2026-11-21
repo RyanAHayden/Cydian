@@ -479,23 +479,24 @@ test("B264: onAppEnd once per app that ends, with its record's promise; not for 
   assert.ok(ends.every(([, t]) => t === null || t === "function"));
 }));
 
-test("B264: runAppQueueRun counts the badge as each app ends, held (signing.hold) until the count is set", async () => {
+test("B264: runAppQueueRun counts the badge as each app ends, after its record, without holding the app", async () => {
   const { runAppQueueRun } = await import("./queue.js");
   const q = createAppQueue();
   q.add(app("a", "Alpha", "resign"));
   const sent = [];
   const keep = (_n, on) => sent.push(on);
-  let counted = 0, finishCount = null, deps = null;
-  const recount = () => { counted++; return new Promise((f) => { finishCount = f; }); };
+  let counted = 0, deps = null, wrote = null;
+  const recount = () => { counted++; return new Promise(() => {}); }; // a count the page never finishes (asleep)
   await runAppQueueRun(q.list(), { queue: q, ready: async () => true, keep, recount, lanes: {},
     run: async (js, d) => { deps = d; return { ok: true }; } });
   assert.deepEqual(sent, [true]); // Confirm
-  const p = deps.onAppEnd({ id: "a" }, Promise.resolve({ before: null, wrote: null }));
+  deps.onAppEnd({ id: "a" }, new Promise((f) => { wrote = f; }));
   await settle();
-  assert.equal(counted, 1); // after the record settled
-  assert.deepEqual(sent, [true, true]); // held while it counts
-  finishCount();
-  await p;
+  assert.equal(counted, 0); // waits for Installed's record
+  wrote({ before: null, wrote: null });
+  await settle();
+  assert.equal(counted, 1);
+  assert.deepEqual(sent, [true]); // no hold for the count: it can't keep the silent audio going
   deps.onClose();
   assert.equal(sent.at(-1), false);
 });

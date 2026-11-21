@@ -128,6 +128,7 @@ export async function enablePush(deps = {}) {
     return fail({ code: "server", text: `${hostOf(server)} refused the push registration: ${e.message}` });
   }
   savePushState(storage, { on: true, token: st.token, sent: JSON.stringify(body), lastError: null });
+  handOver(native, server, body); // B264
   return { ok: true };
 }
 
@@ -164,9 +165,17 @@ export async function disablePush(deps = {}) {
   const { native, server, fetcher, storage } = defaults(deps);
   const s = pushState(storage);
   if (s.token) { try { await post(server, "unregister", { token: s.token }, fetcher); } catch { /* the next run's 410 does it */ } }
+  if (native?.call) handOver(native, server); // B264: nothing for the shell to send again
   try { await native?.call?.("push.unregister", {}); } catch { /* nothing to stop */ }
   savePushState(storage, { on: false, token: null, sent: null, lastError: null });
   return { ok: true };
+}
+
+// B264: the shell keeps what the server has (push.registered), so an update handed to iOS while this page sleeps in
+// the background reaches the server's badge too (BackgroundCheck.appHandedOff sends it again with the new version).
+// No body (Push off): the shell forgets it and sends nothing.
+function handOver(native, server, body = null) {
+  try { Promise.resolve(native.call("push.registered", body ? { server, body } : {})).catch(() => {}); } catch { /* an older shell */ }
 }
 
 // The watch list changed (app-updates.js): register again when push is on and the body differs. Never throws.
@@ -180,9 +189,10 @@ export async function syncPush(deps = {}) {
     if (!st.token || offReason(st)) return { sent: false };
     const body = registration(st, deps.watch ?? storedWatch(storage));
     const json = JSON.stringify(body);
-    if (json === s.sent) return { sent: false };
+    if (json === s.sent) { handOver(native, server, body); return { sent: false }; }
     await post(server, "register", body, fetcher);
     savePushState(storage, { ...s, sent: json, lastError: null });
+    handOver(native, server, body);
     return { sent: true };
   } catch { return { sent: false }; }
 }

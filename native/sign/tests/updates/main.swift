@@ -246,5 +246,24 @@ test("B264: each app's re-sign or install handed to iOS takes its Changes row of
     check(UpdateCheck.afterHandOff(["alpha"], version: "2.0", bg, resign: []).counts.badge == 0, "found: gone")
 }
 
+test("B264: the push server's registration follows an update handed to iOS") {
+    let body: [String: Any] = ["token": "t", "apps": [["id": "alpha", "name": "Alpha", "version": "1.0", "source": "s"],
+                                                      ["id": "beta", "name": "Beta", "version": "3.0", "source": "s"]],
+                               "known": ["alpha 2.0", "beta 3.1"], "counted": ["alpha 2.0"]]
+    guard let after = UpdateCheck.pushAfterHandOff(body, ids: ["alpha.signed", "alpha"], version: "2.0") else {
+        return check(false, "Alpha 2.0 handed off: changed")
+    }
+    let apps = after["apps"] as? [[String: Any]] ?? []
+    check(apps.first?["version"] as? String == "2.0" && apps.last?["version"] as? String == "3.0", "Alpha at 2.0, Beta as it was")
+    check(after["known"] as? [String] == ["beta 3.1"] && after["counted"] as? [String] == [], "its update key gone")
+    check(after["token"] as? String == "t", "the rest as sent")
+    // a re-sign (same version) and an app it doesn't follow change nothing
+    check(UpdateCheck.pushAfterHandOff(body, ids: ["beta"], version: "3.0") == nil, "re-sign: nothing")
+    check(UpdateCheck.pushAfterHandOff(body, ids: ["other"], version: "9") == nil, "not followed: nothing")
+    // no `counted` (no ignored versions): it stays absent
+    let plain = UpdateCheck.pushAfterHandOff(["apps": body["apps"]!, "known": ["alpha 2.0"]], ids: ["alpha"], version: "2.0")
+    check(plain?["counted"] == nil && plain?["known"] as? [String] == [], "counted stays absent")
+}
+
 print(failures == 0 ? "all passed" : "\(failures) failed")
 exit(failures == 0 ? 0 : 1)

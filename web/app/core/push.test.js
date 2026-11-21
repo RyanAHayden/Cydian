@@ -67,16 +67,21 @@ test("enable registers with the server; sync sends only changes; disable forgets
   const storage = memory(), native = fakeNative(), srv = fakeServer();
   const r = await enablePush({ native, server, fetcher: srv.fetcher, storage, watch: WATCH });
   assert.deepEqual(r, { ok: true });
-  assert.deepEqual(called(native), ["push.status", "push.register"]);
+  assert.deepEqual(called(native), ["push.status", "push.register", "push.registered"]);
   assert.equal(srv.posts[0].path, "/api/push/register");
   assert.equal(srv.posts[0].body.token, TOKEN);
+  // B264: the shell keeps what the server has, to send it again after a hand-off while the page sleeps
+  const kept = () => native.calls.filter((c) => c.method === "push.registered").at(-1)?.params;
+  assert.deepEqual(kept(), { server, body: srv.posts[0].body });
   assert.equal(pushState(storage).on, true);
   assert.deepEqual(await syncPush({ native, server, fetcher: srv.fetcher, storage, watch: WATCH }), { sent: false }, "same list");
   const more = { ...WATCH, apps: [...WATCH.apps, { id: "com.y", name: "Y", version: "2", source: "https://s.example/a.json" }] };
   assert.deepEqual(await syncPush({ native, server, fetcher: srv.fetcher, storage, watch: more }), { sent: true });
   assert.equal(srv.posts.at(-1).body.apps.length, 2);
+  assert.equal(kept().body.apps.length, 2, "the shell has the new list");
   assert.equal(storedWatch(storage).apps.length, 2, "remembered for the next Push on");
   await disablePush({ native, server, fetcher: srv.fetcher, storage });
+  assert.deepEqual(kept(), {}, "Push off: the shell forgets it");
   assert.deepEqual(srv.posts.at(-1), { path: "/api/push/unregister", body: { token: TOKEN } });
   assert.equal(called(native).at(-1), "push.unregister");
   assert.deepEqual(pushState(storage), { on: false, token: null, sent: null, lastError: null });
@@ -162,7 +167,7 @@ test("Push turns itself on once the server can push, and never after an explicit
   storage = store(); srv = fakeServer();
   native = fakeNative({ st: { ...ST, authorization: "notDetermined" } });
   assert.deepEqual(await autoEnablePush({ native, server, fetcher: srv.fetcher, storage, watch: WATCH }), { enabled: true });
-  assert.deepEqual(called(native), ["push.status", "push.status", "push.register"]);
+  assert.deepEqual(called(native), ["push.status", "push.status", "push.register", "push.registered"]);
   storage = store(); srv = fakeServer();
   const r0 = await autoEnablePush({ native: fakeNative({ st: { ...ST, authorization: "notDetermined" }, fail: "denied" }), server, fetcher: srv.fetcher, storage, watch: WATCH });
   assert.equal(r0.enabled, false);

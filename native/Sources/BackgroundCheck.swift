@@ -35,6 +35,9 @@ enum BackgroundCheck {
     // B264: the bundle IDs of Changes' Needs Re-sign rows in its last count (updates.resigns), so an app's re-sign
     // handed to iOS takes its row off the icon badge (appHandedOff) while the page can't count.
     static let pageResignKey = "ifizbox.updates.pageResign"
+    // B264: the push server's registration as the page last sent it ({server, body} JSON: push.registered), so an
+    // update handed to iOS reaches the server's badge while the page can't send its own (appHandedOff).
+    static let pushRegistrationKey = "ifizbox.push.registration"
     static let interval: TimeInterval = 4 * 3600
     static let maxBytes = 8 << 20 // AltStore's own source is about 1 MB; the biggest seen (F9) under 8 MB
     private static let queue = DispatchQueue(label: "com.ryha.ifizbox.updates")
@@ -79,6 +82,39 @@ enum BackgroundCheck {
                 Apt.reply(c, nil, nil)
             }
         }
+        // B264: push.registered {server, body}: what core/push.js has on the push server; {} once Push is off.
+        b.on("push.registered") { c in
+            let server = c.params["server"] as? String, body = c.params["body"] as? [String: Any]
+            let data = server.flatMap { s in body.flatMap { try? JSONSerialization.data(withJSONObject: ["server": s, "body": $0]) } }
+            queue.async {
+                if let data { UserDefaults.standard.set(data, forKey: pushRegistrationKey) }
+                else { UserDefaults.standard.removeObject(forKey: pushRegistrationKey) }
+                Apt.reply(c, nil, nil)
+            }
+        }
+    }
+
+    // B264: the push server's copy of the page's list after a hand-off (UpdateCheck.pushAfterHandOff), sent again
+    // from here. On this queue.
+    private static func pushHandedOff(ids: Set<String>, version: String) {
+        guard let data = UserDefaults.standard.data(forKey: pushRegistrationKey),
+              let reg = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+              let server = reg["server"] as? String, let body = reg["body"] as? [String: Any],
+              let next = UpdateCheck.pushAfterHandOff(body, ids: ids, version: version),
+              let url = URL(string: server + "/api/push/register"),
+              let json = try? JSONSerialization.data(withJSONObject: next),
+              let saved = try? JSONSerialization.data(withJSONObject: ["server": server, "body": next]) else { return }
+        UserDefaults.standard.set(saved, forKey: pushRegistrationKey)
+        var r = URLRequest(url: url, timeoutInterval: 20)
+        r.httpMethod = "POST"
+        r.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        r.httpBody = json
+        DispatchQueue.main.async {
+            var task = UIBackgroundTaskIdentifier.invalid
+            let end = { if task != .invalid { UIApplication.shared.endBackgroundTask(task); task = .invalid } }
+            task = UIApplication.shared.beginBackgroundTask(withName: "ifizbox.push") { end() }
+            URLSession.shared.dataTask(with: r) { _, _, _ in DispatchQueue.main.async { end() } }.resume()
+        }
     }
 
     // B264: an app's install or re-sign has been handed to iOS (`ids`: its bundle ID as installed and the source's;
@@ -96,6 +132,7 @@ enum BackgroundCheck {
             let resign = Set(d.stringArray(forKey: pageResignKey) ?? [])
             let after = UpdateCheck.afterHandOff(ids, version: version, before, resign: resign)
             save(UpdateCheck.handedOff(loadWatch(), ids: ids, version: version), known: loadKnown())
+            pushHandedOff(ids: ids, version: version)
             guard after.counts != before || after.resign != resign else { return nil }
             d.set(after.counts.pageCount, forKey: pageCountKey)
             d.set(after.counts.pageKeys.sorted(), forKey: pageKeysKey)

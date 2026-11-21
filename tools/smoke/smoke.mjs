@@ -187,9 +187,18 @@ try {
     await resetMoves();
     const ok = await tap(".page.is-top a.cell[href*='settings/'], .page.is-top .cell.chevron, .page.is-top a[href*='settings/']");
     await until(`location.hash !== ${JSON.stringify(settingsHash)}`, 3000);
+    // The hash changes before the slide starts (a route whose modules aren't loaded yet shows once they are), so
+    // settle() alone can pass before the push even began: wait for the slide to run, then for it to end.
+    await until("window.__smoke.moves > 0", 3000);
     await settle();
     return ok && (await hash()) !== settingsHash;
   };
+  // The edge strip takes a touch only with no slide running and something to go back to (app.js canStart,
+  // updateEdge): wait until it is the live element under the finger's start, with nothing moving, for two frames.
+  const EDGE_LIVE = `!document.documentElement.classList.contains("nav-moving") && !document.querySelector(".page.is-moving, .nav-item.is-moving")
+    && document.elementFromPoint(4, 420)?.matches(".edge-swipe:not(.off)")`;
+  const edgeLive = async () => (await until(EDGE_LIVE, 4000))
+    && ev(`new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => r(${EDGE_LIVE}))))`);
   check(await pushOne(), `push a Settings page (route ${await hash()})`);
   check(await moved() > 0, "that push slid");
   await shot("3-pushed");
@@ -205,6 +214,7 @@ try {
   // 3. swipe back (the app only: the website leaves Back to the browser's own gesture)
   if (!SITE) {
     check(await pushOne(), "push again");
+    check(await edgeLive(), "the edge strip is live once the push is at rest");
     await resetMoves();
     await swipeBack();
     await until(`location.hash === ${JSON.stringify(settingsHash)}`, 3000);

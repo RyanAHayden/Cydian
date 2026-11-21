@@ -234,12 +234,16 @@ async function confirmInstall(url, name, message, { alert, install, open, reload
   if (index !== 1) return false;
   const run = install ?? (await defaultInstall());
   let dropping = null;
-  const onInstalled = (r) => { dropping = Promise.resolve().then(() => drop(r)).catch(() => {}); };
+  let ended = false;
+  const again = () => Promise.resolve().then(() => reload()).catch(() => {});
+  // A run that ends after confirmInstall has (rememberInstall) reloads Installed itself once its drop is done.
+  const onInstalled = (r) => { dropping = Promise.resolve().then(() => drop(r)).catch(() => {}).then(() => (ended ? again() : null)); };
   try {
     await run({ url, name, onInstalled });
   } finally {
     await dropping;
-    await Promise.resolve().then(() => reload()).catch(() => {});
+    ended = true;
+    await again();
   }
   return true;
 }

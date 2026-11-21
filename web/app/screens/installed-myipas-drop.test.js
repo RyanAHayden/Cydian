@@ -38,6 +38,21 @@ test("B283: no answer (failed run), or another sideloader's link, drops only wha
   assert.deepEqual(got, ["my.app"]);
 });
 
+test("B283: a run that lands after the link returned (waited for a connection) drops, then reloads Installed again", async () => {
+  const order = [];
+  let later = null;
+  const install = async ({ onInstalled }) => { later = onInstalled; return false; }; // rememberInstall: runs later
+  const drop = async (r) => { order.push(["drop", r.bundleId]); };
+  let reloaded = null;
+  const reload = async () => { order.push("reload"); reloaded?.(); };
+  await handleIncoming(LINK, { alert: yes, install, open: () => {}, reload, drop });
+  assert.deepEqual(order, ["reload"]);
+  const second = new Promise((res) => { reloaded = res; });
+  later({ bundleId: "com.example.probe" });
+  await second;
+  assert.deepEqual(order, ["reload", ["drop", "com.example.probe"], "reload"]);
+});
+
 test("B283: a drop that throws doesn't fail the link and Installed still reloads", async () => {
   let reloaded = 0;
   const r = await handleIncoming(LINK, { alert: yes, open: () => {}, reload: async () => { reloaded++; },

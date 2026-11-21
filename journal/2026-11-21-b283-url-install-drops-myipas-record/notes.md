@@ -33,6 +33,16 @@ There were two choices: **drop the library: record**, or write a source-less one
 - Filed **B285** (low): in the jailbreak build, the helper install's `rememberIpa` keeps an existing My IPAs record,
   so the same "Source: My IPAs" stays there.
 
+## Spec review
+
+- If a run waits for a connection (`rememberInstall`), it lands only after `confirmInstall` has already reloaded.
+  Its drop then fired only `onAppsChange`, so an open app page could stay on "Source: My IPAs". Fixed: a drop that
+  starts after the link has returned now reloads Installed (`reloadSigned`) again. There is a test for this.
+- On the signing-server route, `onInstalled` fires once iOS's install prompt shows, not once iOS has the app. The drop
+  happens then, after the shell's signed record already names the URL. So if the person cancels iOS's prompt, the
+  page reads as the URL install, matching the signed record. The comment now says this instead of "the install did
+  land".
+
 ## Tried and failed
 
 Nothing failed.

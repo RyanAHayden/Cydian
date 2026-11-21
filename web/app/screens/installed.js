@@ -1304,8 +1304,9 @@ export function reloadSigned({ load = loadAllApps, draw = renderAppPage } = {}) 
 // B283: a My IPAs install writes a device record (key library:<file>, sourceName "My IPAs"); a later install of the
 // same app from a URL (an ifizbox://install link, another sideloader's IPA link) writes none, so that record kept the
 // app's page on "Source: My IPAs" while the shell's signed record said the URL. Once such an install ends, the app's
-// My IPAs record goes, but only when the shell's signed record for it is not a My IPAs one (the install did land, from
-// a URL): the app then reads as any URL install does, its signed-only row and page. keptIpa finds My IPAs' signed copy
+// My IPAs record goes, but only when the shell's signed record for it is not a My IPAs one (the URL was signed for
+// it; on the signing-server route that is once iOS's install prompt shows, before iOS has the app): the app then reads
+// as its signed record does, as any URL install's signed-only row and page. keptIpa finds My IPAs' signed copy
 // by bundle ID, not through this record, so Save Signed IPA stays; Re-sign signs from the signed record's URL.
 // A source's record stays (Changes and Update read its source). The jailbreak build and the website keep no signed
 // record of the shell's, so nothing is dropped there.

@@ -260,6 +260,9 @@
 }
 .find-add .find-spinner { display: inline-block; width: 12px; height: 12px; margin: 0; }
 .find-directory .cell-inner { padding-right: 36px; }
+/* B272: the mark is placed on its own row; without this it was placed on the list, and sat halfway down it (beside
+   Limneos Repo, as a ↗ emoji on the phone). */
+.find-directory { position: relative; }
 .find-external { position: absolute; right: 14px; top: 50%; width: 13px; height: 13px; margin-top: -6.5px; }
 /* A repo's page: the head row's icon sits in the letter's 29px slot, clipped, as on a source row; the <img> shows
    only once it loads (source-icon.js removes it when no URL answers), so a failed icon leaves the letter. */

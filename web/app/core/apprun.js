@@ -80,10 +80,14 @@ import { isNewer } from "./selfupdate.js"; // B159: staleSelf
 // have it: an install iOS never fetched, B128's ECONNREFUSED, or one still going) or null (B170: apps.isInstalled had no
 // answer; the user's Cancel on iOS's own prompt looks exactly like that), and a sent row with no bundle ID to ask
 // about; "never" for a row that didn't end installed (failed, or cancelled by the red Cancel or its stop).
+// B236: iOS 27 never answers apps.isInstalled (null for every app, B229), so a row whose IPA iOS fetched in full
+// (row.fetched: the shell's served word, B200's handoff) is recorded on that no-answer. A Cancel on iOS's prompt
+// fetches nothing, so B170's cancelled install still waits; a false (iOS says it doesn't have it) still waits too.
 export function recordWhen(row, onPhone) {
   if (row?.state !== "installed") return "never";
   if (!row.unsure || row.mode === "resign" || row.mode === "remove" || isSelf(row)) return "now";
   if (row.bundleId && onPhone === true) return "now";
+  if (row.bundleId && onPhone === null && row.fetched === true) return "now";
   return "wait";
 }
 
@@ -106,7 +110,7 @@ export function appRows(jobs = []) {
   return runOrder(jobs).map((j) => ({
     id: j.id, name: j.name || j.id, mode: j.mode || "install", job: j, size: Number(j.size) > 0 ? Number(j.size) : null,
     state: "waiting", phase: null, fraction: 0, error: null, token: null, bundleId: null, expires: null, unsure: false,
-    dismissed: false, again: false, here: false, local: false, busy: false, progress: 0,
+    dismissed: false, again: false, here: false, local: false, busy: false, progress: 0, fetched: false,
   }));
 }
 
@@ -352,7 +356,9 @@ export function createAppRun({ rows, sign, install, discard = () => {}, reprompt
     const unsure = res?.installed !== true;
     // B200: `finishing` while the call's `later` (iOS still installing what it fully has) hasn't answered
     const finishing = unsure && typeof res?.later?.then === "function";
-    finishRow(r, "installed", { token: null, expires, unsure, phase: null, fraction: 1, ...(finishing ? { finishing } : {}) });
+    // B236: `fetched`: the call's handedOff is only ever the shell's word that iOS had the whole IPA (f.away is not)
+    finishRow(r, "installed", { token: null, expires, unsure, phase: null, fraction: 1, fetched: res?.handedOff === true,
+      ...(finishing ? { finishing } : {}) });
     if (r.mode === "resign") log(r, "step", `Re-signed ${label(r)}${expires ? `, expires ${dateText(expires)}` : ""}`);
     else if (r.mode === "remove") log(r, "step", `Removed ${label(r)}`);
     else log(r, "step", unsure ? `Sent ${label(r)} to iOS` : `Installed ${label(r)}`);
@@ -374,7 +380,7 @@ export function createAppRun({ rows, sign, install, discard = () => {}, reprompt
   const retryPatch = (r) => {
     const back = r.state === "failed" && r.dismissed && Boolean(reprompt) && Boolean(r.bundleId) && !helperRow(r);
     return { state: back ? "signed" : "waiting", again: back, phase: null, fraction: back ? 1 : 0, progress: back ? 0.5 : 0, error: null,
-      token: null, unsure: false, dismissed: false, busy: false, finishing: false };
+      token: null, unsure: false, dismissed: false, busy: false, finishing: false, fetched: false };
   };
 
   function pump() {

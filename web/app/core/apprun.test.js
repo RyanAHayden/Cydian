@@ -5,6 +5,7 @@ import assert from "node:assert/strict";
 import { appRows, createAppRun, rowStatus, summaryLine, runStatus, runPercent, stallText } from "./apprun.js";
 import { coordinatorBusy, busyBundleId, ownIdOk, BUSY_ROW, BUSY_ROW_KEPT } from "./apprun.js"; // B151
 import { SELF_ID } from "./appqueue.js";
+import { recordWhen } from "./apprun.js"; // B236
 
 const tick = () => new Promise((r) => setTimeout(r, 0));
 const flush = async (n = 6) => { for (let i = 0; i < n; i++) await tick(); };
@@ -660,6 +661,50 @@ test("B152: a retry starts the row's bar again from the start", async () => {
   await flush();
   assert.equal(rows[0].state, "downloading");
   assert.equal(barOf(rows[0]), 0);
+  run.cancel();
+  await again;
+});
+
+// B236: iOS 27 never answers apps.isInstalled (null for every app), so an install whose IPA iOS fetched in full is
+// recorded on that no-answer; one iOS never fetched (B170: the user's Cancel on iOS's prompt) still waits.
+test("B236: a row handed off once iOS had the whole IPA is fetched, and recordWhen records it when iOS can't answer", async () => {
+  const ph = phone();
+  const rows = appRows(jobs("a", "b"));
+  assert.equal(rows[0].fetched, false);
+  const run = createAppRun({ rows, sign: ph.sign, install: ph.install, discard: ph.discard });
+  const end = run.start();
+  await flush();
+  ph.signed("a");
+  ph.signed("b");
+  await flush();
+  ph.pending.install.get("a").resolve({ installed: null, handedOff: true }); // the shell's served word
+  await flush();
+  ph.pending.install.get("b").resolve({ installed: null }); // no answer, nothing fetched (iOS's prompt cancelled)
+  await end;
+  assert.deepEqual(rows.map((r) => [r.state, r.unsure, r.fetched]), [["installed", true, true], ["installed", true, false]]);
+  assert.equal(recordWhen(rows[0]), "wait", "not asked yet");
+  assert.equal(recordWhen(rows[0], null), "now", "iOS can't answer: the fetch is the proof");
+  assert.equal(recordWhen(rows[0], false), "wait", "iOS says it doesn't have it");
+  assert.equal(recordWhen(rows[1], null), "wait", "B170: no fetch, no record");
+  assert.equal(recordWhen({ ...rows[0], bundleId: null }, null), "wait");
+  assert.equal(recordWhen({ ...rows[0], state: "failed" }, null), "never");
+});
+
+test("B236: a retried row starts unfetched", async () => {
+  const ph = phone();
+  const rows = appRows(jobs("a"));
+  const run = createAppRun({ rows, sign: ph.sign, install: ph.install, discard: ph.discard });
+  const end = run.start();
+  await flush();
+  ph.signed("a");
+  await flush();
+  ph.pending.install.get("a").resolve({ installed: null, handedOff: true });
+  await end;
+  assert.equal(rows[0].fetched, true);
+  rows[0].state = "failed"; // as a later notTaken would leave it
+  const again = run.retry("a");
+  await flush();
+  assert.equal(rows[0].fetched, false);
   run.cancel();
   await again;
 });

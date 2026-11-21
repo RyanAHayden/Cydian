@@ -32,23 +32,30 @@ So on the next Sign In the app has no machine key, and the tailnet registers a *
 wording, "still lists the same ifizbox-on-iphone nodes, no new one per sign-in", cannot hold for the
 Sign Out → Sign In step as built. What B218 can promise is:
 
-1. **Sign Out → Sign In (new login):** the logged-out `-4` should drop off the list (Tailscale removes a node that
-   logs out) and one new node take its place. The **count stays at five**, though the name may change (`-4` again,
-   or `-5`). If `-4` stays listed beside a new node, every Sign Out cycle adds a node: that would be a bug to file
-   (the fix would be either to keep the machine key across Sign Out, or to delete the node through the API).
-2. **Sign In again, with no Sign Out in between** (the brief's "then again"): the state is kept, so it should go
-   straight to Running with no login page and no new node.
+1. **Sign Out → Sign In (new login):** a new machine is registered either way. The list stays the same size only if
+   the tailnet drops the logged-out `-4` (my unverified expectation of `LocalClient.Logout`, not a known fact). Then
+   the count stays at five, though the name may change (`-4` again, or `-5`). If `-4` stays listed beside the new
+   node, every Sign Out cycle adds a node, which fails the brief. That would be a bug to file, with two possible
+   fixes: keep the machine key across Sign Out, or delete the node through the API.
+2. **The whole cycle a second time** (the brief's "then again"): the same as step 1 again. Each cycle should
+   leave the count where it was.
 
 Whether Tailscale removes a logged-out node at once, or keeps it as "expired" until someone deletes it, is not
 verified here: it is the key thing for the owner to read off the admin console.
+
+`-4` was created at 03:49 UTC (22:49 on 2026-11-20, local time), three hours after B218 reached main, but B218 does
+not explain it. B218 keeps a node only once one exists, and `-4` came from a **new login**: that evening the owner
+set up Tailscale on the phone (memory: B246, about 23:45 local), and the app had no kept state to restore. Whether
+the build the owner signed in with already held B218 is not known.
 
 ## Owner's check (what the CONFIRM asks)
 
 1. Install Apps With > Tailscale > Sign Out. Look at login.tailscale.com/admin/machines: is `ifizbox-on-iphone-4`
    gone, or still listed (as logged out / expired)?
-2. Sign In with your login. Admin console: which name did it get, and how many `ifizbox-on-iphone*` nodes now
-   (five expected)?
-3. Sign In again (or Test). No login page expected, and no new node.
+2. Sign In with your login. Admin console: what name did the node get, and how many `ifizbox-on-iphone*` nodes
+   are there now? Five passes; six means Sign Out leaves the old node behind.
+3. Do steps 1 and 2 once more (Sign Out, Sign In). Does the count stay the same again?
+4. Then Test, with no Sign Out first. No login page expected, and no new node.
 
 Don't delete old nodes.
 

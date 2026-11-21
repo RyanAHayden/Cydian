@@ -3,7 +3,7 @@
 //
 //   signing.prepare {url, name?, bundleId?, icon?, removeExtensions?, fixArm64e?, tag}   an app from its IPA's url, or
 //   signing.prepare {record: bundleId, tag}       an app iFizBox signed before, from its record (Re-sign: its url or
-//                                                 My IPAs file, its stored edits)
+//                                                 My IPAs file, its stored edits; iFizBox's own: its running bundle)
 //   signing.prepare {library: file, edits?, tag}  a My IPAs file
 //        (stream: {phase: "downloading" | "reading" | "signing", progress}, {log})
 //        -> {token, bundleId, originalBundleId, name, version, expires?, device}: the signed IPA is kept for `life`;
@@ -123,6 +123,14 @@ enum SignAhead {
                         if let s = sha { j["sha256"] = s } // F292
                         answer(j, nil)
                     }
+                }
+            }
+            // B275: iFizBox's own record (signed from its own bundle) signs from the running bundle, as signing.resign does
+            if source == SelfIPA.url {
+                let out = SignBridge.work.appendingPathComponent("\(SignBridge.token())-self.ipa")
+                do { try SelfIPA.make(app: Bundle.main.bundleURL, to: out) { job.cancelled }; return signThat(out) } catch {
+                    try? FileManager.default.removeItem(at: out)
+                    return fail(error)
                 }
             }
             // F77: an app recorded from My IPAs signs from the library's file

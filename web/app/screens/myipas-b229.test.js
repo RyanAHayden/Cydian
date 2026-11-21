@@ -6,15 +6,15 @@ import assert from "node:assert/strict";
 import { installedOf } from "./myipas.js";
 
 const LIST = [
-  { file: "R31Test.ipa", name: "R31Test", bundleId: "com.ryha.r31test", signed: null },
+  { file: "R31Test.ipa", name: "R31Test", bundleId: "com.x.r31test", signed: null },
   { file: "Other.ipa", name: "Other", bundleId: "com.x.other", signed: null },
 ];
-const unknown = { call: async () => ({ installed: { "com.ryha.r31test": null, "com.x.other": null } }) };
+const unknown = { call: async () => ({ installed: { "com.x.r31test": null, "com.x.other": null } }) };
 
 test("B229: an id iOS can't answer counts by the shell's signed record in the sideload app", async () => {
   const map = await installedOf(LIST, { mode: "sideload", native: unknown, records: async () => [],
-    signed: async () => [{ bundleId: "com.ryha.r31test", originalBundleId: "com.ryha.r31test" }] });
-  assert.deepEqual(map, { "com.ryha.r31test": true });
+    signed: async () => [{ bundleId: "com.x.r31test", originalBundleId: "com.x.r31test" }] });
+  assert.deepEqual(map, { "com.x.r31test": true });
   // an old-way copy (Keep Bundle IDs off): installed under the profile's ID, its record keeps the IPA's own
   const old = await installedOf(LIST, { mode: "sideload", native: unknown, records: async () => [],
     signed: async () => [{ bundleId: "S8NFX3A2LT.com.x.other", originalBundleId: "com.x.other" }] });
@@ -28,14 +28,14 @@ test("B229: the shell's records are asked once, and only when Installed's record
   assert.equal(asked, 1);
   asked = 0;
   const map = await installedOf(LIST, { mode: "sideload", native: unknown,
-    records: async () => [{ id: "com.ryha.r31test" }, { id: "com.x.other" }], signed });
+    records: async () => [{ id: "com.x.r31test" }, { id: "com.x.other" }], signed });
   assert.equal(asked, 0);
-  assert.deepEqual(map, { "com.ryha.r31test": true, "com.x.other": true });
+  assert.deepEqual(map, { "com.x.r31test": true, "com.x.other": true });
 });
 
 test("B229: iOS's own false still wins over a signed record; the jailbreak app and a failing call ask nothing more", async () => {
-  const no = { call: async () => ({ installed: { "com.ryha.r31test": false, "com.x.other": false } }) };
-  const rec = async () => [{ bundleId: "com.ryha.r31test" }];
+  const no = { call: async () => ({ installed: { "com.x.r31test": false, "com.x.other": false } }) };
+  const rec = async () => [{ bundleId: "com.x.r31test" }];
   assert.deepEqual(await installedOf(LIST, { mode: "sideload", native: no, records: async () => [], signed: rec }), {});
   assert.deepEqual(await installedOf(LIST, { mode: "jailbreak", native: unknown, records: async () => [],
     signed: async () => assert.fail("the jailbreak build refuses signing.*") }), {});
@@ -47,11 +47,11 @@ test("B229: the default asks signing.installed over the bridge", async () => {
   const calls = [];
   const native = { call: async (m) => {
     calls.push(m);
-    if (m === "apps.isInstalled") return { installed: { "com.ryha.r31test": null } };
-    if (m === "signing.installed") return { apps: [{ bundleId: "com.ryha.r31test" }], next: null };
+    if (m === "apps.isInstalled") return { installed: { "com.x.r31test": null } };
+    if (m === "signing.installed") return { apps: [{ bundleId: "com.x.r31test" }], next: null };
     return null;
   } };
   const map = await installedOf(LIST.slice(0, 1), { mode: "sideload", native, records: async () => [] });
   assert.deepEqual(calls, ["apps.isInstalled", "signing.installed"]);
-  assert.deepEqual(map, { "com.ryha.r31test": true });
+  assert.deepEqual(map, { "com.x.r31test": true });
 });

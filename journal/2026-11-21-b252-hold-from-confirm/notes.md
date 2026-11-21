@@ -39,4 +39,14 @@ polls that call (waitForVPN) and it would hold the audio session for no install.
 - **Whether the page's JavaScript runs while the app is in the background** with KeepAlive held: the native side
   (signing, the copy) does, as B246's runs showed. If WebKit suspends the web content process anyway, the route
   check (`chooseRoute` awaiting `idevice.status`'s answer) would still wait for the app to come back, though the
-  signing would not. The phone test above answers it.
+  signing would not. Why it likely does run: the shell answers a bridge call by evaluating script in the page, and
+  WebKit keeps the web content process running for such a request; from `idevice.status`'s answer to the
+  `signing.install` message, the page code runs as one chain of awaits with no timer in between, so the whole chain
+  finishes inside that one evaluation. The phone test above answers it; filed as an R task (spec review's point).
+
+## Spec review
+
+Fresh subagent, diff + brief only: no wrong code found. It pointed out that the route-decision half is not shown to
+run in the background (see Not verified) and that the other entry points (IPA queue, My IPAs, Re-sign All) aren't
+held from their own buttons. That second point is out of B252's scope (its path is Confirm → signing.install). Both
+are recorded above; the phone check is filed.

@@ -125,7 +125,7 @@ enum SignAhead {
                     }
                 }
             }
-            // B275: iFizBox's own record (signed from its own bundle) signs from the running bundle, as signing.resign's
+            // B275: iFizBox's own record (signed from its own bundle) signs from the running bundle, as signing.resign does
             if source == SelfIPA.url {
                 let out = SignBridge.work.appendingPathComponent("\(SignBridge.token())-self.ipa")
                 do { try SelfIPA.make(app: Bundle.main.bundleURL, to: out) { job.cancelled }; return signThat(out) } catch {

@@ -231,19 +231,18 @@ async function confirmInstall(url, name, message, { alert, install, open, reload
   const { index } = await alert({ title: "Install IPA", message, buttons: ["Cancel", "Install"], cancel: 0 });
   if (index !== 1) return false;
   const run = install ?? (await defaultInstall());
-  let answer = null;
   try {
-    await run({ url, name, onInstalled: (r) => { answer = r ?? null; } });
+    await run({ url, name });
   } finally {
-    await Promise.resolve().then(() => reload(answer)).catch(() => {});
+    await Promise.resolve().then(() => reload()).catch(() => {});
   }
   return true;
 }
 
 // Installed's reloadSigned, loaded only once an install ends (and never under node --test, where no page runs).
-const reloadInstalled = async (answer) => {
+const reloadInstalled = async () => {
   if (typeof document === "undefined") return;
-  (await import("./screens/installed.js")).reloadSigned(answer);
+  (await import("./screens/installed.js")).reloadSigned();
 };
 
 // What Install runs: the helper's ipa.install in the jailbreak build (`jailbreak`), else signAndInstall.

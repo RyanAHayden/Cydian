@@ -1285,28 +1285,24 @@ async function renderAppPage(body, route, ctx, { quiet = false } = {}) {
 // ---- B281: an install that records nothing itself ended ----------------------------------------------------------
 // An ifizbox://install link's Install (incoming.js) and another sideloader's IPA link sign from a URL and write no
 // Installed record, so nothing told the lists: Installed's row and the app's page kept the signed record from before
-// (a My IPAs install's) until they were opened again. When that run ends, a record that still says the app came from
-// My IPAs goes (this install came from a URL, and the shell's signed record now says so), then every live apps list
-// and app page loads the signed records again.
-//   await reloadSigned(result, { store })   result: the install's answer ({ bundleId }), or null
+// (a My IPAs install's) until they were opened again. When that run ends, every live apps list and app page loads
+// the signed records again.
+//   reloadSigned({ load, draw })   -> the number of app pages drawn again (load, draw: stand-ins for tests)
 const appPages = pageViews(() => ({ kind: "app", route: null, ctx: null }));
 
-export const libraryRecord = (rec) => !!rec && !rec.source && String(rec.key ?? "").startsWith("library:");
-
-export async function reloadSigned(result = null, { store = apps } = {}) {
-  const id = typeof result?.bundleId === "string" ? result.bundleId : null;
-  let removed = false;
-  if (id) {
-    try {
-      const s = await store();
-      const had = (await s.all()).find((r) => r?.id === id && !r.self) ?? null;
-      if (libraryRecord(had)) { await removeInstall(s, id); removed = true; } // onAppsChange loads the lists
-    } catch { /* no store: the lists still load */ }
+export function reloadSigned({ load = loadAllApps, draw = renderAppPage } = {}) {
+  load();
+  let n = 0;
+  for (const p of appPages.all()) {
+    if (!p.route || p.body?.isConnected === false) continue;
+    draw(p.body, p.route, p.ctx, { quiet: true });
+    n++;
   }
-  if (!removed) loadAllApps();
-  for (const p of appPages.all()) if (p.route && p.body?.isConnected) renderAppPage(p.body, p.route, p.ctx, { quiet: true });
-  return removed;
+  return n;
 }
+
+// Registers `body` as an app page, as renderAppPage does (tests).
+export const openAppPage = (body, route, ctx = null) => appPages.open(body, { route, ctx });
 
 // The page's sections for a row `r` (with `signed`), testable without a page.
 export function appPageSections(r, { ipa = null, mode = detectMode(), now = new Date(), window, onAction = () => {} } = {}) {

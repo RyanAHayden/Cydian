@@ -10,7 +10,7 @@
 // `net`: URL -> string | { status, body, headers } for net.fetch / net.packages (a missing URL answers 404;
 // net: null means offline, every request fails with "network: ..."). `env` goes to the helper (FAKE_FAIL=update).
 // F63: helper.run of apply-ask gives the helper a stdin pipe, which helper.answer { answer: keep | new } writes to.
-// F64: helper.cancel stops the running apply-ask (SIGTERM to its process group; exit 130 like the real helper's
+// F64: helper.cancel stops the running apply-ask (SIGKILL to its process group; exit 130 like the real helper's
 // SIGINT to apt) until its first pmstatus: line.
 // F59: ipa.install downloads into `ipaDir` (default: beside the prefix, ipa-cache/) and runs install-ipa there.
 // F57: paid packages (native/Sources/Paid.swift): `vendors` (native/fake/fake-vendor.mjs) answer net.request,
@@ -25,6 +25,11 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, 
 import { constants as osConstants, tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+
+// F64/T62: SIGKILL to a detached helper's whole process group; a group already empty is fine.
+function killGroup(pid) {
+  try { process.kill(-pid, "SIGKILL"); } catch (e) { if (e.code !== "ESRCH") throw e; }
+}
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 export const FAKE_HELPER = join(HERE, "ifizbox-helper");
@@ -177,13 +182,14 @@ export function createFakeNative({ prefix, remote, net = {}, env = {}, helper = 
       return true;
     },
     // F64: like Helper.cancel in Apt.swift, while apt still downloads. The real helper turns the "C" line into SIGINT
-    // for apt-get (after resetting every signal to its default); here the fake helper's process group gets SIGTERM,
-    // since a test runner started in the background leaves SIGINT ignored in its children.
+    // for apt-get (after resetting every signal to its default); here the fake helper's process group gets SIGKILL,
+    // since a test runner started in the background leaves SIGINT ignored in its children, and SIGTERM (which a
+    // process can block, catch or ignore) once let the fake's sleep outlive its shell under load (T62).
     "helper.cancel"() {
       if (!running) return fail("helper: no install is running");
       if (running.dpkg) return fail("helper: dpkg is already installing; it can't be stopped halfway");
       running.cancelled = true;
-      process.kill(-running.child.pid, "SIGTERM");
+      killGroup(running.child.pid);
       return true;
     },
     // F59: like IPAInstall.run in Apt.swift: download as <UUID>.ipa into ipaDir, ifizbox-helper install-ipa, remove

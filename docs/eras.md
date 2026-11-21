@@ -133,11 +133,23 @@ The bars' own heights (`--nav-h`, `--tab-h`) are layout that every screen depend
 
 ### Nav hooks
 
-None exist yet. iOS 13 and iOS 26 need three, each off in iOS 6:
+iOS 13 and iOS 26 need three, each off in iOS 6:
 
-- large titles that collapse into the nav bar on scroll (`nav/navbar.js`);
-- a floating tab bar pill, Search as its own circle, content scrolling under it (`nav/tabbar.js`, `style.css`);
-- modal sheets as cards over a scaled-back page (`nav/sheet.js`).
+- large titles that collapse into the nav bar on scroll (`nav/navbar.js`), not built yet;
+- a floating tab bar pill, Search as its own circle, content scrolling under it (`nav/tabbar.js`, `style.css`), not
+  built yet;
+- **card sheets**: `<html data-sheet="card">`, set by the era's JS when it is chosen. A modal sheet (`nav/sheet.js`)
+  stops below the status bar as a card with rounded top corners, and the page behind it (the nav bar, the screens
+  and the tab bar) scales back about the screen's centre and dims onto the black ground. It comes back when the
+  last card sheet closes. Transform and opacity only. Hooks, with their card values from `packages.css` (an era may
+  set its own on `html[data-style=…][data-sheet="card"]`):
+
+  | Hook | iOS 6 | Card | What it moves |
+  |---|---|---|---|
+  | `--sheet-top` | 0px | safe top + 10px | the gap above the sheet |
+  | `--sheet-bar-top` | safe top | 0px | the status bar's room inside the sheet's bar |
+  | `--sheet-radius` (look) | 0px | 10px | the sheet's top corners |
+  | `--sheet-behind-scale`, `--sheet-behind-shift`, `--sheet-behind-opacity` | not used | 0.92, 0, 0.75 | the page behind (shift in px, down) |
 
 ## What is clean today
 
@@ -164,4 +176,4 @@ Not yet clean, each queued as its own cleanup:
 - the light palettes' segmented-control rules in `palettes.css` (they move onto tokens with that control);
 - the art the overlays in `nav/` draw from JS (HUD, spinner, share sheet, lock, placeholders);
 - inline SVG icons drawn from JS, to come from a per-style icon map;
-- the three nav hooks above.
+- the large-title and floating-tab-bar nav hooks above.

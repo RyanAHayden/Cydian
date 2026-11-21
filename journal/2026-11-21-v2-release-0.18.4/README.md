@@ -22,6 +22,11 @@
 
 **Shipped: 0.18.4** (build 3685), <https://github.com/RyanAHayden/iFizBox/releases/tag/v0.18.4>.
 
+- The `web/app/source.json` diff drops 0.9.5 and keeps 0.18.4's description to the headline and first 3 bullets:
+  both are release.sh's documented behaviour (at most 20 versions listed; the app and source keep the notes' first
+  4 lines). docs/release.md has no rule for patch vs minor, so the bump follows the owner's recent releases.
+- The site deploy is part of the release in this repo (docs/release.md, "Cutting one"), so it was not extra work.
+
 ## Checks
 - release.sh's own check: all 7 assets listed; `latest/download/iFizBox.ipa` redirects to v0.18.4's (206).
 - `gh release view v0.18.4`: published, not a draft.

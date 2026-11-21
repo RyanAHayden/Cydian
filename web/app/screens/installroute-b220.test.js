@@ -75,7 +75,9 @@ test("the VPN route off, not paired, or another failure: nothing is forgotten", 
 test("Tailscale's sign-in checks the kept pairing once it's in", () => {
   const src = readFileSync(new URL("./installroute.js", import.meta.url), "utf8");
   const body = src.slice(src.indexOf("async function tailscaleSignIn"), src.indexOf("export const recheckHooks"));
-  assert.match(body, /Signed In[\s\S]*await recheckPairing\(native, alert, redraw\)/);
+  assert.match(body, /await connectAfterSignIn\(native, alert, redraw/); // B219: it tests the connection, then recheckPairing
+  const after = src.slice(src.indexOf("export async function connectAfterSignIn"), src.indexOf("// B220: setting Tailscale up again"));
+  assert.match(after, /await recheckPairing\(native, alert, redraw\)/);
 });
 
 test("picking This iPhone again, or a new Connect With, checks it too (setting up local signing again)", () => {

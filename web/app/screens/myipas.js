@@ -230,7 +230,8 @@ export async function installedOf(list, { mode = listMode(), native = globalThis
     recorded ??= new Set(((await Promise.resolve().then(records).catch(() => [])) ?? []).map((r) => r?.id));
     if (recorded.has(id)) { out[id] = true; continue; }
     if (mode !== "sideload" || typeof native?.call !== "function") continue;
-    shell ??= new Set(((await Promise.resolve().then(signed).catch(() => [])) ?? []).map((r) => r?.bundleId));
+    // by the installed ID or the IPA's own (an old-way copy, Keep Bundle IDs off, is installed under the profile's)
+    shell ??= new Set(((await Promise.resolve().then(signed).catch(() => [])) ?? []).flatMap((r) => [r?.bundleId, r?.originalBundleId]));
     if (shell.has(id)) out[id] = true;
   }
   return out;

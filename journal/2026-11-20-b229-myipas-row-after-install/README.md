@@ -38,6 +38,11 @@ Two separate causes, plus one part that is working as designed.
   installed map, and the list is redrawn only if something changed. That way the kept signed copy shows without
   leaving the page.
 
+- Spec review: the signed-record fallback now also matches `originalBundleId`. This covers an old-way copy (Keep
+  Bundle IDs off), which is installed under the profile's ID while the row asks by the IPA's own ID. The review
+  also flagged that `seesInstalls` is worked out once per launch. That's harmless: when the workspace isn't there,
+  every `isInstalled` call answers nil anyway.
+
 ## Tests
 
 - `web/app/screens/myipas-b229.test.js`: covers the signed-record fallback, when it is asked (only after Installed's

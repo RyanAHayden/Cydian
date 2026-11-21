@@ -15,6 +15,10 @@ test("B229: an id iOS can't answer counts by the shell's signed record in the si
   const map = await installedOf(LIST, { mode: "sideload", native: unknown, records: async () => [],
     signed: async () => [{ bundleId: "com.ryha.r31test", originalBundleId: "com.ryha.r31test" }] });
   assert.deepEqual(map, { "com.ryha.r31test": true });
+  // an old-way copy (Keep Bundle IDs off): installed under the profile's ID, its record keeps the IPA's own
+  const old = await installedOf(LIST, { mode: "sideload", native: unknown, records: async () => [],
+    signed: async () => [{ bundleId: "S8NFX3A2LT.com.x.other", originalBundleId: "com.x.other" }] });
+  assert.deepEqual(old, { "com.x.other": true });
 });
 
 test("B229: the shell's records are asked once, and only when Installed's records don't settle it", async () => {

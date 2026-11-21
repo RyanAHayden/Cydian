@@ -28,6 +28,13 @@ Depends: dev.theos.orion (>= 1.0.0), firmware (>= 14.0)
 Replaces: com.ryannair05.cask2
 Name: Cask 3
 Description: Animated table scrolling
+ Cask 3 brings smooth, springy animations to every table and collection view on your device as you scroll.
+ .
+ Pick from over twenty styles, including Fade, Flip, Wave, Bounce and Zoom, and set the speed and delay for each one.
+ .
+ Works in Settings, Mail, Messages and every app built with UIKit. Choose apps where it stays off from its settings page.
+ .
+ Rewritten in Swift with Orion for iOS 14 and later. Requires Orion Runtime.
 Icon: https://img.chariz.cloud/icon/cask-3/icon@3x.png
 Depiction: https://chariz.com/get/cask-3
 Tag: compatible_min::ios14.0

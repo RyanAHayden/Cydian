@@ -11,6 +11,8 @@
 //
 // Lists come from the catalog in the parse worker (catalog.js); long ones are virtualised (nav/vlist.js).
 import { grouped, placeholder, el, segments, note } from "../nav/ui.js";
+import { rowIcon } from "../icons/rowicons.js"; // concept: Cydia's Details rows
+import { loadStyle } from "../nav/motion.js"; // concept: the price button (myipas.css) for Version's Change
 import { createVList, withLetterHeaders } from "../nav/vlist.js";
 import { createSectionIndex } from "../nav/sectionindex.js";
 import { onPageOpen } from "../nav/pagestate.js";
@@ -131,7 +133,7 @@ export function parseToken(seg) {
   const s = String(seg ?? "");
   const i = s.indexOf(":");
   const kind = i > 0 ? s.slice(0, i) : "";
-  return ["section", "package", "author", "versions"].includes(kind) ? { kind, value: s.slice(i + 1) } : { kind: "unknown", value: s };
+  return ["section", "package", "author", "versions", "info", "pkgsettings", "reviews"].includes(kind) ? { kind, value: s.slice(i + 1) } : { kind: "unknown", value: s };
 }
 
 export const token = (kind, value) => `${kind}:${value}`;
@@ -164,7 +166,11 @@ export function nav(route, sourceName = () => null) {
     case "section": return { title: p.value === ALL ? "All Packages" : p.value, style: "plain" };
     case "author": return { title: p.value || "Author", style: "plain" };
     // F29: Install (Modify once the page knows it's installed) opens the action sheet of what can be done here.
-    case "package": return { title: names.get(p.value) || p.value,
+    // Concept: Cydia's More Information (the full page) and Change Package Settings, under Details.
+    case "info": return { title: "More Information" };
+    case "pkgsettings": return { title: "Settings", style: "plain" };
+    case "reviews": return { title: "Reviews" };
+    case "package": return { title: "Details",
       right: { label: "Install", onClick: (e) => packageActions(route, e.currentTarget),
         onHold: () => installVersionHold(route).catch(() => {}) } }; // F346: a hold picks the version
     case "versions": return { title: "Versions" };
@@ -179,7 +185,10 @@ export function render(body, route, ctx) {
     case "section": return renderList(body, route, async () => sideloadListRows(await catalog.list(p.key, p.value)), true,
       detectMode() === "sideload" && !isAltKey(p.key) ? dropRefusedTweaks : null);
     case "author": return renderAuthor(body, route, p.value);
-    case "package": return renderPackage(body, route, p.key, p.value, ctx);
+    case "package": return renderDetails(body, route, p.key, p.value, ctx);
+    case "info": return renderInfo(body, route, p.key, p.value);
+    case "reviews": return renderReviewsPage(body, p.value);
+    case "pkgsettings": return renderPkgSettings(body, p.value);
     case "versions": return renderVersions(body, route, p.key, p.value);
     default:
       body.append(note("Nothing here."));
@@ -990,7 +999,7 @@ async function renderAuthor(body, route, name) {
       settings.hiddenAuthors.set(name, !hiddenNow);
       renderAuthor(body, route, name);
     } }], footer: hiddenNow ? "Hidden everywhere else: lists, Search and Changes." : null }]);
-    g.classList.add("author-hide");
+    g.firstElementChild?.classList.add("author-hide");
     body.append(g);
   }
   if (!rows.length) { body.append(note("No packages.")); return; }
@@ -1286,6 +1295,161 @@ async function renderPackage(body, route, key, id, ctx) {
       drawNews(json);
     });
   }
+}
+
+// Concept v2: one Details page after Cydia's (the 4S, 2026-11-21), with everything today's page shows, made simpler:
+// the header (icon, name, version, size), icon rows for every option, the screenshots, the description in a dashed
+// box (a long one or a depiction opens More Information, its only subpage besides Version History and Reviews),
+// Information rows with icons, Installed Package with Version and its Change button, Links, Block, footer.
+async function renderDetails(body, route, key, id, ctx) {
+  body.append(placeholder("page"));
+  let pkg, sources;
+  try {
+    await catalog.ensure();
+    [pkg, sources] = await Promise.all([catalog.package(id, key), getBackend().sources()]);
+  } catch (e) { body.replaceChildren(note(e.message)); return; }
+  if (!pkg) { body.replaceChildren(grouped([{ rows: [{ label: "Package not found" }], footer: id }])); return; }
+  const st = pkg.stanza;
+  if (st.kind === "ipa" && st.ipa) return renderPackage(body, route, key, id, ctx);
+  const source = sources.find((s) => s.key === pkg.key);
+  const sourceName = source ? displayName(source) : "";
+  const name = st.name || st.package;
+  names.set(id, name);
+  const desc = description(st);
+  const text = desc.long || desc.short || "";
+  const pid = st.package || id;
+
+  const head = el("div", "cy-head");
+  const art = createArt(true);
+  paintArt(art, { ...pkg.row, icon: st.iconUrl ?? pkg.row.icon });
+  const src = st.iconUrl && mediaUrl(st.iconUrl);
+  if (src) {
+    art.img.onload = () => { art.img.classList.add("loaded"); art.art.classList.add("own"); };
+    art.img.onerror = () => art.img.remove();
+    art.img.src = src;
+  } else art.img.remove();
+  const words = el("div", "cy-head-text");
+  words.append(el("div", "cy-name", name), el("div", "cy-version", st.version ?? ""));
+  head.append(art.art, words);
+  const size = formatSize(st.size);
+  if (size && !pkg.installedOnly) head.append(el("div", "cy-size", size));
+
+  const [installedRows, history, depReport] = await Promise.all([
+    catalog.installed().catch(() => []), catalog.history(id, key).catch(() => null), catalog.deps(id, key).catch(() => null)]);
+  const inst = installedRows?.find((r) => r.id === pid);
+  const author = parseAuthor(st.author);
+  const maint = parseAuthor(st.maintainer);
+  const fit = compat(st, currentDevice());
+  const fitCode = fit.status === "no" ? fit.reason : fit.status;
+
+  const nodes = [head];
+  const piracy = piracyBanner(packageWarning({ key: pkg.key, source: source?.uri }));
+  if (piracy) nodes.push(piracy);
+  // Options: Change Package Settings, Author (and Maintainer when it's someone else).
+  const top = [];
+  if (inst) top.push({ label: "Change Package Settings", icon: rowIcon("pkgSettings"), href: deeper(route, token("pkgsettings", pid)) });
+  if (author || maint) top.push({ label: "Author", detail: (author || maint).name, icon: rowIcon("pkgAuthor"), href: deeper(route, token("author", (author || maint).name)) });
+  if (author && maint && maint.name.toLowerCase() !== author.name.toLowerCase()) top.push({ label: "Maintainer", detail: maint.name, icon: rowIcon("pkgAuthor"), href: deeper(route, token("author", maint.name)) });
+  if (top.length) nodes.push(grouped([{ rows: top }]));
+  if (isSideloadTweak(st)) nodes.push(worksInGroup(st).el);
+  const payBox = pkg.installedOnly || isSideloadTweak(st) ? null : paymentGroup(st, source, ctx, { onState: (s) => paidButton(body, s) });
+  if (payBox) nodes.push(payBox);
+  if (depReport?.problems.length) nodes.push(depProblemsGroup(depReport, route, ctx));
+
+  // Screenshots (Screenshots:, a Sileo depiction's, an HTML depiction's or the GitHub repo's).
+  const sileo = httpUrl(st.sileodepiction);
+  const html = st.depiction?.trim() ? httpUrl(st.depiction) : releaseDepiction(source, pid);
+  const previews = el("div", "package-previews");
+  previews.append(previewSlot(`pkg:${pkg.key ?? "installed"}:${pid}`, { shots: aptShots(st), html: sileo ? null : html, gh: packageGithub(st, null) }));
+  nodes.push(previews);
+
+  // The description: its first lines in the dashed box; More Information (the whole text, or the depiction) under it
+  // when there is more to read.
+  if (text) {
+    const box = el("div", "group cy-desc-group");
+    const d = el("div", "cy-desc");
+    d.append(el("div", "cy-desc-text", text));
+    box.append(d);
+    nodes.push(box);
+  }
+  if (text.split("\n").length > 6 || text.length > 260 || sileo || html) {
+    nodes.push(grouped([{ rows: [{ label: "More Information", icon: rowIcon("pkgMore"), href: deeper(route, token("info", id)) }] }]));
+  }
+
+  // Version: the installed one (or this one) with Change, which picks another version (F346's list).
+  const vrow = { label: "Version", detail: inst?.version ?? st.version ?? "", icon: rowIcon("pkgVersion"), cls: "cy-version-row" };
+  const rows2 = [vrow];
+  if (history?.versions.length) rows2.push({ ...versionHistoryCell(route, id, history), icon: rowIcon("pkgHistory") });
+  if (inst) rows2.push({ label: "Filesystem Content", icon: rowIcon("pkgFiles"), chevron: true, onClick: () => {} });
+  const vg = grouped([{ header: inst ? "Installed Package" : "Version", rows: rows2 }]);
+  const vcell = vg.querySelector(".cy-version-row .cell-inner");
+  if (vcell) {
+    loadStyle("myipas.css");
+    const b = el("button", "price-btn cy-change", "CHANGE");
+    b.type = "button";
+    b.addEventListener("click", () => installVersionHold(route).catch(() => {}));
+    vcell.append(b);
+    vcell.classList.add("has-change");
+  }
+  nodes.push(vg);
+
+  // Information, each row with its icon.
+  const info = [];
+  if (!pkg.installedOnly) info.push({ label: "Source", detail: sourceName || "Unknown", icon: rowIcon("sources"),
+    href: route.tab === "sources" && route.path[0] === pkg.key ? null : format({ tab: "sources", path: [pkg.key] }) });
+  if (pkg.row.section && pkg.row.section !== NO_SECTION) info.push({ label: "Section", detail: pkg.row.section, icon: rowIcon("pkgSection"), href: deeper(route, token("section", pkg.row.section)) });
+  info.push({ label: "Works On", detail: fit.range ?? compatBadge(fitCode), icon: rowIcon("worksOnMyPhone") });
+  const isz = Number(st["installed-size"]);
+  if (isz > 0) info.push({ label: "Installed Size", detail: formatSize(isz * 1024), icon: rowIcon("pkgSize") });
+  const rels = [...parseRelations(st["pre-depends"]), ...parseRelations(st.depends)];
+  if (rels.length) info.push({ label: "Depends", detail: rels.map((g) => g[0].name).join(", "), icon: rowIcon("pkgDepends"), cls: "store-info-long" });
+  info.push({ label: "Reviews", detail: "No Ratings", icon: rowIcon("pkgReviews"), href: deeper(route, token("reviews", id)) });
+  nodes.push(grouped([{ header: "Information", rows: info, footer: fit.detail }]));
+
+  const links = packageLinks(st, null);
+  if (links.length) nodes.push(grouped([{ header: "Links", rows: links.map((l) => ({ label: l.label, icon: rowIcon("pkgLink"), href: l.url })) }]));
+  const blk = blockGroup({ id: pid, name, author: (author || maint)?.name ?? null });
+  for (const c of blk.querySelectorAll?.(".cell-inner") ?? []) { const i = el("span", "cell-icon row-icon"); const im = el("img"); im.alt = ""; im.src = rowIcon("pkgBlock").src; im.onload = () => im.classList.add("loaded"); i.append(im); c.prepend(i); }
+  nodes.push(blk);
+  nodes.push(grouped([{ footer: `${st.package}\n· ${[sourceName, pkg.row.section === NO_SECTION ? null : pkg.row.section].filter(Boolean).join(" - ")}` }]));
+  body.replaceChildren(...nodes);
+  rememberPackage(body, route, { id, key, pkg, source, history, payBox });
+}
+
+// Concept v2: More Information: the whole description, or the depiction (Sileo drawn natively, else the HTML one).
+async function renderInfo(body, route, key, id) {
+  const pkg = await catalog.package(id, key).catch(() => null);
+  if (!pkg) { body.replaceChildren(note("Package not found")); return; }
+  const st = pkg.stanza;
+  const desc = description(st);
+  const text = desc.long || desc.short || "";
+  const sources = await getBackend().sources().catch(() => []);
+  const source = sources.find((s) => s.key === pkg.key);
+  const sileo = httpUrl(st.sileodepiction);
+  const html = st.depiction?.trim() ? httpUrl(st.depiction) : releaseDepiction(source, st.package || id);
+  const slot = el("div", "depiction-slot");
+  const box = el("div", "group cy-desc-group");
+  const d = el("div", "cy-desc cy-desc-full");
+  d.append(el("div", "cy-desc-text", text));
+  box.append(d);
+  body.replaceChildren(box, slot);
+  if (sileo) loadSileo(slot, sileo, { fallback: "" }).catch(() => {});
+  else if (html) slot.append(grouped([{ rows: [{ label: "Open Depiction", icon: rowIcon("pkgLink"), onClick: () => openHtmlDepiction(html, st.name || id), chevron: true }] }]));
+}
+
+// Concept v2: Reviews, its own page (today's Reviews tab).
+async function renderReviewsPage(body, id) {
+  const api = getBackend().reviews ?? reviewsApi({ base: reviewsBase(detectMode()) });
+  const pane = el("div", "cy-reviews");
+  body.replaceChildren(pane);
+  reviewsTab(pane, { id, version: "", depiction: Promise.resolve(null), first: api.list(id, 0).catch(() => null), api,
+    renderText: (rv) => reviewBody(rv, { open: openSileoSheet }), onRating: () => {} });
+}
+
+// Concept: Change Package Settings, Cydia's own page: Ignore Upgrades (and Update Automatically when shown).
+async function renderPkgSettings(body, id) {
+  const g = await installedGroup(id);
+  body.replaceChildren(...(g ? [g] : [note("Not installed.")]));
 }
 
 // F181: the Related tab: other packages in the same section from the same source (All Sources: from every source),

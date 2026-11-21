@@ -33,3 +33,14 @@ Status: deinstall ok config-files
 Architecture: iphoneos-arm64
 Version: 0.9
 Description: removed, config files left
+
+Package: com.ryannair05.cask3
+Status: install ok installed
+Section: Tweaks
+Installed-Size: 860
+Maintainer: Ryan Nair <ryannairtweaks@gmail.com>
+Author: Ryan Nair <ryannairtweaks@gmail.com>
+Architecture: iphoneos-arm64
+Version: 1.0.1
+Name: Cask 3
+Description: Animated table scrolling

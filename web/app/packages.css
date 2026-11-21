@@ -1180,3 +1180,22 @@ html[data-theme="dark"] .dep-piracy .dep-review-title { color: var(--dk-bad); }
   box-shadow: var(--row-failed-badge-shadow);
 }
 /* ==== } look-only ==== */
+
+/* Concept: Cydia's Details page (the 4S): icon, bold name, version in the detail blue, size on the right; the
+   description in a dashed box (first lines only, the rest on More Information). */
+.cy-head { display: flex; align-items: center; gap: 12px; margin: 12px 10px 4px; position: relative; }
+.cy-head .pkg-art.large { width: 64px; height: 64px; }
+.cy-head-text { min-width: 0; flex: 1; align-self: flex-start; padding-top: 10px; }
+.cy-name { font-size: 17px; font-weight: bold; color: var(--text); text-shadow: var(--emboss); overflow-wrap: anywhere; }
+.cy-version { margin-top: 12px; font-size: 17px; color: var(--detail); text-shadow: var(--emboss); }
+.cy-size { position: absolute; right: 2px; bottom: 4px; font-size: 13px; color: var(--detail); text-shadow: var(--emboss); }
+.cy-desc-group { margin: 10px 10px 0; }
+.cy-desc { padding: 11px 13px; color: var(--text);
+  background: color-mix(in srgb, var(--table) 85%, transparent); border: 1.5px dashed var(--table-edge); border-radius: 9.5px; }
+.cy-desc-text { white-space: pre-wrap; font-size: 15px; line-height: 18px; max-height: 108px; overflow: hidden;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 6; }
+/* Concept v2: Version's Change button, the App Store price button at the row's right */
+.cell-inner.has-change { padding-right: 10px; }
+.cell-inner.has-change .cell-detail { margin-right: 10px; }
+.cy-change { flex: none; }
+.cy-desc-full .cy-desc-text { max-height: none; -webkit-line-clamp: unset; display: block; }

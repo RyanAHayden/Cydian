@@ -408,7 +408,8 @@ async function tailscaleSignIn(native, alert, redraw, from = null, { hud = false
 // once. Answers { ok, code, ... } as tailscale.test does (not_responding when it didn't answer in TIMEOUTS.test).
 export const AFTER_SIGN_IN = { budgetMs: 30000, gapMs: 2500 };
 // "error": tailscale.test itself failed (not signed in, the bridge refused it): trying again changes nothing.
-const FINAL_CODES = new Set(["needs_approval", "expired", "needs_login", "refused", "error"]);
+// B246: "not_paired": Tailscale reached iOS and iOS has no pairing; only pairing changes that.
+const FINAL_CODES = new Set(["needs_approval", "expired", "needs_login", "refused", "not_paired", "error"]);
 export async function testUntilConnected(native, now = () => Date.now()) {
   const t0 = now();
   for (;;) {
@@ -431,7 +432,8 @@ export async function connectAfterSignIn(native, alert, redraw, { hud = false } 
     redraw();
     try { r = await testUntilConnected(native); } finally { testing = false; redraw(); }
   }
-  if (r?.ok || r?.code === "refused") {
+  // B246: not_paired with a pairing kept here means the phone forgot it: the same check forgets it and pairs again
+  if (r?.ok || r?.code === "refused" || (r?.code === "not_paired" && r.paired)) {
     const how = await recheckPairing(native, alert, redraw);
     if (r.ok) return "ok";
     if (how === "repair" || how === "ok") return how; // ok: the pairing answered after all
@@ -483,6 +485,11 @@ async function testAlert(alert, r) {
   const why = r?.code === "not_responding"
     ? { title: NOT_RESPONDING, message: `Tailscale didn't answer in ${TIMEOUTS.test / 1000} seconds. Check that the Tailscale app's VPN is on, then test again.` }
     : tailscaleTestResult(r);
+  if (why.pair) { // B246: the route works, the pairing is missing: Pair opens the pairing page
+    const { index } = await alert({ title: why.title, message: why.message, buttons: ["Not Now", "Pair"], cancel: 0 });
+    if (index === 1) recheckHooks.goPair();
+    return;
+  }
   if (!why.copy) return alert({ title: why.title, message: why.message, buttons: ["OK"] });
   const { index } = await alert({ title: why.title, message: why.message, buttons: ["OK", "Copy Rule"], cancel: 0 });
   if (index === 1) copyText(why.copy);

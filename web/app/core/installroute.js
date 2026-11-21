@@ -189,6 +189,10 @@ export function tailscaleTestResult(r) {
       return { title: "Blocked by Your Tailnet", message: `Your tailnet's access rules don't let ${r.name || NAME} reach this iPhone${r.peer ? ` (${r.peer})` : ""}${d}. Add this rule to the policy file in the admin console: ${rule}`, copy: rule };
     }
     case "refused": return { title: "iPhone Refused", message: `This iPhone refused the connection${d}. It no longer has ${NAME}'s pairing: pair again in Pairing.` }; // B220
+    // B246: Tailscale reached iOS, which turned the connection down because it has no pairing for any app
+    case "not_paired": return r.paired
+      ? { title: "Pair Again", message: `Tailscale reached this iPhone, but it no longer has ${NAME}'s pairing. Pair again, then apps install over Tailscale.`, pair: true }
+      : { title: "Not Paired Yet", message: `Tailscale reached this iPhone. Pair ${NAME} with it once, then apps install over Tailscale.`, pair: true };
     case "no_answer": return { title: "No Answer", message: `This iPhone didn't answer through Tailscale${d}. Try again.` };
     default: return { title: "Couldn't Connect", message: `Tailscale didn't connect${d}. Check the internet connection and try again.` };
   }

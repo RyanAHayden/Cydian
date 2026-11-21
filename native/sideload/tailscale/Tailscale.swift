@@ -316,6 +316,14 @@ enum TailscaleBridge {
         var r = Tailscale.json(TSTest(h, Int32(port)))
         r["address"] = own
         r["name"] = st["name"] ?? NSNull()
+        // B246: remotepairingd accepts the connection and then resets it when this phone has no paired host at all
+        // ("Rejecting TCP control channel connection … not enabled", seen on the iPhone 15 Pro over Tailscale): the
+        // route works, the pairing is missing. Not "No Answer": the page says to pair (`paired`: whether this app
+        // still holds a pairing the phone has forgotten).
+        if r["code"] as? String == "no_answer", (r["detail"] as? String)?.contains("reset by peer") == true {
+            r["code"] = "not_paired"
+            r["paired"] = IDevice.pairing() != nil
+        }
         Tailscale.log("test \(own):\(port): \(r)")
         return r
     }

@@ -34,6 +34,26 @@ connect fails with `refused` (a turned-down pairing with `pairing_rejected`), an
 Pair-setup isn't allowed over loopback, Wi-Fi or Tailscale (`allowsPairSetup` false), so a connection only ever
 verifies an existing pairing. LocalDevVPN must be on while installing; iOS lets no app switch another app's VPN.
 
+## When the connection drops mid-install
+
+Leaving the app, a tunnel reset or Tailscale's node going quiet can drop the connection to iOS (idevice's
+`Socket(Kind(UnexpectedEof))`, or the watchdog's timeout). That is not iOS refusing the app, so `IDevice.install`
+connects again, up to 4 times with a growing pause (`../../sign/HereRecheck.swift` holds the rules), always over the
+route the install started on (Automatic would pick LocalDevVPN while Tailscale's VPN is still coming back); a connect
+that fails while it is connecting again counts as one of the tries:
+
+- **During the copy**: it carries on from the end of iOS's file in `PublicStaging` (a whole 1 MB chunk back).
+- **After the install was sent**: installd goes on without us, so it asks installation_proxy (Browse by bundle ID:
+  versions and `Path`) for up to 3 minutes and reports installed when iOS lists the new copy: a new app, a new
+  version, or the same version in a new bundle folder. The same version with nothing to tell it from the earlier
+  copy counts once it has held for 30 s. Still the earlier copy at the end (one 3-minute deadline per install, however
+  often it connects again): it fails and says iOS may still be installing it.
+
+Only installd's own error codes fail an install. A wait that ran far past its 0.5 s tick means iOS suspended the
+app; the step's time limit then starts again. The copy's speed in front and in the background goes to the log
+(`AFC: copied 351.5 MB in 20.1 s: 18.2 MB/s in front, 17.3 MB/s in the background`, measured on an iPhone 15 Pro
+over Tailscale).
+
 ## Building
 
 `native/build.sh` runs `build.sh` on every build. It needs `rustup target add aarch64-apple-ios`, clang, `IOS_SDK`

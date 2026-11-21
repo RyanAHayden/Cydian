@@ -109,7 +109,8 @@ class InstallNeverHangs(unittest.TestCase):
     def test_every_step_has_a_limit(self):
         src = read("IDevice.swift")
         # the whole install and verify run under the watchdog, which closes the tunnel when a step goes quiet
-        self.assertIn('try watched("install")', src)
+        # B246: each try after a dropped connection runs under its own watch ("install, connection 2", ...)
+        self.assertIn('try watched(attempt == 0 ? "install" : "install, connection', src)
         self.assertIn('watched("verify")', src)
         self.assertIn("adapter_clone(adapter)", src)
         self.assertIn("adapter_close(c)", src)

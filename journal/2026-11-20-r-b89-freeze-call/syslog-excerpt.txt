@@ -1,0 +1,92 @@
+2026-11-20 20:53:10.300827 remoted{Network}[57] <INFO>: nw_listener_resume_all_inboxes_if_suspended_on_queue_block_invoke [L99] Resuming inbox <protocol: http2_transport>
+2026-11-20 20:53:45.774712 runningboardd{RunningBoard}[36] <NOTICE>: [app<com.ryha.ifizbox(FEEDEEEE-DDDD-CCCC-BBBB-0000000001F5)>:712] Set darwin role to: UserInteractiveFocal
+2026-11-20 20:53:45.776572 iFizBox{WebKit}[712] <NOTICE>: 0x1190a80e0 - ProcessStateMonitor::~ProcessStateMonitor
+2026-11-20 20:53:45.776619 iFizBox{WebKit}[712] <NOTICE>: 0x1190a80e0 - ProcessStateMonitor::processDidBecomeRunning
+2026-11-20 20:53:56.707902 iFizBox{Network}[712] <INFO>: nw_listener_resume_all_inboxes_if_suspended_on_queue_block_invoke [L2] Resuming inbox socket: 19, endpoint: 127.0.0.1:61001, interface: <NULL>
+2026-11-20 20:53:56.708106 iFizBox{Network}[712] <NOTICE>: nw_listener_set_state_on_queue [L3] reporting state ready ((null))
+2026-11-20 20:53:56.708163 iFizBox{Network}[712] <NOTICE>: nw_listener_set_state_on_queue [L2] reporting state cancelled ((null))
+2026-11-20 20:53:56.941051 appstored{appstored}[192] <NOTICE>: [379EF1C5] Manifest for UPP: https://sign.ifizbox.com/sign/manifest?bundleid=com.ryha.r51test&version=9.9&title=R51Test&port=61002&path=669e17a7286e45606ad3f36fcf4749d3/app.ipa clientID: itunesstor
+2026-11-20 20:54:00.705460 remoted{Network}[57] <INFO>: nw_listener_resume_all_inboxes_if_suspended_on_queue_block_invoke [L101] Resuming inbox <protocol: http2_transport>
+2026-11-20 20:54:10.090941 iFizBox{WebKit}[712] <NOTICE>: 0x1190a80e0 - ProcessStateMonitor::ProcessStateMonitor
+2026-11-20 20:54:10.183023 runningboardd{RunningBoard}[36] <NOTICE>: [app<com.ryha.ifizbox(FEEDEEEE-DDDD-CCCC-BBBB-0000000001F5)>:712] Set darwin role to: NonUserInteractive
+2026-11-20 20:54:11.639321 remoted{Network}[57] <INFO>: nw_listener_resume_all_inboxes_if_suspended_on_queue_block_invoke [L102] Resuming inbox <protocol: http2_transport>
+2026-11-20 20:56:45.611912 mediaplaybackd{CoreMedia}[391] <NOTICE>: <<<< FigProcessStateMonitorServer >>>> fpsmServer_createCompanion: Created companion <FigProcessStateMonitorServerCompanion (0x7dd9c00e00, 37)> {
+2026-11-20 20:56:45.611934 mediaplaybackd{CoreMedia}[391] <NOTICE>: <<<< FigProcessStateMonitorServer >>>> figProcessStateMonitorHandleCreate: client:37 companion:<FigProcessStateMonitorServerCompanion (0x7dd9c00e00, 37)> {
+2026-11-20 20:56:45.612084 SpringBoard{CoreMedia}[37] <NOTICE>: <<<< FigProcessStateMonitorRemote >>>> figProcessStateMonitor_createRemoteFromObjectID: Created monitor <FigProcessStateMonitorRemoteRef 0x774203dc00 <FigXPCRemoteClient 0x7735ab3d80 [0x1fe6ecfd8]
+2026-11-20 20:56:45.612141 SpringBoard{CoreMedia}[37] <NOTICE>: <<<< FigProcessStateMonitorRemote >>>> FigProcessStateMonitorCopyRemoteStateMonitor: monitorRemoteOut <FigProcessStateMonitorRemoteRef 0x774203dc00 <FigXPCRemoteClient 0x7735ab3d80 [0x1fe6ecfd8]> 
+2026-11-20 20:56:45.613714 SpringBoard{CoreMedia}[37] <NOTICE>: <<<< FigProcessStateMonitorRemote >>>> FigProcessStateMonitorCopyRemoteStateMonitor: monitorRemoteOut <FigProcessStateMonitorRemoteRef 0x774203dc00 <FigXPCRemoteClient 0x7735ab3d80 [0x1fe6ecfd8]> 
+2026-11-20 20:56:45.617850 SpringBoard{CoreMedia}[37] <NOTICE>: <<<< FigProcessStateMonitorRemote >>>> FigProcessStateMonitorCopyRemoteStateMonitor: monitorRemoteOut <FigProcessStateMonitorRemoteRef 0x774203dc00 <FigXPCRemoteClient 0x7735ab3d80 [0x1fe6ecfd8]> 
+2026-11-20 20:56:45.626482 SpringBoard{CoreMedia}[37] <NOTICE>: <<<< FigProcessStateMonitorRemote >>>> FigProcessStateMonitorCopyRemoteStateMonitor: monitorRemoteOut <FigProcessStateMonitorRemoteRef 0x774203dc00 <FigXPCRemoteClient 0x7735ab3d80 [0x1fe6ecfd8]> 
+2026-11-20 20:56:45.676044 audiomxd{MediaExperience}[121] <NOTICE>: -CMSessionMgr- cmsInterruptSession:3199 'sid:0x79027, SpringBoard(37), 'auxi''[0x7a63563c00] with priority [0] and category 'Alarm' INTERRUPTING 'sid:0x7901c, iFizBox(712), 'prim''[0x7a63560c0
+2026-11-20 20:56:46.814097 SpringBoard{CoreMedia}[37] <NOTICE>: <<<< FigProcessStateMonitorRemote >>>> FigProcessStateMonitorCopyRemoteStateMonitor: monitorRemoteOut <FigProcessStateMonitorRemoteRef 0x774203dc00 <FigXPCRemoteClient 0x7735ab3d80 [0x1fe6ecfd8]> 
+2026-11-20 20:56:46.823837 SpringBoard{CoreMedia}[37] <NOTICE>: <<<< FigProcessStateMonitorRemote >>>> FigProcessStateMonitorCopyRemoteStateMonitor: monitorRemoteOut <FigProcessStateMonitorRemoteRef 0x774203dc00 <FigXPCRemoteClient 0x7735ab3d80 [0x1fe6ecfd8]> 
+2026-11-20 20:56:50.687394 runningboardd{RunningBoard}[36] <NOTICE>: [app<com.ryha.ifizbox(FEEDEEEE-DDDD-CCCC-BBBB-0000000001F5)>:712] Set darwin role to: Background
+2026-11-20 20:56:50.702227 iFizBox{WebKit}[712] <NOTICE>: 0x1190a80e0 - ProcessStateMonitor::processWillBeSuspended starts timer for 14.978330s
+2026-11-20 20:56:53.401852 remoted{Network}[57] <INFO>: nw_listener_resume_all_inboxes_if_suspended_on_queue_block_invoke [L103] Resuming inbox <protocol: http2_transport>
+2026-11-20 20:57:05.777248 iFizBox{WebKit}[712] <NOTICE>: 0x1190a80e0 - ProcessStateMonitor::suspendTimerFired
+2026-11-20 20:57:05.777326 iFizBox{WebKit}[712] <NOTICE>: 0x1190a80e0 - ProcessStateMonitor::processWillBeSuspendedImmediately
+2026-11-20 20:57:06.516863 SpringBoard{ToneLibrary}[37] <NOTICE>: <TLAlertQueuePlayerController: 0x7740976f40; stateDescriptor = (null)>: -_deactivateAudioSession…: About to deactivate audio session AVAudioSession: category:AVAudioSessionCategory(_rawValue: AV
+2026-11-20 20:57:06.733651 runningboardd{RunningBoard}[36] <NOTICE>: [app<com.ryha.ifizbox(FEEDEEEE-DDDD-CCCC-BBBB-0000000001F5)>:712] Set darwin role to: NonUserInteractive
+2026-11-20 20:57:06.734144 audiomxd{MediaExperience}[121] <NOTICE>: -CMSessionMgr- MXCoreSessionEndInterruption_WithSecTaskAndStatus: Sending EndInterruption to 'sid:0x7901c, iFizBox(712), 'prim' (com.ryha.ifizbox)' with status 'resumable.endInterruption'
+2026-11-20 20:57:06.742923 iFizBox{WebKit}[712] <NOTICE>: 0x1190a80e0 - ProcessStateMonitor::processDidBecomeRunning
+2026-11-20 20:57:49.469208 remoted{Network}[57] <INFO>: nw_listener_resume_all_inboxes_if_suspended_on_queue_block_invoke [L104] Resuming inbox <protocol: http2_transport>
+2026-11-20 20:57:59.163158 appstored{appstored}[192] <NOTICE>: [UPPD1F7CDE4/com.ryha.r51test] Running HEAD operation to get size for URL: http://127.0.0.1:61002/669e17a7286e45606ad3f36fcf4749d3/app.ipa task: LocalDataTask <678D4C8B-7B8F-42A9-8B88-B9E6281FD9FC>
+2026-11-20 20:57:59.173424 iFizBox{Network}[712] <NOTICE>: -[NWConcrete_nw_listener handleInbound:addProtocolInbox:] [L3] Handling inbound connection (add inbox 0) [C50 IPv4#8c4f9df7:49760 tcp, local: 127.0.0.1:61002, server, prohibit joining protocols, defini
+2026-11-20 20:57:59.224995 appstored{appstored}[192] <NOTICE>: [UPPD1F7CDE4/com.ryha.r51test] Found size: 18794 for URL: http://127.0.0.1:61002/669e17a7286e45606ad3f36fcf4749d3/app.ipa
+2026-11-20 20:57:59.313742 appstored{appstored}[192] <NOTICE>: [UPPD1F7CDE4/com.ryha.r51test] Will download package using request: http://127.0.0.1:61002/669e17a7286e45606ad3f36fcf4749d3/app.ipa
+2026-11-20 20:57:59.326155 appstored{appstored}[192] <NOTICE>: [UPPD1F7CDE4/com.ryha.r51test/436381AF] Created task: BackgroundDataTask <C35D4A4D-2912-4E88-B863-B67D8C960D27>.<3> in session: 3D3A47F2-7438-4078-900D-1CA2AB354693 (com.apple.appstored.itunesstore
+2026-11-20 20:57:59.342234 iFizBox{Network}[712] <NOTICE>: -[NWConcrete_nw_listener handleInbound:addProtocolInbox:] [L3] Handling inbound connection (add inbox 0) [C51 IPv4#8c4f9df7:49761 tcp, local: 127.0.0.1:61002, server, prohibit joining protocols, defini
+2026-11-20 20:57:59.379597 appstored{appstored}[192] <NOTICE>: [UPPD1F7CDE4/com.ryha.r51test/436381AF] Received response: <NSHTTPURLResponse: 0x7919236840> { URL: http://127.0.0.1:61002/669e17a7286e45606ad3f36fcf4749d3/app.ipa } { Status Code: 200, Headers {
+2026-11-20 20:58:03.851084 runningboardd{RunningBoard}[36] <NOTICE>: [app<com.ryha.ifizbox(FEEDEEEE-DDDD-CCCC-BBBB-0000000001F5)>:712] Set darwin role to: UserInteractiveFocal
+2026-11-20 20:58:03.853652 iFizBox{WebKit}[712] <NOTICE>: 0x1190a80e0 - ProcessStateMonitor::~ProcessStateMonitor
+2026-11-20 20:58:05.493781 remoted{Network}[57] <INFO>: nw_listener_resume_all_inboxes_if_suspended_on_queue_block_invoke [L105] Resuming inbox <protocol: http2_transport>
+2026-11-20 20:58:31.465377 iFizBox{WebKit}[712] <NOTICE>: 0x1190a80e0 - ProcessStateMonitor::ProcessStateMonitor
+2026-11-20 20:58:31.562327 runningboardd{RunningBoard}[36] <NOTICE>: [app<com.ryha.ifizbox(FEEDEEEE-DDDD-CCCC-BBBB-0000000001F5)>:712] Set darwin role to: NonUserInteractive
+2026-11-20 20:58:35.448355 remoted{Network}[57] <INFO>: nw_listener_resume_all_inboxes_if_suspended_on_queue_block_invoke [L106] Resuming inbox <protocol: http2_transport>
+2026-11-20 20:58:43.263004 remoted{Network}[57] <INFO>: nw_listener_resume_all_inboxes_if_suspended_on_queue_block_invoke [L107] Resuming inbox <protocol: http2_transport>
+2026-11-20 20:59:11.520434 remoted{Network}[57] <INFO>: nw_listener_resume_all_inboxes_if_suspended_on_queue_block_invoke [L108] Resuming inbox <protocol: http2_transport>
+2026-11-20 20:59:20.877784 runningboardd{RunningBoard}[36] <NOTICE>: [app<com.ryha.ifizbox(FEEDEEEE-DDDD-CCCC-BBBB-0000000001F5)>:712] Set darwin role to: UserInteractiveFocal
+2026-11-20 20:59:20.881493 iFizBox{WebKit}[712] <NOTICE>: 0x1190a80e0 - ProcessStateMonitor::~ProcessStateMonitor
+2026-11-20 20:59:27.361543 remoted{Network}[57] <INFO>: nw_listener_resume_all_inboxes_if_suspended_on_queue_block_invoke [L109] Resuming inbox <protocol: http2_transport>
+2026-11-20 20:59:36.146146 appstored{appstored}[192] <NOTICE>: [FF224689] Manifest for UPP: https://sign.ifizbox.com/sign/manifest?bundleid=com.ryha.r51test&version=9.9&title=R51Test&port=61002&path=2de18acd19c6e4fcc1373bbe8771c92a/app.ipa clientID: itunesstor
+2026-11-20 20:59:39.923392 remoted{Network}[57] <INFO>: nw_listener_resume_all_inboxes_if_suspended_on_queue_block_invoke [L110] Resuming inbox <protocol: http2_transport>
+2026-11-20 20:59:48.309886 iFizBox{WebKit}[712] <NOTICE>: 0x1190a80e0 - ProcessStateMonitor::ProcessStateMonitor
+2026-11-20 20:59:48.396148 runningboardd{RunningBoard}[36] <NOTICE>: [app<com.ryha.ifizbox(FEEDEEEE-DDDD-CCCC-BBBB-0000000001F5)>:712] Set darwin role to: NonUserInteractive
+2026-11-20 21:02:00.006271 mobiletimerd{MobileTimer}[62] <NOTICE>: <MTAlarmScheduler: 0x7a74c70120> 3950BC28-ED7F-471F-A2CE-B7C935B0135E fired (scheduled fire date: Fri Nov 20 21:02:00 2026)
+2026-11-20 21:02:05.301443 runningboardd{RunningBoard}[36] <NOTICE>: [app<com.ryha.ifizbox(FEEDEEEE-DDDD-CCCC-BBBB-0000000001F5)>:712] Set darwin role to: Background
+2026-11-20 21:02:05.313335 iFizBox{WebKit}[712] <NOTICE>: 0x1190a80e0 - ProcessStateMonitor::processWillBeSuspended starts timer for 14.979839s
+2026-11-20 21:02:15.685941 ClockAngel{MobileTimerSupport}[775] <NOTICE>: MTSessionUtilities INFO: ClockAngel.AlarmCoordinator sending dismiss alarm action for id: 3950BC28-ED7F-471F-A2CE-B7C935B0135E
+2026-11-20 21:02:15.774296 SpringBoard{ToneLibrary}[37] <NOTICE>: <TLAlertQueuePlayerController: 0x7740976f40; stateDescriptor = (null)>: -_deactivateAudioSession…: About to deactivate audio session AVAudioSession: category:AVAudioSessionCategory(_rawValue: AV
+2026-11-20 21:02:15.960727 runningboardd{RunningBoard}[36] <NOTICE>: [app<com.ryha.ifizbox(FEEDEEEE-DDDD-CCCC-BBBB-0000000001F5)>:712] Set darwin role to: NonUserInteractive
+2026-11-20 21:02:15.961204 audiomxd{MediaExperience}[121] <NOTICE>: -CMSessionMgr- MXCoreSessionEndInterruption_WithSecTaskAndStatus: Sending EndInterruption to 'sid:0x7901c, iFizBox(712), 'prim' (com.ryha.ifizbox)' with status 'resumable.endInterruption'
+2026-11-20 21:02:15.978961 iFizBox{WebKit}[712] <NOTICE>: 0x1190a80e0 - ProcessStateMonitor::processDidBecomeRunning
+2026-11-20 21:02:46.332763 remoted{Network}[57] <INFO>: nw_listener_resume_all_inboxes_if_suspended_on_queue_block_invoke [L111] Resuming inbox <protocol: http2_transport>
+2026-11-20 21:03:05.876267 remoted{Network}[57] <INFO>: nw_listener_resume_all_inboxes_if_suspended_on_queue_block_invoke [L112] Resuming inbox <protocol: http2_transport>
+2026-11-20 21:03:36.481334 runningboardd{RunningBoard}[36] <NOTICE>: [app<com.ryha.ifizbox(FEEDEEEE-DDDD-CCCC-BBBB-0000000001F5)>:712] Set darwin role to: UserInteractiveFocal
+2026-11-20 21:03:36.487101 iFizBox{WebKit}[712] <NOTICE>: 0x1190a80e0 - ProcessStateMonitor::~ProcessStateMonitor
+2026-11-20 21:03:38.517404 remoted{Network}[57] <INFO>: nw_listener_resume_all_inboxes_if_suspended_on_queue_block_invoke [L113] Resuming inbox <protocol: http2_transport>
+2026-11-20 21:04:07.578353 remoted{Network}[57] <INFO>: nw_listener_resume_all_inboxes_if_suspended_on_queue_block_invoke [L114] Resuming inbox <protocol: http2_transport>
+2026-11-20 21:04:27.800648 iFizBox{WebKit}[712] <NOTICE>: 0x1190a80e0 - ProcessStateMonitor::ProcessStateMonitor
+2026-11-20 21:04:27.898911 runningboardd{RunningBoard}[36] <NOTICE>: [app<com.ryha.ifizbox(FEEDEEEE-DDDD-CCCC-BBBB-0000000001F5)>:712] Set darwin role to: NonUserInteractive
+2026-11-20 21:04:35.173186 remoted{Network}[57] <INFO>: nw_listener_resume_all_inboxes_if_suspended_on_queue_block_invoke [L115] Resuming inbox <protocol: http2_transport>
+2026-11-20 21:05:09.973760 runningboardd{RunningBoard}[36] <NOTICE>: [app<com.ryha.ifizbox(FEEDEEEE-DDDD-CCCC-BBBB-0000000001F5)>:712] Set darwin role to: UserInteractiveFocal
+2026-11-20 21:05:09.977183 iFizBox{WebKit}[712] <NOTICE>: 0x1190a80e0 - ProcessStateMonitor::~ProcessStateMonitor
+2026-11-20 21:05:16.548876 remoted{Network}[57] <INFO>: nw_listener_resume_all_inboxes_if_suspended_on_queue_block_invoke [L116] Resuming inbox <protocol: http2_transport>
+2026-11-20 21:05:26.174032 appstored{appstored}[192] <NOTICE>: [A0F69EF8] Manifest for UPP: https://sign.ifizbox.com/sign/manifest?bundleid=com.ryha.r51test&version=9.9&title=R51Test&port=61002&path=1b040bcd3da5fc5844e706a036373645/app.ipa clientID: itunesstor
+2026-11-20 21:05:30.048077 remoted{Network}[57] <INFO>: nw_listener_resume_all_inboxes_if_suspended_on_queue_block_invoke [L117] Resuming inbox <protocol: http2_transport>
+2026-11-20 21:05:39.963731 iFizBox{WebKit}[712] <NOTICE>: 0x1190a80e0 - ProcessStateMonitor::ProcessStateMonitor
+2026-11-20 21:05:40.051427 runningboardd{RunningBoard}[36] <NOTICE>: [app<com.ryha.ifizbox(FEEDEEEE-DDDD-CCCC-BBBB-0000000001F5)>:712] Set darwin role to: NonUserInteractive
+2026-11-20 21:07:00.003271 mobiletimerd{MobileTimer}[62] <NOTICE>: <MTAlarmScheduler: 0x7a74c70120> FC478CFA-D62F-46A2-A7A3-1A38C745E375 fired (scheduled fire date: Fri Nov 20 21:07:00 2026)
+2026-11-20 21:07:05.243362 runningboardd{RunningBoard}[36] <NOTICE>: [app<com.ryha.ifizbox(FEEDEEEE-DDDD-CCCC-BBBB-0000000001F5)>:712] Set darwin role to: Background
+2026-11-20 21:07:05.257526 iFizBox{WebKit}[712] <NOTICE>: 0x1190a80e0 - ProcessStateMonitor::processWillBeSuspended starts timer for 14.979809s
+2026-11-20 21:07:05.583043 remoted{Network}[57] <INFO>: nw_listener_resume_all_inboxes_if_suspended_on_queue_block_invoke [L118] Resuming inbox <protocol: http2_transport>
+2026-11-20 21:07:11.530288 SpringBoard{ToneLibrary}[37] <NOTICE>: <TLAlertQueuePlayerController: 0x7740976f40; stateDescriptor = (null)>: -_deactivateAudioSession…: About to deactivate audio session AVAudioSession: category:AVAudioSessionCategory(_rawValue: AV
+2026-11-20 21:07:11.742052 runningboardd{RunningBoard}[36] <NOTICE>: [app<com.ryha.ifizbox(FEEDEEEE-DDDD-CCCC-BBBB-0000000001F5)>:712] Set darwin role to: NonUserInteractive
+2026-11-20 21:07:11.742373 audiomxd{MediaExperience}[121] <NOTICE>: -CMSessionMgr- MXCoreSessionEndInterruption_WithSecTaskAndStatus: Sending EndInterruption to 'sid:0x7901c, iFizBox(712), 'prim' (com.ryha.ifizbox)' with status 'resumable.endInterruption'
+2026-11-20 21:07:11.915648 iFizBox{WebKit}[712] <NOTICE>: 0x1190a80e0 - ProcessStateMonitor::processDidBecomeRunning
+2026-11-20 21:07:55.415460 remoted{Network}[57] <INFO>: nw_listener_resume_all_inboxes_if_suspended_on_queue_block_invoke [L119] Resuming inbox <protocol: http2_transport>
+2026-11-20 21:08:06.150546 ClockAngel{MobileTimerSupport}[775] <NOTICE>: MTSessionUtilities INFO: ClockAngel.AlarmCoordinator sending dismiss alarm action for id: FC478CFA-D62F-46A2-A7A3-1A38C745E375
+2026-11-20 21:08:09.466121 remoted{Network}[57] <INFO>: nw_listener_resume_all_inboxes_if_suspended_on_queue_block_invoke [L120] Resuming inbox <protocol: http2_transport>
+2026-11-20 21:08:30.013242 remoted{Network}[57] <INFO>: nw_listener_resume_all_inboxes_if_suspended_on_queue_block_invoke [L121] Resuming inbox <protocol: http2_transport>
+2026-11-20 21:08:42.444444 remoted{Network}[57] <INFO>: nw_listener_resume_all_inboxes_if_suspended_on_queue_block_invoke [L122] Resuming inbox <protocol: http2_transport>
+2026-11-20 21:08:59.100421 remoted{Network}[57] <INFO>: nw_listener_resume_all_inboxes_if_suspended_on_queue_block_invoke [L123] Resuming inbox <protocol: http2_transport>

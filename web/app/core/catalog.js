@@ -61,7 +61,7 @@
 import { parseControl, description, resolveFilename, resolveIcon, matchesArch, compareVersions, DEFAULT_ARCH, parseRelations } from "./apt.js";
 import { parseStatus, installedStanzas, findUpgrades } from "./installed.js";
 import { compat, compatCode, isIncompatible, normalizeDevice, needText } from "./compat.js";
-import { parseSource, appStanza, isAltKey, runsOn, installOptions } from "./altstore.js";
+import { parseSource, appStanza, isAltKey, runsOn, installOptions, signableApp } from "./altstore.js";
 import { depIndex, explain, explainApt } from "./deps.js";
 import { withIpaInfo } from "./ipainfo.js";
 import { needsRestart } from "./queue.js";
@@ -493,7 +493,9 @@ export function createCatalog() {
     for (const app of parsed.apps) {
       const st = appStanza(app, { url: key.replace(/^alt:/, ""), name: parsed.name }, ios);
       // `app` keeps every versions[] entry (the stanza only those that run here) for Version History (F29).
-      if (st) byId.set(st.package, { stanza: st, row: makeRow(st, key), app, ios });
+      // B269: an entry that can't be signed and installed (no IPA download, a .deb, an App Store link, a web clip)
+      // is marked; while not jailbroken it stays out of every list, Search, Browse and the source's own list.
+      if (st) byId.set(st.package, { stanza: st, row: { ...makeRow(st, key), unsignable: !signableApp(st).ok }, app, ios });
     }
     for (const e of byId.values()) judge(e);
     const { apps, ...meta } = parsed;
@@ -511,7 +513,7 @@ export function createCatalog() {
     if (!meta) return null;
     const byId = sources.get(key)?.byId ?? new Map();
     const featured = meta.featuredApps.map((id) => byId.get(id)?.row).filter(Boolean).map(slim);
-    return { ...meta, featured, count: byId.size };
+    return { ...meta, featured, count: [...byId.values()].filter((e) => listed(e.row)).length };
   }
 
   function remove(key) {
@@ -573,6 +575,8 @@ export function createCatalog() {
   }
   const isBlocked = (r) => blocked.size > 0 && blocked.has(r.id);
   const isHidden = (r) => hidden.has(r.section) || byHiddenAuthor(r) || isBlocked(r);
+  // B269: rows a list may show at all: while not jailbroken (the sideload build), no app entry that can't be signed.
+  const listed = (r) => !(appsOnly && r.unsignable);
 
   // id -> entry for a source, or the merge of all of them: the newest version wins; on a tie, the first source
   // loaded keeps it (apt's default: equal pins, first listed).
@@ -593,7 +597,7 @@ export function createCatalog() {
   function rowsOf(key) {
     let rows = sorted.get(key);
     if (!rows) {
-      rows = [...entries(key).values()].map((e) => e.row).sort(compareNames);
+      rows = [...entries(key).values()].map((e) => e.row).filter(listed).sort(compareNames);
       sorted.set(key, rows);
     }
     return rows;
@@ -774,7 +778,7 @@ export function createCatalog() {
       const id = ref?.id;
       if (typeof id !== "string" || seen.has(id)) continue;
       const e = (ref.key !== ALL && counts(ref.key) && sources.get(ref.key)?.byId.get(id)) || entries(ALL).get(id);
-      if (!e || isHidden(e.row) || (fitFilter && isIncompatible(e.row.compat))) continue;
+      if (!e || isHidden(e.row) || !listed(e.row) || (fitFilter && isIncompatible(e.row.compat))) continue;
       seen.add(id);
       out.push(slim(e.row));
     }

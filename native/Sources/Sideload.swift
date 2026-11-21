@@ -250,11 +250,12 @@ enum Sideload {
         }
         guard let url = Apt.httpURL(c.params["url"]) else { job.end(); return Apt.reply(c, nil, "bad_url: not an http(s) URL") }
         log("Downloading \(url.absoluteString)")
+        let started = Date()
         let d = download(url, http: httpPolicy(c), emit: emit) { res in
             switch res {
             case .failure(let e): finish(.failure(e))
             case .success(let file):
-                log("Downloaded \(Sideload.size(file))")
+                log(Sideload.downloaded(file, since: started))
                 guard hashed(file) else { return }
                 signAndOpen(file, url: url.absoluteString, id: id, profile: profile, options: options, servers: servers, emit: emit, log: log, job: job, opened: finish, step: step)
             }
@@ -286,6 +287,15 @@ enum Sideload {
     static func size(_ file: URL) -> String {
         let n = (try? FileManager.default.attributesOfItem(atPath: file.path))?[.size] as? Int64
         return n.map { ByteCountFormatter.string(fromByteCount: $0, countStyle: .file) } ?? "? bytes"
+    }
+
+    // B223: the Log's "Downloaded" line with the time and rate ("Downloaded 43 MB in 1.1 s, 38.9 MB/s"), so a slow
+    // download shows whether the network or iFizBox is to blame (the 15 Pro gets Safari's and a desktop curl's speed).
+    static func downloaded(_ file: URL, since start: Date) -> String {
+        let secs = max(Date().timeIntervalSince(start), 0.001)
+        let n = (try? FileManager.default.attributesOfItem(atPath: file.path))?[.size] as? Int64 ?? 0
+        let rate = ByteCountFormatter.string(fromByteCount: Int64(Double(n) / secs), countStyle: .file)
+        return "Downloaded \(size(file)) in \(String(format: secs < 10 ? "%.1f" : "%.0f", secs)) s, \(rate)/s"
     }
 
     struct Failed: LocalizedError { let text: String; var errorDescription: String? { text } } // the text, not "Sideload.Failed error 1"
@@ -328,7 +338,12 @@ enum Sideload {
                          done: @escaping (Result<URL, Error>) -> Void) -> DebFetch {
         let file = SignBridge.work.appendingPathComponent("\(SignBridge.token())-in.ipa")
         let progress = { (p: Double) in emit("downloading", p) }
+        // B223: iFizBox kept alive while it downloads (KeepAlive's silent audio), as Safari keeps downloading in the
+        // background: without it iOS suspends the app about 30 s after the user leaves it, and the download stops.
+        KeepAlive.shared.begin()
+        let released = Once()
         let finished = { (err: String?) in
+            if released.first() { KeepAlive.shared.end() }
             if let e = err { try? FileManager.default.removeItem(at: file); return done(.failure(Failed(text: e))) }
             SignBridge.queue.async { done(.success(file)) }
         }
@@ -973,10 +988,11 @@ enum Sideload {
                 }
                 guard let url = Apt.httpURL(r.url) else { fail(Failed(text: "bad_url: \(r.url)")); return next() }
                 log("Downloading \(url.absoluteString)")
+                let started = Date()
                 let d = download(url, http: .fallback, emit: emit) { res in // B104: its http link was let through at install
                     switch res {
                     case .failure(let e): fail(e); next()
-                    case .success(let file): log("Downloaded \(Sideload.size(file))"); signThat(file)
+                    case .success(let file): log(Sideload.downloaded(file, since: started)); signThat(file)
                     }
                 }
                 job.onCancel { d.cancel() }

@@ -345,9 +345,8 @@ async function showAbout(ctx) {
   await ctx.showAlert({
     title: `About ${NAME}`,
     message: `${version ? `Version ${version}` : `${NAME} Web`}\nFree and open source`
-      + "\n\nRyan Hayden (Fizlo)\n\nInspired by Cydia\nby Jay Freeman (saurik)\nNot affiliated with SaurikIT"
-      // C9: what we take from Cydia, and under what licence
-      + "\n\nUses Cydia's section icons,\npurpose badges and some of\nits interface wording (GPLv3)",
+      + "\n\nRyan Hayden (Fizlo)\n\nInspired by Cydia\nby Jay Freeman (saurik)\nNot affiliated with SaurikIT",
+    // What we take from Cydia, and under what licence, is in Credits (C9).
     buttons: ["Close"],
   });
 }

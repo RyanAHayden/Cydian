@@ -24,6 +24,7 @@ html[data-style="ios13"] {
   --cell-min-h: 44px; --cell-pad: 0 16px; --cell-gap: 12px;
   --seg-h: 32px; --seg-margin: 10px 16px 0;
   --large-title-pad: 3px 16px 8px;
+  --sw-w: 51px; --sw-h: 31px; --sw-knob-size: 31px; --sw-travel: 20px; /* iOS 7's 51 x 31 switch (ios7.css), as iOS 13's */
 }
 
 /* ---- White ---- */
@@ -33,7 +34,7 @@ html[data-style="ios13"][data-theme="light"] {
   --i13-tint: #007aff; --i13-red: #ff3b30; --i13-green: #34c759;
   --i13-bar: #f9f9f9; --i13-hairline: rgba(0,0,0,.3); --i13-label: #000;
   --i13-sw-track: #e9e9eb; --i13-knob: #fff;
-  --i13-knob-shadow: 0 3px 8px rgba(0,0,0,.15), 0 3px 1px rgba(0,0,0,.06), 0 0 0 .5px rgba(0,0,0,.04);
+  --i13-knob-shadow: 0 3px 8px -2px rgba(0,0,0,.15), 0 3px 1px -2px rgba(0,0,0,.06), 0 0 0 -1.5px rgba(0,0,0,.04);
   --i13-knob-held: #f2f2f2;
   --i13-seg-track: #e3e3e8; --i13-seg-pill: #fff; --i13-seg-text: #000; --i13-seg-divider: #c7c7cc;
   --i13-seg-pressed: #d6d6db;
@@ -101,6 +102,17 @@ html[data-style="ios13"][data-theme="light"] {
   --action-cancel: #fff; --action-cancel-pressed: #e5e5ea;
   --action-cancel-text: #007aff; --action-cancel-emboss: none;
   --store-head: #fff; --store-head-edge: #c6c6c8; --store-head-emboss: none;
+  /* packages.css .sig-pill (B241): flat systemGreen / systemOrange / systemRed / systemGray, no gloss or shadow;
+     tweaks.css's tweak pills the same way */
+  --sig-pill: #34c759; --sig-pill-soon: #ff9500; --sig-pill-expired: #ff3b30; --sig-pill-unknown: #8e8e93;
+  --sig-pill-shadow: none;
+  --tweak-pill: #8e8e93; --tweak-pill-up: #34c759; --tweak-pill-shadow: none;
+  /* the notification banner (nav/banner.js), flat: the bars' #f9f9f9 over a hairline, black text, no embosses */
+  --banner: #f9f9f9; --banner-shadow: none; --banner-edge: var(--i13-hairline); --banner-icon-shadow: none;
+  --banner-emboss: none; --banner-title: #000; --banner-text: #000; --banner-timer: rgba(0,0,0,.2);
+  /* the reload bar (nav/reloadbar.js): the tab bar's #f9f9f9 under a hairline, black text, the grey spinner */
+  --reload-bar: linear-gradient(var(--i13-hairline), var(--i13-hairline)) top / 100% .5px no-repeat, #f9f9f9;
+  --reload-text: #000; --reload-emboss: none; --i13-reload-spinner: var(--spinner-gray);
 }
 
 /* ---- OLED Black: the same shapes, white on black; ios6.css's dark rules read the --dk-* tokens ---- */
@@ -109,7 +121,7 @@ html[data-style="ios13"][data-theme="dark"] {
   --i13-tint: #0a84ff; --i13-red: #ff453a; --i13-green: #30d158;
   --i13-bar: #000; --i13-hairline: #38383a; --i13-label: #fff;
   --i13-sw-track: #39393d; --i13-knob: #fff;
-  --i13-knob-shadow: 0 3px 8px rgba(0,0,0,.3), 0 3px 1px rgba(0,0,0,.1);
+  --i13-knob-shadow: 0 3px 8px -2px rgba(0,0,0,.3), 0 3px 1px -2px rgba(0,0,0,.1);
   --i13-knob-held: #e5e5e5;
   --i13-seg-track: #1c1c1e; --i13-seg-pill: #636366; --i13-seg-text: #fff; --i13-seg-divider: #3a3a3c;
   --i13-seg-pressed: #2c2c2e;
@@ -157,6 +169,13 @@ html[data-style="ios13"][data-theme="dark"] {
   --action-btn-pressed: #2c2c2e; --action-btn-pressed-text: #0a84ff; --action-btn-pressed-emboss: none;
   --action-destructive: #1c1c1e; --action-destructive-text: #ff453a; --action-destructive-emboss: none;
   --action-cancel-text: #0a84ff; --action-cancel-emboss: none; --action-cancel-pressed: #3a3a3c;
+  --sig-pill: #30d158; --sig-pill-soon: #ff9f0a; --sig-pill-expired: #ff453a; --sig-pill-unknown: #8e8e93;
+  --sig-pill-shadow: none;
+  --tweak-pill: #8e8e93; --tweak-pill-up: #30d158; --tweak-pill-shadow: none;
+  --banner: #1c1c1e; --banner-shadow: none; --banner-edge: var(--i13-hairline); --banner-icon-shadow: none;
+  --banner-emboss: none; --banner-title: #fff; --banner-text: #fff; --banner-timer: rgba(255,255,255,.3);
+  --reload-bar: linear-gradient(var(--i13-hairline), var(--i13-hairline)) top / 100% .5px no-repeat, #000;
+  --reload-text: #fff; --reload-emboss: none; --i13-reload-spinner: var(--spinner-white);
 }
 
 /* ---- Look-only rules: type, and the shapes no token carries ---- */
@@ -211,10 +230,12 @@ html[data-style="ios13"] .cell-inner.chevron.is-pressed::after { background-imag
 /* Plain tables: the flat grey section bar with a 15pt semibold label. */
 html[data-style="ios13"] .section-header { font-size: 15px; font-weight: 600; color: var(--i13-label); text-shadow: none; }
 
-/* Switch: flat, iOS 13's green with a white knob and no ON / OFF (iOS 6's 77 x 27 box: its size is not a hook yet). */
+/* Switch: flat, iOS 13's green with a white knob and no ON / OFF, in iOS 7's 51 x 31 box (the hooks above). The knob
+   is drawn 2pt inside its 31pt box (a transparent ring, the shadow pulled in by the same 2pt), so the track shows
+   round it as on iOS 13. */
 html[data-style="ios13"] .sw-track,
 html[data-style="ios13"][data-theme] .sw-track {
-  border: 1.5px solid var(--i13-sw-track); background: var(--i13-sw-track); box-shadow: none;
+  border: 1.5px solid var(--i13-sw-track); border-radius: 15.5px; background: var(--i13-sw-track); box-shadow: none;
 }
 html[data-style="ios13"] .switch[aria-checked="true"] .sw-track { border-color: var(--i13-green); }
 html[data-style="ios13"] .sw-track::before,
@@ -222,10 +243,24 @@ html[data-style="ios13"][data-theme] .sw-track::before { content: ""; text-shado
 html[data-style="ios13"] .sw-track::after { content: ""; }
 html[data-style="ios13"] .sw-knob,
 html[data-style="ios13"][data-theme] .sw-knob {
-  border: 0; background: var(--i13-knob); box-shadow: var(--i13-knob-shadow);
+  border: 2px solid transparent; background: var(--i13-knob) padding-box; box-shadow: var(--i13-knob-shadow);
 }
 html[data-style="ios13"] .switch.is-held .sw-knob,
-html[data-style="ios13"][data-theme] .switch.is-held .sw-knob { background: var(--i13-knob-held); }
+html[data-style="ios13"][data-theme] .switch.is-held .sw-knob { background: var(--i13-knob-held) padding-box; }
+
+/* Signature pills (packages.css .sig-pill, whose fills the tokens above make flat): semibold white text, no tracking. */
+html[data-style="ios13"] .sig-pill,
+html[data-style="ios13"] .cell[class*="sig-row-"] .cell-detail,
+html[data-style="ios13"] .pkg-row[data-change="resign"] .pkg-version { font-weight: 600; letter-spacing: 0; }
+
+/* The bars over the page: the banner's Upgrade is semibold tinted text centred in its 30pt box (the 44pt line-height
+   of the bar buttons above pushed it down); the banner's title semibold, its icon iOS 13's rounder corner; the
+   reload bar's status line semibold over the grey spinner in White. */
+html[data-style="ios13"] .banner .banner-action { font-size: 15px; font-weight: 600; line-height: 28px; color: var(--i13-tint); }
+html[data-style="ios13"] .banner-text strong { font-weight: 600; }
+html[data-style="ios13"] .banner-icon { border-radius: 7px; }
+html[data-style="ios13"] .reload-text { font-size: 15px; font-weight: 600; }
+html[data-style="ios13"] .reload-spinner { background-image: var(--i13-reload-spinner); }
 
 /* Segmented control: iOS 13's grey track with the chosen segment a white pill (the track's colour as a 1pt ring
    inside it, so the pill sits 2pt in from the track's edge), black 13pt text, semibold when chosen. The

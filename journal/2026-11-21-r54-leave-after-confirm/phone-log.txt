@@ -1,0 +1,161 @@
+2026-11-21 00:48:58.900349 SpringBoard{SpringBoard}[37] <NOTICE>: Application process state changed for com.ryha.ifizbox: <SBApplicationProcessState: 0x7741c8da80; pid: 1044; taskState: Running; visibility: Background>
+2026-11-21 00:49:09.218468 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: This iPhone: com.ryha.r54test 2.0, 326.6 MB
+2026-11-21 00:49:09.222573 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: installing 7071434a5d6360889c9503521d0e6ef3-ahead.ipa (311.5 MB) as com.ryha.r54test 2.0
+2026-11-21 00:49:09.227533 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: idevice log: /var/mobile/Containers/Data/Application/68A828AD-5AD6-496B-A5BD-6C07283A79D1/Library/Caches/idevice.log (IdeviceLoggerError(rawVal
+2026-11-21 00:49:09.232593 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: step: starting Tailscale (limit 30 s)
+2026-11-21 00:49:09.304974 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: step: finding RemotePairing's port through Tailscale (limit 30 s)
+2026-11-21 00:49:10.398218 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: RemotePairing is on port 49152
+2026-11-21 00:49:10.398235 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: step: connecting to iOS at 127.0.0.1:52071 through Tailscale (RemotePairing tunnel, RSD) (limit 30 s)
+2026-11-21 00:49:10.440433 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: install: FAILED at connecting to iOS at 127.0.0.1:52071 through Tailscale (RemotePairing tunnel, RSD) after 1.2 s: connect_failed: Socket(Custo
+2026-11-21 00:49:10.459941 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: This iPhone: com.ryha.r54test failed: connect_failed: Socket(Custom { kind: UnexpectedEof, error: "early eof" }) (1)
+2026-11-21 00:49:15.608569 audiomxd{MediaExperience}[123] <NOTICE>: -CMSessionMgr- CMSessionMgrHandleApplicationStateChange: Sending stop command to com.ryha.ifizbox with pid '1044' because client is background suspended
+2026-11-21 00:49:15.616913 SpringBoard{SpringBoard}[37] <NOTICE>: Application process state changed for com.ryha.ifizbox: <SBApplicationProcessState: 0x7741c8c5c0; pid: 1044; taskState: Suspended; visibility: Background>
+2026-11-21 00:49:29.075992 SpringBoard{SpringBoard}[37] <NOTICE>: Application process state changed for com.ryha.ifizbox: <SBApplicationProcessState: 0x7740426e20; pid: 1044; taskState: Suspended; visibility: Foreground>
+2026-11-21 00:49:29.087417 SpringBoard{SpringBoard}[37] <NOTICE>: Application process state changed for com.ryha.ifizbox: <SBApplicationProcessState: 0x7740424140; pid: 1044; taskState: Running; visibility: Foreground>
+2026-11-21 00:49:29.100016 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: the app is in front again
+2026-11-21 00:50:01.405376 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: step: starting Tailscale (limit 30 s)
+2026-11-21 00:50:02.711549 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: step: finding RemotePairing's port through Tailscale (limit 30 s)
+2026-11-21 00:50:02.774044 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: step: connecting to iOS at 127.0.0.1:52104 through Tailscale (RemotePairing tunnel, RSD) (limit 30 s)
+2026-11-21 00:50:02.819669 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: verify: FAILED at connecting to iOS at 127.0.0.1:52104 through Tailscale (RemotePairing tunnel, RSD) after 1.4 s: connect_failed: Socket(Custom
+2026-11-21 00:51:30.754647 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: the app went to the background
+2026-11-21 00:51:30.801840 SpringBoard{SpringBoard}[37] <NOTICE>: Application process state changed for com.ryha.ifizbox: <SBApplicationProcessState: 0x7737ee0960; pid: 1044; taskState: Running; visibility: Background>
+2026-11-21 00:52:11.394815 SpringBoard{SpringBoard}[37] <NOTICE>: Application process state changed for com.ryha.ifizbox: <SBApplicationProcessState: 0x7741c13060; pid: 1044; taskState: Running; visibility: Foreground>
+2026-11-21 00:52:11.409888 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: the app is in front again
+2026-11-21 00:52:22.859387 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: step: starting Tailscale (limit 30 s)
+2026-11-21 00:52:24.159491 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: step: finding RemotePairing's port through Tailscale (limit 30 s)
+2026-11-21 00:52:24.221850 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: step: connecting to iOS at 127.0.0.1:52188 through Tailscale (RemotePairing tunnel, RSD) (limit 30 s)
+2026-11-21 00:52:24.403549 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: tunnel and RSD up in 0.18 s: RSD 737a8efe-cff1-47a2-bab5-74df5eecf24e, 76 services, AFC on 52242, installation_proxy on 52238
+2026-11-21 00:52:24.403574 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: step: asking lockdown for the UDID (limit 20 s)
+2026-11-21 00:52:24.623592 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: verify: done in 1.8 s
+2026-11-21 00:53:17.476681 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: the app went to the background
+2026-11-21 00:53:17.518623 SpringBoard{SpringBoard}[37] <NOTICE>: Application process state changed for com.ryha.ifizbox: <SBApplicationProcessState: 0x7740725400; pid: 1044; taskState: Running; visibility: Background>
+2026-11-21 00:53:29.065831 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: This iPhone: com.ryha.r54test 2.0, 326.6 MB
+2026-11-21 00:53:29.067236 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: installing 74bfc838f46d7798bf77f1aa22a9a56f-ahead.ipa (311.5 MB) as com.ryha.r54test 2.0
+2026-11-21 00:53:29.074133 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: step: starting Tailscale (limit 30 s)
+2026-11-21 00:53:29.130593 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: step: finding RemotePairing's port through Tailscale (limit 30 s)
+2026-11-21 00:53:30.206811 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: step: connecting to iOS at 127.0.0.1:52286 through Tailscale (RemotePairing tunnel, RSD) (limit 30 s)
+2026-11-21 00:53:30.461477 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: tunnel and RSD up in 0.25 s: RSD 737a8efe-cff1-47a2-bab5-74df5eecf24e, 76 services, AFC on 52344, installation_proxy on 52340
+2026-11-21 00:53:30.461497 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: step: connecting to installation_proxy (limit 20 s)
+2026-11-21 00:53:30.471359 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: installation_proxy connected
+2026-11-21 00:53:30.474569 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: step: asking installation_proxy for com.ryha.r54test (limit 20 s)
+2026-11-21 00:53:30.523794 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: before the install, iOS lists com.ryha.r54test: nothing
+2026-11-21 00:53:30.523945 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: step: connecting to AFC (limit 20 s)
+2026-11-21 00:53:30.526556 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: AFC connected
+2026-11-21 00:53:30.526585 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: step: opening /PublicStaging/C704A83E-AB82-45BE-A7D2-300BEC45C62C.ipa on iOS (AFC) (limit 20 s)
+2026-11-21 00:53:30.531351 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: step: copying the IPA to iOS (AFC) (limit 30 s)
+2026-11-21 00:53:48.594198 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: step: closing /PublicStaging/C704A83E-AB82-45BE-A7D2-300BEC45C62C.ipa on iOS (AFC) (limit 20 s)
+2026-11-21 00:53:48.595436 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: AFC: copied 311.5 MB in 18.1 s: 17.2 MB/s in the background
+2026-11-21 00:53:48.595503 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: step: connecting to installation_proxy (limit 20 s)
+2026-11-21 00:53:48.604012 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: installation_proxy connected
+2026-11-21 00:53:48.604044 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: step: iOS installing the app (installd) (limit 180 s)
+2026-11-21 00:53:52.201097 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: installd: Complete
+2026-11-21 00:53:52.201204 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: step: connecting to AFC (limit 20 s)
+2026-11-21 00:53:52.203459 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: AFC connected
+2026-11-21 00:53:52.203640 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: step: removing the staged IPA (limit 20 s)
+2026-11-21 00:53:52.209308 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: install: done in 23.1 s
+2026-11-21 00:53:52.214598 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: This iPhone: com.ryha.r54test installed
+2026-11-21 00:53:57.372430 audiomxd{MediaExperience}[123] <NOTICE>: -CMSessionMgr- CMSessionMgrHandleApplicationStateChange: Sending stop command to com.ryha.ifizbox with pid '1044' because client is background suspended
+2026-11-21 00:53:57.374158 SpringBoard{SpringBoard}[37] <NOTICE>: Application process state changed for com.ryha.ifizbox: <SBApplicationProcessState: 0x7741cf68c0; pid: 1044; taskState: Suspended; visibility: Background>
+2026-11-21 00:54:55.427746 SpringBoard{SpringBoard}[37] <NOTICE>: Application process state changed for com.ryha.ifizbox: <SBApplicationProcessState: 0x7741c4b580; pid: 1044; taskState: Suspended; visibility: Foreground>
+2026-11-21 00:54:55.438723 SpringBoard{SpringBoard}[37] <NOTICE>: Application process state changed for com.ryha.ifizbox: <SBApplicationProcessState: 0x7741c4b4a0; pid: 1044; taskState: Running; visibility: Foreground>
+2026-11-21 00:54:55.441392 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: the app is in front again
+2026-11-21 00:56:40.467543 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: the app went to the background
+2026-11-21 00:56:40.478048 SpringBoard{SpringBoard}[37] <NOTICE>: Application process state changed for com.ryha.ifizbox: <SBApplicationProcessState: 0x7741c49340; pid: 1044; taskState: Running; visibility: Background>
+2026-11-21 00:56:50.689053 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: This iPhone: com.ryha.r54test 3.0, 326.6 MB
+2026-11-21 00:56:50.690615 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: installing 2da8c7c5fdc4aeb98201ca682ed24bef-ahead.ipa (311.5 MB) as com.ryha.r54test 3.0
+2026-11-21 00:56:50.699283 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: step: starting Tailscale (limit 30 s)
+2026-11-21 00:56:51.996106 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: step: finding RemotePairing's port through Tailscale (limit 30 s)
+2026-11-21 00:56:52.056881 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: step: connecting to iOS at 127.0.0.1:52437 through Tailscale (RemotePairing tunnel, RSD) (limit 30 s)
+2026-11-21 00:56:52.247274 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: tunnel and RSD up in 0.19 s: RSD 737a8efe-cff1-47a2-bab5-74df5eecf24e, 76 services, AFC on 52491, installation_proxy on 52487
+2026-11-21 00:56:52.247313 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: step: connecting to installation_proxy (limit 20 s)
+2026-11-21 00:56:52.268387 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: installation_proxy connected
+2026-11-21 00:56:52.268502 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: step: asking installation_proxy for com.ryha.r54test (limit 20 s)
+2026-11-21 00:56:52.314140 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: before the install, iOS lists com.ryha.r54test: 2.0 (2.0) in EC2C1167-6E4C-48DB-827B-6E018CA48FFF
+2026-11-21 00:56:52.314204 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: step: connecting to AFC (limit 20 s)
+2026-11-21 00:56:52.320740 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: AFC connected
+2026-11-21 00:56:52.321271 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: step: opening /PublicStaging/CECEB813-E372-4FCD-A2CD-6764A30FEB62.ipa on iOS (AFC) (limit 20 s)
+2026-11-21 00:56:52.327406 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: step: copying the IPA to iOS (AFC) (limit 30 s)
+2026-11-21 00:57:10.678821 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: step: closing /PublicStaging/CECEB813-E372-4FCD-A2CD-6764A30FEB62.ipa on iOS (AFC) (limit 20 s)
+2026-11-21 00:57:10.680667 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: AFC: copied 311.5 MB in 18.4 s: 17.0 MB/s in the background
+2026-11-21 00:57:10.680931 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: step: connecting to installation_proxy (limit 20 s)
+2026-11-21 00:57:10.688162 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: installation_proxy connected
+2026-11-21 00:57:10.688193 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: step: iOS installing the app (installd) (limit 180 s)
+2026-11-21 00:57:14.332339 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: installd: Complete
+2026-11-21 00:57:14.332356 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: step: connecting to AFC (limit 20 s)
+2026-11-21 00:57:14.335882 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: AFC connected
+2026-11-21 00:57:14.335909 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: step: removing the staged IPA (limit 20 s)
+2026-11-21 00:57:14.349849 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: install: done in 23.7 s
+2026-11-21 00:57:14.360729 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: This iPhone: com.ryha.r54test installed
+2026-11-21 00:57:19.512871 audiomxd{MediaExperience}[123] <NOTICE>: -CMSessionMgr- CMSessionMgrHandleApplicationStateChange: Sending stop command to com.ryha.ifizbox with pid '1044' because client is background suspended
+2026-11-21 00:57:19.524085 SpringBoard{SpringBoard}[37] <NOTICE>: Application process state changed for com.ryha.ifizbox: <SBApplicationProcessState: 0x7741cf5220; pid: 1044; taskState: Suspended; visibility: Background>
+2026-11-21 00:59:23.936250 SpringBoard{SpringBoard}[37] <NOTICE>: Application process state changed for com.ryha.ifizbox: <SBApplicationProcessState: 0x7737bec2a0; pid: 1044; taskState: Suspended; visibility: Foreground>
+2026-11-21 00:59:23.946144 SpringBoard{SpringBoard}[37] <NOTICE>: Application process state changed for com.ryha.ifizbox: <SBApplicationProcessState: 0x7741fc1b80; pid: 1044; taskState: Running; visibility: Foreground>
+2026-11-21 00:59:23.969076 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: the app is in front again
+2026-11-21 01:00:13.546169 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: the app went to the background
+2026-11-21 01:00:13.604311 SpringBoard{SpringBoard}[37] <NOTICE>: Application process state changed for com.ryha.ifizbox: <SBApplicationProcessState: 0x7741c8d000; pid: 1044; taskState: Running; visibility: Background>
+2026-11-21 01:00:49.040874 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: This iPhone: com.ryha.r54test 4.0, 326.6 MB
+2026-11-21 01:00:49.049078 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: installing 8f95fe1382c5b5ecf05b3b3f4ecc563b-ahead.ipa (311.5 MB) as com.ryha.r54test 4.0
+2026-11-21 01:00:49.052588 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: step: starting Tailscale (limit 30 s)
+2026-11-21 01:00:49.097513 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: step: finding RemotePairing's port through Tailscale (limit 30 s)
+2026-11-21 01:00:50.171896 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: step: connecting to iOS at 127.0.0.1:52563 through Tailscale (RemotePairing tunnel, RSD) (limit 30 s)
+2026-11-21 01:00:50.347277 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: tunnel and RSD up in 0.18 s: RSD 737a8efe-cff1-47a2-bab5-74df5eecf24e, 76 services, AFC on 52621, installation_proxy on 52617
+2026-11-21 01:00:50.352350 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: step: connecting to installation_proxy (limit 20 s)
+2026-11-21 01:00:50.359787 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: installation_proxy connected
+2026-11-21 01:00:50.363444 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: step: asking installation_proxy for com.ryha.r54test (limit 20 s)
+2026-11-21 01:00:50.433463 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: before the install, iOS lists com.ryha.r54test: 3.0 (3.0) in 6AB73966-1FF2-4413-8D07-82F3C9F98B68
+2026-11-21 01:00:50.433481 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: step: connecting to AFC (limit 20 s)
+2026-11-21 01:00:50.436690 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: AFC connected
+2026-11-21 01:00:50.436727 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: step: opening /PublicStaging/7F15B0E9-D545-4806-9FE2-5CC3EFD17B60.ipa on iOS (AFC) (limit 20 s)
+2026-11-21 01:00:50.439888 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: step: copying the IPA to iOS (AFC) (limit 30 s)
+2026-11-21 01:01:08.850930 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: step: closing /PublicStaging/7F15B0E9-D545-4806-9FE2-5CC3EFD17B60.ipa on iOS (AFC) (limit 20 s)
+2026-11-21 01:01:08.852477 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: AFC: copied 311.5 MB in 18.4 s: 16.9 MB/s in the background
+2026-11-21 01:01:08.852563 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: step: connecting to installation_proxy (limit 20 s)
+2026-11-21 01:01:08.859961 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: installation_proxy connected
+2026-11-21 01:01:08.859989 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: step: iOS installing the app (installd) (limit 180 s)
+2026-11-21 01:01:12.632331 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: installd: Complete
+2026-11-21 01:01:12.632350 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: step: connecting to AFC (limit 20 s)
+2026-11-21 01:01:12.635004 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: AFC connected
+2026-11-21 01:01:12.635015 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: step: removing the staged IPA (limit 20 s)
+2026-11-21 01:01:12.657922 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: install: done in 23.6 s
+2026-11-21 01:01:12.665388 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: This iPhone: com.ryha.r54test installed
+2026-11-21 01:01:17.812175 audiomxd{MediaExperience}[123] <NOTICE>: -CMSessionMgr- CMSessionMgrHandleApplicationStateChange: Sending stop command to com.ryha.ifizbox with pid '1044' because client is background suspended
+2026-11-21 01:01:17.818044 SpringBoard{SpringBoard}[37] <NOTICE>: Application process state changed for com.ryha.ifizbox: <SBApplicationProcessState: 0x7741c30f20; pid: 1044; taskState: Suspended; visibility: Background>
+2026-11-21 01:03:15.841415 SpringBoard{SpringBoard}[37] <NOTICE>: Application process state changed for com.ryha.ifizbox: <SBApplicationProcessState: 0x7741cf7e60; pid: 1044; taskState: Suspended; visibility: Foreground>
+2026-11-21 01:03:15.852100 SpringBoard{SpringBoard}[37] <NOTICE>: Application process state changed for com.ryha.ifizbox: <SBApplicationProcessState: 0x7741cf74e0; pid: 1044; taskState: Running; visibility: Foreground>
+2026-11-21 01:03:15.872134 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: the app is in front again
+2026-11-21 01:04:01.324115 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: the app went to the background
+2026-11-21 01:04:01.365159 SpringBoard{SpringBoard}[37] <NOTICE>: Application process state changed for com.ryha.ifizbox: <SBApplicationProcessState: 0x7741c69120; pid: 1044; taskState: Running; visibility: Background>
+2026-11-21 01:04:39.308157 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: This iPhone: com.ryha.r54test 5.0, 144.6 MB
+2026-11-21 01:04:39.310079 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: installing e46237c5e8642ae3d34a17dc8e1d40b3-ahead.ipa (137.9 MB) as com.ryha.r54test 5.0
+2026-11-21 01:04:39.317925 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: step: starting Tailscale (limit 30 s)
+2026-11-21 01:04:40.607317 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: step: finding RemotePairing's port through Tailscale (limit 30 s)
+2026-11-21 01:04:40.667372 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: step: connecting to iOS at 127.0.0.1:52696 through Tailscale (RemotePairing tunnel, RSD) (limit 30 s)
+2026-11-21 01:04:40.857188 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: tunnel and RSD up in 0.19 s: RSD 737a8efe-cff1-47a2-bab5-74df5eecf24e, 76 services, AFC on 52750, installation_proxy on 52746
+2026-11-21 01:04:40.857205 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: step: connecting to installation_proxy (limit 20 s)
+2026-11-21 01:04:40.870992 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: installation_proxy connected
+2026-11-21 01:04:40.874771 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: step: asking installation_proxy for com.ryha.r54test (limit 20 s)
+2026-11-21 01:04:40.931457 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: before the install, iOS lists com.ryha.r54test: 4.0 (4.0) in 8A0BC62C-B31D-4E73-ABAE-0F2E9CF2F4D8
+2026-11-21 01:04:40.931628 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: step: connecting to AFC (limit 20 s)
+2026-11-21 01:04:40.936850 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: AFC connected
+2026-11-21 01:04:40.936980 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: step: opening /PublicStaging/5826D939-FD7E-461B-8FC0-A2CB5C9A0888.ipa on iOS (AFC) (limit 20 s)
+2026-11-21 01:04:40.943826 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: step: copying the IPA to iOS (AFC) (limit 30 s)
+2026-11-21 01:04:49.394535 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: step: closing /PublicStaging/5826D939-FD7E-461B-8FC0-A2CB5C9A0888.ipa on iOS (AFC) (limit 20 s)
+2026-11-21 01:04:49.396247 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: AFC: copied 137.9 MB in 8.5 s: 16.3 MB/s in the background
+2026-11-21 01:04:49.396338 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: step: connecting to installation_proxy (limit 20 s)
+2026-11-21 01:04:49.404192 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: installation_proxy connected
+2026-11-21 01:04:49.404217 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: step: iOS installing the app (installd) (limit 180 s)
+2026-11-21 01:04:54.553517 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: installd: Complete
+2026-11-21 01:04:54.553545 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: step: connecting to AFC (limit 20 s)
+2026-11-21 01:04:54.556308 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: AFC connected
+2026-11-21 01:04:54.556419 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: step: removing the staged IPA (limit 20 s)
+2026-11-21 01:04:54.834575 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: install: done in 15.5 s
+2026-11-21 01:04:54.834681 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: This iPhone: com.ryha.r54test installed
+2026-11-21 01:04:59.975013 audiomxd{MediaExperience}[123] <NOTICE>: -CMSessionMgr- CMSessionMgrHandleApplicationStateChange: Sending stop command to com.ryha.ifizbox with pid '1044' because client is background suspended
+2026-11-21 01:04:59.988686 SpringBoard{SpringBoard}[37] <NOTICE>: Application process state changed for com.ryha.ifizbox: <SBApplicationProcessState: 0x7741c69700; pid: 1044; taskState: Suspended; visibility: Background>
+2026-11-21 01:06:28.503493 SpringBoard{SpringBoard}[37] <NOTICE>: Application process state changed for com.ryha.ifizbox: <SBApplicationProcessState: 0x7741c121c0; pid: 1044; taskState: Suspended; visibility: Foreground>
+2026-11-21 01:06:28.518519 SpringBoard{SpringBoard}[37] <NOTICE>: Application process state changed for com.ryha.ifizbox: <SBApplicationProcessState: 0x7741c13540; pid: 1044; taskState: Running; visibility: Foreground>
+2026-11-21 01:06:28.555494 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: the app is in front again
+2026-11-21 01:07:31.739341 iFizBox{iFizBox}[1044] <NOTICE>: iFizBox install: the app went to the background
+2026-11-21 01:07:31.745013 SpringBoard{SpringBoard}[37] <NOTICE>: Application process state changed for com.ryha.ifizbox: <SBApplicationProcessState: 0x7737bd8ea0; pid: 1044; taskState: Running; visibility: Background>
+2026-11-21 01:07:33.041249 SpringBoard{SpringBoard}[37] <NOTICE>: Application process state changed for com.ryha.ifizbox: <SBApplicationProcessState: 0x77421bf1e0; pid: 1044; taskState: Suspended; visibility: Background>
+2026-11-21 01:07:33.045969 audiomxd{MediaExperience}[123] <NOTICE>: -CMSessionMgr- CMSessionMgrHandleApplicationStateChange: Sending stop command to com.ryha.ifizbox with pid '1044' because client is background suspended

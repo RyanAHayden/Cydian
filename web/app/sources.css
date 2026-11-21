@@ -210,9 +210,15 @@
 }
 .editing .source-row .source-lock { transform: none; }
 .name-lock { display: inline-block; margin-left: 5px; vertical-align: -1px; }
-.name-lock svg, .source-lock svg { display: block; }
-/* ==== look-only { ==== the small lock's line box; coloured alert buttons */
+/* The padlock: 12 x 16 units, 9 x 12 pt after the name, 13.5 x 18 pt in the edit list (centred in a 14 pt box). */
+.lock-icon { display: block; width: 9px; height: 12px; }
+.source-lock .lock-icon { width: 14px; height: 18px; }
+/* ==== look-only { ==== the small lock's line box and art; coloured alert buttons */
 .name-lock { line-height: 0; }
+:root {
+  --lock-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 16'%3E%3Cpath d='M3 7V4.5a3 3 0 0 1 6 0V7' fill='none' stroke='%238a8a8a' stroke-width='1.8'/%3E%3Crect x='0.5' y='6.5' width='11' height='9' rx='1.5' fill='%238a8a8a'/%3E%3C/svg%3E");
+}
+.lock-icon { background: var(--lock-icon) center / contain no-repeat; }
 /* Coloured alert buttons (nav/alert.js colors): iOS 6's green "go" and red destructive, the same gloss split at half
    and dark edge as the greys. Greyed while counting down (disabled). */
 .alert-button.green { background: linear-gradient(#6fcf5a, #2f9d22 49%, #1f8c13 50%, #2a961c); background-origin: border-box; border-color: #134f0c; }

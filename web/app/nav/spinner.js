@@ -4,7 +4,8 @@
 // (8 o'clock round to 4), the other six at the floor alpha. Every next frame is frame 0 turned 30 degrees clockwise,
 // so one image turned a spoke at a time (ios6.css @keyframes hud-spin) is the whole animation.
 // ios6.css holds these images as data URLs (--spinner-white, --spinner-gray, --spinner-large); spinner.test.js checks
-// that they are the same as spinnerURL() here, so change both together.
+// that they are the same as spinnerURL() here, so change both together. The app never loads this file: the spinners
+// it shows are those tokens, and an era draws its own by setting them in its stylesheet (docs/eras.md, Overlays).
 
 // Alphas (of 255) by spoke, spoke k pointing k * 30 degrees clockwise from 12 o'clock, as sampled from frame 0.
 const WHITE_ALPHA = [69, 69, 69, 69, 94, 118, 143, 168, 192, 217, 69, 69];

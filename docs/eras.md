@@ -151,6 +151,34 @@ iOS 13 and iOS 26 need three, each off in iOS 6:
   | `--sheet-radius` (look) | 0px | 10px | the sheet's top corners |
   | `--sheet-behind-scale`, `--sheet-behind-shift`, `--sheet-behind-opacity` | not used | 0.92, 0, 0.75 | the page behind (shift in px, down) |
 
+### Overlays (nav/)
+
+The overlays `nav/` draws build markup with the classes below and nothing else: no colour, SVG art or inline style
+that paints comes from their JS (inline styles left are geometry and motion: a menu's position, a banner's drag, a
+row's swipe offset). Their art is CSS, so an era restyles an overlay by setting its tokens or writing look rules
+against these classes. The classes and states are the hooks: keep them when an overlay's markup changes.
+
+| Overlay | JS | Classes and states | Look today |
+|---|---|---|---|
+| Alert | `alert.js` | `.alert-scrim`, `.alert`, `.alert-title`, `.alert-message`, `.alert-field`, `.alert-field-row`, `.alert-paste`, `.alert-buttons` (`.stacked`), `.alert-button` (`.cancel`, `.green`, `.red`) | `sources.css`, literal |
+| Action sheet | `actionsheet.js` | `.action-scrim`, `.action-dim`, `.action-sheet`, `.action-title`, `.action-list`, `.action-button` (`.destructive`, `.cancel`) | `packages.css`, literal |
+| Share sheet | `sharesheet.js` | `.share-scrim`, `.share-dim`, `.share-sheet`, `.share-pages`, `.share-grid`, `.share-item`, `.share-icon` (`.system`, `.app`, `.has-image`), `.share-glyph` (`.glyph-copy`, `.glyph-qr`), `.share-letter`, `.share-image`, `.share-label`, `.share-dots` (`span.on`), `.share-cancel`; the nav bar's `.share-button` | `ios6.css`, tokens: `--share-*`, the glyphs `--share-glyph-copy`, `--share-glyph-qr`; an app's own colour comes in `--share-tint` |
+| HUD | `hud.js` | `.hud-scrim`, `.hud`, `.hud-spinner`, `.hud-label`, `.hud-check` | `ios6.css`, tokens: `--hud`, `--hud-text`, `--hud-emboss`, `--spinner-large`, `--hud-check` (the checkmark's art) |
+| Spinners | `spinner.js` | `.hud-spinner`, `.reload-spinner`, `.pull-spinner`, `.badge.spinning`, `.source-row.is-loading` | `ios6.css` tokens `--spinner-white`, `--spinner-gray`, `--spinner-large` |
+| Reload bar | `reloadbar.js` | `.reload-bar`, `.reload-spinner`, `.reload-text`, `.reload-cancel` (a `.bar-button.done`) | `ios6.css`, literal |
+| Section index | `sectionindex.js` | `.section-index` (`.held`), its letters (`.section-index span`) | `packages.css`, literal |
+| Row swipe | `rowswipe.js` | `.row-swipe` (`.armed`, `.hint`, `.swiping`, `[data-kind="add"|"remove"|"cancel"]`), `.row-swipe-control` | `packages.css`, literal |
+| Banner | `banner.js` | `.banner`, `.banner-icon`, `.banner-text`, `.banner-action` (a `.bar-button.done`), `.banner-timer` | `ios6.css`, literal |
+| Undo bar | `undobar.js` | `.undo-bar` (`.shown`), `.undo-bar-text`, `.undo-bar-button` (a `.bar-button.done`) | `ios6.css`, literal |
+| Menu | `menu.js` | `.menu` (`.below`), `.menu-items`, `.menu-item` (`.is-held`), `.menu-arrow` | `ios6.css`, literal |
+| Built-in lock | `lock.js` | `.name-lock`, `.source-lock`, `.lock-icon` | `sources.css`, token `--lock-icon` (the padlock's art) |
+| Row icon tint | `ui.js` | `.cell-icon` | `ios6.css`, tokens `--cell-icon`, `--cell-icon-text`; a row's own colour (`icon.color`) comes in `--cell-icon-tint` |
+
+`spinner.js` is not loaded by the app: it generates `ios6.css`'s three spinner tokens from the 4S's measurements, and
+`spinner.test.js` keeps the two the same. An era draws its own spinner by setting those tokens in its stylesheet.
+"Literal" means the look rules still hold their iOS 6 colours: an era restyles them with look rules of its own until
+that sheet's cleanup turns them into tokens.
+
 ## What is clean today
 
 Clean: the nav bar (bar, shadow, title, status-bar strip), bar buttons (bordered, back, red, the Share glyph), the
@@ -174,11 +202,10 @@ Not yet clean, each queued as its own cleanup:
   reload bar, segmented control, undo bar, pull to refresh, placeholders);
 - the other stylesheets (`packages.css`; the small ones);
 - the light palettes' segmented-control rules in `palettes.css` (they move onto tokens with that control);
-- the art the overlays in `nav/` draw from JS (HUD, spinner, share sheet, lock, placeholders);
 - the large-title and floating-tab-bar nav hooks above.
 
-The screens' inline SVG art comes from the icon map below; the share sheet's activity glyphs are drawn in `nav/` with
-its other overlays.
+The screens' inline SVG art comes from the icon map below; the overlays `nav/` draws take theirs from CSS tokens
+([Overlays](#overlays-nav)).
 
 ## Icon map
 

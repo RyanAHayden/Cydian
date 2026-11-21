@@ -37,7 +37,8 @@ function cell(row) {
   if (row.onClick) { if (!row.href) inner.type = "button"; inner.addEventListener("click", row.onClick); }
   if (row.icon) {
     const icon = el("span", row.icon.cls ? `cell-icon ${row.icon.cls}` : "cell-icon", row.icon.text || "");
-    if (row.icon.color) icon.style.background = row.icon.color;
+    // The row's own colour or gradient (data): ios6.css .cell-icon paints it through --cell-icon-tint.
+    if (row.icon.color) icon.style.setProperty("--cell-icon-tint", row.icon.color);
     if (row.icon.src) {
       const img = el("img");
       img.alt = "";

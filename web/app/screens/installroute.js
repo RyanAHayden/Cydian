@@ -28,7 +28,7 @@ import { ROUTE_KEY, ROUTE_OPTIONS, VPNS, VPN_POLL, vpnList, vpnOn, IPHONE_INTRO,
 import { ringStyle, vpnWaitText } from "../core/installroute.js";
 import { tailscaleRoute } from "../core/installroute.js";
 import { leaveQuestion, LEAVE } from "../core/installroute.js";
-import { tailscaleVPNOn, installStatus, CHECKING, STATUS_ACTIONS } from "../core/installroute.js";
+import { tailscaleVPNOn, installStatus, CHECKING, CHECKING_SERVER, STATUS_ACTIONS } from "../core/installroute.js";
 import { NAME } from "../brand.js";
 import { showHUD } from "../nav/hud.js";
 import { slideChange } from "../nav/slide.js";
@@ -512,7 +512,8 @@ async function openVPN(native, alert) {
 //                 Signing Server)
 //   Signing       Certificate > (days left), Signed Apps > (count)
 //   How Signing Works >
-// `links` holds the hrefs, `signing()` resolves {certificate: {text, red}}, `apps()` the Signed Apps count (text),
+// `links` holds the hrefs, `signing()` resolves {certificate: {text, red}, ready} (`ready`: a certificate kept; false turns
+// the status cell into Import Your Certificate, B250), `apps()` the Signed Apps count (text),
 // `checkServer` is Settings' Check Server and `host()` the Signing Server's host.
 export const MAIN_ROWS = ["status", "action", "with", "certificate", "apps", "help"];
 
@@ -541,7 +542,7 @@ export function mainPage({ store, native = nativeBridge(), alert = showAlert, li
   let now = CHECKING; // the status cell's answer (core installStatus)
   let busyNow = false;
   const act = async () => {
-    if (now === CHECKING || busyNow) return;
+    if (now.state === "checking" || busyNow) return;
     busyNow = true;
     try { await runAction(now.action); } finally { busyNow = false; }
   };
@@ -567,6 +568,8 @@ export function mainPage({ store, native = nativeBridge(), alert = showAlert, li
   ["with", "certificate", "apps"].forEach((k, i) => { slots[k] = slotOf(cells[i + 2].querySelector(".cell-detail")); });
 
   let known; // idevice.status once read
+  let certRead = false; // B250: signing() has answered once (or failed)
+  let certificate; // B250: signing.status has an identity (signing()'s `ready`); undefined until read
   const paintStatus = (s) => {
     now = s;
     icon.className = `status-icon tone-${s.tone}`;
@@ -574,7 +577,7 @@ export function mainPage({ store, native = nativeBridge(), alert = showAlert, li
     subtitle.set(s.subtitle);
     if (checkButton.active() && s.action !== "check") checkButton.reset();
     if (!checkButton.active()) actionLabel.textContent = STATUS_ACTIONS[s.action];
-    const dim = s === CHECKING;
+    const dim = s.state === "checking"; // CHECKING, or CHECKING_SERVER (B250)
     actionCell.classList.toggle("is-dim", dim);
     if (dim) actionCell.setAttribute("aria-disabled", "true"); else actionCell.removeAttribute?.("aria-disabled");
   };
@@ -584,9 +587,12 @@ export function mainPage({ store, native = nativeBridge(), alert = showAlert, li
     const n = ++asked;
     const choice = store.get(ROUTE_KEY);
     const h = host();
-    if (choice !== "iphone") { paintStatus(installStatus(choice, undefined, { host: h })); slots.with.set(withDetail(choice)); }
+    // B250: the Signing Server route says nothing until signing.status first answers (no Ready without a certificate)
+    const cell = (c, st) => (c !== "iphone" ? (certRead ? installStatus(c, undefined, { host: h, certificate }) : CHECKING_SERVER)
+      : installStatus(c, st, { host: h, certificate }));
+    if (choice !== "iphone") { paintStatus(cell(choice)); slots.with.set(withDetail(choice)); }
     else if (lastChoice && lastChoice !== choice) { paintStatus(CHECKING); title.wait(); subtitle.wait(); slots.with.wait(); } // just picked
-    else if (!lastChoice && lastStatus) { paintStatus(installStatus(choice, lastStatus, { host: h })); slots.with.set(withDetail(choice, lastStatus)); } // F301: the last answer at once
+    else if (!lastChoice && lastStatus) { paintStatus(cell(choice, lastStatus)); slots.with.set(withDetail(choice, lastStatus)); } // F301: the last answer at once
     lastChoice = choice;
     const reads = [
       status(native).then((st) => {
@@ -595,12 +601,22 @@ export function mainPage({ store, native = nativeBridge(), alert = showAlert, li
         known = st;
         rememberStatus(st);
         const c = store.get(ROUTE_KEY);
-        paintStatus(installStatus(c, st, { host: h }));
+        paintStatus(cell(c, st));
         slots.with.set(withDetail(c, st));
       }),
       Promise.resolve().then(signing).catch(() => null).then((v) => {
         if (n < signingShown) return;
         signingShown = n;
+        // B250: no certificate kept: the status cell says Import Your Certificate (and back once one is)
+        const had = certificate, first = !certRead;
+        certificate = typeof v?.ready === "boolean" ? v.ready : undefined;
+        certRead = true;
+        const c = store.get(ROUTE_KEY);
+        if (certificate !== had || (first && c !== "iphone")) {
+          // This iPhone with this refresh's idevice.status still out: Checking… until it answers
+          const st = c !== "iphone" ? undefined : statusShown === n ? known : undefined;
+          paintStatus(cell(c, st));
+        }
         slots.certificate.set(v?.certificate?.text ?? "Unknown", { red: Boolean(v?.certificate?.red) });
       }),
       Promise.resolve().then(apps).catch(() => "").then((v) => {
@@ -616,6 +632,7 @@ export function mainPage({ store, native = nativeBridge(), alert = showAlert, li
     if (a === "checkServer") return checkServer();
     if (a === "openVPN") return openVPN(native, alert).then(refresh);
     if (a === "pair") return goTo("pair");
+    if (a === "certificate") return navGo(links.certificate); // B250: the Certificate page, as its row opens
     if (a === "signIn") return tailscaleSignIn(native, alert, refresh, null, { hud: true });
     if (a === "openTailscale") return openApp(native, alert, TAILSCALE_URL, "Tailscale");
     if (a === "useTailscale") { await busy("Switching", () => call(native, "tailscale.setConnect", { value: "auto" }).catch(() => {})); return refresh(); }

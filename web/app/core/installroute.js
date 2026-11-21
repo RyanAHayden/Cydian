@@ -91,9 +91,17 @@ export const setUpWithTailscale = (ts) => ts?.connect === "tailscale" || Boolean
 export const STATUS_ACTIONS = {
   check: "Check Connection", checkServer: "Check Server", openVPN: `Open ${VPNS[0]}`, pair: "Start Pairing",
   signIn: "Sign In to Tailscale", openTailscale: "Open Tailscale", useTailscale: "Use Tailscale",
+  certificate: "Import Certificate",
 };
 export const CHECKING = { state: "checking", title: "Checking…", subtitle: "Pairing and the VPN.", action: "check", tone: "wait", local: false };
-export function installStatus(choice, st, { host = DOMAIN } = {}) {
+// B250: `certificate` is whether signing.status has an identity (signing/device.js statusReady): false says Import Your
+// Certificate on either route, since every install stops at Set Up Signing without one (signing/device.js
+// firstInstallCheck); undefined (not read yet, or the read failed) leaves the route's own answer.
+export const NO_CERTIFICATE = { state: "certificate", title: "Import Your Certificate", subtitle: "Installs need your certificate and its profile first.", action: "certificate", tone: "warn", local: false };
+// The Signing Server route before signing.status first answers: no Ready to Install until the certificate is known.
+export const CHECKING_SERVER = { ...CHECKING, subtitle: "Your certificate." };
+export function installStatus(choice, st, { host = DOMAIN, certificate } = {}) {
+  if (certificate === false) return NO_CERTIFICATE;
   if (choice !== "iphone") return { state: "server", title: "Ready to Install", subtitle: `Through the Signing Server, ${host}.`, action: "checkServer", tone: "ok", local: false };
   if (st === undefined) return CHECKING;
   const later = `Installs use ${host} for now.`;

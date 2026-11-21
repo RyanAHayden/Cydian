@@ -1,0 +1,18 @@
+`afcclient --container com.ryha.ifizbox -- ls Library/Caches` (`ipa` lines, or a `grep -c ipa` count), copied from the
+session's command output. Times are approximate (EST, from the run order).
+
+before the test (04:03)        no .ipa (com.apple.dyld, com.apple.WebKit.GPU, com.ryha.ifizbox, idevice.log, WebKit, com.apple.WebKit.Networking)
+after run 1 (04:05)            com.ryha.ifizbox.probe.ipa   (pulled with `get`: sha256 98aaa3721afe14b72c40eaa16f1d8eb95130b0eb7e7e06a989d497d301a45ae4, the served file's)
+after run 2 (04:07)            com.ryha.ifizbox.probe.ipa
+after run 3 (04:08)            com.ryha.ifizbox.probe.ipa
+after run 4 (04:09)            com.ryha.ifizbox.probe.ipa
+after run 5 (04:09)            0
+after run 6 (04:10)            com.ryha.ifizbox.probe.ipa
+after run 7 (04:11)            0
+after run 8a (04:12)           com.ryha.ifizbox.probe.ipa
+`rm Library/Caches/com.ryha.ifizbox.probe.ipa` (no output), then a count of 0
+after run 8 (04:13)            com.ryha.ifizbox.probe.ipa
+after cleanup (04:14)          0
+
+URL check while the server was stopped (run 3, before Retry All):
+curl -s -o /dev/null -w "%{http_code}" https://omarchy-desktop.beetal-ling.ts.net:8475/probe.ipa  ->  502

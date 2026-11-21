@@ -1,0 +1,9 @@
+before the test: 10 records; probe: {"url": "library:probe.ipa", "sha256": null, "appID": null, "signed": "2026-11-21T01:41:50Z"}
+after run 1 (URL install): 10 records; probe: {"url": "https://omarchy-desktop.beetal-ling.ts.net:8475/probe.ipa", "sha256": "98aaa3721afe14b72c40eaa16f1d8eb95130b0eb7e7e06a989d497d301a45ae4", "appID": "S8NFX3A2LT.com.ryha.sideload", "signed": "2026-11-21T09:05:22Z"}
+after run 3 (appid_mismatch): 10 records; probe: {"url": "https://omarchy-desktop.beetal-ling.ts.net:8475/probe.ipa", "sha256": "98aaa3721afe14b72c40eaa16f1d8eb95130b0eb7e7e06a989d497d301a45ae4", "appID": "S8NFX3A2LT.com.ryha.sideload", "signed": "2026-11-21T09:05:22Z"}
+after run 4 (re-signed): 10 records; probe: {"url": "https://omarchy-desktop.beetal-ling.ts.net:8475/probe.ipa", "sha256": "98aaa3721afe14b72c40eaa16f1d8eb95130b0eb7e7e06a989d497d301a45ae4", "appID": null, "signed": "2026-11-21T09:09:08Z"}
+after run 5 (Remove from List): 9 records; probe: none
+after run 6 (URL install): 10 records; probe: {"url": "https://omarchy-desktop.beetal-ling.ts.net:8475/probe.ipa", "sha256": "98aaa3721afe14b72c40eaa16f1d8eb95130b0eb7e7e06a989d497d301a45ae4", "appID": "S8NFX3A2LT.com.ryha.ifizbox.probe", "signed": "2026-11-21T09:10:18Z"}
+after run 7 (My IPAs reinstall): 10 records; probe: {"url": "library:probe.ipa", "sha256": null, "appID": null, "signed": "2026-11-21T09:11:36Z"}
+after run 8a (URL install, before the Re-sign): 10 records; probe: {"url": "https://omarchy-desktop.beetal-ling.ts.net:8475/probe.ipa", "sha256": "98aaa3721afe14b72c40eaa16f1d8eb95130b0eb7e7e06a989d497d301a45ae4", "appID": "S8NFX3A2LT.com.ryha.ifizbox.probe", "signed": "2026-11-21T09:12:05Z"}
+after cleanup: 10 records; probe: {"url": "library:probe.ipa", "sha256": null, "appID": null, "signed": "2026-11-21T09:14:20Z"}

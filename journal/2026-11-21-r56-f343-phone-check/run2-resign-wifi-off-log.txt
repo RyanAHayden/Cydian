@@ -1,0 +1,23 @@
+Complete
+Retry All
+Apps
+Log
+Signing from the IPA kept at install (20 KB), no download
+IPA SHA-256: 98aaa3721afe14b72c40eaa16f1d8eb95130b0eb7e7e06a989d497d301a45ae4
+Certificate: Apple Distribution: Ian Smith (S8NFX3A2LT) (team S8NFX3A2LT)
+App Probe.app: com.ryha.ifizbox.probe, 6 files
+Signing Probe
+Read 4 files (135 KB), 1 Mach-O, 1 bundles to sign
+Group fix: group.org.example.probe.original -> the app's own folder; keychain groups stripped
+Injected @rpath/ifizbox-groupfix.dylib
+Signed Probe.app (com.ryha.ifizbox.probe), with the profile's entitlements
+Signed Probe 1.0 as com.ryha.ifizbox.probe, 45 KB
+Keeping the IPA for Re-sign once it is installed (Caches/com.ryha.ifizbox.probe.ipa)
+Signed Probe
+Copying Probe to this iPhone
+Installing on this iPhone through Tailscale; nothing goes to a Signing Server
+Copying the IPA to iOS (45 KB), then iOS installs it
+This iPhone's install failed: connect_failed: Tailscale didn't connect (NoState); check the internet connection
+Probe: Tailscale didn't connect (NoState); check the internet connection
+1 failed
+Return to iFizBox

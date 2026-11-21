@@ -35,13 +35,19 @@ installed under, so iOS refuses the update (**B280**, below).
 | 4 | `ios uninstall com.ryha.ifizbox.probe` (go-ios) to get past B280, Retry All, server still stopped | "Signing from the IPA kept at install … no download" … "iOS installed Probe 1.0", "Re-signed Probe, expires Oct 28, 2027", "1 re-signed" | nothing | kept file present |
 | 5 | Probe > Remove from List > Remove from List | | | **kept file gone**, record gone (9 records) |
 | 6 | Server started, installed from the URL again | Downloading … installed | GET 04:10:18 | kept file back |
-| 7 | probe.ipa put in My IPAs (`afcclient … put Documents/probe.ipa`), Install IPAs > Probe > Install (Reinstall) > Confirm | signed from the library file, "Kept the signed copy in My IPAs", installed | nothing | **kept file gone**; record `url` = `library:probe.ipa`, no `sha256` |
+| 7 (`run7-reinstall-my-ipas-log.txt`) | probe.ipa put in My IPAs (`afcclient … put Documents/probe.ipa`), Install IPAs > Probe > Install (Reinstall) > Confirm | signed from the library file, "Kept the signed copy in My IPAs", installed | nothing | **kept file gone**; record `url` = `library:probe.ipa`, no `sha256` |
 | 8 | Installed from the URL again, then the kept file deleted by hand (`afcclient --container com.ryha.ifizbox -- rm Library/Caches/com.ryha.ifizbox.probe.ipa`), Probe > Re-sign > Confirm | **"The kept IPA is gone (iOS clears caches when storage runs low): downloading it again"**, "Downloading https://…/probe.ipa", same SHA-256, signed, "Keeping the IPA…", installed, "1 re-signed" | GET 04:12:03 (install), **GET 04:13:12 (the Re-sign)** | kept file back |
 
-The server's GET at 04:10:07 was my own `curl` check after restarting it, not the phone.
+Two server lines are mine, not the phone's: the HEAD at 04:04:51 (`curl -sI` through tailscale serve before the
+first install) and the GET at 04:10:07 (`curl` after restarting the server). Run 8a is the URL install in run 8 before
+its Re-sign (`run8a-install-third-log.txt`). Run 5 has no Log: Remove from List shows none. The record after each run
+is in `probe-record-states.txt` (from the saved `signed.json` reads) and the Caches listings in `caches-listings.txt`.
 
 Runs 2-4 show the Re-sign doesn't touch the network for the IPA. Run 2 had no network at all. In runs 3-4 the URL
-was dead and the server logged nothing. Run 4 got all the way to "Re-signed".
+was dead and the server logged nothing. Run 4 got all the way to "Re-signed". Because of B280, Probe had just been
+deleted, so iOS did a fresh install there, not an update. What run 4 shows is the kept IPA signed and installed
+offline from the URL. Run 3 shows the same signing over the installed app, up to iOS's refusal. Run 8 is a normal
+Re-sign over the installed app, and it completed.
 
 ## Purging the cache by hand: possible from Linux
 
@@ -73,6 +79,14 @@ and I didn't try storage pressure.
 - Caches holds no kept IPA. `signed.json` has the same 10 bundle IDs as before.
 - Wi-Fi is back on. The HTTP server, `tailscale serve --https=8475` and the Web Inspector server are stopped, and the UI
   lock is released.
+
+## Spec review
+
+A fresh subagent read only the diff and the brief. Fixed: the run 7 log was misnamed `run6-…`. Added the evidence the
+claims rest on (`probe-record-states.txt`, `caches-listings.txt`, the run 6 and 8a install logs). The HEAD request is
+now explained, and so is the fact that run 4 was a fresh install. Kept: the ``ios uninstall`` in run 4 (needed to get
+past B280, and noted under Cleanup). The three bugs were filed with `run plan add`, as the rules ask; the TODO diff is
+that tool's output. Wi-Fi off can't reach "Re-signed" on a SIM-less phone, so that stays under Not verified.
 
 ## Tried that went wrong
 

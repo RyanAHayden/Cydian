@@ -314,25 +314,42 @@ function b64Bytes(b64) {
 }
 
 const endpoints = new Map(); // source key -> Promise<vendor base | null>
-function endpointOf(source, text) {
+function endpointOf(source, text, cache = endpoints) {
   const url = paymentEndpointUrl(source);
   if (!url) return Promise.resolve(null);
-  if (!endpoints.has(source.key)) endpoints.set(source.key, Promise.resolve().then(() => text(url)).then(parseEndpoint, () => null));
-  return endpoints.get(source.key);
+  if (!cache.has(source.key)) {
+    // B268: a fetch that failed (offline, a timeout) is asked again next time, not kept as "no seller" for the session
+    cache.set(source.key, Promise.resolve().then(() => text(url)).then(parseEndpoint, () => { cache.delete(source.key); return null; }));
+  }
+  return cache.get(source.key);
 }
 
-// The source that carries this version and sells it: { base, source } or null.
-async function catalogVendorFor(st) {
-  const [{ catalog }, { getBackend }] = await Promise.all([import("../catalog.js"), import("../backend.js")]);
-  const backend = getBackend();
-  const [p, sources] = await Promise.all([catalog.package(st.package, "*").catch(() => null), backend.sources()]);
-  const keys = [...new Set([p?.key, ...(p?.others ?? []).filter((o) => !st.version || o.version === st.version).map((o) => o.key)].filter(Boolean))];
-  for (const key of keys) {
+// The source that carries this version and sells it: { base, source } or null. B268: All Sources ("*") leaves the
+// sideload build's Tweak Sources out, so a tweak it doesn't list is looked up in each APT source the app has (the one
+// its stanza came from among them) before the answer is "no seller". `catalog`: { package(id, key) }, `sources`: the
+// backend's list, `text(url)`: the payment_endpoint file's text.
+export async function findSeller(st, { catalog, sources, text, cache = endpoints }) {
+  const hasVersion = (p) => p && (!st.version || p.stanza?.version === st.version || (p.others ?? []).some((o) => o.version === st.version));
+  const p = await catalog.package(st.package, "*").catch(() => null);
+  let keys = [p?.key, ...(p?.others ?? []).filter((o) => !st.version || o.version === st.version).map((o) => o.key)];
+  if (!keys.some(Boolean)) {
+    for (const s of sources) {
+      if (!s?.key || String(s.key).startsWith("alt:")) continue;
+      if (hasVersion(await catalog.package(st.package, s.key).catch(() => null))) keys.push(s.key);
+    }
+  }
+  for (const key of new Set(keys.filter(Boolean))) {
     const source = sources.find((s) => s.key === key);
-    const base = source ? await endpointOf(source, (u) => backend.text(u)) : null;
+    const base = source ? await endpointOf(source, text, cache) : null;
     if (base) return { base, source };
   }
   return null;
+}
+
+async function catalogVendorFor(st) {
+  const [{ catalog }, { getBackend }] = await Promise.all([import("../catalog.js"), import("../backend.js")]);
+  const backend = getBackend();
+  return findSeller(st, { catalog, sources: await backend.sources(), text: (u) => backend.text(u) });
 }
 
 export function createPaidTweaks({ call = bridgeCall, vendorFor = catalogVendorFor, storage } = {}) {

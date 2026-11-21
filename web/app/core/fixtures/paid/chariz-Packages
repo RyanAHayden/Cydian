@@ -1,0 +1,1013 @@
+Package: com.amywhile.aemulo
+Name: Aemulo
+Architecture: iphoneos-arm
+Description: NFC Frickery
+Author: Amy While <support@anamy.gay>
+Maintainer: Amy While <support@anamy.gay>
+Version: 1.1.2
+Section: Tweaks
+Icon: https://img.chariz.cloud/icon/aemulo/icon@3x.png
+Depiction: https://chariz.com/buy/aemulo
+SileoDepiction: https://repo.chariz.com/api/sileo/package/com.amywhile.aemulo/depiction.json
+Header: https://img.chariz.cloud/sileo-banner/aemulo.jpg
+Tag: cydia::commercial, compatible_min::ios13.0
+Depends: mobilesubstrate (>= 0.9.5000), firmware (>= 13.0), ws.hbang.alderis (>= 1.1)
+Filename: debs/com.amywhile.aemulo_1.1.2_iphoneos-arm.deb
+Size: 415974
+Installed-Size: 1876
+SHA256: daabb9351f94fad35c33f3bffecdb9494984b4826bebf0be1d857b50d749dc85
+MD5sum: 3fed788661189f1dbb54c2e3f9fa5f8c
+
+Package: com.amywhile.aemulotrial
+Name: Aemulo (Trial)
+Architecture: iphoneos-arm
+Description: NFC Frickery
+Author: Amy While <support@anamy.gay>
+Maintainer: Amy While <support@anamy.gay>
+Version: 1.1.2
+Section: Tweaks
+Icon: https://img.chariz.cloud/icon/aemulo-trial/icon@3x.png
+Depiction: https://chariz.com/get/aemulo-trial
+SileoDepiction: https://repo.chariz.com/api/sileo/package/com.amywhile.aemulotrial/depiction.json
+Header: https://img.chariz.cloud/sileo-banner/aemulo-trial.jpg
+Tag: compatible_min::ios13.0
+Depends: mobilesubstrate (>= 0.9.5000), firmware (>= 13.0), ws.hbang.alderis (>= 1.1)
+Filename: debs/com.amywhile.aemulotrial_1.1.2_iphoneos-arm.deb
+Size: 397752
+Installed-Size: 1684
+SHA256: ed0c98d7fe3a222672a2833e347010a4867ddb8d1570555821450fca70319f4b
+MD5sum: 6024f06d1e087835938bec613b3b5c4c
+
+Package: com.amywhile.aemulo
+Name: Aemulo
+Architecture: iphoneos-arm
+Description: NFC Frickery
+Author: Amy While <support@anamy.gay>
+Maintainer: Amy While <support@anamy.gay>
+Version: 1.1.1
+Section: Tweaks
+Icon: https://img.chariz.cloud/icon/aemulo/icon@3x.png
+Depiction: https://chariz.com/buy/aemulo
+SileoDepiction: https://repo.chariz.com/api/sileo/package/com.amywhile.aemulo/depiction.json
+Header: https://img.chariz.cloud/sileo-banner/aemulo.jpg
+Tag: cydia::commercial, compatible_min::ios13.0
+Depends: mobilesubstrate (>= 0.9.5000), firmware (>= 13.0), ws.hbang.alderis (>= 1.1)
+Filename: debs/com.amywhile.aemulo_1.1.1_iphoneos-arm.deb
+Size: 416042
+Installed-Size: 1876
+SHA256: bc2980cc724f1f3d52b80c96de389ba5195becbca45f7f1e4b5a31c0c83786c4
+MD5sum: 176a6bf5eda48c0c9cd7c2b370cf6d4e
+
+Package: com.amywhile.aemulo
+Name: Aemulo
+Architecture: iphoneos-arm
+Description: NFC Frickery
+Author: Amy While <support@anamy.gay>
+Maintainer: Amy While <support@anamy.gay>
+Version: 1.1-1
+Section: Tweaks
+Icon: https://img.chariz.cloud/icon/aemulo/icon@3x.png
+Depiction: https://chariz.com/buy/aemulo
+SileoDepiction: https://repo.chariz.com/api/sileo/package/com.amywhile.aemulo/depiction.json
+Header: https://img.chariz.cloud/sileo-banner/aemulo.jpg
+Tag: cydia::commercial, compatible_min::ios13.0
+Depends: mobilesubstrate (>= 0.9.5000), firmware (>= 13.0), ws.hbang.alderis (>= 1.1)
+Conflicts: com.amywhile.aemulotrial
+Filename: debs/com.amywhile.aemulo_1.1-1_iphoneos-arm.deb
+Size: 398714
+Installed-Size: 1872
+SHA256: 17911dfe208a6ce9c8961c12933a441021ab84554790812cc6c2b115a878cf21
+MD5sum: 7fc05516b1def5279e66dd1ff50ef2f8
+
+Package: com.amywhile.aemulo
+Name: Aemulo
+Architecture: iphoneos-arm
+Description: NFC Frickery
+Author: Amy While <support@anamy.gay>
+Maintainer: Amy While <support@anamy.gay>
+Version: 1.0.1
+Section: Tweaks
+Icon: https://img.chariz.cloud/icon/aemulo/icon@3x.png
+Depiction: https://chariz.com/buy/aemulo
+SileoDepiction: https://repo.chariz.com/api/sileo/package/com.amywhile.aemulo/depiction.json
+Header: https://img.chariz.cloud/sileo-banner/aemulo.jpg
+Tag: cydia::commercial, compatible_min::ios13.0
+Depends: mobilesubstrate (>= 0.9.5000), firmware (>= 13.0), ws.hbang.alderis (>= 1.1)
+Filename: debs/com.amywhile.aemulo_1.0.1_iphoneos-arm.deb
+Size: 453404
+Installed-Size: 1532
+SHA256: 73d54c3ea6bd642b4189c2fd728a3b8cf2bfca26bf87f34d1cb4ef8847e106c3
+MD5sum: 8bfcb5d98a9e50756329d00c34c9895f
+
+Package: com.amywhile.aemulo
+Name: Aemulo
+Architecture: iphoneos-arm
+Description: NFC Frickery
+Author: Amy While <support@anamy.gay>
+Maintainer: Amy While <support@anamy.gay>
+Version: 1.0
+Section: Tweaks
+Icon: https://img.chariz.cloud/icon/aemulo/icon@3x.png
+Depiction: https://chariz.com/buy/aemulo
+SileoDepiction: https://repo.chariz.com/api/sileo/package/com.amywhile.aemulo/depiction.json
+Header: https://img.chariz.cloud/sileo-banner/aemulo.jpg
+Tag: cydia::commercial, compatible_min::ios13.0
+Depends: mobilesubstrate (>= 0.9.5000), firmware (>= 13.0), ws.hbang.alderis (>= 1.1)
+Filename: debs/com.amywhile.aemulo_1.0_iphoneos-arm.deb
+Size: 437698
+Installed-Size: 1492
+SHA256: 298026a2d57ef8e0285f69aad1cdebfcbe3acd1263992ea010e8247a242988b5
+MD5sum: 63345b57012a1c002622ec18a5f83be9
+
+Package: com.amywhile.aemulotrial
+Name: Aemulo (Trial)
+Architecture: iphoneos-arm
+Description: NFC Frickery
+Author: Amy While <support@anamy.gay>
+Maintainer: Amy While <support@anamy.gay>
+Version: 1.1.1
+Section: Tweaks
+Icon: https://img.chariz.cloud/icon/aemulo-trial/icon@3x.png
+Depiction: https://chariz.com/get/aemulo-trial
+SileoDepiction: https://repo.chariz.com/api/sileo/package/com.amywhile.aemulotrial/depiction.json
+Header: https://img.chariz.cloud/sileo-banner/aemulo-trial.jpg
+Tag: compatible_min::ios13.0
+Depends: mobilesubstrate (>= 0.9.5000), firmware (>= 13.0), ws.hbang.alderis (>= 1.1)
+Filename: debs/com.amywhile.aemulotrial_1.1.1_iphoneos-arm.deb
+Size: 397610
+Installed-Size: 1676
+SHA256: 5bc09059329bad417a217b5b4d360bbb627b3bb32566f1c3ff11005b29913cde
+MD5sum: 460310ad41155d96d541fcdbe0b43cb4
+
+Package: com.amywhile.aemulotrial
+Name: Aemulo (Trial)
+Architecture: iphoneos-arm
+Description: NFC Frickery
+Author: Amy While <support@anamy.gay>
+Maintainer: Amy While <support@anamy.gay>
+Version: 1.1-1
+Section: Tweaks
+Icon: https://img.chariz.cloud/icon/aemulo-trial/icon@3x.png
+Depiction: https://chariz.com/buy/aemulo-trial
+SileoDepiction: https://repo.chariz.com/api/sileo/package/com.amywhile.aemulotrial/depiction.json
+Header: https://img.chariz.cloud/sileo-banner/aemulo-trial.jpg
+Tag: compatible_min::ios13.0
+Depends: mobilesubstrate (>= 0.9.5000), firmware (>= 13.0), ws.hbang.alderis (>= 1.1)
+Conflicts: com.amywhile.aemulo
+Filename: debs/com.amywhile.aemulotrial_1.1-1_iphoneos-arm.deb
+Size: 380894
+Installed-Size: 1672
+SHA256: 299664e2035b3e173ffe10067b4c78a04b8a734e6624ed436afbcb9ea424a323
+MD5sum: 06b0f844e54441011f2085c8ab379607
+
+Package: com.amywhile.aemulo
+Version: 1.2
+Architecture: iphoneos-arm
+Section: Tweaks
+Maintainer: Amy While <support@anamy.gay>
+Author: Amy While <support@anamy.gay>
+Installed-Size: 2531
+Depends: mobilesubstrate (>= 0.9.5000), firmware (>= 13.0)
+Conflicts: com.amywhile.aemulotrial
+Name: Aemulo
+Description: NFC Frickery
+Icon: https://img.chariz.cloud/icon/aemulo/icon@3x.png
+Depiction: https://chariz.com/buy/aemulo
+Tag: cydia::commercial, compatible_min::ios13.0
+SileoDepiction: https://chariz.com/api/sileo/package/com.amywhile.aemulo/depiction.json
+Header: https://cdn.chariz.cloud/sileo-banner/aemulo.jpg
+Filename: debs/com.amywhile.aemulo_1.2_iphoneos-arm.deb
+SHA256: b4bd43be02315df2c7dc4dcc914f8f930da6436025d4af0d14936c64ee20cf49
+MD5Sum: 73fbb1beb2fedbb090a70f230df8c24d
+Size: 642778
+
+Package: com.amywhile.aemulotrial
+Version: 1.2
+Architecture: iphoneos-arm
+Section: Tweaks
+Maintainer: Amy While <support@anamy.gay>
+Author: Amy While <support@anamy.gay>
+Installed-Size: 2203
+Depends: mobilesubstrate (>= 0.9.5000), firmware (>= 13.0)
+Conflicts: com.amywhile.aemulo
+Name: Aemulo (Trial)
+Description: NFC Frickery
+Icon: https://img.chariz.cloud/icon/aemulo-trial/icon@3x.png
+Depiction: https://chariz.com/get/aemulo-trial
+Tag: compatible_min::ios13.0
+SileoDepiction: https://chariz.com/api/sileo/package/com.amywhile.aemulotrial/depiction.json
+Header: https://cdn.chariz.cloud/sileo-banner/aemulo-trial.jpg
+Filename: debs/com.amywhile.aemulotrial_1.2_iphoneos-arm.deb
+SHA256: 1f9d42cc7f7208f36a01e35e47e0934d97f3f52ed4ed1a552ace5b7b214433b8
+MD5Sum: bdba48f068a76af5029c20557d170493
+Size: 607552
+
+Package: com.amywhile.aemulo
+Version: 1.2.1
+Architecture: iphoneos-arm
+Section: Tweaks
+Maintainer: Amy While <support@anamy.gay>
+Author: Amy While <support@anamy.gay>
+Installed-Size: 2444
+Depends: mobilesubstrate (>= 0.9.5000), firmware (>= 13.0)
+Conflicts: com.amywhile.aemulotrial
+Name: Aemulo
+Description: NFC Frickery
+Icon: https://img.chariz.cloud/icon/aemulo/icon@3x.png
+Depiction: https://chariz.com/buy/aemulo
+Tag: cydia::commercial, compatible_min::ios13.0
+SileoDepiction: https://chariz.com/api/sileo/package/com.amywhile.aemulo/depiction.json
+Header: https://cdn.chariz.cloud/sileo-banner/aemulo.jpg
+Filename: debs/com.amywhile.aemulo_1.2.1_iphoneos-arm.deb
+SHA256: bef2fb638ee6f95129e0abdf0e46f78125484a9125de7d2572f2d1a79e369a56
+MD5Sum: 5544a3806b1d81102512fad563174df4
+Size: 632824
+
+Package: com.amywhile.aemulotrial
+Version: 1.2.1
+Architecture: iphoneos-arm
+Section: Tweaks
+Maintainer: Amy While <support@anamy.gay>
+Author: Amy While <support@anamy.gay>
+Installed-Size: 2202
+Depends: mobilesubstrate (>= 0.9.5000), firmware (>= 13.0)
+Conflicts: com.amywhile.aemulo
+Name: Aemulo (Trial)
+Description: NFC Frickery
+Icon: https://img.chariz.cloud/icon/aemulo-trial/icon@3x.png
+Depiction: https://chariz.com/get/aemulo-trial
+Tag: compatible_min::ios13.0
+SileoDepiction: https://chariz.com/api/sileo/package/com.amywhile.aemulotrial/depiction.json
+Header: https://cdn.chariz.cloud/sileo-banner/aemulo-trial.jpg
+Filename: debs/com.amywhile.aemulotrial_1.2.1_iphoneos-arm.deb
+SHA256: 1bf422f16c425819895183c7fb16dc4867b1166820f3e3e00b356d51d465530b
+MD5Sum: 7cc9abb9eb70f46aed5ce2c8a51c62cb
+Size: 605660
+
+Package: com.amywhile.aemulotrial
+Version: 1.2.2
+Architecture: iphoneos-arm
+Section: Tweaks
+Maintainer: Amy While <support@anamy.gay>
+Author: Amy While <support@anamy.gay>
+Installed-Size: 2202
+Depends: mobilesubstrate (>= 0.9.5000), firmware (>= 13.0)
+Conflicts: com.amywhile.aemulo
+Name: Aemulo (Trial)
+Description: NFC Frickery
+Icon: https://img.chariz.cloud/icon/aemulo-trial/icon@3x.png
+Depiction: https://chariz.com/get/aemulo-trial
+Tag: compatible_min::ios13.0
+SileoDepiction: https://chariz.com/api/sileo/package/com.amywhile.aemulotrial/depiction.json
+Header: https://cdn.chariz.cloud/sileo-banner/aemulo-trial.jpg
+Filename: debs/com.amywhile.aemulotrial_1.2.2_iphoneos-arm.deb
+SHA256: aaa5709557bb969f1de8515c1a7af0e26abde2185742b9180a02b8c2ab3051ab
+MD5Sum: 3744a1b52f6c811dd9884b413e051fa5
+Size: 605650
+
+Package: com.amywhile.aemulo
+Version: 1.2.2
+Architecture: iphoneos-arm
+Section: Tweaks
+Maintainer: Amy While <support@anamy.gay>
+Author: Amy While <support@anamy.gay>
+Installed-Size: 2444
+Depends: mobilesubstrate (>= 0.9.5000), firmware (>= 13.0)
+Conflicts: com.amywhile.aemulotrial
+Name: Aemulo
+Description: NFC Frickery
+Icon: https://img.chariz.cloud/icon/aemulo/icon@3x.png
+Depiction: https://chariz.com/buy/aemulo
+Tag: cydia::commercial, compatible_min::ios13.0
+SileoDepiction: https://chariz.com/api/sileo/package/com.amywhile.aemulo/depiction.json
+Header: https://cdn.chariz.cloud/sileo-banner/aemulo.jpg
+Filename: debs/com.amywhile.aemulo_1.2.2_iphoneos-arm.deb
+SHA256: e5144f4251ef265deb7681dc32a4a2925867e572e21850f05b5bd80c8ac3f1c1
+MD5Sum: e7690d48364e19f83f07612025a76ceb
+Size: 632958
+
+Package: com.amywhile.aemulo
+Version: 1.2.3
+Architecture: iphoneos-arm
+Section: Tweaks
+Maintainer: Amy While <support@anamy.gay>
+Author: Amy While <support@anamy.gay>
+Installed-Size: 2444
+Depends: mobilesubstrate (>= 0.9.5000), firmware (>= 13.0)
+Conflicts: com.amywhile.aemulotrial
+Name: Aemulo
+Description: NFC Frickery
+Icon: https://img.chariz.cloud/icon/aemulo/icon@3x.png
+Depiction: https://chariz.com/buy/aemulo
+Tag: cydia::commercial, compatible_min::ios13.0
+SileoDepiction: https://chariz.com/api/sileo/package/com.amywhile.aemulo/depiction.json
+Header: https://cdn.chariz.cloud/sileo-banner/aemulo.jpg
+Filename: debs/com.amywhile.aemulo_1.2.3_iphoneos-arm.deb
+SHA256: 86d40994960b09a8816c5cb55435ceb35e7418ee4ef4fbed2e40f03325ddf7a4
+MD5Sum: b5e9381d81c70a542b2aa196d23f4f76
+Size: 632646
+
+Package: com.amywhile.aemulotrial
+Version: 1.2.3
+Architecture: iphoneos-arm
+Section: Tweaks
+Maintainer: Amy While <support@anamy.gay>
+Author: Amy While <support@anamy.gay>
+Installed-Size: 2202
+Depends: mobilesubstrate (>= 0.9.5000), firmware (>= 13.0)
+Conflicts: com.amywhile.aemulo
+Name: Aemulo (Trial)
+Description: NFC Frickery
+Icon: https://img.chariz.cloud/icon/aemulo-trial/icon@3x.png
+Depiction: https://chariz.com/get/aemulo-trial
+Tag: compatible_min::ios13.0
+SileoDepiction: https://chariz.com/api/sileo/package/com.amywhile.aemulotrial/depiction.json
+Header: https://cdn.chariz.cloud/sileo-banner/aemulo-trial.jpg
+Filename: debs/com.amywhile.aemulotrial_1.2.3_iphoneos-arm.deb
+SHA256: 98b474cdd74322788dd28bb36a911ed45d3dbd47b84b5a911c77ada7c2d1f1f8
+MD5Sum: 4a15f9f227574c94c243c7cb47974054
+Size: 605532
+
+Package: com.serena.antoine
+Version: 1.0
+Architecture: iphoneos-arm
+Section: Tweaks
+Maintainer: Serena <hanzikashi@gmail.com>
+Author: Serena <hanzikashi@gmail.com>
+Installed-Size: 3247
+Name: Antoine
+Description: An Application to view System Logs, commonly known as syslog or OSLog, in real time
+Icon: https://img.chariz.cloud/icon/antoine/icon@3x.png
+Depiction: https://chariz.com/get/antoine
+Tag: compatible_min::ios13.0
+SileoDepiction: https://chariz.com/api/sileo/package/com.serena.antoine/depiction.json
+Header: https://cdn.chariz.cloud/sileo-banner/antoine.jpg
+Filename: debs/com.serena.antoine_1.0_iphoneos-arm.deb
+SHA256: a9bb01d1ccbf2e73f0655ae1c059f64cbadfc240e04b4654c357230a81a8734c
+MD5Sum: 52bb6e733253fd29dd3644a4e7b4d9cb
+Size: 1458252
+
+Package: com.amywhile.aemulo
+Version: 1.2.3-2
+Architecture: iphoneos-arm
+Section: Tweaks
+Maintainer: Amy While <support@anamy.gay>
+Author: Amy While <support@anamy.gay>
+Installed-Size: 2444
+Depends: mobilesubstrate (>= 0.9.5000), firmware (>= 13.0)
+Conflicts: com.amywhile.aemulotrial
+Name: Aemulo
+Description: NFC Frickery
+Icon: https://img.chariz.cloud/icon/aemulo/icon@3x.png
+Depiction: https://chariz.com/buy/aemulo
+Tag: cydia::commercial, compatible_min::ios13.0
+SileoDepiction: https://chariz.com/api/sileo/package/com.amywhile.aemulo/depiction.json
+Header: https://cdn.chariz.cloud/sileo-banner/aemulo.jpg
+Filename: debs/com.amywhile.aemulo_1.2.3-2_iphoneos-arm.deb
+SHA256: 38dd3687ced3acb57e578e1623db7f7df1cca9509aa50dc27703b05300890189
+MD5Sum: b65d44c2e5b8040e3bcd9ad7dc428111
+Size: 632762
+
+Package: com.serena.antoine
+Version: 1.1
+Architecture: iphoneos-arm
+Section: Tweaks
+Maintainer: Serena <hanzikashi@gmail.com>
+Author: Serena <hanzikashi@gmail.com>
+Installed-Size: 3254
+Name: Antoine
+Description: An Application to view System Logs, commonly known as syslog or OSLog, in real time
+Icon: https://img.chariz.cloud/icon/antoine/icon@3x.png
+Depiction: https://chariz.com/get/antoine
+Tag: compatible_min::ios13.0
+SileoDepiction: https://chariz.com/api/sileo/package/com.serena.antoine/depiction.json
+Header: https://cdn.chariz.cloud/sileo-banner/antoine.jpg
+Filename: debs/com.serena.antoine_1.1_iphoneos-arm.deb
+SHA256: a32ff5d9c2a7ebae419779aacb99b5cab125d7544c0bd0856b9e27fad480816b
+MD5Sum: a038f5bd773bae152ea3954cbc1649b3
+Size: 1459034
+
+Package: com.amywhile.aemulo
+Version: 1.2.3-3
+Architecture: iphoneos-arm
+Section: Tweaks
+Maintainer: Amy While <support@anamy.gay>
+Author: Amy While <support@anamy.gay>
+Installed-Size: 2444
+Depends: mobilesubstrate (>= 0.9.5000), firmware (>= 13.0)
+Conflicts: com.amywhile.aemulotrial
+Name: Aemulo
+Description: NFC Frickery
+Icon: https://img.chariz.cloud/icon/aemulo/icon@3x.png
+Depiction: https://chariz.com/buy/aemulo
+Tag: cydia::commercial, compatible_min::ios13.0
+SileoDepiction: https://chariz.com/api/sileo/package/com.amywhile.aemulo/depiction.json
+Header: https://cdn.chariz.cloud/sileo-banner/aemulo.jpg
+Filename: debs/com.amywhile.aemulo_1.2.3-3_iphoneos-arm.deb
+SHA256: 13e2e7c54a88571646e43d89a488b383c72e7b81822f3a21795354b81301410f
+MD5Sum: fe9735d1cb3abede4f7f5a08e5253a8b
+Size: 632614
+
+Package: com.amywhile.aemulo
+Version: 1.2.3-3
+Architecture: iphoneos-arm64
+Section: Tweaks
+Maintainer: Amy While <support@anamy.gay>
+Author: Amy While <support@anamy.gay>
+Installed-Size: 2453
+Depends: mobilesubstrate (>= 0.9.5000), firmware (>= 13.0)
+Conflicts: com.amywhile.aemulotrial
+Name: Aemulo
+Description: NFC Frickery
+Icon: https://img.chariz.cloud/icon/aemulo/icon@3x.png
+Depiction: https://chariz.com/buy/aemulo
+Tag: cydia::commercial, compatible_min::ios13.0
+SileoDepiction: https://chariz.com/api/sileo/package/com.amywhile.aemulo/depiction.json
+Header: https://cdn.chariz.cloud/sileo-banner/aemulo.jpg
+Filename: debs/com.amywhile.aemulo_1.2.3-3_iphoneos-arm64.deb
+SHA256: 73d94e7a3a6203e6da25b2bbabac74339beb4da97cd1bdfae07b7ec82c427b7c
+MD5Sum: ec25062895f132fcf336bb4a2fe6b822
+Size: 632398
+
+Package: com.amywhile.aemulotrial
+Version: 1.2.3-3
+Architecture: iphoneos-arm
+Section: Tweaks
+Maintainer: Amy While <support@anamy.gay>
+Author: Amy While <support@anamy.gay>
+Installed-Size: 2202
+Depends: mobilesubstrate (>= 0.9.5000), firmware (>= 13.0)
+Conflicts: com.amywhile.aemulo
+Name: Aemulo (Trial)
+Description: NFC Frickery
+Icon: https://img.chariz.cloud/icon/aemulo-trial/icon@3x.png
+Depiction: https://chariz.com/get/aemulo-trial
+Tag: compatible_min::ios13.0
+SileoDepiction: https://chariz.com/api/sileo/package/com.amywhile.aemulotrial/depiction.json
+Header: https://cdn.chariz.cloud/sileo-banner/aemulo-trial.jpg
+Filename: debs/com.amywhile.aemulotrial_1.2.3-3_iphoneos-arm.deb
+SHA256: 322347a9b6286989c837dfafec38e90e7e45c3f8d7802549d353bd149817b199
+MD5Sum: addb09fd56edbd0b07681482d7090e6f
+Size: 605542
+
+Package: com.amywhile.aemulotrial
+Version: 1.2.3-3
+Architecture: iphoneos-arm64
+Section: Tweaks
+Maintainer: Amy While <support@anamy.gay>
+Author: Amy While <support@anamy.gay>
+Installed-Size: 2210
+Depends: mobilesubstrate (>= 0.9.5000), firmware (>= 13.0)
+Conflicts: com.amywhile.aemulo
+Name: Aemulo (Trial)
+Description: NFC Frickery
+Icon: https://img.chariz.cloud/icon/aemulo-trial/icon@3x.png
+Depiction: https://chariz.com/get/aemulo-trial
+Tag: compatible_min::ios13.0
+SileoDepiction: https://chariz.com/api/sileo/package/com.amywhile.aemulotrial/depiction.json
+Header: https://cdn.chariz.cloud/sileo-banner/aemulo-trial.jpg
+Filename: debs/com.amywhile.aemulotrial_1.2.3-3_iphoneos-arm64.deb
+SHA256: 6055724e3495102308c4021d6272b2141ca60b2e7e30b4d44dfa94097752189e
+MD5Sum: 45c17cfc9f93eabfae1ccaf1f3fdeaef
+Size: 605524
+
+Package: com.serena.antoine
+Version: 1.2
+Architecture: iphoneos-arm
+Section: Tweaks
+Maintainer: Serena <hanzikashi@gmail.com>
+Author: Serena <hanzikashi@gmail.com>
+Installed-Size: 3348
+Name: Antoine
+Description: An Application to view System Logs, commonly known as syslog or OSLog, in real time
+Icon: https://img.chariz.cloud/icon/antoine/icon@3x.png
+Depiction: https://chariz.com/get/antoine
+Tag: compatible_min::ios13.0
+SileoDepiction: https://chariz.com/api/sileo/package/com.serena.antoine/depiction.json
+Header: https://cdn.chariz.cloud/sileo-banner/antoine.jpg
+Filename: debs/vCBwyAXjAnc5RYlNhhkuZaN1410AXlfnG35-_sWxjO_Hjt1KW9k6Eze01RnZPhSYwnKftxLFdAnCpJKC8W0X6g/com.serena.antoine_1.2_iphoneos-arm.deb
+SHA256: 5838637765638e26765111f031e7342093e1c1a8e2eaf1f9e33c056d311a50d2
+MD5Sum: 082b42f46b77ade4b527890175ef02c5
+Size: 1475716
+
+Package: com.serena.antoine
+Version: 1.2
+Architecture: iphoneos-arm64
+Section: Tweaks
+Maintainer: Serena <hanzikashi@gmail.com>
+Author: Serena <hanzikashi@gmail.com>
+Installed-Size: 3356
+Name: Antoine
+Description: An Application to view System Logs, commonly known as syslog or OSLog, in real time
+Icon: https://img.chariz.cloud/icon/antoine/icon@3x.png
+Depiction: https://chariz.com/get/antoine
+Tag: compatible_min::ios13.0
+SileoDepiction: https://chariz.com/api/sileo/package/com.serena.antoine/depiction.json
+Header: https://cdn.chariz.cloud/sileo-banner/antoine.jpg
+Filename: debs/R1Xxg_-1KPKigNTWJEvlbxaS24xV3PWHuHsMiMjIfT8CbImroIu254t_U1ewZAi1C6YewOC3fNulrl8Uxmzk6w/com.serena.antoine_1.2_iphoneos-arm64.deb
+SHA256: 2ce857b3b1ef5a6ebefd8ee32b816abb47733f5a87040b7ddf9592af1f9684cf
+MD5Sum: 1b6085c9214d1943d10b3b0866e1af7b
+Size: 1476162
+
+Package: com.serena.antoine
+Version: 1.1
+Architecture: iphoneos-arm
+Section: Tweaks
+Maintainer: Serena <hanzikashi@gmail.com>
+Author: Serena <hanzikashi@gmail.com>
+Installed-Size: 3254
+Name: Antoine
+Description: An Application to view System Logs, commonly known as syslog or OSLog, in real time
+Icon: https://img.chariz.cloud/icon/antoine/icon@3x.png
+Depiction: https://chariz.com/get/antoine
+Tag: compatible_min::ios13.0
+SileoDepiction: https://chariz.com/api/sileo/package/com.serena.antoine/depiction.json
+Header: https://cdn.chariz.cloud/sileo-banner/antoine.jpg
+Filename: debs/com.serena.antoine_1.1_iphoneos-arm.deb
+SHA256: a32ff5d9c2a7ebae419779aacb99b5cab125d7544c0bd0856b9e27fad480816b
+MD5Sum: a038f5bd773bae152ea3954cbc1649b3
+Size: 1459034
+
+Package: com.serena.antoine
+Version: 1.1.1
+Architecture: iphoneos-arm64
+Section: Tweaks
+Maintainer: Serena <hanzikashi@gmail.com>
+Author: Serena <hanzikashi@gmail.com>
+Installed-Size: 3287
+Name: Antoine
+Description: An Application to view System Logs, commonly known as syslog or OSLog, in real time
+Icon: https://img.chariz.cloud/icon/antoine/icon@3x.png
+Depiction: https://chariz.com/get/antoine
+Tag: compatible_min::ios13.0
+SileoDepiction: https://chariz.com/api/sileo/package/com.serena.antoine/depiction.json
+Header: https://cdn.chariz.cloud/sileo-banner/antoine.jpg
+Filename: debs/com.serena.antoine_1.1.1_iphoneos-arm64.deb
+SHA256: cb13e29d80f111e53979bf0b36e839dae5e7dbd6d8ac507fe5d1f173ec835460
+MD5Sum: fac8bba4b4c657a763ef1bdc9acbfe56
+Size: 1462612
+
+Package: com.icraze.artemis
+Version: 1.0
+Architecture: iphoneos-arm
+Section: Tweaks
+Maintainer: iCraze <icrazeios@protonmail.com>
+Author: iCraze <icrazeios@protonmail.com>
+Installed-Size: 120
+Name: Artemis
+Description: Bring back Apollo
+Icon: https://img.chariz.cloud/icon/artemis/icon@3x.png
+Depiction: https://chariz.com/get/artemis
+Tag: compatible_min::ios13.0
+SileoDepiction: https://chariz.com/api/sileo/package/com.icraze.artemis/depiction.json
+Header: https://cdn.chariz.cloud/sileo-banner/artemis.jpg
+Filename: debs/sGQdPIOhvMvfyyX-T5WHUsWjW0N5PFVZP8Hm8j9tjLuWLuwjIwECABwANB2VJKNfzkqGdSp99L6wklV6kRWq1A/com.icraze.artemis_1.0_iphoneos-arm.deb
+SHA256: b07e8bdaefe2f7ee299cfe60194332326517295ad34338c0881a0508b5198c42
+MD5Sum: 4d728877f81a1b8f90ae2907defcd12f
+Size: 10972
+
+Package: com.icraze.artemis
+Version: 1.0
+Architecture: iphoneos-arm64
+Section: Tweaks
+Maintainer: iCraze <icrazeios@protonmail.com>
+Author: iCraze <icrazeios@protonmail.com>
+Installed-Size: 128
+Name: Artemis
+Description: Bring back Apollo
+Icon: https://img.chariz.cloud/icon/artemis/icon@3x.png
+Depiction: https://chariz.com/get/artemis
+Tag: compatible_min::ios13.0
+SileoDepiction: https://chariz.com/api/sileo/package/com.icraze.artemis/depiction.json
+Header: https://cdn.chariz.cloud/sileo-banner/artemis.jpg
+Filename: debs/ApDXyRmNpaIrXrEo8c6Ra5jVdexg_p3J8V0pHjIOedSzYu-Gl7jA6u0Nh4oyxX_AZQ8PZ5CrmMzWgIMaWFtlcQ/com.icraze.artemis_1.0_iphoneos-arm64.deb
+SHA256: 58f901c66a5f81ecb9a839ced86705f1f2808c9166201a1d899a39f10ca62c97
+MD5Sum: 318b0fd86abce65c32e93ea86da81590
+Size: 11016
+
+Package: com.icraze.artemis
+Version: 1.1
+Architecture: iphoneos-arm
+Section: Tweaks
+Maintainer: iCraze <icrazeios@protonmail.com>
+Author: iCraze <icrazeios@protonmail.com>
+Installed-Size: 120
+Name: Artemis
+Description: A tweak that allows you to use the Apollo Reddit client after it was shut down
+Icon: https://img.chariz.cloud/icon/artemis/icon@3x.png
+Depiction: https://chariz.com/get/artemis
+Tag: compatible_min::ios13.0
+SileoDepiction: https://chariz.com/api/sileo/package/com.icraze.artemis/depiction.json
+Header: https://cdn.chariz.cloud/sileo-banner/artemis.jpg
+Filename: debs/UBbPEkcvd7UtQdlh5dWlR47qERic7nqliwxuKQcDc0fjEsRICU4at3B8PJnWA9rHiPs4zt9WMesGVAZdzyRD8w/com.icraze.artemis_1.1_iphoneos-arm.deb
+SHA256: ec0de9fb54693ee644f7820948c80073973b11a50a92e28bb4ded58a9e673bde
+MD5Sum: 11c50e35979fc63a0f5a5086fade6b86
+Size: 14130
+
+Package: com.icraze.artemis
+Version: 1.1
+Architecture: iphoneos-arm64
+Section: Tweaks
+Maintainer: iCraze <icrazeios@protonmail.com>
+Author: iCraze <icrazeios@protonmail.com>
+Installed-Size: 128
+Name: Artemis
+Description: A tweak that allows you to use the Apollo Reddit client after it was shut down
+Icon: https://img.chariz.cloud/icon/artemis/icon@3x.png
+Depiction: https://chariz.com/get/artemis
+Tag: compatible_min::ios13.0
+SileoDepiction: https://chariz.com/api/sileo/package/com.icraze.artemis/depiction.json
+Header: https://cdn.chariz.cloud/sileo-banner/artemis.jpg
+Filename: debs/tqyaFOuBi1uXOhCVvhLUPlBCD5dP80ZjyRpD8-mwGEuYy-YnatK3nKlCQslQWjKpjUtv1Oq6EnRzgEQhO0wXkA/com.icraze.artemis_1.1_iphoneos-arm64.deb
+SHA256: e785d3ff4399d278f5fc4286bd85cc0f5ebd67430f0e408c32f49201e2bad8c3
+MD5Sum: af98ae385162450a74089903d28c2f40
+Size: 14168
+
+Package: com.icraze.artemis
+Version: 1.2
+Architecture: iphoneos-arm
+Section: Tweaks
+Maintainer: iCraze <icrazeios@protonmail.com>
+Author: iCraze <icrazeios@protonmail.com>
+Installed-Size: 120
+Name: Artemis
+Description: A tweak that allows you to use the Apollo Reddit client after it was shut down
+Icon: https://img.chariz.cloud/icon/artemis/icon@3x.png
+Depiction: https://chariz.com/get/artemis
+Tag: compatible_min::ios13.0
+SileoDepiction: https://chariz.com/api/sileo/package/com.icraze.artemis/depiction.json
+Header: https://cdn.chariz.cloud/sileo-banner/artemis.jpg
+Filename: debs/HzowBpZPsLvkcMuWMdEGjhbn3QXvDKkExXRp34F2iR0WtYlwE-JWAEVgJlUG0eWEj-v6zOlTlDt809S5pDroSg/com.icraze.artemis_1.2_iphoneos-arm.deb
+SHA256: f3bb701c8a32dfbab6e7c2cb174fb5d62c803ae8cce8c839ba251ad37ea587e9
+MD5Sum: 45a933b72a11bb7a624dde697df15c69
+Size: 14176
+
+Package: com.icraze.artemis
+Version: 1.2
+Architecture: iphoneos-arm64
+Section: Tweaks
+Maintainer: iCraze <icrazeios@protonmail.com>
+Author: iCraze <icrazeios@protonmail.com>
+Installed-Size: 128
+Name: Artemis
+Description: A tweak that allows you to use the Apollo Reddit client after it was shut down
+Icon: https://img.chariz.cloud/icon/artemis/icon@3x.png
+Depiction: https://chariz.com/get/artemis
+Tag: compatible_min::ios13.0
+SileoDepiction: https://chariz.com/api/sileo/package/com.icraze.artemis/depiction.json
+Header: https://cdn.chariz.cloud/sileo-banner/artemis.jpg
+Filename: debs/r51e02-lFgknWNmwmKm7XuRYbxqx_H_i_ugTK4ARBS5SYWDx2MUyrVsVdrRvu_saZD6RtSFfXuU4kG3OjjoCKA/com.icraze.artemis_1.2_iphoneos-arm64.deb
+SHA256: 93bf6520a743278ec87eb23545e8decf612c261c170de3a62ac51d8fbe0b7834
+MD5Sum: ffdfdfcc298cc03f957a84991800ee98
+Size: 14246
+
+Package: com.icraze.artemis
+Version: 1.3
+Architecture: iphoneos-arm
+Section: Tweaks
+Maintainer: iCraze <icrazeios@protonmail.com>
+Author: iCraze <icrazeios@protonmail.com>
+Installed-Size: 121
+Name: Artemis
+Description: A tweak that allows you to use the Apollo Reddit client after it was shut down
+Icon: https://img.chariz.cloud/icon/artemis/icon@3x.png
+Depiction: https://chariz.com/get/artemis
+Tag: compatible_min::ios13.0
+SileoDepiction: https://chariz.com/api/sileo/package/com.icraze.artemis/depiction.json
+Header: https://cdn.chariz.cloud/sileo-banner/artemis.jpg
+Filename: debs/yctGxf7WGEyd8Usi2Zw3izYibraqjvWfKZRokocL17S26-RD6PQUwTW_oqdMdyaBpnLB4DsUQDmXZGL70Fs5Uw/com.icraze.artemis_1.3_iphoneos-arm.deb
+SHA256: 88734abeb1d09c54d371c84ac7a336d5cef6516a8320239d906fb909acfbb735
+MD5Sum: 4a57801e6508308a40d9226d33adf6fd
+Size: 14986
+
+Package: com.icraze.artemis
+Version: 1.3
+Architecture: iphoneos-arm64
+Section: Tweaks
+Maintainer: iCraze <icrazeios@protonmail.com>
+Author: iCraze <icrazeios@protonmail.com>
+Installed-Size: 129
+Name: Artemis
+Description: A tweak that allows you to use the Apollo Reddit client after it was shut down
+Icon: https://img.chariz.cloud/icon/artemis/icon@3x.png
+Depiction: https://chariz.com/get/artemis
+Tag: compatible_min::ios13.0
+SileoDepiction: https://chariz.com/api/sileo/package/com.icraze.artemis/depiction.json
+Header: https://cdn.chariz.cloud/sileo-banner/artemis.jpg
+Filename: debs/J5lnY6JqQfmAvzl0cjhWAPzdfIyxa3b94xLsLkA2IB2c0uPzWLIzh7XP_n4rzxFK9xRxLCG89WnLIxvf22GBBA/com.icraze.artemis_1.3_iphoneos-arm64.deb
+SHA256: 4509dc0a8e8d6ee8a492c8275f67603a0e7af2be16618da40f2ad2b28039fd0b
+MD5Sum: 1704995d0016edfc7a6e0e73680d2019
+Size: 15022
+
+Package: com.icraze.artemis
+Version: 1.3.1
+Architecture: iphoneos-arm
+Section: Tweaks
+Maintainer: iCraze <icrazeios@protonmail.com>
+Author: iCraze <icrazeios@protonmail.com>
+Installed-Size: 121
+Name: Artemis
+Description: A tweak that allows you to use the Apollo Reddit client after it was shut down
+Icon: https://img.chariz.cloud/icon/artemis/icon@3x.png
+Depiction: https://chariz.com/get/artemis
+Tag: compatible_min::ios13.0
+SileoDepiction: https://chariz.com/api/sileo/package/com.icraze.artemis/depiction.json
+Header: https://cdn.chariz.cloud/sileo-banner/artemis.jpg
+Filename: debs/fEl3Tx3jHsKPKFpCHpcycMebmzJGrKPiGp-5wdkNG-XfocJSWRB2pnqIND19hiQEqgWIGg7MTFjibdwMntBWaw/com.icraze.artemis_1.3.1_iphoneos-arm.deb
+SHA256: d506e7977d4018a1533b341ae5b67526ddc0e5d1eef60ef9b2283dbc2b44eaaf
+MD5Sum: bc35a3ed4478851658418206c2a50557
+Size: 15654
+
+Package: com.icraze.artemis
+Version: 1.3.1
+Architecture: iphoneos-arm64
+Section: Tweaks
+Maintainer: iCraze <icrazeios@protonmail.com>
+Author: iCraze <icrazeios@protonmail.com>
+Installed-Size: 129
+Name: Artemis
+Description: A tweak that allows you to use the Apollo Reddit client after it was shut down
+Icon: https://img.chariz.cloud/icon/artemis/icon@3x.png
+Depiction: https://chariz.com/get/artemis
+Tag: compatible_min::ios13.0
+SileoDepiction: https://chariz.com/api/sileo/package/com.icraze.artemis/depiction.json
+Header: https://cdn.chariz.cloud/sileo-banner/artemis.jpg
+Filename: debs/nQBnvEYoPFlOMXbT4WC8ieucPnMayGfypXjuJbu93ISXbK86OO2nrJDSRyWYjCMcbOdCFNFEBr5NzipFU8eRKg/com.icraze.artemis_1.3.1_iphoneos-arm64.deb
+SHA256: e7d1830fbd95ebbd4bb58957b39a713d0f5041fca0899a7eca14b124ea8870ff
+MD5Sum: e98917dc4765ad04287a31a777bd8ffc
+Size: 15672
+
+Package: com.icraze.artemis
+Version: 1.4
+Architecture: iphoneos-arm
+Section: Tweaks
+Maintainer: iCraze <icrazeios@protonmail.com>
+Author: iCraze <icrazeios@protonmail.com>
+Installed-Size: 121
+Name: Artemis
+Description: A tweak that allows you to use the Apollo Reddit client after it was shut down
+Icon: https://img.chariz.cloud/icon/artemis/icon@3x.png
+Depiction: https://chariz.com/get/artemis
+Tag: compatible_min::ios13.0
+SileoDepiction: https://chariz.com/api/sileo/package/com.icraze.artemis/depiction.json
+Header: https://cdn.chariz.cloud/sileo-banner/artemis.jpg
+Filename: debs/QLzhBXraZxNqxy_6nZgJllpxkyTefxyTjmJdb5cdz2HyKsmljvnWCFD5gGZ8yQTSLY4IyTMSZGGz7hm0WVfUDg/com.icraze.artemis_1.4_iphoneos-arm.deb
+SHA256: f9ea4afc5771c3c5b9932aef0955cc8b774928473161986e2d8eda500182d0a5
+MD5Sum: fa71c852713b32fc771451af11b1c917
+Size: 13640
+
+Package: com.icraze.artemis
+Version: 1.4
+Architecture: iphoneos-arm64
+Section: Tweaks
+Maintainer: iCraze <icrazeios@protonmail.com>
+Author: iCraze <icrazeios@protonmail.com>
+Installed-Size: 129
+Name: Artemis
+Description: A tweak that allows you to use the Apollo Reddit client after it was shut down
+Icon: https://img.chariz.cloud/icon/artemis/icon@3x.png
+Depiction: https://chariz.com/get/artemis
+Tag: compatible_min::ios13.0
+SileoDepiction: https://chariz.com/api/sileo/package/com.icraze.artemis/depiction.json
+Header: https://cdn.chariz.cloud/sileo-banner/artemis.jpg
+Filename: debs/qvyLGoZhqzKweAVA4oeECSbGQvAqhfNcYWe5lg73lZJdCfUzjowFLbFU0QIAgGFuPBByq0PKaOLD3ddcBKrT7g/com.icraze.artemis_1.4_iphoneos-arm64.deb
+SHA256: 260e224729b418c61c016a6c46662c9ec27b8ebdc01d94898af87516c2ce1ee1
+MD5Sum: a07ff31517917888b378dce22769a74c
+Size: 13738
+
+Package: com.serena.antoine
+Version: 1.3
+Architecture: iphoneos-arm
+Section: Tweaks
+Maintainer: Serena <hanzikashi@gmail.com>
+Author: Serena <hanzikashi@gmail.com>
+Installed-Size: 2935
+Name: Antoine
+Description: An Application to view System Logs, commonly known as syslog or OSLog, in real time
+Icon: https://img.chariz.cloud/icon/antoine/icon@3x.png
+Depiction: https://chariz.com/get/antoine
+Tag: compatible_min::ios13.0
+SileoDepiction: https://chariz.com/api/sileo/package/com.serena.antoine/depiction.json
+Header: https://cdn.chariz.cloud/sileo-banner/antoine.jpg
+Filename: debs/U0_krFzEojoz4sFYNlzKl4kzN1zVsfVvCXHeWcEgetn7n7_vYDe-sZesXiJ_04SW4F7QBtKus0vkum3fbailSA/com.serena.antoine_1.3_iphoneos-arm.deb
+SHA256: 1a93a82db5f0e327c2fdf34f9adf2abaf05c4a8bdd4a417b64d0cd0ea51a0d73
+MD5Sum: 60c86c7fc9acfb6350afa42b9ad8b6e8
+Size: 1456074
+
+Package: com.serena.antoine
+Version: 1.3
+Architecture: iphoneos-arm64
+Section: Tweaks
+Maintainer: Serena <hanzikashi@gmail.com>
+Author: Serena <hanzikashi@gmail.com>
+Installed-Size: 2944
+Name: Antoine
+Description: An Application to view System Logs, commonly known as syslog or OSLog, in real time
+Icon: https://img.chariz.cloud/icon/antoine/icon@3x.png
+Depiction: https://chariz.com/get/antoine
+Tag: compatible_min::ios13.0
+SileoDepiction: https://chariz.com/api/sileo/package/com.serena.antoine/depiction.json
+Header: https://cdn.chariz.cloud/sileo-banner/antoine.jpg
+Filename: debs/vXn2S5ejq9ZUnR2FbPzFd5-HccyXk_xwO9TmPkEVsp8wwqC_J-n29W4PwhvwzfThs8oHgLXeEWl5aSGgX9Ix0g/com.serena.antoine_1.3_iphoneos-arm64.deb
+SHA256: 94bb5af6b81eea517428a7998cf43d759b5ab9952ebfa4e0d50f4708187d56d3
+MD5Sum: f166810e30a0bd1731c5fd66e10919be
+Size: 1456584
+
+Package: com.serena.antoine
+Version: 1.3
+Architecture: iphoneos-arm
+Section: Tweaks
+Maintainer: Serena <hanzikashi@gmail.com>
+Author: Serena <hanzikashi@gmail.com>
+Installed-Size: 2935
+Name: Antoine
+Description: An Application to view System Logs, commonly known as syslog or OSLog, in real time
+Icon: https://img.chariz.cloud/icon/antoine/icon@3x.png
+Depiction: https://chariz.com/get/antoine
+Tag: compatible_min::ios13.0
+SileoDepiction: https://chariz.com/api/sileo/package/com.serena.antoine/depiction.json
+Header: https://cdn.chariz.cloud/sileo-banner/antoine.jpg
+Filename: debs/U0_krFzEojoz4sFYNlzKl4kzN1zVsfVvCXHeWcEgetn7n7_vYDe-sZesXiJ_04SW4F7QBtKus0vkum3fbailSA/com.serena.antoine_1.3_iphoneos-arm.deb
+SHA256: 1a93a82db5f0e327c2fdf34f9adf2abaf05c4a8bdd4a417b64d0cd0ea51a0d73
+MD5Sum: 60c86c7fc9acfb6350afa42b9ad8b6e8
+Size: 1456074
+
+Package: com.serena.antoine
+Version: 1.3.1
+Architecture: iphoneos-arm64
+Section: Tweaks
+Maintainer: Serena <hanzikashi@gmail.com>
+Author: Serena <hanzikashi@gmail.com>
+Installed-Size: 2924
+Name: Antoine
+Description: An Application to view System Logs, commonly known as syslog or OSLog, in real time
+Icon: https://img.chariz.cloud/icon/antoine/icon@3x.png
+Depiction: https://chariz.com/buy/antoine
+Tag: cydia::commercial, compatible_min::ios13.0
+SileoDepiction: https://chariz.com/api/sileo/package/com.serena.antoine/depiction.json
+Header: https://cdn.chariz.cloud/sileo-banner/antoine.jpg
+Filename: debs/MsTEBbleOHdJ9_4sUOkPatOGMOeaqk78YH0qpIuq8sLsjvyDNAd-8kfoU82r0daruW6B2MyEn-XmIFoYwu0Cvg/com.serena.antoine_1.3.1_iphoneos-arm64.deb
+SHA256: c264e8cb31cb8ccfb8db942a5ec1e73440209799a4b855a2239fa36a9b558056
+MD5Sum: 2141c619e728c2857563f2e849f60b0b
+Size: 1448570
+
+Package: com.amywhile.aemulo
+Version: 1.2.4
+Architecture: iphoneos-arm
+Section: Tweaks
+Maintainer: Amy While <support@anamy.gay>
+Author: Amy While <support@anamy.gay>
+Installed-Size: 2379
+Depends: mobilesubstrate (>= 0.9.5000), firmware (>= 13.0)
+Conflicts: com.amywhile.aemulotrial
+Name: Aemulo
+Description: NFC Frickery
+Icon: https://img.chariz.cloud/icon/aemulo/icon@3x.png
+Depiction: https://chariz.com/buy/aemulo
+Tag: cydia::commercial, compatible_min::ios13.0
+SileoDepiction: https://chariz.com/api/sileo/package/com.amywhile.aemulo/depiction.json
+Header: https://cdn.chariz.cloud/sileo-banner/aemulo.jpg
+Filename: debs/86rWPuv4yZfO49C8lYQYvHAcV3PpEzzg_5UPTyao_7Pjv3wPCRQpMObIBi9Aqj121P6x6AQv_bzBOsIhQfjA7A/com.amywhile.aemulo_1.2.4_iphoneos-arm.deb
+SHA256: b7fa071dfd8ab66f6130c7786ea77134f02ed6fc1aef0c9dbe0a27831cb2e852
+MD5Sum: ef19e8097f5f8c15180aa9cd11d6851e
+Size: 617532
+
+Package: com.amywhile.aemulo
+Version: 1.2.4
+Architecture: iphoneos-arm64
+Section: Tweaks
+Maintainer: Amy While <support@anamy.gay>
+Author: Amy While <support@anamy.gay>
+Installed-Size: 2388
+Depends: mobilesubstrate (>= 0.9.5000), firmware (>= 13.0)
+Conflicts: com.amywhile.aemulotrial
+Name: Aemulo
+Description: NFC Frickery
+Icon: https://img.chariz.cloud/icon/aemulo/icon@3x.png
+Depiction: https://chariz.com/buy/aemulo
+Tag: cydia::commercial, compatible_min::ios13.0
+SileoDepiction: https://chariz.com/api/sileo/package/com.amywhile.aemulo/depiction.json
+Header: https://cdn.chariz.cloud/sileo-banner/aemulo.jpg
+Filename: debs/AB_7ZuZsodctuSCvF5sivaOC4EwFWVq_mbCOi1zvVdvgqzNDojTOS-aXPkX1QwOCJADpJdc6cGo-4zHT-oQXLA/com.amywhile.aemulo_1.2.4_iphoneos-arm64.deb
+SHA256: a28a16c6ff09ee047822592f9b6d69563f647050a8fd0ce4391a3add3e93a452
+MD5Sum: 8e89223edccd8e7b54749ce0939060df
+Size: 617206
+
+Package: com.amywhile.aemulotrial
+Version: 1.2.4
+Architecture: iphoneos-arm
+Section: Tweaks
+Maintainer: Amy While <support@anamy.gay>
+Author: Amy While <support@anamy.gay>
+Installed-Size: 2137
+Depends: mobilesubstrate (>= 0.9.5000), firmware (>= 13.0)
+Conflicts: com.amywhile.aemulo
+Name: Aemulo (Trial)
+Description: NFC Frickery
+Icon: https://img.chariz.cloud/icon/aemulo-trial/icon@3x.png
+Depiction: https://chariz.com/get/aemulo-trial
+Tag: compatible_min::ios13.0
+SileoDepiction: https://chariz.com/api/sileo/package/com.amywhile.aemulotrial/depiction.json
+Header: https://cdn.chariz.cloud/sileo-banner/aemulo-trial.jpg
+Filename: debs/4KGXrMCXN94V50Y1GhhRyL4L1pTFt_1veuCHvs367O4Kf4DXzyKh44hCYoaap-z41G-1VFSEMjEGo9Il7AkzoQ/com.amywhile.aemulotrial_1.2.4_iphoneos-arm.deb
+SHA256: 42af1208cc3313caa283dbaff922f7c43cd6aa55f08d123014b11dd1ccc5ef9c
+MD5Sum: 5d7a18c9c80cd9e185123584edf6e1ad
+Size: 589452
+
+Package: com.amywhile.aemulotrial
+Version: 1.2.4
+Architecture: iphoneos-arm64
+Section: Tweaks
+Maintainer: Amy While <support@anamy.gay>
+Author: Amy While <support@anamy.gay>
+Installed-Size: 2351
+Depends: mobilesubstrate (>= 0.9.5000), firmware (>= 13.0)
+Conflicts: com.amywhile.aemulo
+Name: Aemulo (Trial)
+Description: NFC Frickery
+Icon: https://img.chariz.cloud/icon/aemulo-trial/icon@3x.png
+Depiction: https://chariz.com/get/aemulo-trial
+Tag: compatible_min::ios13.0
+SileoDepiction: https://chariz.com/api/sileo/package/com.amywhile.aemulotrial/depiction.json
+Header: https://cdn.chariz.cloud/sileo-banner/aemulo-trial.jpg
+Filename: debs/JR3J8DVIx1QqaDql05m1aeFHJsw8uWJJ1uws9Q11GF9bT0NBM9CQ6ec-onssCZRYnn0NwL26fW6s8MS6nevLvA/com.amywhile.aemulotrial_1.2.4_iphoneos-arm64.deb
+SHA256: 9e0b76b86e317f4d215ef75ff5ab067f0c723fc8b136f4a4ca7532b675c0ade1
+MD5Sum: 07dc137fe92a07fbb7c070c8ae3921ba
+Size: 608146
+
+Package: com.serena.antoine
+Version: 1.3.1.1
+Architecture: iphoneos-arm
+Section: Tweaks
+Maintainer: Antoine <hanzikashi@gmail.com>
+Author: Antoine <hanzikashi@gmail.com>
+Installed-Size: 2859
+Name: Antoine
+Description: An Application to view System Logs, commonly known as syslog or OSLog, in real time
+Icon: https://img.chariz.cloud/icon/antoine/icon@3x.png
+Depiction: https://chariz.com/buy/antoine
+Tag: cydia::commercial, compatible_min::ios13.0
+SileoDepiction: https://chariz.com/api/sileo/package/com.serena.antoine/depiction.json
+Header: https://cdn.chariz.cloud/sileo-banner/antoine.jpg
+Filename: debs/vPYd9z1rYJKDBqsU5lFClFmXlamMYdGzH90oDDxOP2kmIoZ_uUDq0NRSYq7782qakbilu869_4h59f1GTaoK9g/com.serena.antoine_1.3.1.1_iphoneos-arm.deb
+SHA256: 28795b20ee7b009486287d2d72f7301df34cc027bfa7f0f7e38e36825d85869e
+MD5Sum: db488e449bf3fe26fb0e2d7f0c0dad3a
+Size: 1442224
+
+Package: com.serena.antoine
+Version: 1.3.1
+Architecture: iphoneos-arm64
+Section: Tweaks
+Maintainer: Serena <hanzikashi@gmail.com>
+Author: Serena <hanzikashi@gmail.com>
+Installed-Size: 2924
+Name: Antoine
+Description: An Application to view System Logs, commonly known as syslog or OSLog, in real time
+Icon: https://img.chariz.cloud/icon/antoine/icon@3x.png
+Depiction: https://chariz.com/buy/antoine
+Tag: cydia::commercial, compatible_min::ios13.0
+SileoDepiction: https://chariz.com/api/sileo/package/com.serena.antoine/depiction.json
+Header: https://cdn.chariz.cloud/sileo-banner/antoine.jpg
+Filename: debs/MsTEBbleOHdJ9_4sUOkPatOGMOeaqk78YH0qpIuq8sLsjvyDNAd-8kfoU82r0daruW6B2MyEn-XmIFoYwu0Cvg/com.serena.antoine_1.3.1_iphoneos-arm64.deb
+SHA256: c264e8cb31cb8ccfb8db942a5ec1e73440209799a4b855a2239fa36a9b558056
+MD5Sum: 2141c619e728c2857563f2e849f60b0b
+Size: 1448570
+
+Package: com.icraze.artemis
+Version: 1.5.1
+Architecture: iphoneos-arm
+Section: Tweaks
+Maintainer: iCraze <icrazeios@protonmail.com>
+Author: iCraze <icrazeios@protonmail.com>
+Installed-Size: 220
+Name: Artemis
+Description: A tweak that allows you to use the Apollo Reddit client after it was shut down
+Icon: https://img.chariz.cloud/icon/artemis/icon@3x.png
+Depiction: https://chariz.com/get/artemis
+Tag: compatible_min::ios13.0
+SileoDepiction: https://chariz.com/api/sileo/package/com.icraze.artemis/depiction.json
+Header: https://cdn.chariz.cloud/sileo-banner/artemis.jpg
+Filename: debs/c00wtz9bI-Li4LQ_cdzUGZkpmIkPqPpGfc96UG1FkGOyWucsfcbyFsBu_RlIk5vSRNlurFGWpFdP3Ria8Q59Xw/com.icraze.artemis_1.5.1_iphoneos-arm.deb
+SHA256: ba44c03ebcde0a42c84304d2d4badb4be7dc11bb2d51e39a86737c95b667c038
+MD5Sum: f4e39b206d32e861cd3da064fdb49e85
+Size: 19948
+
+Package: com.icraze.artemis
+Version: 1.5.1
+Architecture: iphoneos-arm64
+Section: Tweaks
+Maintainer: iCraze <icrazeios@protonmail.com>
+Author: iCraze <icrazeios@protonmail.com>
+Installed-Size: 228
+Name: Artemis
+Description: A tweak that allows you to use the Apollo Reddit client after it was shut down
+Icon: https://img.chariz.cloud/icon/artemis/icon@3x.png
+Depiction: https://chariz.com/get/artemis
+Tag: compatible_min::ios13.0
+SileoDepiction: https://chariz.com/api/sileo/package/com.icraze.artemis/depiction.json
+Header: https://cdn.chariz.cloud/sileo-banner/artemis.jpg
+Filename: debs/uIdL1Y6mgzLsDpLmFDRR5o9F3yaJ-sryygoPyNjnEaiXF4LxEjffvO5beYQVzGxVyJSDlJj4dlKPNhKPsi7Fsw/com.icraze.artemis_1.5.1_iphoneos-arm64.deb
+SHA256: dfc4449bff83be48ac85ea0066f211ce9dc991ede6f57b8044782dee0ba181b6
+MD5Sum: 85ba9db1ae880e4b1db12e6a5ba38ff8
+Size: 19998
+

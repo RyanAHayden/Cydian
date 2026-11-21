@@ -1,0 +1,943 @@
+Package: com.polytweaks.aerial2
+Name: Aerial 2
+Version: 1.0.3
+Section: Tweaks
+Architecture: iphoneos-arm
+Depends: mobilesubstrate
+Installed-Size: 5172
+Author: sharedroutine <sharedroutine@icloud.com>
+Maintainer: sharedroutine <sharedroutine@icloud.com>
+Description: An awesome MobileSubstrate tweak!
+Tag: cydia::commercial
+Size: 81404
+MD5sum: 65cab20675d59c620ad6fd1801ecf2b5
+SHA256: 9e556ff03505688fbf1a9bf51290095625715927d7a477357d02983a3faf4593
+Filename: api/download/package/620bf6c0d7e208af00210dc3/com.polytweaks.aerial2_1.0.3.deb
+Depiction: https://havoc.app/depiction/aerial2
+SileoDepiction: https://havoc.app/package/aerial2/depiction.json
+Icon: https://media.havoc.app/620bf6aed7e208af00207915
+
+Package: com.mtac.ampere
+Name: Ampere
+Architecture: iphoneos-arm
+Description: iOS 16 Style Battery Indicator
+Maintainer: MTAC <mtac@mtac.app>
+Author: MTAC <mtac@mtac.app>
+Section: Tweaks
+Depends: mobilesubstrate (>= 0.9.5000), firmware (>= 14.0), firmware (< 16.0)
+Icon: https://media.havoc.app/638be16badf93b0004f9807a
+Version: 1.0.2
+Installed-Size: 1652
+Size: 1289484
+MD5sum: 348597c7c696e1b309be4590fc958b87
+SHA256: 76895954e61f708004651a0c7541149580bbb75966c72538d11074393582f66d
+Filename: api/download/package/638be24faf814dd4c786366d/com.mtac.ampere_1.0.2_iphoneos-arm.deb
+Depiction: https://havoc.app/depiction/ampere
+SileoDepiction: https://havoc.app/package/ampere/depiction.json
+
+Package: com.mtac.ampere
+Name: Ampere
+Architecture: iphoneos-arm
+Description: iOS 16 Style Battery Indicator
+Maintainer: MTAC <mtac@mtac.app>
+Author: MTAC <mtac@mtac.app>
+Section: Tweaks
+Depends: mobilesubstrate (>= 0.9.5000), firmware (>= 14.0)
+Icon: https://media.havoc.app/638be16badf93b0004f9807a
+Version: 1.0.7
+Installed-Size: 1724
+Size: 1325762
+MD5sum: 32a42bc8e9a1030ba39b8af650c31225
+SHA256: 558537e7d43a02994cffb26cc954360388c0caa74c18e5b7855da05f0cdae772
+Filename: api/download/package/63bcca5da13fef67b4d8bf44/com.mtac.ampere_1.0.7_iphoneos-arm.deb
+Depiction: https://havoc.app/depiction/ampere
+SileoDepiction: https://havoc.app/package/ampere/depiction.json
+
+Package: com.mtac.ampere
+Name: Ampere
+Architecture: iphoneos-arm
+Description: iOS 16 Style Battery Indicator
+Maintainer: MTAC <mtac@mtac.app>
+Author: MTAC <mtac@mtac.app>
+Section: Tweaks
+Depends: mobilesubstrate (>= 0.9.5000)
+Icon: https://media.havoc.app/638be16badf93b0004f9807a
+Version: 1.0.0
+Installed-Size: 1436
+Size: 1288910
+MD5sum: 8c72581a73b33961def034fb962a21a5
+SHA256: 15049cc8cbf1af8844f7af9efe65ebd3db2d4a760f92b84ce4b744207c9ca8e3
+Filename: api/download/package/637ae3532d177ad64d5b4973/com.mtac.ampere_1.0.0_iphoneos-arm.deb
+Depiction: https://havoc.app/depiction/ampere
+SileoDepiction: https://havoc.app/package/ampere/depiction.json
+
+Package: com.mtac.ampere
+Name: Ampere
+Architecture: iphoneos-arm
+Description: iOS 16 Style Battery Indicator
+Maintainer: MTAC <mtac@mtac.app>
+Author: MTAC <mtac@mtac.app>
+Section: Tweaks
+Depends: mobilesubstrate (>= 0.9.5000)
+Icon: https://media.havoc.app/638be16badf93b0004f9807a
+Version: 1.0.1
+Installed-Size: 1436
+Size: 1289160
+MD5sum: f17b8d203c0596884332cab0ae374a6d
+SHA256: a2727046140af267a13fc08599d2da37c7e82689e550235075fddbfcf45e5a7e
+Filename: api/download/package/63823e1a3c84d3be9bef7b5a/com.mtac.ampere_1.0.1_iphoneos-arm.deb
+Depiction: https://havoc.app/depiction/ampere
+SileoDepiction: https://havoc.app/package/ampere/depiction.json
+
+Package: com.mtac.ampere
+Name: Ampere
+Architecture: iphoneos-arm
+Description: iOS 16 Style Battery Indicator
+Maintainer: MTAC <mtac@mtac.app>
+Author: MTAC <mtac@mtac.app>
+Section: Tweaks
+Depends: mobilesubstrate (>= 0.9.5000), firmware (>= 14.0)
+Icon: https://media.havoc.app/638be16badf93b0004f9807a
+Version: 1.0.3
+Installed-Size: 1652
+Size: 1289550
+MD5sum: 5f7c889457ba1ba088bf239d466b803d
+SHA256: ca6a6c67307fdeeb1beac6dbfe186cb9b84d281a9ff347d91115f5c1da3c173e
+Filename: api/download/package/638ca94eef75604df38bd8fc/com.mtac.ampere_1.0.3_iphoneos-arm.deb
+Depiction: https://havoc.app/depiction/ampere
+SileoDepiction: https://havoc.app/package/ampere/depiction.json
+
+Package: com.mtac.ampere
+Name: Ampere
+Architecture: iphoneos-arm
+Description: iOS 16 Style Battery Indicator
+Maintainer: MTAC <mtac@mtac.app>
+Author: MTAC <mtac@mtac.app>
+Section: Tweaks
+Depends: mobilesubstrate (>= 0.9.5000), firmware (>= 14.0)
+Icon: https://media.havoc.app/638be16badf93b0004f9807a
+Version: 1.0.5
+Installed-Size: 1648
+Size: 1289610
+MD5sum: e355a07925b98dc87ca8cf6759e37818
+SHA256: 295d81dad1ce9f37d3d5b2594322194fd2cf21352fcf79ea98dd943b056466f8
+Filename: api/download/package/639355f1648008036bc3cbb0/com.mtac.ampere_1.0.5_iphoneos-arm.deb
+Depiction: https://havoc.app/depiction/ampere
+SileoDepiction: https://havoc.app/package/ampere/depiction.json
+
+Package: com.mtac.ampere
+Name: Ampere
+Architecture: iphoneos-arm
+Description: iOS 16 Style Battery Indicator
+Maintainer: MTAC <mtac@mtac.app>
+Author: MTAC <mtac@mtac.app>
+Section: Tweaks
+Depends: mobilesubstrate, firmware (>= 14.0)
+Version: 1.0.8
+Installed-Size: 536
+Size: 84768
+MD5sum: 19f031d4e5967ffb09bef3d94a8ed8f7
+SHA256: ebd725f593ddff7a5d86a616ea391def8bbf933032349a9edd6a32f432fa1ad6
+Filename: api/download/package/64238d2a290dfdf2cb54ac8f/com.mtac.ampere_1.0.8_iphoneos-arm.deb
+Depiction: https://havoc.app/depiction/ampere
+SileoDepiction: https://havoc.app/package/ampere/depiction.json
+Icon: https://media.havoc.app/638be16badf93b0004f9807a
+
+Package: com.mtac.ampere
+Name: Ampere
+Architecture: iphoneos-arm64
+Description: iOS 16 Style Battery Indicator
+Maintainer: MTAC <mtac@mtac.app>
+Author: MTAC <mtac@mtac.app>
+Section: Tweaks
+Depends: mobilesubstrate, firmware (>= 14.0)
+Version: 1.0.8
+Installed-Size: 536
+Size: 84878
+MD5sum: d62d3d57cd7efdbbf1835e319465c574
+SHA256: fc9ee75ab433b1a7bac3c11398395834cb4ae363999644edc5decacc90278ec5
+Filename: api/download/package/64238d2a290dfdf2cb54ac8f/com.mtac.ampere_1.0.8_iphoneos-arm64.deb
+Depiction: https://havoc.app/depiction/ampere
+SileoDepiction: https://havoc.app/package/ampere/depiction.json
+Icon: https://media.havoc.app/638be16badf93b0004f9807a
+
+Package: com.mtac.ampere
+Name: Ampere
+Architecture: iphoneos-arm64
+Description: iOS 16 Style Battery Indicator
+Maintainer: MTAC <mtac@mtac.app>
+Author: MTAC <mtac@mtac.app>
+Section: Tweaks
+Depends: mobilesubstrate, firmware (>= 14.0), preferenceloader
+Version: 1.1
+Installed-Size: 568
+Size: 86922
+MD5sum: 40812740924e20d193bbce5cb0302fda
+SHA256: 7f1b998367fd1b6bb672f824c62be43a77256c97f641230ac02a73a49c5844ab
+Filename: api/download/package/6461527bb5b1c4804492e23c/com.mtac.ampere_1.1_iphoneos-arm64.deb
+Depiction: https://havoc.app/depiction/ampere
+SileoDepiction: https://havoc.app/package/ampere/depiction.json
+Icon: https://media.havoc.app/638be16badf93b0004f9807a
+
+Package: com.mtac.ampere
+Name: Ampere
+Architecture: iphoneos-arm
+Description: iOS 16 Style Battery Indicator
+Maintainer: MTAC <mtac@mtac.app>
+Author: MTAC <mtac@mtac.app>
+Section: Tweaks
+Depends: mobilesubstrate, firmware (>= 14.0), preferenceloader
+Version: 1.1
+Installed-Size: 568
+Size: 86428
+MD5sum: 4ac8bc3c074e897f15ae69580091c611
+SHA256: 235ed49c5d681bbb9b03e2c9acf8a38dd4ea302a58cb6c9b4c8a3010295c858e
+Filename: api/download/package/6461527bb5b1c4804492e23c/com.mtac.ampere_1.1_iphoneos-arm.deb
+Depiction: https://havoc.app/depiction/ampere
+SileoDepiction: https://havoc.app/package/ampere/depiction.json
+Icon: https://media.havoc.app/638be16badf93b0004f9807a
+
+Package: com.mtac.ampere
+Name: Ampere
+Architecture: iphoneos-arm64
+Description: iOS 16 Style Battery Indicator
+Maintainer: MTAC <mtac@mtac.app>
+Author: MTAC <mtac@mtac.app>
+Section: Tweaks
+Depends: mobilesubstrate, firmware (>= 14.0), preferenceloader
+Version: 1.2
+Installed-Size: 604
+Size: 98322
+MD5sum: 70855b7f980000f6639474d6cf63388f
+SHA256: 829915dea7539c50f33fa106625626186d7950fd5b53903ac3ef52565e4fcfeb
+Filename: api/download/package/650917cee30cff42273a17af/com.mtac.ampere_1.2_iphoneos-arm64.deb
+Depiction: https://havoc.app/depiction/ampere
+SileoDepiction: https://havoc.app/package/ampere/depiction.json
+Icon: https://media.havoc.app/638be16badf93b0004f9807a
+
+Package: com.mtac.ampere
+Name: Ampere
+Architecture: iphoneos-arm
+Description: iOS 16 Style Battery Indicator
+Maintainer: MTAC <mtac@mtac.app>
+Author: MTAC <mtac@mtac.app>
+Section: Tweaks
+Depends: mobilesubstrate, firmware (>= 14.0), preferenceloader
+Version: 1.2
+Installed-Size: 604
+Size: 98354
+MD5sum: b6a87baf09acbe4a079de63ea9ea93f0
+SHA256: da8674c9a6c93a85aeb2d9f133101f286b01767a9a1a6255a26999685741eaa6
+Filename: api/download/package/650917cee30cff42273a17af/com.mtac.ampere_1.2_iphoneos-arm.deb
+Depiction: https://havoc.app/depiction/ampere
+SileoDepiction: https://havoc.app/package/ampere/depiction.json
+Icon: https://media.havoc.app/638be16badf93b0004f9807a
+
+Package: com.mtac.ampere
+Name: Ampere
+Architecture: iphoneos-arm
+Description: iOS 16 Style Battery Indicator
+Maintainer: MTAC <mtac@mtac.app>
+Author: MTAC <mtac@mtac.app>
+Section: Tweaks
+Depends: mobilesubstrate, firmware (>= 14.0), preferenceloader
+Version: 1.4
+Installed-Size: 604
+Size: 101102
+MD5sum: ef2d38afc6b8be000639201acb83717b
+SHA256: 7cd7b24e72e9a652f0d538bdf000f4578de611376ebb20837a6e138dc85d1e21
+Filename: api/download/package/656d21002103ae387bc6e05a/com.mtac.ampere_1.4_iphoneos-arm.deb
+Depiction: https://havoc.app/depiction/ampere
+SileoDepiction: https://havoc.app/package/ampere/depiction.json
+Icon: https://media.havoc.app/638be16badf93b0004f9807a
+
+Package: com.mtac.ampere
+Name: Ampere
+Architecture: iphoneos-arm64
+Description: iOS 16 Style Battery Indicator
+Maintainer: MTAC <mtac@mtac.app>
+Author: MTAC <mtac@mtac.app>
+Section: Tweaks
+Depends: mobilesubstrate, firmware (>= 14.0), preferenceloader
+Version: 1.4
+Installed-Size: 604
+Size: 101292
+MD5sum: 4953fb6aa0044cdb83b5b689810277d2
+SHA256: 4ef245a64f319c20c79ce8f5f4d40783d8d66ae822646349d6396e5ffaff6c15
+Filename: api/download/package/656d21002103ae387bc6e05a/com.mtac.ampere_1.4_iphoneos-arm64.deb
+Depiction: https://havoc.app/depiction/ampere
+SileoDepiction: https://havoc.app/package/ampere/depiction.json
+Icon: https://media.havoc.app/638be16badf93b0004f9807a
+
+Package: com.nahtedetihw.airpodscompanion
+Name: AirpodsCompanion
+Description: Floating Noise Cancellation control next to volume slider
+Maintainer: ETHN <ethanwhited2208@gmail.com>
+Author: ETHN <ethanwhited2208@gmail.com>
+Section: Tweaks
+Depends: preferenceloader
+Architecture: iphoneos-arm
+Version: 1.0
+Installed-Size: 1060
+Size: 459880
+MD5sum: 461ad61d5ded4d1f08badff8f4b5d4e3
+SHA256: ee797ee4ce746f45144ac4cfd646d30bbb2015318ed320095d1a07f0f95448d1
+Filename: api/download/package/65e41746c97a362fa842c9dd/com.nahtedetihw.airpodscompanion_1.0_iphoneos-arm.deb
+Depiction: https://havoc.app/depiction/airpodscompanio
+SileoDepiction: https://havoc.app/package/airpodscompanio/depiction.json
+Icon: https://media.havoc.app/65e4177bc97a362fa842d940
+
+Package: com.nahtedetihw.airpodscompanion
+Name: AirpodsCompanion
+Description: Floating Noise Cancellation control next to volume slider
+Maintainer: ETHN <ethanwhited2208@gmail.com>
+Author: ETHN <ethanwhited2208@gmail.com>
+Section: Tweaks
+Depends: preferenceloader
+Architecture: iphoneos-arm64
+Version: 1.0
+Installed-Size: 1060
+Size: 460144
+MD5sum: 18dca803ab91dadc14924bbfeaf1969e
+SHA256: e4031f3b425a1fb1fe4b646e1632fd78f2c7f89e29a0ed0b33b9417b37661952
+Filename: api/download/package/65e41746c97a362fa842c9dd/com.nahtedetihw.airpodscompanion_1.0_iphoneos-arm64.deb
+Depiction: https://havoc.app/depiction/airpodscompanio
+SileoDepiction: https://havoc.app/package/airpodscompanio/depiction.json
+Icon: https://media.havoc.app/65e4177bc97a362fa842d940
+
+Package: com.nahtedetihw.airpodscompanion
+Name: AirpodsCompanion
+Description: Floating Noise Cancellation control next to volume slider
+Maintainer: ETHN <ethanwhited2208@gmail.com>
+Author: ETHN <ethanwhited2208@gmail.com>
+Section: Tweaks
+Depends: preferenceloader
+Architecture: iphoneos-arm64
+Version: 1.1
+Installed-Size: 1060
+Size: 460226
+MD5sum: 9dcbe5724ed696a1625e868b7beb46cd
+SHA256: 7e1c81365efa31ec3a9692b4b3d82aae18eb77dbf6e88e661c9e585dbb091bf7
+Filename: api/download/package/65ea994c8d81327976efe632/com.nahtedetihw.airpodscompanion_1.1_iphoneos-arm64.deb
+Depiction: https://havoc.app/depiction/airpodscompanio
+SileoDepiction: https://havoc.app/package/airpodscompanio/depiction.json
+Icon: https://media.havoc.app/65e4177bc97a362fa842d940
+
+Package: com.nahtedetihw.airpodscompanion
+Name: AirpodsCompanion
+Description: Floating Noise Cancellation control next to volume slider
+Maintainer: ETHN <ethanwhited2208@gmail.com>
+Author: ETHN <ethanwhited2208@gmail.com>
+Section: Tweaks
+Depends: preferenceloader
+Architecture: iphoneos-arm
+Version: 1.1
+Installed-Size: 1060
+Size: 460302
+MD5sum: 346931bde51b0c0c6ac46c8c67017c7b
+SHA256: 3bb0e22bfe5d6340894966cb8bd5479f2f29080a3c69cff997c8ec3c7a29f978
+Filename: api/download/package/65ea994c8d81327976efe632/com.nahtedetihw.airpodscompanion_1.1_iphoneos-arm.deb
+Depiction: https://havoc.app/depiction/airpodscompanio
+SileoDepiction: https://havoc.app/package/airpodscompanio/depiction.json
+Icon: https://media.havoc.app/65e4177bc97a362fa842d940
+
+Package: com.nahtedetihw.airpodscompanion
+Name: AirpodsCompanion
+Description: Floating Noise Cancellation control next to volume slider
+Maintainer: ETHN <ethanwhited2208@gmail.com>
+Author: ETHN <ethanwhited2208@gmail.com>
+Section: Tweaks
+Depends: preferenceloader
+Architecture: iphoneos-arm64
+Version: 1.2
+Installed-Size: 1060
+Size: 461016
+MD5sum: bb070caac2d00b72f15377ba43da5b3b
+SHA256: 9a9a1095a608b4a2a0d9cf0e0d0f5960d903facb4fe243aa9a6839e3720dd2fd
+Filename: api/download/package/65ecf1e0c9032416b5094746/com.nahtedetihw.airpodscompanion_1.2_iphoneos-arm64.deb
+Depiction: https://havoc.app/depiction/airpodscompanio
+SileoDepiction: https://havoc.app/package/airpodscompanio/depiction.json
+Icon: https://media.havoc.app/65e4177bc97a362fa842d940
+
+Package: com.nahtedetihw.airpodscompanion
+Name: AirpodsCompanion
+Description: Floating Noise Cancellation control next to volume slider
+Maintainer: ETHN <ethanwhited2208@gmail.com>
+Author: ETHN <ethanwhited2208@gmail.com>
+Section: Tweaks
+Depends: preferenceloader
+Architecture: iphoneos-arm
+Version: 1.2
+Installed-Size: 1060
+Size: 460748
+MD5sum: abe95850dbb499096adae5d21c3aa258
+SHA256: aae9dd54fdc4960c3527142d1acd6cebb26e1ea8a6b23a9e0571bae38079dd1f
+Filename: api/download/package/65ecf1e0c9032416b5094746/com.nahtedetihw.airpodscompanion_1.2_iphoneos-arm.deb
+Depiction: https://havoc.app/depiction/airpodscompanio
+SileoDepiction: https://havoc.app/package/airpodscompanio/depiction.json
+Icon: https://media.havoc.app/65e4177bc97a362fa842d940
+
+Package: com.nahtedetihw.airpodscompanion
+Name: AirpodsCompanion
+Description: Floating Noise Cancellation control next to volume slider
+Maintainer: ETHN <ethanwhited2208@gmail.com>
+Author: ETHN <ethanwhited2208@gmail.com>
+Section: Tweaks
+Depends: preferenceloader
+Architecture: iphoneos-arm
+Version: 1.3
+Installed-Size: 10632
+Size: 10346286
+MD5sum: 8113a1b58b49772077481a063037a282
+SHA256: 3055b2659f0d03ae27eea1ad5a7fa7206bff5589ddaea9492b76e7fb41b6919e
+Filename: api/download/package/664acc358c47b7c0893a3808/com.nahtedetihw.airpodscompanion_1.3_iphoneos-arm.deb
+Depiction: https://havoc.app/depiction/airpodscompanio
+SileoDepiction: https://havoc.app/package/airpodscompanio/depiction.json
+Icon: https://media.havoc.app/65e4177bc97a362fa842d940
+
+Package: com.nahtedetihw.airpodscompanion
+Name: AirpodsCompanion
+Description: Floating Noise Cancellation control next to volume slider
+Maintainer: ETHN <ethanwhited2208@gmail.com>
+Author: ETHN <ethanwhited2208@gmail.com>
+Section: Tweaks
+Depends: preferenceloader
+Architecture: iphoneos-arm64
+Version: 1.3
+Installed-Size: 10632
+Size: 10346660
+MD5sum: 326d5cfd41f50fda728cb9ca36920782
+SHA256: 60a5308149d696fe7d1cd7ec4f5e429e76cd62c89c68c01cc7b7a9aa9a5f78e8
+Filename: api/download/package/664acc358c47b7c0893a3808/com.nahtedetihw.airpodscompanion_1.3_iphoneos-arm64.deb
+Depiction: https://havoc.app/depiction/airpodscompanio
+SileoDepiction: https://havoc.app/package/airpodscompanio/depiction.json
+Icon: https://media.havoc.app/65e4177bc97a362fa842d940
+
+Package: com.nahtedetihw.airpodscompanion
+Name: AirpodsCompanion
+Description: Floating Noise Cancellation control next to volume slider
+Maintainer: ETHN <ethanwhited2208@gmail.com>
+Author: ETHN <ethanwhited2208@gmail.com>
+Section: Tweaks
+Depends: preferenceloader
+Architecture: iphoneos-arm64
+Version: 1.4
+Installed-Size: 10668
+Size: 10353096
+MD5sum: eede33623df6e07f3c3976d5c9a42404
+SHA256: c44cf0f14e4abd1937bf35846e50f71268fd76306ce3e39d9e9221e492febbff
+Filename: api/download/package/66a9ceac57730627a26629fe/com.nahtedetihw.airpodscompanion_1.4_iphoneos-arm64.deb
+Depiction: https://havoc.app/depiction/airpodscompanio
+SileoDepiction: https://havoc.app/package/airpodscompanio/depiction.json
+Icon: https://media.havoc.app/65e4177bc97a362fa842d940
+
+Package: com.nahtedetihw.airpodscompanion
+Name: AirpodsCompanion
+Description: Floating Noise Cancellation control next to volume slider
+Maintainer: ETHN <ethanwhited2208@gmail.com>
+Author: ETHN <ethanwhited2208@gmail.com>
+Section: Tweaks
+Depends: preferenceloader
+Architecture: iphoneos-arm
+Version: 1.4
+Installed-Size: 10668
+Size: 10353016
+MD5sum: a5a9a866e1a95b3c91324248e99ab922
+SHA256: fc4c101be0b1637e2a80bf99d9cb27cd7e8480c4a4995577e72ae3123769a98f
+Filename: api/download/package/66a9ceac57730627a26629fe/com.nahtedetihw.airpodscompanion_1.4_iphoneos-arm.deb
+Depiction: https://havoc.app/depiction/airpodscompanio
+SileoDepiction: https://havoc.app/package/airpodscompanio/depiction.json
+Icon: https://media.havoc.app/65e4177bc97a362fa842d940
+
+Package: com.nahtedetihw.airpodscompanion
+Name: AirpodsCompanion
+Description: Floating Noise Cancellation control next to volume slider
+Maintainer: ETHN <ethanwhited2208@gmail.com>
+Author: ETHN <ethanwhited2208@gmail.com>
+Section: Tweaks
+Depends: preferenceloader
+Architecture: iphoneos-arm
+Version: 1.5
+Installed-Size: 10704
+Size: 10362724
+MD5sum: cb0970631fbc5b26356f4dc38d2dd172
+SHA256: 2193ccd53c0a4800e446c3d425208d4817fb947c6603db7c409a02d13e0b69fe
+Filename: api/download/package/6704b877d921fac823490819/com.nahtedetihw.airpodscompanion_1.5_iphoneos-arm.deb
+Depiction: https://havoc.app/depiction/airpodscompanio
+SileoDepiction: https://havoc.app/package/airpodscompanio/depiction.json
+Icon: https://media.havoc.app/65e4177bc97a362fa842d940
+
+Package: com.nahtedetihw.airpodscompanion
+Name: AirpodsCompanion
+Description: Floating Noise Cancellation control next to volume slider
+Maintainer: ETHN <ethanwhited2208@gmail.com>
+Author: ETHN <ethanwhited2208@gmail.com>
+Section: Tweaks
+Depends: preferenceloader
+Architecture: iphoneos-arm64
+Version: 1.5
+Installed-Size: 10704
+Size: 10363416
+MD5sum: e21a054fb9ade8e8128fca5d881ed505
+SHA256: f78e508e981722cd76bc64fca67400e6494ca369d9b27091a21fac28a8d9c72a
+Filename: api/download/package/6704b877d921fac823490819/com.nahtedetihw.airpodscompanion_1.5_iphoneos-arm64.deb
+Depiction: https://havoc.app/depiction/airpodscompanio
+SileoDepiction: https://havoc.app/package/airpodscompanio/depiction.json
+Icon: https://media.havoc.app/65e4177bc97a362fa842d940
+
+Package: jp.uzra.aerial
+Name: Aerial
+Description: Stage Manager, redesigned for iOS
+Maintainer: uzra <tanoura.uz@gmail.com>
+Author: uzra <tanoura.uz@gmail.com>
+Section: Tweaks
+Depends: mobilesubstrate
+Architecture: iphoneos-arm64
+Version: 1.2
+Installed-Size: 692
+Tag: cydia::commercial
+Size: 119098
+MD5sum: a6bf2b79a4cfc1de2109f695860c6fa6
+SHA256: 63e64f8c420be6879f9003d9b4d66cc1330f42e9af917d4a4f458d8f36844109
+Filename: api/download/package/6919cbc02eba311408927d58/jp.uzra.aerial_1.2_iphoneos-arm64.deb
+Depiction: https://havoc.app/depiction/aerial
+SileoDepiction: https://havoc.app/package/aerial/depiction.json
+Icon: https://media.havoc.app/691618f1e17cb71877e8edca
+
+Package: jp.uzra.aerial
+Name: Aerial
+Description: Stage Manager, redesigned for iOS
+Maintainer: uzra <tanoura.uz@gmail.com>
+Author: uzra <tanoura.uz@gmail.com>
+Section: Tweaks
+Depends: mobilesubstrate
+Architecture: iphoneos-arm64
+Version: 1.3
+Installed-Size: 728
+Tag: cydia::commercial
+Size: 124478
+MD5sum: 4d5ee043becde827ed462d058269c8ee
+SHA256: 71cca97c1fef8d5df510b5e9f95d3c031aa73d7f65b8dc14bb053f58f88a59b1
+Filename: api/download/package/691dad9b174b1c77f33b3c2b/jp.uzra.aerial_1.3_iphoneos-arm64.deb
+Depiction: https://havoc.app/depiction/aerial
+SileoDepiction: https://havoc.app/package/aerial/depiction.json
+Icon: https://media.havoc.app/691618f1e17cb71877e8edca
+
+Package: jp.uzra.aerial
+Name: Aerial
+Description: Stage Manager, redesigned for iOS
+Maintainer: uzra <tanoura.uz@gmail.com>
+Author: uzra <tanoura.uz@gmail.com>
+Section: Tweaks
+Depends: mobilesubstrate
+Architecture: iphoneos-arm64
+Version: 2.0
+Installed-Size: 896
+Tag: cydia::commercial
+Size: 166968
+MD5sum: 014acb97e2dd863383b26fda0ffd35b3
+SHA256: 5abaa329b7dc85fca1d6d4d9cf982bbdcb844c169dcd05e3cc46d8801952c670
+Filename: api/download/package/691f3f5a174b1c77f3443a34/jp.uzra.aerial_2.0_iphoneos-arm64.deb
+Depiction: https://havoc.app/depiction/aerial
+SileoDepiction: https://havoc.app/package/aerial/depiction.json
+Icon: https://media.havoc.app/691618f1e17cb71877e8edca
+
+Package: jp.uzra.aerial
+Name: Aerial
+Description: Stage Manager, redesigned for iOS
+Maintainer: uzra <tanoura.uz@gmail.com>
+Author: uzra <tanoura.uz@gmail.com>
+Section: Tweaks
+Depends: mobilesubstrate, com.opa334.ccsupport
+Architecture: iphoneos-arm64
+Version: 2.1.6
+Installed-Size: 2268
+Tag: cydia::commercial
+Size: 1388948
+MD5sum: 14f4d3b856a43a62eafc851d0f816f38
+SHA256: ce8254a40edcb8368c5ea8ffcee2b9ed24add0ba3593687f924f09e77b442a19
+Filename: api/download/package/692d62cad4f3b09e0cab2fac/jp.uzra.aerial_2.1.6_iphoneos-arm64.deb
+Depiction: https://havoc.app/depiction/aerial
+SileoDepiction: https://havoc.app/package/aerial/depiction.json
+Icon: https://media.havoc.app/691618f1e17cb71877e8edca
+
+Package: jp.uzra.aerial
+Name: Aerial
+Description: Stage Manager, redesigned for iOS
+Maintainer: uzra <tanoura.uz@gmail.com>
+Author: uzra <tanoura.uz@gmail.com>
+Section: Tweaks
+Depends: mobilesubstrate, com.opa334.ccsupport
+Architecture: iphoneos-arm64
+Version: 2.1.7
+Installed-Size: 2268
+Tag: cydia::commercial
+Size: 1388488
+MD5sum: 5f183039f6c8792d1bfb5d0d64e8b585
+SHA256: 75c25bd94ad785c482597386bb8d16838f9f08600100a356c1450ab344b52a31
+Filename: api/download/package/69326a62cc3ae4e0806e698c/jp.uzra.aerial_2.1.7_iphoneos-arm64.deb
+Depiction: https://havoc.app/depiction/aerial
+SileoDepiction: https://havoc.app/package/aerial/depiction.json
+Icon: https://media.havoc.app/691618f1e17cb71877e8edca
+
+Package: jp.uzra.aerial
+Name: Aerial
+Description: Stage Manager, redesigned for iOS
+Maintainer: uzra <tanoura.uz@gmail.com>
+Author: uzra <tanoura.uz@gmail.com>
+Section: Tweaks
+Depends: mobilesubstrate, com.opa334.ccsupport
+Architecture: iphoneos-arm64
+Version: 2.1.8
+Installed-Size: 2268
+Tag: cydia::commercial
+Size: 1389592
+MD5sum: d5da16a5208ad949a8e00c3434ba7323
+SHA256: 737880a99fa5220d4b43d08274b28a4d12260e2208580da6e1df1a0810856fd4
+Filename: api/download/package/6936757eba8444ab7b480ddb/jp.uzra.aerial_2.1.8_iphoneos-arm64.deb
+Depiction: https://havoc.app/depiction/aerial
+SileoDepiction: https://havoc.app/package/aerial/depiction.json
+Icon: https://media.havoc.app/691618f1e17cb71877e8edca
+
+Package: jp.uzra.aerial
+Name: Aerial
+Description: Stage Manager, redesigned for iOS
+Maintainer: uzra <tanoura.uz@gmail.com>
+Author: uzra <tanoura.uz@gmail.com>
+Section: Tweaks
+Depends: mobilesubstrate, com.opa334.ccsupport
+Architecture: iphoneos-arm64
+Version: 2.2
+Installed-Size: 2304
+Tag: cydia::commercial
+Size: 1398872
+MD5sum: b9db086bfa800236dd694effbfbaac0f
+SHA256: 8cdd296497b713b70d62d251a890dcd7faa3c110db4f3fc1f49517406c84807f
+Filename: api/download/package/693a88082755018bcc873dd7/jp.uzra.aerial_2.2_iphoneos-arm64.deb
+Depiction: https://havoc.app/depiction/aerial
+SileoDepiction: https://havoc.app/package/aerial/depiction.json
+Icon: https://media.havoc.app/691618f1e17cb71877e8edca
+
+Package: jp.uzra.aerial
+Name: Aerial
+Description: Stage Manager, redesigned for iOS
+Maintainer: uzra <tanoura.uz@gmail.com>
+Author: uzra <tanoura.uz@gmail.com>
+Section: Tweaks
+Depends: mobilesubstrate, com.opa334.ccsupport
+Architecture: iphoneos-arm64
+Version: 2.2.1
+Installed-Size: 2300
+Tag: cydia::commercial
+Size: 1398898
+MD5sum: 223dfd6f302a940335d69025786b2f12
+SHA256: 2fbc44872bea7328174c429a16af4d8e7bd985d2aa364faaa687c01565bd7239
+Filename: api/download/package/693b9c792755018bcc8e30ca/jp.uzra.aerial_2.2.1_iphoneos-arm64.deb
+Depiction: https://havoc.app/depiction/aerial
+SileoDepiction: https://havoc.app/package/aerial/depiction.json
+Icon: https://media.havoc.app/691618f1e17cb71877e8edca
+
+Package: jp.uzra.aerial
+Name: Aerial
+Description: Stage Manager, redesigned for iOS
+Maintainer: uzra <tanoura.uz@gmail.com>
+Author: uzra <tanoura.uz@gmail.com>
+Section: Tweaks
+Depends: mobilesubstrate, com.opa334.ccsupport
+Architecture: iphoneos-arm64
+Version: 2.2.3
+Installed-Size: 2336
+Tag: cydia::commercial
+Size: 1408376
+MD5sum: 2112d9f688193b797ed447bc051d7606
+SHA256: 0c9dbca66fdd14fa794baf96941ae4af0da20890a87f5bfd6b4c315b42b3b5e8
+Filename: api/download/package/693d7f307747618580531dbe/jp.uzra.aerial_2.2.3_iphoneos-arm64.deb
+Depiction: https://havoc.app/depiction/aerial
+SileoDepiction: https://havoc.app/package/aerial/depiction.json
+Icon: https://media.havoc.app/691618f1e17cb71877e8edca
+
+Package: jp.uzra.aerial
+Name: Aerial
+Description: Stage Manager, redesigned for iOS
+Maintainer: uzra <tanoura.uz@gmail.com>
+Author: uzra <tanoura.uz@gmail.com>
+Section: Tweaks
+Depends: mobilesubstrate, com.opa334.ccsupport
+Architecture: iphoneos-arm64
+Version: 3.1
+Installed-Size: 2464
+Tag: cydia::commercial
+Size: 1435764
+MD5sum: bdf5540cfa5dc9b995ce4bb885df1a5e
+SHA256: 6a953252afce73b203f695df851caf01ac3f98d947dc3c4b04e28476f9366f69
+Filename: api/download/package/6943c68d92524ac8e29372c7/jp.uzra.aerial_3.1_iphoneos-arm64.deb
+Depiction: https://havoc.app/depiction/aerial
+SileoDepiction: https://havoc.app/package/aerial/depiction.json
+Icon: https://media.havoc.app/691618f1e17cb71877e8edca
+
+Package: jp.uzra.aerial
+Name: Aerial
+Description: Stage Manager, redesigned for iOS
+Maintainer: uzra <tanoura.uz@gmail.com>
+Author: uzra <tanoura.uz@gmail.com>
+Section: Tweaks
+Depends: mobilesubstrate, com.opa334.ccsupport
+Architecture: iphoneos-arm64
+Version: 3.4.1
+Installed-Size: 2528
+Tag: cydia::commercial
+Size: 1448436
+MD5sum: 9dfcb3ca46675cbee1790321cf233024
+SHA256: 3534d6db715dc8e5c93ead88841693a94bb8ac83d75b46b8a368599eb43dc61c
+Filename: api/download/package/6949acd9c29776457e580fda/jp.uzra.aerial_3.4.1_iphoneos-arm64.deb
+Depiction: https://havoc.app/depiction/aerial
+SileoDepiction: https://havoc.app/package/aerial/depiction.json
+Icon: https://media.havoc.app/691618f1e17cb71877e8edca
+
+Package: jp.uzra.aerial
+Name: Aerial
+Description: Stage Manager, redesigned for iOS
+Maintainer: uzra <tanoura.uz@gmail.com>
+Author: uzra <tanoura.uz@gmail.com>
+Section: Tweaks
+Depends: mobilesubstrate, com.opa334.ccsupport
+Architecture: iphoneos-arm64
+Version: 3.5
+Installed-Size: 2592
+Tag: cydia::commercial
+Size: 1464952
+MD5sum: 27ab96b209b70cee145c14e1d4678623
+SHA256: d9d701311904a265aca643a8f7296826b220223a983eb977032b92be2ee3ffbc
+Filename: api/download/package/694ff4e679c8eb7cf9da9b3d/jp.uzra.aerial_3.5_iphoneos-arm64.deb
+Depiction: https://havoc.app/depiction/aerial
+SileoDepiction: https://havoc.app/package/aerial/depiction.json
+Icon: https://media.havoc.app/691618f1e17cb71877e8edca
+
+Package: jp.uzra.aerial
+Name: Aerial
+Description: Stage Manager, redesigned for iOS
+Maintainer: uzra <tanoura.uz@gmail.com>
+Author: uzra <tanoura.uz@gmail.com>
+Section: Tweaks
+Depends: mobilesubstrate, com.opa334.ccsupport
+Architecture: iphoneos-arm64
+Version: 3.6
+Installed-Size: 2612
+Tag: cydia::commercial
+Size: 1470876
+MD5sum: 87d5c9d6f33ed641be6efa96e22c844d
+SHA256: a36acdc8d9fd31949790e0572f38b927eca1347acd3903b5785e046b1c7e59fb
+Filename: api/download/package/695935328bef295b541389a9/jp.uzra.aerial_3.6_iphoneos-arm64.deb
+Depiction: https://havoc.app/depiction/aerial
+SileoDepiction: https://havoc.app/package/aerial/depiction.json
+Icon: https://media.havoc.app/691618f1e17cb71877e8edca
+
+Package: jp.uzra.aerial
+Name: Aerial
+Description: Stage Manager, redesigned for iOS
+Maintainer: uzra <tanoura.uz@gmail.com>
+Author: uzra <tanoura.uz@gmail.com>
+Section: Tweaks
+Depends: mobilesubstrate, com.opa334.ccsupport
+Architecture: iphoneos-arm64
+Version: 3.6.1
+Installed-Size: 2628
+Tag: cydia::commercial
+Size: 1471768
+MD5sum: 487c51544621b370ff077bb35d6ecb51
+SHA256: 6e6343686dae8662e67398c90f6576aed24199c33b68a9d526f779d8ee479acc
+Filename: api/download/package/695e025a00840a6a6a6c6330/jp.uzra.aerial_3.6.1_iphoneos-arm64.deb
+Depiction: https://havoc.app/depiction/aerial
+SileoDepiction: https://havoc.app/package/aerial/depiction.json
+Icon: https://media.havoc.app/691618f1e17cb71877e8edca
+
+Package: jp.uzra.aerial
+Name: Aerial
+Description: Stage Manager, redesigned for iOS
+Maintainer: uzra <tanoura.uz@gmail.com>
+Author: uzra <tanoura.uz@gmail.com>
+Section: Tweaks
+Depends: mobilesubstrate, com.opa334.ccsupport
+Architecture: iphoneos-arm64
+Version: 3.7
+Installed-Size: 2688
+Tag: cydia::commercial
+Size: 1484150
+MD5sum: 6d8f4f5d19318b9faeabefd8bd569133
+SHA256: 1ba290bcf66d266a6dd00945da1925b4b55630116b184dce986d0589893f1060
+Filename: api/download/package/69633f8fcbf6beea2ef9edba/jp.uzra.aerial_3.7_iphoneos-arm64.deb
+Depiction: https://havoc.app/depiction/aerial
+SileoDepiction: https://havoc.app/package/aerial/depiction.json
+Icon: https://media.havoc.app/691618f1e17cb71877e8edca
+
+Package: jp.uzra.aerial
+Name: Aerial
+Description: Stage Manager, redesigned for iOS
+Maintainer: uzra <tanoura.uz@gmail.com>
+Author: uzra <tanoura.uz@gmail.com>
+Section: Tweaks
+Depends: mobilesubstrate, com.opa334.ccsupport
+Architecture: iphoneos-arm64
+Version: 4.2
+Installed-Size: 34040
+Tag: cydia::commercial
+Size: 10617016
+MD5sum: 4619a39601747edc89d09aa6171224cb
+SHA256: 43062fa6431c40bce26075a13c8c9d91846b7cfe9f565494efe3242234399423
+Filename: api/download/package/69908581ce03ecde7e22341c/jp.uzra.aerial_4.2_iphoneos-arm64.deb
+Depiction: https://havoc.app/depiction/aerial
+SileoDepiction: https://havoc.app/package/aerial/depiction.json
+Icon: https://media.havoc.app/691618f1e17cb71877e8edca
+
+Package: jp.uzra.aerial
+Name: Aerial
+Description: Stage Manager, redesigned for iOS
+Maintainer: uzra <tanoura.uz@gmail.com>
+Author: uzra <tanoura.uz@gmail.com>
+Section: Tweaks
+Depends: mobilesubstrate, com.opa334.ccsupport
+Architecture: iphoneos-arm64
+Version: 4.3
+Installed-Size: 34408
+Tag: cydia::commercial
+Size: 10715814
+MD5sum: 022c07ab303cf88db5aa5fb9f5bf9a90
+SHA256: 16cf0a6778f1ce01a0dc1db68ed0234a7291a487886201ed0fa094c0bf7a3851
+Filename: api/download/package/699dd223a634b7ccf71e16fd/jp.uzra.aerial_4.3_iphoneos-arm64.deb
+Depiction: https://havoc.app/depiction/aerial
+SileoDepiction: https://havoc.app/package/aerial/depiction.json
+Icon: https://media.havoc.app/691618f1e17cb71877e8edca
+
+Package: jp.uzra.aerial
+Name: Aerial
+Description: Stage Manager, redesigned for iOS
+Maintainer: uzra <tanoura.uz@gmail.com>
+Author: uzra <tanoura.uz@gmail.com>
+Section: Tweaks
+Depends: mobilesubstrate, com.opa334.ccsupport
+Architecture: iphoneos-arm64
+Version: 4.4
+Installed-Size: 34560
+Tag: cydia::commercial
+Size: 10765770
+MD5sum: b57e86916fe0ab6c7dbdad2be27366e7
+SHA256: 1fe70d1936fc1ee3bf59a3f9c660e5aafb282b4b2869588eb945933515a55045
+Filename: api/download/package/69a308438a1a1189920db6a8/jp.uzra.aerial_4.4_iphoneos-arm64.deb
+Depiction: https://havoc.app/depiction/aerial
+SileoDepiction: https://havoc.app/package/aerial/depiction.json
+Icon: https://media.havoc.app/691618f1e17cb71877e8edca
+
+Package: jp.uzra.aerial
+Name: Aerial
+Description: Stage Manager, redesigned for iOS
+Maintainer: uzra <tanoura.uz@gmail.com>
+Author: uzra <tanoura.uz@gmail.com>
+Section: Tweaks
+Depends: mobilesubstrate, com.opa334.ccsupport
+Architecture: iphoneos-arm64
+Version: 4.4.1
+Installed-Size: 34576
+Tag: cydia::commercial
+Size: 10738062
+MD5sum: 8a2a8691634e3c3e232c09a8d88290de
+SHA256: a5e6899d2ecd32b018f747a7a2e9e36ff0687e3e9b925b181dffcc805bdcc9a5
+Filename: api/download/package/69ac9d0ca812911adacf0577/jp.uzra.aerial_4.4.1_iphoneos-arm64.deb
+Depiction: https://havoc.app/depiction/aerial
+SileoDepiction: https://havoc.app/package/aerial/depiction.json
+Icon: https://media.havoc.app/691618f1e17cb71877e8edca
+
+Package: jp.uzra.aerial
+Name: Aerial
+Description: Stage Manager, redesigned for iOS
+Maintainer: uzra <tanoura.uz@gmail.com>
+Author: uzra <tanoura.uz@gmail.com>
+Section: Tweaks
+Depends: mobilesubstrate, com.opa334.ccsupport
+Architecture: iphoneos-arm64
+Version: 4.5
+Installed-Size: 34836
+Tag: cydia::commercial
+Size: 10818742
+MD5sum: 9d192810e1452b0c0b73b5a1bdb7eb80
+SHA256: d6d0f758143571bb4976ab4d11a44b03ffee7f622ddfd1a095e144bb022397a0
+Filename: api/download/package/69cfe5686fc452abc7fe9264/jp.uzra.aerial_4.5_iphoneos-arm64.deb
+Depiction: https://havoc.app/depiction/aerial
+SileoDepiction: https://havoc.app/package/aerial/depiction.json
+Icon: https://media.havoc.app/691618f1e17cb71877e8edca
+
+Package: jp.uzra.aerial
+Name: Aerial
+Description: Stage Manager, redesigned for iOS
+Maintainer: uzra <tanoura.uz@gmail.com>
+Author: uzra <tanoura.uz@gmail.com>
+Section: Tweaks
+Depends: mobilesubstrate, com.opa334.ccsupport
+Architecture: iphoneos-arm64
+Version: 4.5.1
+Installed-Size: 34704
+Tag: cydia::commercial
+Size: 10816716
+MD5sum: aec73fe89264a61b5d8ac30658871635
+SHA256: 9e7243ceb269e8ed36d8f842fe844e77149ab4282770dfcf5ab351ccf9f54e31
+Filename: api/download/package/69dcaed0c1270409b9778df0/jp.uzra.aerial_4.5.1_iphoneos-arm64.deb
+Depiction: https://havoc.app/depiction/aerial
+SileoDepiction: https://havoc.app/package/aerial/depiction.json
+Icon: https://media.havoc.app/691618f1e17cb71877e8edca
+
+Package: jp.uzra.aerial
+Name: Aerial
+Description: Stage Manager, redesigned for iOS
+Maintainer: uzra <tanoura.uz@gmail.com>
+Author: uzra <tanoura.uz@gmail.com>
+Section: Tweaks
+Depends: mobilesubstrate, com.opa334.ccsupport
+Architecture: iphoneos-arm64
+Version: 4.6
+Installed-Size: 34996
+Tag: cydia::commercial
+Size: 10977476
+MD5sum: 3c25b0b51d65200da9caf931139bb0f8
+SHA256: 42f177bc99a6092bd640696b38d5ded053a322bcd326612032d9b2548ee481f5
+Filename: api/download/package/6a26584313ba747765184d10/jp.uzra.aerial_4.6_iphoneos-arm64.deb
+Depiction: https://havoc.app/depiction/aerial
+SileoDepiction: https://havoc.app/package/aerial/depiction.json
+Icon: https://media.havoc.app/691618f1e17cb71877e8edca
+
+Package: jp.uzra.aerial
+Name: Aerial
+Description: Stage Manager, redesigned for iOS
+Maintainer: uzra <tanoura.uz@gmail.com>
+Author: uzra <tanoura.uz@gmail.com>
+Section: Tweaks
+Depends: mobilesubstrate, com.opa334.ccsupport
+Architecture: iphoneos-arm64
+Version: 5.0
+Installed-Size: 36732
+Tag: cydia::commercial
+Size: 11626100
+MD5sum: 7419fe429f2d7975ec2de265b15c302b
+SHA256: e4807823b1ed918d559604910fec9b26b90109e700b5d4422e898bdc5bffc806
+Filename: api/download/package/6a83293cf3b9ae8e534d86c5/jp.uzra.aerial_5.0_iphoneos-arm64.deb
+Depiction: https://havoc.app/depiction/aerial
+SileoDepiction: https://havoc.app/package/aerial/depiction.json
+Icon: https://media.havoc.app/691618f1e17cb71877e8edca
+
+Package: jp.uzra.aerial
+Name: Aerial
+Description: Stage Manager, redesigned for iOS
+Maintainer: uzra <tanoura.uz@gmail.com>
+Author: uzra <tanoura.uz@gmail.com>
+Section: Tweaks
+Depends: mobilesubstrate, com.opa334.ccsupport
+Architecture: iphoneos-arm64
+Version: 5.1
+Installed-Size: 36828
+Tag: cydia::commercial
+Size: 11596990
+MD5sum: a2fcc657f2dc9526ecf77fdd35e8541d
+SHA256: b47b422d0c0050b1357d99dba7cfba876cd010134f7315ba74290546d2e5435e
+Filename: api/download/package/6ad727a98810bfe0129d9f3e/jp.uzra.aerial_5.1_iphoneos-arm64.deb
+Depiction: https://havoc.app/depiction/aerial
+SileoDepiction: https://havoc.app/package/aerial/depiction.json
+Icon: https://media.havoc.app/691618f1e17cb71877e8edca
+

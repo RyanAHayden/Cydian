@@ -19,6 +19,14 @@
       "category": "utilities",
       "versions": [
         {
+          "version": "0.18.3",
+          "date": "2026-11-21T06:42:57Z",
+          "localizedDescription": "Installs on This iPhone survive a dropped connection: the copy resumes and a finished install counts as installed.\nLeaving the app, locking it or a VPN blip during an install no longer ends in \"failed\".\nTailscale's Test Connection says Not Paired Yet with a Pair button instead of No Answer.\nApps from a source keep the source's name (RyukGram, not Instagram).\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.18.3",
+          "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.18.3/iFizBox.ipa",
+          "size": 35701097,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "0.18.2",
           "date": "2026-11-21T02:45:32Z",
           "localizedDescription": "iFizBox keeps its own secrets out of reach of other sideloaded apps\nYour signing certificate, App Store Connect key and sign-ins are saved where only iFizBox can read them, even when other apps share its signing profile.\nRe-signed apps keep their own keychain and app-group data (from 0.18.1).\nThe website warns before signing an app it can't update without losing data (from 0.18.1).\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.18.2",
@@ -168,14 +176,6 @@
           "localizedDescription": "Version 0.9.5\nApp: turn off shake to undo (accidental Undo Typing alerts)\nSearch: iOS 6 Cancel button right of the field, clears it and hides the keyboard\nF178 iFizBox's AltStore source at https://ifizbox.com/repo/source.json (Worker /repo route, release asset fallback) and lite/full kept apart: the jailbreak app hides the lite IPA, the sideload app offers no .deb or APT repo\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.9.5",
           "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.9.5/iFizBox.ipa",
           "size": 5147762,
-          "minOSVersion": "15.0"
-        },
-        {
-          "version": "0.9.4",
-          "date": "2026-11-18T20:15:13Z",
-          "localizedDescription": "Website installs bring your certificate and settings into iFizBox again, under the new com.ryha.ifizbox ID.\nInstalls end on Done once iOS has the install link; no more page stuck at 72%.\nSettings > General: Return to Home After. Home's Recommended Sources opens the new Recommended page, with Add All.\nThe install log starts on the real first step (no Signing, Reading, Signing).\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.9.4",
-          "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.9.4/iFizBox.ipa",
-          "size": 5148232,
           "minOSVersion": "15.0"
         }
       ]

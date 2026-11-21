@@ -31,12 +31,34 @@ guard args.count >= 6 else {
     exit(2)
 }
 
+// SIGNBENCH_KEY_PEM (Linux): the key's PEM file, signed with by openssl, so the IPA really installs (the re-sign
+// probe, tools/resignprobe/run.sh); SIGNBENCH_CHAIN: the certificate's issuers, DER files separated by ":", as the
+// app's KeychainIdentity.issuers; SIGNBENCH_GROUPFIX: the group fix dylib (web/app/vendor/groupfix/), which the
+// app takes from its bundle.
+let benchEnv = ProcessInfo.processInfo.environment
+if let fix = benchEnv["SIGNBENCH_GROUPFIX"] { GroupFix.dylib = { try? Data(contentsOf: URL(fileURLWithPath: fix)) } }
+
 struct BenchIdentity: SigningIdentity {
     let keyDER: Data
     let certificate: Data
-    var chain: [Data] { [] }
+    var chain: [Data] {
+        (benchEnv["SIGNBENCH_CHAIN"] ?? "").split(separator: ":").compactMap { try? Data(contentsOf: URL(fileURLWithPath: String($0))) }
+    }
     var signatureAlgorithm: String { "1.2.840.113549.1.1.1" }
     func sign(_ message: Data) throws -> Data {
+        if let pem = benchEnv["SIGNBENCH_KEY_PEM"] {
+            let p = Process(), inp = Pipe(), out = Pipe()
+            p.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+            p.arguments = ["openssl", "dgst", "-sha256", "-sign", pem]
+            p.standardInput = inp; p.standardOutput = out
+            try p.run()
+            inp.fileHandleForWriting.write(message)
+            inp.fileHandleForWriting.closeFile()
+            let sig = out.fileHandleForReading.readDataToEndOfFile()
+            p.waitUntilExit()
+            guard p.terminationStatus == 0 else { throw SignError("bench", "openssl dgst failed") }
+            return sig
+        }
         #if canImport(Security)
         // As the app's KeychainIdentity does: SecKey, PKCS#1 v1.5 over SHA-256.
         var err: Unmanaged<CFError>?

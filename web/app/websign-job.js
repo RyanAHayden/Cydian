@@ -2,7 +2,8 @@
 // signs an IPA with the user's certificate, all in the worker's memory. Nothing here touches the network.
 //
 //   await runSignJob(createZsign, { ipa, p12, password, profile, bring, appBundleId, keepBundleId, tweaks, groupFix, refuseSha256 }, { progress })
-//     -> { ipa: Uint8Array (signed), bundleId (signed as), originalId, name, version, sha256 (of the IPA as it came) }
+//     -> { ipa: Uint8Array (signed), bundleId (signed as), originalId, name, version, sha256 (of the IPA as it came),
+//          injected?, warnings? (B227: data iOS keeps from the app after this signature, in words) }
 //   Throws Error with .code: bad_ipa (not an IPA, no app inside), bad_profile, sign_failed (zsign's own reason),
 //   malware (F292: the IPA's SHA-256 is in refuseSha256, core/malicious.js malwareHashes).
 //
@@ -95,7 +96,7 @@ export async function runSignJob(createZsign, { ipa, p12, password = "", profile
 
   FS.writeFile("/w/key.p12", new Uint8Array(p12));
   FS.writeFile("/w/app.mobileprovision", new Uint8Array(profile));
-  FS.writeFile("/w/ents.plist", plistXml(appEntitlements(prof, entitlementsId)));
+  FS.writeFile("/w/ents.plist", plistXml(appEntitlements(prof, entitlementsId, bundleId)));
   if (bring && own === IFIZBOX_ID) {
     if (bring.identity) FS.writeFile(`${appDir}/${IDENTITY_FILE}`, identityPlist({ p12, password, profile }));
     if (typeof bring.transfer === "string" && bring.transfer.startsWith("ifizbox://import?")) {
@@ -124,8 +125,10 @@ export async function runSignJob(createZsign, { ipa, p12, password = "", profile
   let out = null;
   try { out = code === 0 ? FS.readFile("/w/out.ipa") : null; } catch { /* no output */ }
   if (!out?.length) throw fail("sign_failed", zsignError(log));
+  // B227: what iOS will keep from the app after this signature (the group folder an earlier sign used, gone from this profile)
+  const warnings = plan?.lost ? [`This profile has no ${plan.lost}, where ${info.name} kept its shared data until now: iOS keeps that folder from it.`] : [];
   return { ipa: out, bundleId, originalId: info.bundleId, name: info.name, version: info.version, ...(sha256 ? { sha256 } : {}),
-    ...(injected.length ? { injected } : {}) };
+    ...(injected.length ? { injected } : {}), ...(warnings.length ? { warnings } : {}) };
 }
 
 // B211: a file's entitlements (core/groupfix.js entitlementsRead), read in pieces; null when there's none or no file.

@@ -3,12 +3,12 @@
 // so iOS answers nil and errSecMissingEntitlement and the app loses its settings and sign-in. Both signers (this
 // website's, websign-job.js, and the app's, native/sign/IPASigner.swift with the same rules) read the original
 // executable's entitlements before signing and inject a small fix dylib (native/groupfix/groupfix.m, committed built
-// at vendor/groupfix/) that maps those groups to the profile's own group, or to a folder in the app's own container
-// when the profile has none, and strips kSecAttrAccessGroup from keychain calls.
+// at vendor/groupfix/) that maps those groups to a folder in the app's own container (B227: the same under every
+// profile; an older sign's profile group is copied in once) and strips kSecAttrAccessGroup from keychain calls.
 //
 //   machoEntitlements(bin)                  the entitlements (XML slot) of a Mach-O's first slice, or null when unsigned
 //   entitlementsRead(read)                  the same through read(pos, len), reading only the parts it needs
-//   groupFixPlan(original, profileEnts, previous)  { groups, target, keychain } to fix, or null when the app needs
+//   groupFixPlan(original, profileEnts, previous)  { groups, target, keychain, legacy?, lost? } to fix, or null when the app needs
 //                                           nothing; previous: the config an earlier sign left in the app
 //   readConfig(bytes)                       that config's { groups, keychain }, or null
 //   groupFixTweaks(plan, dylib)             { files, inject } for the F288 tweak path (putTweaks / TweakSet)
@@ -76,16 +76,27 @@ export function entitlementsRead(read) {
   return null;
 }
 
-// The original's groups the profile doesn't have, mapped to the profile's first group ("" for none: a folder in the
-// app's own container); keychain when the original names keychain access groups.
+// The original's groups the profile doesn't have, mapped to a folder in the app's own container (target ""); keychain
+// when the original names keychain access groups.
 // `previous`: the config an earlier sign left in the app (an IPA signed again), whose groups still count: its
 // executable now carries the profile's groups, not the original ones.
+// B227: never the profile's own group for a new plan. Its first group changed whenever the profile was made again
+// (groups added, or listed in another order), and the folder with it, so the app lost that data; and every app signed
+// with the profile shared it. The app's own folder is the same under any profile, App ID or certificate. An app an
+// earlier sign mapped to a profile group keeps it while the profile still has it; `lost` names it when it doesn't
+// (iOS keeps that group's folder from the app: worth a warning before signing).
 export function groupFixPlan(original, profileEnts = {}, previous = null) {
   const have = strings(profileEnts?.[APP_GROUPS]);
   const groups = [...new Set([...strings(original?.[APP_GROUPS]), ...strings(previous?.groups)])].filter((g) => !have.includes(g));
   const keychain = strings(original?.[KEYCHAIN]).length > 0 || previous?.keychain === true;
   if (!groups.length && !keychain) return null;
-  return { groups, target: have[0] ?? "", keychain };
+  const was = typeof previous?.target === "string" ? previous.target : "";
+  const plan = { groups, target: was && have.includes(was) ? was : "", keychain };
+  if (was && !have.includes(was)) plan.lost = was;
+  // the group the older rule (the profile's first) would have picked: the dylib copies its folder and suite into the
+  // app's own once, so an app signed that way, now signed again from its original IPA, keeps that data
+  if (!plan.target && have.length && !(previous && was === "")) plan.legacy = have[0];
+  return plan;
 }
 
 export function readConfig(bytes) {
@@ -99,7 +110,8 @@ export function groupFixTweaks(plan, dylib) {
   const data = dylib instanceof Uint8Array ? dylib : new Uint8Array(dylib);
   return {
     files: [{ path: GROUPFIX.dylib, data },
-      { path: GROUPFIX.config, data: new TextEncoder().encode(plistXml({ groups: plan.groups, target: plan.target, keychain: plan.keychain })) }],
+      { path: GROUPFIX.config, data: new TextEncoder().encode(plistXml({ groups: plan.groups, target: plan.target, keychain: plan.keychain,
+        ...(plan.legacy ? { legacy: plan.legacy } : {}) })) }],
     inject: [GROUPFIX.inject],
   };
 }

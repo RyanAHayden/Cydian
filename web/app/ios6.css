@@ -12,6 +12,7 @@
   --field-text: #4c566c; /* F149: an editable field's text, the kit's blue-grey (its "Table Label" colour) */
   --field-hint: #b3b3b3; /* F149: a field's placeholder, the kit's "URL field" hint ("Google") */
   --select: linear-gradient(#85a7e9, #2765db); /* cell selection: the kit's "Button (Matte Blue)" gradient */
+  --multi-select: #e1e8f5; /* a picked row in a multi-select list (Mail's Edit, Installed's Manage): the pale blue */
   --text: #000;
   --subtitle: #7f7f7f;
   --table: #f7f7f7;     /* "Grouped Table" */
@@ -59,6 +60,7 @@ html[data-theme="dark"] {
   --count: #48484e;
   --plain: #000;
   --keyline: #1c1c1f;
+  --multi-select: rgba(95,162,255,.2); /* the same pale blue over any dark ground (a palette's too), not grey */
   --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 17.5 26.4'%3E%3Cpath fill='%2355555b' d='M.07 4.23 9.12 13.27 0 22.26 4.12 26.38 17.47 13.03 4.43 0Z'/%3E%3C/svg%3E");
   --category: linear-gradient(rgba(36,36,40,.94), rgba(22,22,24,.94) 5%, rgba(14,14,15,.94) 94%, rgba(0,0,0,.94) 96%);
   /* Bars: the page behind everything, the nav bar (status bar under the notch, top highlight, gloss, base line), its
@@ -454,9 +456,11 @@ html[data-theme="dark"] .pair-button.delete-button:is(:active, .is-pressed) {
 .cell-check::after { content: "✓"; font-size: 20px; font-weight: bold; color: var(--detail); }
 /* Tap: the blue selection, white text, as UITableViewCell does on touch down. */
 /* Only app.js's .is-pressed, not :active: iOS keeps :active on a held row after the touch turns into a scroll. */
-.cell-inner.is-pressed { background: var(--select); color: #fff; }
-.cell-inner.is-pressed * { color: #fff; }
-.cell-inner.chevron.is-pressed::after { background-image: var(--chevron-pressed); }
+/* Not on a row Manage picks from (packages.css .manage-row): UIKit's multi-select cell shows its selection fill on
+   touch down, across the whole row, not the blue (:where keeps these rules' weight as it was). */
+.cell-inner.is-pressed:not(:where(.managing .manage-row > *)) { background: var(--select); color: #fff; }
+.cell-inner.is-pressed:not(:where(.managing .manage-row > *)) * { color: #fff; }
+.cell-inner.chevron.is-pressed:not(:where(.managing .manage-row > *))::after { background-image: var(--chevron-pressed); }
 /* ==== } look-only ==== */
 
 /* "switch (on)" / "switch (off)": 77 x 27, a pill with the kit's edge gradient (on #819fb9 to #255985, off #ccc to

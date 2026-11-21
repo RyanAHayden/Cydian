@@ -804,7 +804,9 @@ export function applyTheme(doc = document, win = window) {
     m.replaceWith(fresh);
   }
   // A preview pins the shell to the tone on screen (its status bar and keyboard follow the page) until it ends.
-  tellShell(preview ? theme : appearance, theme, win, darkPalette, paletteFor("light", darkPalette, lightTheme));
+  // B221: the era's own light theme (iOS 7: White), not the iOS 6 pick, and dark status-bar text on a light bar.
+  const lightPalette = themeState({ style, appearance: "light", lightTheme, darkTheme: darkPalette }, false).palette;
+  tellShell(preview ? theme : appearance, theme, win, darkPalette, lightPalette, DARK_TEXT_BARS.has(palette));
   // F323: the Home Screen icon follows, once the theme lists are left (a tap through them would switch it each time,
   // with iOS's alert in the sideload build); the icons the page shows follow at once.
   if (!preview) tellIcon(theme);
@@ -819,14 +821,19 @@ export function applyTheme(doc = document, win = window) {
 // window at the next launch before the page runs (black for OLED Black), whichever way Automatic then goes.
 // F214: lightPalette (classic, sepia or solarized) likewise, so a light launch paints Sepia's or Solarized Light's
 // pinstripes, not the kit's blue-grey.
-export function themeMessage(appearance, theme, darkPalette = "gunmetal", lightPalette = "classic") {
-  return { id: 0, method: "app.theme", params: { style: appearance === "auto" ? "auto" : theme, theme, darkPalette, lightPalette } };
+// B221: statusBar "dark" (sent only then) while the theme showing has a light bar (iOS 7's White): the shell's status
+// bar text goes dark; without it the text stays light, as on every iOS 6 bar.
+export const DARK_TEXT_BARS = new Set(["white"]);
+export function themeMessage(appearance, theme, darkPalette = "gunmetal", lightPalette = "classic", darkText = false) {
+  const params = { style: appearance === "auto" ? "auto" : theme, theme, darkPalette, lightPalette };
+  if (darkText) params.statusBar = "dark";
+  return { id: 0, method: "app.theme", params };
 }
 let lastSent = "";
-function tellShell(appearance, theme, win, darkPalette, lightPalette) {
+function tellShell(appearance, theme, win, darkPalette, lightPalette, darkText) {
   const h = win.webkit?.messageHandlers?.ifizbox;
   if (!h) return;
-  const msg = themeMessage(appearance, theme, darkPalette, lightPalette);
+  const msg = themeMessage(appearance, theme, darkPalette, lightPalette, darkText);
   const key = JSON.stringify(msg.params);
   if (key === lastSent) return;
   lastSent = key;

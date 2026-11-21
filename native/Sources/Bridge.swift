@@ -41,7 +41,8 @@ final class Bridge: NSObject, WKScriptMessageHandlerWithReply {
                 if let w = c.web?.window { Theme.apply(style: c.params["style"] as? String ?? "auto",
                                                        theme: c.params["theme"] as? String ?? "light",
                                                        darkPalette: c.params["darkPalette"] as? String ?? "gunmetal",
-                                                       lightPalette: c.params["lightPalette"] as? String ?? "classic", to: w) }
+                                                       lightPalette: c.params["lightPalette"] as? String ?? "classic",
+                                                       darkText: c.params["statusBar"] as? String == "dark", to: w) }
                 c.reply(nil, nil)
             }
         }
@@ -194,8 +195,8 @@ enum WebKitFeature {
 
 // What the shell draws itself follows the page's theme: the keyboard, <select> pickers, alerts and menus through the
 // window's interface style. Automatic leaves the style to the system, so the
-// page's prefers-color-scheme (which follows the window's traits) keeps tracking it. The status bar stays light
-// text in both themes: it sits on the blue nav bar in light and on the black (OLED Black) or gunmetal bar in dark.
+// page's prefers-color-scheme (which follows the window's traits) keeps tracking it. The status bar is light text
+// on every iOS 6 bar (blue, dark palettes'); B221: dark text on iOS 7's White bar (the page's statusBar "dark").
 // The bars themselves are web/app/'s (R3 (a)): the shell draws no UINavigationBar or UITabBar.
 // F198: the window and web view behind the page take the palette's ground (black for OLED Black), and the shell keeps
 // the last {style, darkPalette} so the next launch paints that ground before the page has run (no light or grey
@@ -219,8 +220,18 @@ enum Theme {
                              lightPalette: s.lightPalette)
     }
 
+    // B221: dark status-bar text (WebController.preferredStatusBarStyle) while the theme showing has a light bar:
+    // the page's app.theme statusBar "dark" once it has run; until then the saved theme's (White in light).
+    static let darkTextPalettes: Set<String> = ["white"] // screens/settings.js DARK_TEXT_BARS
+    static var darkText: Bool = {
+        let s = saved
+        let dark = s.style == "dark" || (s.style == "auto" && UIScreen.main.traitCollection.userInterfaceStyle == .dark)
+        return darkTextPalettes.contains(dark ? s.darkPalette : s.lightPalette)
+    }()
+
     static func apply(style: String, theme: String, darkPalette: String, lightPalette: String = "classic",
-                      to window: UIWindow) {
+                      darkText: Bool = false, to window: UIWindow) {
+        Self.darkText = darkText
         window.overrideUserInterfaceStyle = Self.style(style)
         let ground = Launch.ground(dark: theme == "dark", palette: darkPalette, lightPalette: lightPalette)
         window.backgroundColor = ground.pattern

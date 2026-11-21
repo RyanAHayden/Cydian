@@ -6,7 +6,8 @@
 //                                                 My IPAs file, its stored edits)
 //   signing.prepare {library: file, edits?, tag}  a My IPAs file
 //        (stream: {phase: "downloading" | "reading" | "signing", progress}, {log})
-//        -> {token, bundleId, originalBundleId, name, version, expires?, device}: the signed IPA is kept for `life`
+//        -> {token, bundleId, originalBundleId, name, version, expires?, device}: the signed IPA is kept for `life`;
+//        KeepAlive is held from the call to its answer (B257), so it signs with the app in the background
 //   signing.open {token, manifestServer, host?, tag}   serves the kept IPA and opens iOS's Install prompt (host: iFizBox's
 //        own, uploaded to the Signing Server as signing.install's) -> signing.install's reply; records the app
 //        route: "idevice" (This iPhone): installd installs it, no prompt (stream: {phase: "copying" | "installing",
@@ -45,6 +46,13 @@ enum SignAhead {
         guard let (id, profile) = Sideload.ready(c) else { return }
         let tag = (c.params["tag"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? SignBridge.token()
         let job = SignJob.begin(tag: tag)
+        // B257: KeepAlive from the call to its answer (as Sideload.install's), so the signing after the download's own
+        // hold ends goes on with the app in the background; every answer below goes through `answer`, which lets go
+        let released = Sideload.holdUntilAnswer()
+        let answer = { (j: [String: Any]?, e: String?) in
+            released()
+            Apt.reply(c, j, e)
+        }
         let throttle = Throttle()
         let emit = { (phase: String, p: Double) in
             if throttle.pass(phase, p) { c.emitOnMain([["phase": phase, "progress": p]]) }
@@ -52,7 +60,7 @@ enum SignAhead {
         let log = { (s: String) in c.emitOnMain([["log": s]]) }
         let fail = { (e: Error) in
             job.end()
-            Apt.reply(c, nil, job.cancelled ? SignBridge.text(SignJob.cancelledError) : (e as? Sideload.Failed)?.text ?? SignBridge.text(e))
+            answer(nil, job.cancelled ? SignBridge.text(SignJob.cancelledError) : (e as? Sideload.Failed)?.text ?? SignBridge.text(e))
         }
         SignBridge.queue.async {
             // where the IPA comes from, and the edits it is signed with
@@ -60,7 +68,7 @@ enum SignAhead {
             if let bid = c.params["record"] as? String, !bid.isEmpty {
                 guard let r = SignedRecords.only(Sideload.records(), bundleID: bid).first else {
                     job.end()
-                    return Apt.reply(c, nil, "not_signed: \(Brand.name) has no record of signing \(bid)")
+                    return answer(nil, "not_signed: \(Brand.name) has no record of signing \(bid)")
                 }
                 source = r.url
                 var o = SignOptions(r.options)
@@ -100,7 +108,7 @@ enum SignAhead {
                         if let x = record.expires { j["expires"] = ISO8601DateFormatter().string(from: x) }
                         j["device"] = PhoneID.check(profile).json
                         if let s = sha { j["sha256"] = s } // F292
-                        Apt.reply(c, j, nil)
+                        answer(j, nil)
                     } catch { fail(error) }
                 }
             }
@@ -110,7 +118,7 @@ enum SignAhead {
                     if let file = try MyIPAs.copyForResign(source) { return signThat(file) }
                 } catch { return fail(Sideload.Failed(text: "gone: that app isn't in My IPAs any more")) }
             }
-            guard let url = Apt.httpURL(source) else { job.end(); return Apt.reply(c, nil, "bad_url: not an http(s) URL") }
+            guard let url = Apt.httpURL(source) else { job.end(); return answer(nil, "bad_url: not an http(s) URL") }
             log("Downloading \(url.absoluteString)")
             // B104: a recorded app's http link was let through at install; a new one follows the page's insecure
             let http: Sideload.HTTPPolicy = (c.params["record"] as? String ?? "").isEmpty ? Sideload.httpPolicy(c) : .fallback

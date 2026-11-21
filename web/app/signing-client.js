@@ -31,6 +31,8 @@ export { SELF_UPDATE_LINES, SELF_UPDATE_FAILED, followSelfUpdate, HERE_CLOSING_L
   watchSelfUpdate } from "./signing/selfupdate.js";
 export { ASK_WAIT, prepareParams, prepareOnDevice, openPrepared, hereLabel, shownName, finishHere, herePhase,
   repromptPrepared, discardPrepared } from "./signing/queue.js";
+export { HOLD_IDLE, heldLanes } from "./signing/queue.js"; // B257
+export { holdApp } from "./signing/route.js"; // B257
 export { libraryCall, serverReachable, offlineText, installFromLibrary } from "./signing/library.js";
 export { runInWorker, CUT_TEXT, CUT_TRIES, downloadIpa, reconnectText, droppedText, grayIconText, uploadSigned,
   signInBrowser } from "./signing/browser.js";

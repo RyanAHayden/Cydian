@@ -14,6 +14,7 @@
 //
 // The .p12, password and profile go only into the Web Worker (this browser), and with bring into iFizBox's signed
 // IPA, which waits on the Worker for those 10 minutes as the old server signer's copy did.
+import { createDownloadMeter, downloadLine, rateText } from "../core/downloadmeter.js"; // B262
 import { IPA_MAX, overSiteLimit, overMemoryLimit, memoryLimit, IFIZBOX_ID, noteSigned, isOutOfMemory,
   noteOutOfMemory, profileInfo, signingIds } from "../core/websign.js";
 import { withKeep, siteSigned, rememberSiteSigned, resignNote, RESIGN_TITLE, RESIGN_BUTTONS, installWarningText,
@@ -74,7 +75,8 @@ export const droppedText = (bytes) => {
 };
 export const grayIconText = (app) => `If a gray ${app ? `${app} ` : ""}icon was left on your Home Screen, delete it.`;
 
-async function downloadIpaOnce(url, { base = "", fetcher = globalThis.fetch, onProgress = () => {}, max = IPA_MAX, wait = undefined, signal = null } = {}, got = { buf: null, n: 0 }) {
+// B262: `onBytes(n, total)` after each piece (total 0 when the Worker sent no length), for the MB/s.
+async function downloadIpaOnce(url, { base = "", fetcher = globalThis.fetch, onProgress = () => {}, onBytes = () => {}, max = IPA_MAX, wait = undefined, signal = null } = {}, got = { buf: null, n: 0 }) {
   let res;
   const init = { cache: "no-store", ...(got.n ? { headers: { Range: `bytes=${got.n}-` } } : {}), ...(signal ? { signal } : {}) };
   try { res = await retrying(() => fetcher(`${base}/api/fetch?${new URLSearchParams({ url, kind: "ipa" })}`, init), { wait, signal }); } catch {
@@ -114,6 +116,7 @@ async function downloadIpaOnce(url, { base = "", fetcher = globalThis.fetch, onP
     buf.set(value, n);
     n += value.length;
     if (total) onProgress(Math.min(99, Math.floor((n / total) * 100)));
+    try { onBytes(n, total); } catch { /* the log only */ }
   }
   keep();
   if (total && n < total) throw cut(`${n} of ${total} bytes`);
@@ -209,6 +212,19 @@ export async function signInBrowser({ url, name = "", onInstalled = () => {}, br
   }
   const h = hud(bytes ? "Reading" : "Downloading");
   const pct = (label) => (p) => h.set(`${label} ${p}%`);
+  // B262: the download's MB/s on the page's label, and its Log line ("Downloaded 120.3 of 312.0 MB (38%), 21.4 MB/s")
+  // once a second
+  const meter = createDownloadMeter({ now: clock });
+  let speed = "";
+  const dlLabel = (n, total) => (total ? `Downloading ${Math.min(99, Math.floor((n / total) * 100))}%` : `Downloading ${(n / 1048576).toFixed(1)} MB`) + speed;
+  const onBytes = (n, total) => {
+    const t = meter.add(n, total);
+    if (!t) return;
+    speed = `, ${rateText(t.rate)}`;
+    h.page?.raw?.(downloadLine(t));
+    h.set(dlLabel(n, total));
+  };
+  const dlPct = (p) => h.set(`Downloading ${p}%${speed}`);
   // F188: the page's Cancel stops the download, the signer and the upload; B90: so does iOS's prompt cancelled
   const signal = eitherSignal(h.signal ?? null, ios?.signal ?? null);
   const guard = (p) => untilCancel(h, ios ? ios.race(p) : p);
@@ -216,7 +232,7 @@ export async function signInBrowser({ url, name = "", onInstalled = () => {}, br
   let ipaSize = 0; // F261: the IPA zsign got, for this browser's memory limit
   try {
     const ipa = bytes ? await guard(keptBytes(bytes))
-      : await guard(downloadIpa(url, { base, fetcher, onProgress: pct("Downloading"), onCut: ({ attempt, at }) => {
+      : await guard(downloadIpa(url, { base, fetcher, onProgress: dlPct, onBytes, onCut: ({ attempt, at }) => {
         cutOnce = true;
         h.page?.raw?.(droppedText(at)); // F257: grey, then the step
         h.set(reconnectText(attempt));

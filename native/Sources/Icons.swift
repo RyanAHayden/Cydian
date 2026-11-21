@@ -270,6 +270,7 @@ final class PlainDownload: DebFetch {
 
     private let url: URL, dest: URL, max: Int64, redirects: Int
     private let progress: (Double) -> Void
+    private var bytes: ((Int64, Int64) -> Void)? // B262: as Download's (written, expected; 0 when unknown)
     private var done: ((String?) -> Void)?
     private let queue = DispatchQueue(label: "ifizbox.deb.http")
     private var conn: NWConnection?
@@ -287,8 +288,10 @@ final class PlainDownload: DebFetch {
 
     @discardableResult
     static func start(_ url: URL, to dest: URL, max: Int64, redirects: Int = maxRedirects,
-                      progress: @escaping (Double) -> Void, done: @escaping (String?) -> Void) -> PlainDownload {
+                      progress: @escaping (Double) -> Void, bytes: ((Int64, Int64) -> Void)? = nil,
+                      done: @escaping (String?) -> Void) -> PlainDownload {
         let d = PlainDownload(url, dest, max, redirects, progress, done)
+        d.bytes = bytes
         d.keep = d
         d.queue.async { d.begin() }
         return d
@@ -403,9 +406,9 @@ final class PlainDownload: DebFetch {
             timer = nil
             let pass: (String?) -> Void = { [self] err in queue.async { self.finish(err) } }
             if to.scheme?.lowercased() == "https" {
-                next = Download.start(to, to: dest, max: max, progress: progress, done: pass)
+                next = Download.start(to, to: dest, max: max, progress: progress, bytes: bytes, done: pass)
             } else {
-                next = PlainDownload.start(to, to: dest, max: max, redirects: redirects - 1, progress: progress, done: pass)
+                next = PlainDownload.start(to, to: dest, max: max, redirects: redirects - 1, progress: progress, bytes: bytes, done: pass)
             }
             return true
         }
@@ -424,6 +427,7 @@ final class PlainDownload: DebFetch {
         guard let f = file else { return }
         try f.write(contentsOf: body)
         if let n = stream.length, n > 0 { progress(Double(stream.received) / Double(n)) }
+        bytes?(Int64(stream.received), Int64(stream.length ?? 0))
     }
 }
 

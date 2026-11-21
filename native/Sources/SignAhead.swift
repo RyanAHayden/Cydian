@@ -137,7 +137,8 @@ enum SignAhead {
             // B104: a recorded app's http link was let through at install; a new one follows the page's insecure
             let http: Sideload.HTTPPolicy = (c.params["record"] as? String ?? "").isEmpty ? Sideload.httpPolicy(c) : .fallback
             let started = Date()
-            let d = Sideload.download(url, http: http, emit: emit) { res in
+            let d = Sideload.download(url, http: http, emit: emit, // B262: the Log's line and the row's MB/s once a second
+                                      bytes: Sideload.downloadTicks(log: log, event: { c.emitOnMain([$0]) })) { res in
                 switch res {
                 case .failure(let e): fail(e)
                 case .success(let file):

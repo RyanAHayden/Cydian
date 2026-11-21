@@ -122,7 +122,7 @@ the app supports iOS 15.0, so cascade layers are out.
 | `--callout-h` | 38px | the menu callout and the queue hint |
 | `--banner-pad` | 6px 12px 7px | the notification banner |
 | `--sw-w`, `--sw-h`, `--sw-knob-size`, `--sw-travel` | 77px, 27px, 27px, 50px | the switch's box, its knob and the knob's travel (`ios6.css`'s on `--x`; `nav/switch.js` reads it when a drag starts) |
-| `--settings-seg-margin`, `--settings-seg-h` | 0, 44px | Settings > Theme's Mode, inside its group (`settings.css`) |
+| `--settings-seg-margin` | 0 | Settings > Theme's Mode, inside its group (`settings.css`) |
 | `--home-inset`, `--home-tile-pad` | 10px, 0 10px 0 6px | Home's head and tile rows from the screen's sides, and a tile's padding (`home.css`) |
 
 A hook never reuses a look token's name (`ios6-css.test.js` checks the switch, Mode and Home hooks): the knob's size is

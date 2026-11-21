@@ -10,8 +10,9 @@
 /* The Import row carries the hidden file input it clicks. */
 .signing-page .sign-import { position: relative; }
 /* F199: Theme's Mode, the segmented control (nav/ui.js segmented(), ios6.css .store-segmented) at a settings
-   group's full width: no margins of its own (the group has them), 44px like a grouped row and its 9.5px corners. */
-.store-segmented.settings-segmented { margin: var(--settings-seg-margin); height: var(--settings-seg-h); }
+   group's full width: in iOS 6 no margins of its own (the group has them; --settings-seg-margin, an era's inset),
+   44px like a grouped row and its 9.5px corners. */
+.store-segmented.settings-segmented { margin: var(--settings-seg-margin); height: 44px; }
 /* F199: a theme's swatch in Theme > Light / Dark: a small rounded tile, its bar colour over its ground (the gradient
    comes from core/settings.js `swatch`), with a hairline edge so OLED Black shows on a near-black row. */
 .cell-icon.theme-swatch { width: 24px; height: 24px; }

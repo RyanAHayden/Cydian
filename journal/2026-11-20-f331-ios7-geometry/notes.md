@@ -6,8 +6,9 @@ iOS 7's four pieces of geometry, set in `web/app/ios7.css` through hooks only:
   `:root` in style.css for hooks read outside it). `ios6.css`'s on state is `--x: var(--sw-travel)`, the fill's offset
   is `--x + knob/2 - width` (iOS 6: the old −63.5px), and `nav/switch.js` reads `--sw-travel` at each pointerdown
   instead of a fixed 50. iOS 7: 51 x 31, knob 31, travel 20, track corners 15.5px (look).
-- **Theme's Mode inset 15pt**: `--settings-seg-margin` / `--settings-seg-h` (settings.css). iOS 7: `0 15px`, 29px
-  (the control's own height), its type and corners in look rules.
+- **Theme's Mode inset 15pt**: `--settings-seg-margin` (settings.css). iOS 7: `0 15px`. It keeps the 44pt row
+  height; iOS 7's own 29pt control was tried here and taken out after the spec review as not asked (filed as a
+  follow-up). The shots `white-theme.png` / `oled-theme.png` show the 29pt try.
 - **Separators to the label on icon rows**: look only (background position/size) in ios7.css, `:has(> .cell-inner >
   .cell-icon)`: 15 + 29 + cell gap = 52pt, 47pt for Theme's 24pt swatches. No hook needed: `background*` is look.
 - **Home's tiles edge to edge**: `--home-inset` (head and tile rows) and `--home-tile-pad` (home.css). iOS 7: 0 and
@@ -31,6 +32,9 @@ Docs: docs/eras.md's hooks table and its "no hook yet" list. Test: ios6-css.test
 - 3x screenshots, headless Chromium against `worker/node.mjs` (capture.mjs from the T12 journal): `shots/` White and
   OLED Black Home, Settings, Theme, General; iOS 6 Home, Settings, Theme, General. iOS 6's switch computed: knob
   27x27, fill at −63.5px, as before.
+
+Spec review: a row of two separate half tables (9pt gap) would keep that gap and side edges; Home draws none today
+(its pairs are one table split by a line), so nothing shows it. Left as is.
 
 ## Not verified
 

@@ -124,7 +124,7 @@ html.native .navbar, html.native .tabbar { display: none; }
 /* F331: era hooks read outside style.css (ios6.css, nav/switch.js, settings.css, home.css), iOS 6's values. */
 :root {
   --sw-travel: 50px;                                                /* the switch knob's travel: its on --x */
-  --settings-seg-margin: 0; --settings-seg-h: 44px;                 /* Settings > Theme's Mode, inside its group */
+  --settings-seg-margin: 0;                                         /* Settings > Theme's Mode, inside its group */
   --home-inset: 10px; --home-tile-pad: 0 10px 0 6px;                /* Home's head and tiles from the sides; in a tile */
 }
 /* Large titles: the root page's title, big, bold and left, at the top of its body; it scrolls with the content and

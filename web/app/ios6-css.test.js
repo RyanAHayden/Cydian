@@ -291,7 +291,7 @@ test("F331: era hooks don't reuse a look token's name, and the new geometry read
   }
   assert.match(css, /\.switch\[aria-checked="true"\]\s*\{\s*--x:\s*var\(--sw-travel\)/);
   const settings = readFileSync(new URL("./settings.css", import.meta.url), "utf8");
-  assert.match(settings, /\.store-segmented\.settings-segmented \{ margin: var\(--settings-seg-margin\); height: var\(--settings-seg-h\); \}/);
+  assert.match(settings, /\.store-segmented\.settings-segmented \{ margin: var\(--settings-seg-margin\);/);
   const home = readFileSync(new URL("./home.css", import.meta.url), "utf8");
   assert.match(home, /\.home-row \{ margin: 0 var\(--home-inset\)/);
   const ios7 = readFileSync(new URL("./ios7.css", import.meta.url), "utf8");

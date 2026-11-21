@@ -20,7 +20,7 @@ html[data-style="ios7"] {
   --group-head-margin: 0 15px 7px; --group-foot-margin: 7px 15px 0;
   --cell-min-h: 44px; --cell-pad: 0 15px;
   --sw-w: 51px; --sw-h: 31px; --sw-knob-size: 31px; --sw-travel: 20px;  /* the kit's 51 x 31 switch, its knob the track's height */
-  --settings-seg-margin: 0 15px; --settings-seg-h: 29px;           /* Theme's Mode: the 29pt control, inset like a label */
+  --settings-seg-margin: 0 15px;                                   /* Theme's Mode, inset like a label */
   --home-inset: 0px; --home-tile-pad: 0 15px;                      /* Home's tiles edge to edge, content 15pt in */
 }
 /* Home's tiles take the tables' flat edges: square, the table hairline (Home sets these on .home). */
@@ -256,11 +256,7 @@ html[data-style="ios7"][data-theme] .store-segment:not(.selected) {
 html[data-style="ios7"] .store-segment + .store-segment,
 html[data-style="ios7"] .store-segment.selected + .store-segment,
 html[data-style="ios7"] .store-segment + .store-segment.selected { border-left-color: var(--i7-tint); }
-html[data-style="ios7"] .store-segment:active:not(.selected) { background: var(--i7-seg-pressed); }
-/* Theme's Mode: the 29pt control's corners and type (settings.css draws iOS 6's 44pt row). */
-html[data-style="ios7"] .store-segmented.settings-segmented { border-radius: 4px; }
-html[data-style="ios7"] .settings-segmented .store-segment { font-size: 13px; line-height: 27px; }
-html[data-style="ios7"] .store-segment.selected,
+html[data-style="ios7"] .store-segment:active:not(.selected) { background: var(--i7-seg-pressed); }html[data-style="ios7"] .store-segment.selected,
 html[data-style="ios7"][data-theme] .store-segment.selected { color: var(--i7-tint-text); background: var(--i7-tint); }
 
 /* Scope bar (Changes' All / Installed, Installed's title, Search's scopes): the same tinted outline control. The

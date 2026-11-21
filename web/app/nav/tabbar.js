@@ -35,6 +35,24 @@ export function createTabbar(el, tabs, titleOf) {
   };
 }
 
+// Floating tab bar (era hook, docs/eras.md; iOS 26): with <html data-tabbar="float">, set by the era's JS through
+// setFloatingTabbar(true), the bar is a pill inset from the screen's edges and the Search tab (FLOAT_OWN_TAB) its own
+// circle beside it; the screens scroll under both. All of it is layout in style.css behind the attribute (--tab-h
+// becomes the pill's height plus its gap to the bottom, so every scroller's end room and the bars that sit on the
+// tab bar follow); the markup is the same either way. Off (iOS 6, the default) the attribute is absent and nothing
+// changes. The app draws its own UITabBar (html.native hides this one), so there it is the shell's job.
+export const FLOAT_OWN_TAB = "search";
+
+export const floatingTabbarOn = (doc = globalThis.document) =>
+  doc?.documentElement?.getAttribute?.("data-tabbar") === "float";
+
+export function setFloatingTabbar(on, doc = globalThis.document) {
+  const root = doc?.documentElement;
+  if (!root) return;
+  if (on) root.setAttribute("data-tabbar", "float");
+  else root.removeAttribute("data-tabbar");
+}
+
 // A tap on tab `tab` while `current` is the route on screen. As on iOS: another tab -> switch to it (selectTab
 // keeps its place); the current tab below its root -> back to the root (selectTab again); the current tab at its
 // root -> scrollTop() (the screen's scroller back to the top, like UIKit's status-bar tap, F148) and then the

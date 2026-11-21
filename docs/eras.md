@@ -214,8 +214,16 @@ iOS 13 and iOS 26 need three, each off in iOS 6:
   Opacity only, once a frame. Pushed pages and
   pages whose title is a control keep the bar title. Hooks in `style.css`: `--large-title-h` (52px, also the
   collapse distance) and `--large-title-pad` (3px 16px 8px); its type is look an era may restyle on `.large-title`;
-- a floating tab bar pill, Search as its own circle, content scrolling under it (`nav/tabbar.js`, `style.css`), not
-  built yet;
+- **floating tab bar**: `<html data-tabbar="float">`, set by the era's JS through `nav/tabbar.js`
+  `setFloatingTabbar(true)`. The tab bar becomes a pill inset from the screen's sides and bottom, and the Search tab
+  (`FLOAT_OWN_TAB`) leaves the tabs' row to sit as its own slot to the pill's right, as tall as the pill; the screens
+  scroll under both. `--tab-h` becomes the pill's height plus its gap to the bottom, so every scroller's end room
+  and the bars that sit on the tab bar (reload, undo, Filter, Theme's preview) follow. Layout only, same markup.
+  Hooks in `style.css`: `--tabbar-float-h` (62px, the pill's height and the circle's size), `--tabbar-float-pad`
+  (4px, inside the pill), `--tabbar-float-inset` (21px, from the sides), `--tabbar-float-gap` (10px, pill to circle)
+  and `--tabbar-float-bottom` (safe bottom − 13px, at least 12px). The pill's and the circle's paint (round corners,
+  glass, their own ground on `.tab[data-tab="search"]`) is the era's look. The app draws its own UITabBar (this one
+  is hidden there), so the hook moves the website's bar only;
 - **card sheets**: `<html data-sheet="card">`, set by the era's JS when it is chosen. A modal sheet (`nav/sheet.js`)
   stops below the status bar as a card with rounded top corners, and the page behind it (the nav bar, the screens
   and the tab bar) scales back about the screen's centre and dims onto the black ground. It comes back when the
@@ -289,8 +297,7 @@ Not yet clean, each queued as its own cleanup:
 
 - the other stylesheets (the small ones);
 - the light palettes' segmented-control rules in `palettes.css` (the control now reads `--seg*` tokens; the rules
-  have not moved onto them yet);
-- the floating-tab-bar nav hook above.
+  have not moved onto them yet).
 
 The screens' inline SVG art comes from the icon map below; the overlays `nav/` draws take theirs from CSS tokens
 ([Overlays](#overlays-nav)).

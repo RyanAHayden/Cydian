@@ -26,6 +26,7 @@ import { debOf, tweakTitle, withTweaksText, tweakSteps, madeFor, tweakUpdates, i
   HOW_TO_TEXT, tweakParams } from "../core/tweaks.js"; // F302a
 import { BUNDLE_ID } from "../brand.js"; // F302a
 import { loadStyle } from "../nav/motion.js";
+import { tweakListRow } from "./tweakrow.js"; // B267
 import { isCommercial, paymentEndpointUrl, parseEndpoint, createPaymentClient, createCredentialStore, isFreePrice,
   paidTweakDeb, PaidNeeded } from "../core/payment.js"; // F308
 
@@ -593,7 +594,8 @@ export async function sourceTweakRows({ catalogMod = null } = {}) {
 
 export function pickSourceTweak({ bundleId, onPick, rows = sourceTweakRows, pkg = async (r) => (await (await import("../catalog.js")).catalog.package(r.id, r.key))?.stanza,
   alert = showAlert, storage, paid = null } = {}) {
-  const body = el("div", "tweak-pick");
+  // B267: its own scroller under the fixed bar (sheet-scroll page-body, as Add Tweaks), Cydia's list rows (tweakrow.js)
+  const body = el("div", "sheet-scroll page-body grouped tweak-pick tw-browse");
   const loading = el("div", "loading");
   loading.append(el("span", "loading-spinner"), el("span", null, "Loading Tweaks"));
   body.append(loading);
@@ -609,13 +611,9 @@ export function pickSourceTweak({ bundleId, onPick, rows = sourceTweakRows, pkg 
     const ul = (items) => {
       const u = el("ul", "table grouped");
       for (const r of items) {
-        const li = el("li", "cell");
-        const b = el("button", "cell-inner ss-tweak chevron");
-        b.type = "button";
-        const t = el("span", "cell-text");
-        t.append(el("span", "cell-label", r.name || r.id), el("span", "cell-subtitle", [r.version, r.short].filter(Boolean).join(" · ")));
-        b.append(t);
-        b.addEventListener("click", async () => {
+        const li = tweakListRow(r, { onClick: () => pick() });
+        const b = li.firstChild;
+        const pick = async () => {
           const st = await pkg(r).catch(() => null);
           if (!st) return;
           const hide = (await import("../nav/hud.js")).showHUD("Checking Tweak");
@@ -636,8 +634,7 @@ export function pickSourceTweak({ bundleId, onPick, rows = sourceTweakRows, pkg 
             if (e instanceof PaidNeeded) { if (await offerPaid(st, e, { paid, alert })) b.click(); return; } // F308
             await alert({ title: "Can't Add This Tweak", message: String(e?.message ?? e), buttons: ["OK"] });
           }
-        });
-        li.append(b);
+        };
         u.append(li);
       }
       return u;
@@ -701,7 +698,7 @@ export function pickApp({ name, made, locked = [], not = [] }, { sheet = null, a
   style();
   return new Promise((resolve) => {
     let picked = null;
-    const body = el("div", "tweak-pick");
+    const body = el("div", "sheet-scroll page-body grouped tweak-pick"); // B267: its own scroller, as Add Tweaks
     const group = (header, apps, { onTap = null, cls = "", detail = (a) => a.from ?? null, footer = null } = {}) => {
       const g = el("div", "group");
       g.append(el("h2", "group-header", header));
@@ -969,7 +966,8 @@ export function openAddTweaks({ bundleId, name = "", rows = sourceTweakRows, sto
       const kept = await savedTweaks(bundleId, { store });
       const groups = [];
       if (made.length) {
-        groups.push(group(`Made for ${name || "This App"}`, made.map((r) => cell(r.name || r.id, [r.version, r.short].filter(Boolean).join(" · "), addButton(r, keptHas(kept, r.id))))));
+        // B267: Cydia's list rows (tweakrow.js: 29pt icon, version · author), the ADD button at the end
+        groups.push(group(`Made for ${name || "This App"}`, made.map((r) => tweakListRow(r, { right: addButton(r, keptHas(kept, r.id)) }))));
       }
       const others = kept.filter((x) => !made.some((r) => debOf(x.name)?.package === r.id));
       if (others.length) {

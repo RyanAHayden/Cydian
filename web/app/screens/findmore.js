@@ -37,6 +37,7 @@ import {
 } from "../core/canister.js";
 import { canisterApi, offerTweak } from "./extras.js";
 import { nativeBridge } from "../native.js";
+import { tweakListRow } from "./tweakrow.js"; // B267
 
 export const FIND = "find";
 export const DIRECTORY_URL = "https://ios-repo-updates.com/";
@@ -327,7 +328,7 @@ export async function repoTweaks(r, { api = canisterApi() } = {}) {
 
 async function showRepoTweaks(r, ctx, { api }) {
   const { showSheet } = await import("../nav/sheet.js");
-  const body = el("div", "tweak-pick find-tweak-list");
+  const body = el("div", "sheet-scroll page-body grouped tweak-pick find-tweak-list"); // B267: its own scroller
   body.append(placeholder("list", 6));
   const close = showSheet({ title: r.name, body });
   try {
@@ -340,13 +341,14 @@ async function showRepoTweaks(r, ctx, { api }) {
   }
 }
 
+// B267: Cydia's list rows (tweakrow.js): the package's icon cropped to 29pt over its section's, the name, version ·
+// author (· the repo, for results from several repos). The repo's trust is said by offerTweak's sheet on the tap.
 function tweakList(rows, ctx, opts) {
-  const trusted = trustedNow();
-  const frag = grouped([{ rows: rows.map((r) => ({ label: r.name, subtitle: [r.repo.name, r.description].filter(Boolean).join(" · "),
-    icon: { text: r.name[0]?.toUpperCase() ?? "?", ...(r.icon ? { src: r.icon } : {}) }, onClick: () => { opts.onDone?.(); offerTweak(r, ctx, opts); } })) }]);
-  const cells = frag.querySelectorAll(".cell");
-  rows.forEach((r, i) => cells[i]?.querySelector(".cell-subtitle")?.prepend(...labelNode(labelOf(r.repo, { trusted }))));
-  return frag;
+  const g = el("div", "group");
+  const ul = el("ul", "table grouped");
+  for (const r of rows) ul.append(tweakListRow(r, { repo: opts.viewRepo !== false, onClick: () => { opts.onDone?.(); offerTweak(r, ctx, opts); } }));
+  g.append(ul);
+  return g;
 }
 
 // ---- Add Tweaks: Search All Repos --------------------------------------------------------------------------------
@@ -354,11 +356,12 @@ function tweakList(rows, ctx, opts) {
 // A sheet with Canister's package search, already holding `appName`: tweaks for sideloaded apps only, each opening
 // the Add Source & Add to App sheet. `api` is a seam for the tests. Returns { close, ready } (ready: the first search).
 export function searchAllRepos({ appName = "", ctx = null, api = canisterApi(), sources = haveSources, sheet = null } = {}) {
-  const body = el("div", "tweak-pick find-all-repos");
-  const results = el("div", "find-all-results");
+  // B267: the search bar stays under the fixed nav bar and the results scroll on their own (pinned: Search's layout)
+  const body = el("div", "sheet-scroll page-body grouped tweak-pick find-all-repos");
   let seq = 0, close = () => {};
   const bar = searchBar({ placeholder: "Search All Repos", value: appName, delay: 400, className: "find-search", onQuery: (q) => run(q) });
-  body.append(bar, results);
+  const results = pinned(body, bar);
+  results.classList.add("find-all-results");
   const open = sheet ?? ((o) => import("../nav/sheet.js").then(({ showSheet }) => showSheet(o)));
   Promise.resolve(open({ title: "Search All Repos", body })).then((c) => { if (typeof c === "function") close = c; });
   const ready = run(appName);

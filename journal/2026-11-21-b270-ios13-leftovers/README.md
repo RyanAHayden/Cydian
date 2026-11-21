@@ -26,11 +26,15 @@ Look-only changes in `web/app/ios13.css` and `web/app/ios7.css` (iOS 6 untouched
    bars' flat colour under a hairline. Re-sign and Update were already the eras' tinted text. The toolbar change goes
    past the brief's words, but red text on iOS 6's blue gradient would still not be flat iOS 13/7.
 5. **Alerts and prompts (iOS 13).** It had none of its own, so it showed iOS 6's navy box. Now: 270pt box with 14pt
-   corners, rgba(255,255,255,.88) / rgba(28,28,30,.92) over `backdrop-filter: blur(20px) saturate(1.8)`, 17pt
+   corners, rgba(250,250,250,.97) / rgba(28,28,30,.97), 17pt
    semibold title, 13pt message, a 7pt-rounded field with a .5pt edge, Paste as tinted text, 44pt flat tinted
    buttons edge to edge under .5pt separators (a .5pt line between two side by side), the last (preferred) one
    semibold, a destructive one red, pressed a light wash; scrim 20% / 48% black. The geometry goes through the
    alert hooks (`--alert-w`, `--alert-pad`, ...) as iOS 7's does.
+   **Tried and dropped: the blur.** The brief asks for one, and the first version had `backdrop-filter: blur(20px)`,
+   but the gate failed: `theme-palette.test.js` (F202) forbids `backdrop-filter` in ios13.css because the app must hold
+   120 Hz. The box is now all but opaque (.97) in place of a blur. Adding a real blur would mean changing that rule,
+   which is a person's call.
    **iOS 7's** alert (F333/B254) was checked in the renders and already matches its kit (7pt box, flat hairline
    buttons, bold preferred), so it wasn't changed.
 
@@ -60,8 +64,7 @@ A fresh reviewer read the diff and the brief. Kept, as judgment calls:
 
 ## Not verified
 
-- **On a phone**: Chromium renders only. `backdrop-filter` blur behind the iOS 13 alert is drawn by Chromium here;
-  WebKit on the phone takes the `-webkit-` form too, but it wasn't looked at on a device.
+- **On a phone**: Chromium renders only.
 - **Pressed states** (Delete held, an alert button held): rules in place, no shot holds a finger down.
 - **Install IPAs' Manage**: same `.manage-check` / `.myipa-row.picked` rules, not rendered (it needs a library
   of IPAs in the fake shell).

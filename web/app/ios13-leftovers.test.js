@@ -61,12 +61,12 @@ for (const [era, css] of Object.entries(sheets)) {
   });
 }
 
-test("iOS 13's alert is a 14pt box over a blur, white or #1c1c1e, with a rounded field", () => {
+test("iOS 13's alert is a 14pt box, white or #1c1c1e (no blur: 120 Hz), with a rounded field", () => {
   const css = sheets.ios13;
   const box = decls(css, 'html[data-style="ios13"] .alert {');
   assert.match(box, /border-radius:\s*14px/);
-  assert.match(box, /backdrop-filter:\s*blur\(/);
-  assert.match(decls(css, 'html[data-style="ios13"][data-theme="light"] {\n  --i13-alert:'), /--i13-alert:\s*rgba\(255,255,255,/);
+  assert.doesNotMatch(box, /backdrop-filter/);
+  assert.match(decls(css, 'html[data-style="ios13"][data-theme="light"] {\n  --i13-alert:'), /--i13-alert:\s*rgba\(250,250,250,/);
   assert.match(decls(css, 'html[data-style="ios13"][data-theme="dark"] {\n  --i13-alert:'), /--i13-alert:\s*rgba\(28,28,30,/);
   assert.match(decls(css, 'html[data-style="ios13"] .alert-field {'), /border-radius:\s*7px/);
 });

@@ -133,3 +133,56 @@ test("C51: Why's tile and Copying Files' tiles are the map's", async () => {
     assert.equal(guides.glyph(id, "X").color, ICON_SETS.ios6.guides[id][1], id);
   }
 });
+
+// F332: iOS 7's set, after the Teehan+Lax iOS 7 kit (ref/teehanlax/ios7/sheet.svg).
+test("F332: iOS 7 redraws every row tile: kit corners (6.5pt), iOS 7 colours, thin white line glyphs", async () => {
+  const { ICON_SETS } = await import("./rowicons.js");
+  const s7 = ICON_SETS.ios7;
+  const palette = new Set(["#8e8e93", "#007aff", "#34aadc", "#4cd964", "#ff3b30", "#ff9500", "#5856d6", "#4a4a4f",
+    "#5ac8fa", "#ffcc00", "#a2845e", "#ff2d55"]);
+  assert.deepEqual(Object.keys(s7.rows), Object.keys(ROW_ICONS), "every row has its iOS 7 tile");
+  assert.deepEqual(Object.keys(s7.glyphs).sort(), Object.keys(GLYPHS).sort(), "every glyph redrawn");
+  for (const [name, [colour, glyph]] of Object.entries(s7.rows)) {
+    assert.ok(palette.has(colour), `${name}: ${colour}`);
+    assert.equal(glyph, ROW_ICONS[name][1], `${name}: the same thing, the same glyph`);
+    const svg = tileSvg(name, "ios7");
+    assert.match(svg, /^<svg xmlns="http:\/\/www.w3.org\/2000\/svg" width="29" height="29" viewBox="0 0 29 29">/);
+    assert.match(svg, new RegExp(`<rect width="29" height="29" rx="6.5" fill="${colour}"/>`), name);
+    assert.doesNotMatch(svg, /NaN|undefined|Gradient/, name);
+    assert.notEqual(svg, tileSvg(name, "ios6"), name);
+    for (const m of svg.matchAll(/stroke-width="([\d.]+)"/g)) assert.ok(Number(m[1]) <= 2.2, `${name}: a thin line`);
+    assert.ok(svg.includes("stroke=\"#fff\""), `${name}: drawn in lines`);
+  }
+  // 20pt across, centred: the 24 units scaled 20/24
+  assert.match(tileSvg("general", "ios7"), /translate\(4\.5 4\.5\) scale\(0\.8333/);
+});
+
+test("F332: iOS 6's tiles are as they were", () => {
+  assert.match(tileSvg("general", "ios6"), /rx="6" fill="#8c9097"/);
+  assert.equal(rowIcon("general").src, rowIcon("general", "ios6").src);
+});
+
+test("F332: iOS 7's Copying Files and Why tiles are its own, flat", async () => {
+  const { ICON_SETS, guideSvg, homeTileCss, GUIDE_TILE_NAMES } = await import("./rowicons.js");
+  assert.deepEqual(Object.keys(ICON_SETS.ios7.guides), GUIDE_TILE_NAMES);
+  for (const id of GUIDE_TILE_NAMES) {
+    const svg = guideSvg(id, "ios7");
+    assert.match(svg, new RegExp(`<rect width='58' height='58' fill='${ICON_SETS.ios7.guides[id][1]}'/>`), id);
+    if (id !== "linux") assert.notEqual(svg, guideSvg(id, "ios6"), id);
+  }
+  const why = homeTileCss("why", "ios7");
+  assert.match(why, /^background-color: #ff9500; .*linear-gradient\(#ff9500, #ff9500\);$/, "flat: one colour");
+  assert.notEqual(why, homeTileCss("why", "ios6"));
+});
+
+test("F332: ios7.css carries iOS 7's tab glyphs, outline and (chosen) filled, from the map", async () => {
+  const { ICON_SETS, tabGlyphTokens } = await import("./rowicons.js");
+  const css = readFileSync(new URL("../ios7.css", import.meta.url), "utf8");
+  for (const kind of ["tabs", "tabsSelected"]) {
+    for (const line of tabGlyphTokens("ios7", kind).split("\n")) assert.ok(css.includes(`html[data-style="ios7"] ${line}`), line);
+    assert.deepEqual(Object.keys(ICON_SETS.ios7[kind]), Object.keys(ICON_SETS.ios6.tabs), kind);
+  }
+  for (const svg of Object.values(ICON_SETS.ios7.tabs)) assert.match(svg, /fill='none'/, "outline");
+  assert.doesNotMatch(css, /:not\(\.active\) \{ --glyph/, "one glyph rule per tab and state");
+  assert.throws(() => tabGlyphTokens("ios6", "tabsSelected"), "iOS 6 draws no separate chosen glyph");
+});

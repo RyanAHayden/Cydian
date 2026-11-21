@@ -1,0 +1,95 @@
+[
+{
+"eval": "(()=>{localStorage.clear();localStorage.setItem('ifizbox.firstVisit','later');localStorage.setItem('ifizbox.device','iphoneos-arm64');localStorage.setItem('ifizbox.style','ios7');localStorage.setItem('ifizbox.appearance','light');localStorage.setItem('ifizbox.darkTheme','oled');return document.documentElement.dataset.style})()"
+},
+{
+"nav": "#/home",
+"ms": 5000
+},
+{
+"shot": "white-home"
+},
+{
+"nav": "#/home/settings",
+"ms": 3000
+},
+{
+"shot": "white-settings"
+},
+{
+"nav": "#/home/settings/general",
+"ms": 3000
+},
+{
+"shot": "white-general"
+},
+{
+"nav": "#/home/guides/copying",
+"ms": 3000
+},
+{
+"shot": "white-copying"
+},
+{
+"nav": "#/sources/manage",
+"ms": 3000
+},
+{
+"shot": "white-manage"
+},
+{
+"eval": "(()=>{localStorage.clear();localStorage.setItem('ifizbox.firstVisit','later');localStorage.setItem('ifizbox.device','iphoneos-arm64');localStorage.setItem('ifizbox.style','ios7');localStorage.setItem('ifizbox.appearance','dark');localStorage.setItem('ifizbox.darkTheme','oled');return document.documentElement.dataset.style})()"
+},
+{
+"nav": "#/home",
+"ms": 5000
+},
+{
+"shot": "oled-home"
+},
+{
+"nav": "#/home/settings",
+"ms": 3000
+},
+{
+"shot": "oled-settings"
+},
+{
+"nav": "#/home/settings/general",
+"ms": 3000
+},
+{
+"shot": "oled-general"
+},
+{
+"nav": "#/home/guides/copying",
+"ms": 3000
+},
+{
+"shot": "oled-copying"
+},
+{
+"nav": "#/sources/manage",
+"ms": 3000
+},
+{
+"shot": "oled-manage"
+},
+{
+"eval": "(()=>{localStorage.clear();localStorage.setItem('ifizbox.firstVisit','later');localStorage.setItem('ifizbox.device','iphoneos-arm64');localStorage.setItem('ifizbox.style','ios6');localStorage.setItem('ifizbox.appearance','light');localStorage.setItem('ifizbox.darkTheme','oled');return document.documentElement.dataset.style})()"
+},
+{
+"nav": "#/home",
+"ms": 5000
+},
+{
+"shot": "ios6-home"
+},
+{
+"nav": "#/home/settings",
+"ms": 3000
+},
+{
+"shot": "ios6-settings"
+}
+]

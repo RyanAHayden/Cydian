@@ -592,6 +592,7 @@ function draw(view) {
   // App Sources then its Tweak Sources (F302); a group with nothing in it (searching: nothing to search) is left out.
   const groups = sourceGroups({ shown, list, tweakShown, tweakList, searching, sideload: tweakSourcesOn(settings.deviceType(), detectMode()) });
   const ul = plain([...(top.length ? [{ rows: top }] : []), ...groups.map((g) => ({ header: g.header, rows: g.list.map(sourceRow) }))]);
+  ul.classList.add("sources-list"); // B253: packages.css lines every row's icon up on the source rows' 29pt column
   const cells = ul.querySelectorAll(":scope > .cell");
   if (top.length) {
     cells[0].classList.add("all-sources-row");

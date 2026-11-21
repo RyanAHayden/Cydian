@@ -21,7 +21,11 @@
    their first drawing. `myipas.js afterInstall`: when a job leaves the IPA queue (`clear`/`clearAll`, which the
    run sends as each app installs) or Installed's records change (`onAppsChange`), the list re-reads the library
    and which IPAs are installed (`recheck`) and the IPA page (remembered in `view.ipa`) is drawn again, while they
-   are on a stack, coalesced into one redraw.
+   are on a stack, coalesced into one redraw. Spec review: a redraw replaces the page with its placeholder, so the
+   IPA page is drawn again only when its library entry (and certificate state) differ from the drawn one
+   (`ipaChanged`); an unrelated app's change or a job cleared from Confirm leaves it alone.
+   Spec review also asked whether the Pairing row can still say LocalDevVPN with Tailscale on: the pairing state is
+   reached only when `vpnOn(st)` (localDevVPN or `tailscale.use`), so with LocalDevVPN off `verifyVPN` says Tailscale.
 4. **'Reinstall' for 3.0 over 2.0**: `queueLibraryInstall` passed `installed: true` to `libraryJob`, which puts the
    IPA's own version as the installed one, so the mode was always Reinstall. It now looks up the version on the
    phone (`installedVersionOf`: Installed's record, else the shell's `signing.installed` record by bundle ID or

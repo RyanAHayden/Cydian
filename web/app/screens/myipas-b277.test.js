@@ -3,7 +3,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createAppQueue } from "../core/appqueue.js";
-import { queueLibraryInstall, installedVersionOf, afterInstall } from "./myipas.js";
+import { queueLibraryInstall, installedVersionOf, afterInstall, ipaChanged } from "./myipas.js";
 import { setupGroups } from "./installroute.js";
 
 const R55 = { file: "R55-3.0.ipa", name: "R55 Test", bundleId: "com.x.r55", version: "3.0", size: 10, icon: null };
@@ -48,6 +48,16 @@ test("afterInstall: several changes at once read the list and draw the IPA page 
   afterInstall(hooks);
   await new Promise((r) => setTimeout(r, 5));
   assert.deepEqual([lists, pages], [2, 2]);
+});
+
+test("ipaChanged: the IPA page redraws only when its entry differs from the one drawn", async () => {
+  const entry = { file: "A.ipa", signed: null };
+  const shown = { body: { isConnected: true }, file: "A.ipa", drawn: JSON.stringify({ entry, identity: true }) };
+  assert.equal(await ipaChanged(shown, { read: async () => ({ entry, identity: true }) }), false);
+  assert.equal(await ipaChanged(shown, { read: async () => ({ entry: { ...entry, signed: { at: "x" } }, identity: true }) }), true);
+  assert.equal(await ipaChanged(shown, { read: async () => { throw new Error("x"); } }), false);
+  assert.equal(await ipaChanged({ ...shown, body: { isConnected: false } }, { read: () => assert.fail("read") }), false);
+  assert.equal(await ipaChanged({ ...shown, drawn: null }, { read: () => assert.fail("read") }), false);
 });
 
 test("the Pairing page names the VPN that's on: Tailscale when its route is the way in, LocalDevVPN otherwise", () => {

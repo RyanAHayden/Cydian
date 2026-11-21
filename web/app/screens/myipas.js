@@ -605,10 +605,21 @@ if (typeof window !== "undefined") {
 
 // B277: after an install from the IPA queue (an IPA's own Install, Confirm, the run's page): Install IPAs reads the
 // library and which IPAs iOS has again (recheck), and the IPA's page is drawn again, while they are on a stack (not
-// only on screen: the list sits under the IPA's page). Several changes at once draw once.
+// only on screen: the list sits under the IPA's page). Several changes at once draw once. The IPA's page is drawn
+// again only when its library entry changed (ipaChanged), so an unrelated app's change never blanks it.
 let againSoon = false;
+export async function ipaChanged(shown, { read = entryOf } = {}) {
+  if (!shown?.body?.isConnected || shown.drawn == null) return false;
+  let now;
+  try { now = await read(shown.file); } catch { return false; }
+  return shown.body.isConnected && JSON.stringify(now) !== shown.drawn;
+}
 export function afterInstall({ list = () => { if (view.body?.isConnected) recheck(); },
-  page = () => { const v = view.ipa; if (v?.body?.isConnected) rerender(v.body, v.route); else view.ipa = null; } } = {}) {
+  page = async () => {
+    const v = view.ipa;
+    if (!v?.body?.isConnected) { if (view.ipa === v) view.ipa = null; return; }
+    if (await ipaChanged(v) && view.ipa === v) rerender(v.body, v.route);
+  } } = {}) {
   if (againSoon) return;
   againSoon = true;
   setTimeout(() => { againSoon = false; list(); page(); }, 0);
@@ -1018,13 +1029,15 @@ export function siteIpaSections(details, onInstall = () => {}) {
 }
 
 async function renderIpa(body, route, file) {
-  view.ipa = { body, route }; // B277: drawn again when an install ends (afterInstall)
+  const shown = { body, route, file, drawn: null };
+  view.ipa = shown; // B277: drawn again when an install changes its entry (afterInstall, ipaChanged)
   body.append(placeholder("page"));
   let entry, identity;
   try { ({ entry, identity } = await entryOf(file)); } catch (e) {
     body.replaceChildren(note(deviceError(e).message));
     return;
   }
+  shown.drawn = JSON.stringify({ entry, identity });
   if (!entry) {
     body.replaceChildren(grouped([{ rows: [{ label: "Not in My IPAs" }], footer: `${file} was deleted or moved.` }]));
     return;

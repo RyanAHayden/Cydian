@@ -37,7 +37,7 @@ test("Feather install link: Install IPAs, then Install signs and installs it", a
   assert.equal(await handleIncoming(`feather://install/${IPA}`, d), "other-install");
   assert.match(log.hashes[0], /installed\/myipas/);
   assert.match(log.alerts[0].message, /Feather link: My\.ipa/);
-  assert.deepEqual(log.installs, [{ url: IPA, name: "" }]);
+  assert.deepEqual(log.installs.map(({ url, name }) => ({ url, name })), [{ url: IPA, name: "" }]);
 });
 
 test("Install IPA's Cancel installs nothing", async () => {

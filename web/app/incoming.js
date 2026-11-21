@@ -147,11 +147,11 @@ export function onReceiving({ hud = liveHUD } = {}) {
 }
 
 export async function handleIncoming(url, { native = nativeBridge(), alert = showAlert, hud = showHUD,
-  review = null, add = null, shared = null, install = null, signIn = null, on = otherLinksOn, open = goHash, now = Date.now } = {}) {
+  review = null, add = null, shared = null, install = null, signIn = null, on = otherLinksOn, open = goHash, now = Date.now, reload = reloadInstalled } = {}) {
   const u = String(url ?? "");
   if (/^ifizbox:\/\/install\b/i.test(u)) {
     const ask = installAsk(u);
-    if (ask) await confirmInstall(ask.url, ask.name, `${ask.name || ipaFileName(ask.url)}\n${ask.url}`, { alert, install, open });
+    if (ask) await confirmInstall(ask.url, ask.name, `${ask.name || ipaFileName(ask.url)}\n${ask.url}`, { alert, install, open, reload });
     return "install";
   }
   if (/^ifizbox:\/\/myipas\b/i.test(u)) {
@@ -193,7 +193,7 @@ export async function handleIncoming(url, { native = nativeBridge(), alert = sho
     return "tab";
   }
   const other = parseOtherLink(u);
-  if (other) return handleOtherLink(u, other, { native, alert, hud, add, install, on, open, now });
+  if (other) return handleOtherLink(u, other, { native, alert, hud, add, install, on, open, now, reload });
   return null;
 }
 
@@ -208,7 +208,7 @@ const goHash = (hash) => { if (typeof location !== "undefined") location.hash = 
 
 // F83: another sideloader's link. On: iFizBox does what that app would have (a source, an IPA). Off, or a link only
 // that app understands (a certificate export, a pairing callback): handed back.
-async function handleOtherLink(u, other, { native, alert, hud, add, install, on, open, now }) {
+async function handleOtherLink(u, other, { native, alert, hud, add, install, on, open, now, reload }) {
   if (!on() || other.action === "other") return handBack(u, other, { native, alert, now, off: !on() });
   if (other.action === "source") {
     open(format({ tab: "sources", path: ["manage", "sources"] }));
@@ -216,7 +216,7 @@ async function handleOtherLink(u, other, { native, alert, hud, add, install, on,
     await run({ showHUD: hud }, { url: other.url });
     return "other-source";
   }
-  await confirmInstall(other.url, "", `${other.app} link: ${ipaFileName(other.url)}\n${other.url}`, { alert, install, open });
+  await confirmInstall(other.url, "", `${other.app} link: ${ipaFileName(other.url)}\n${other.url}`, { alert, install, open, reload });
   return "other-install";
 }
 
@@ -224,14 +224,27 @@ async function handleOtherLink(u, other, { native, alert, hud, add, install, on,
 // B50: the jailbreak build has no signer (signAndInstall only says "Can't Install Here" there): Install downloads the
 // IPA and installs it through the helper (ipa.install, screens/ipa-install.js's progress page), as Settings > Install
 // IPA and a tapped .ipa link do, and remembers it for Installed's Apps.
-async function confirmInstall(url, name, message, { alert, install, open }) {
+// B281: once the run ends, Installed loads the signed records again (screens/installed.js reloadSigned): this install
+// writes no record of its own, so its list row and the app's page would keep the record from before.
+async function confirmInstall(url, name, message, { alert, install, open, reload = reloadInstalled }) {
   open(format({ tab: "installed", path: ["myipas"] }));
   const { index } = await alert({ title: "Install IPA", message, buttons: ["Cancel", "Install"], cancel: 0 });
   if (index !== 1) return false;
   const run = install ?? (await defaultInstall());
-  await run({ url, name });
+  let answer = null;
+  try {
+    await run({ url, name, onInstalled: (r) => { answer = r ?? null; } });
+  } finally {
+    await Promise.resolve().then(() => reload(answer)).catch(() => {});
+  }
   return true;
 }
+
+// Installed's reloadSigned, loaded only once an install ends (and never under node --test, where no page runs).
+const reloadInstalled = async (answer) => {
+  if (typeof document === "undefined") return;
+  (await import("./screens/installed.js")).reloadSigned(answer);
+};
 
 // What Install runs: the helper's ipa.install in the jailbreak build (`jailbreak`), else signAndInstall.
 // `ipaInstall` and `remember` stand in for screens/ipa-install.js's openIpaInstall and rememberIpa (tests).

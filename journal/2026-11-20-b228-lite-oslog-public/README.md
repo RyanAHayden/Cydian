@@ -7,12 +7,16 @@ log; only `IDevice.ilog` (os_log `%{public}@`) does. In `native/Sources/Sideload
 
 - New `DeviceLog.say(_:)`: `os_log("%{public}@", log: OSLog(subsystem: "ifizbox.sideload", category: "install"),
   type: .default, s)`, the same form as `IDevice.ilog`. `import os` added.
-- Every NSLog in the file now goes through it: `InstallLog.say` (all install-server lines, B89's frozen / listens
+- The lines the task names now go through it: `InstallLog.say` (all install-server lines, B89's frozen / listens
   again / uploading-to-the-Signing-Server notes and B29's request lines, since InstallServer and InstallPrompt
-  only reach the log through `InstallLog.say`), KeepAlive's interruption line, the install watch's summary, B146's
-  "not installed" line, and the three `[sideload]` lines (plain-http download, missing https twin, HostUpload's
-  retry). The last three were not named in the task but are the same bug in the same file; the retry is part of
-  the upload B228 wants visible.
+  only reach the log through `InstallLog.say`), KeepAlive's interruption line (its only log line) and the install
+  watch's summary.
+- First pass also converted B146's "not installed" line and the three `[sideload]` lines (plain-http download,
+  missing https twin, HostUpload's retry). The spec review flagged them as not asked, so they are reverted here
+  and filed as a follow-up. Other files' NSLogs (Apt.swift, Launch.swift, …) are left as they are too.
+- Subsystem `ifizbox.sideload` (IDevice uses `ifizbox.idevice`): idevicesyslog / syslog live show every
+  subsystem, so the name only matters for `log stream --predicate` filtering. The summary line stays well under
+  os_log's ~1 KB dynamic-string limit.
 - The `%` → `%%` escaping is gone: the text is now an argument, not the format string.
 
 Line text is unchanged, so a syslog grep for `iFizBox install <bundle id>:` finds them.

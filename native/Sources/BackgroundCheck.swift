@@ -32,6 +32,9 @@ enum BackgroundCheck {
     // B124: the "<id> <version>" keys the last background run found (its badge's other part); app.badge drops them,
     // since the page's count then stands for everything.
     static let foundKey = "ifizbox.updates.foundKeys"
+    // B264: the bundle IDs of Changes' Needs Re-sign rows in its last count (updates.resigns), so an app's re-sign
+    // handed to iOS takes its row off the icon badge (appHandedOff) while the page can't count.
+    static let pageResignKey = "ifizbox.updates.pageResign"
     static let interval: TimeInterval = 4 * 3600
     static let maxBytes = 8 << 20 // AltStore's own source is about 1 MB; the biggest seen (F9) under 8 MB
     private static let queue = DispatchQueue(label: "com.ryha.ifizbox.updates")
@@ -67,6 +70,43 @@ enum BackgroundCheck {
                 Apt.reply(c, ["scheduled": schedule()], nil)
             }
         }
+        // B264: updates.resigns {ids}: the apps Changes counted under Needs Re-sign (screens/changes.js badge), sent
+        // with each count.
+        b.on("updates.resigns") { c in
+            let ids = (c.params["ids"] as? [Any] ?? []).compactMap { $0 as? String }
+            queue.async {
+                UserDefaults.standard.set(ids.sorted(), forKey: pageResignKey)
+                Apt.reply(c, nil, nil)
+            }
+        }
+    }
+
+    // B264: an app's install or re-sign has been handed to iOS (`ids`: its bundle ID as installed and the source's;
+    // `version`: the one handed over): the icon badge drops its Changes row now (UpdateCheck.afterHandOff), not when
+    // the page next counts, which in the background may only be once iFizBox is opened again. The watch list moves it
+    // to that version, as selfHandedOff does, so a background run doesn't badge the same update again. The page's
+    // next count stands over this one. Sideload build only; any queue but this one's own.
+    static func appHandedOff(ids: Set<String>, version: String) {
+        guard AppMode.current == .sideload else { return }
+        let d = UserDefaults.standard
+        let n: Int? = queue.sync {
+            let before = UpdateCheck.Counts(pageCount: d.integer(forKey: pageCountKey),
+                                            pageKeys: Set(d.stringArray(forKey: pageKeysKey) ?? []),
+                                            found: d.stringArray(forKey: foundKey) ?? [])
+            let resign = Set(d.stringArray(forKey: pageResignKey) ?? [])
+            let after = UpdateCheck.afterHandOff(ids, version: version, before, resign: resign)
+            save(UpdateCheck.handedOff(loadWatch(), ids: ids, version: version), known: loadKnown())
+            guard after.counts != before || after.resign != resign else { return nil }
+            d.set(after.counts.pageCount, forKey: pageCountKey)
+            d.set(after.counts.pageKeys.sorted(), forKey: pageKeysKey)
+            d.set(after.counts.found, forKey: foundKey)
+            d.set(after.resign.sorted(), forKey: pageResignKey)
+            return after.counts.badge
+        }
+        guard let n else { return }
+        WidgetStore.save(count: n, names: []) // N8: the widget shows the same count
+        if n == 0 { UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: [Notifications.upgradesID]) }
+        Notifications.setIcon(n) // B158: in order with the page's app.badge
     }
 
     @discardableResult

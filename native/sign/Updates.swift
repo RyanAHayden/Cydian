@@ -185,6 +185,23 @@ enum UpdateCheck {
                       found: c.found.filter { !mine($0) })
     }
 
+    // B264: any app's install or re-sign has been handed to iOS (any of `ids`: its bundle ID as installed, the
+    // source's; `version`: the one handed over): its row comes off Changes' count at once, as B124's `without` does
+    // for iFizBox's own update, so the icon drops even while the page sleeps in the background. An update row (a page
+    // key) goes only when `version` reaches that update's (a re-sign keeps the version, so an update stays counted); a
+    // Needs Re-sign row (`resign`, the apps the page counted there: updates.resigns) goes either way. One app is one
+    // row (Changes files an app with both under its update). -> the counts and the re-sign rows left.
+    static func afterHandOff(_ ids: Set<String>, version: String, _ c: Counts, resign: Set<String>) -> (counts: Counts, resign: Set<String>) {
+        let done = { (k: String) -> Bool in
+            guard let id = keyID(k), ids.contains(id) else { return false }
+            return DebVersion.compare(version, String(k.dropFirst(id.count + 1))) >= 0
+        }
+        let row = c.pageKeys.contains(where: done) || !resign.isDisjoint(with: ids)
+        let after = Counts(pageCount: max(0, c.pageCount - (row ? 1 : 0)), pageKeys: c.pageKeys.filter { !done($0) },
+                           found: c.found.filter { !done($0) })
+        return (after, resign.subtracting(ids))
+    }
+
     // B124: the watch list once iFizBox has handed iOS `version` of itself: its entries (any of `ids`) at that version,
     // so a background run before the new version's first launch doesn't find and badge the same update again. Never
     // lowers a version.

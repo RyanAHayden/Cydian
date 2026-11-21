@@ -98,10 +98,21 @@ async function badge(upgrades, resign) {
     upgrades ??= await withAppUpgrades(await upgradesWithSelf(await catalog.upgrades(ignoredIds())), ignoredIds()); // F72, I3
     resign ??= await resignNow(upgrades);
     if (asked !== badgeAsked) return;
+    sendResigns(resign);
     state.ctx?.setBadge("changes", badgeCount(upgrades, resign));
   } catch {
     // no catalog yet: no badge
   }
+}
+
+// B264: the sideload app's shell learns which Needs Re-sign rows the count holds (updates.resigns), so the icon badge
+// drops a row the moment that app's re-sign is handed to iOS (BackgroundCheck.appHandedOff), even while this page
+// sleeps in the background. Update rows it knows already (updates.watch's keys).
+export function sendResigns(resign, { mode = detectMode(), native = nativeBridge() } = {}) {
+  if (mode !== "sideload" || typeof native?.call !== "function") return false;
+  const ids = [...new Set((resign ?? []).map((r) => r?.id).filter(Boolean))];
+  Promise.resolve().then(() => native.call("updates.resigns", { ids })).catch(() => {});
+  return true;
 }
 
 // B264: count again now (the tab badge, and through it the icon badge): an app's re-sign or install has just ended.

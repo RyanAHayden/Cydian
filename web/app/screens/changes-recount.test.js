@@ -14,7 +14,9 @@ const signed = (id, expiresIn) => ({ bundleId: id, name: id, version: "1.0", exp
 test("recountBadge: a re-signed app leaves the count at once; the latest count wins over an older one answering late", async () => {
   let answer = { apps: [signed("a", -day), signed("b", -day)] };
   let slow = null; // a signing.installed answer held back until released
-  globalThis.ifizboxNative = { mode: "sideload", call: async (m) => {
+  const resigns = [];
+  globalThis.ifizboxNative = { mode: "sideload", call: async (m, p) => {
+    if (m === "updates.resigns") resigns.push(p.ids.join(","));
     if (m !== "signing.installed") return {};
     const now = answer;
     if (slow) { const gate = slow; slow = null; await gate; }
@@ -31,6 +33,9 @@ test("recountBadge: a re-signed app leaves the count at once; the latest count w
     answer = { apps: [signed("a", 300 * day), signed("b", -day)] }; // Alpha's re-sign ended
     await m.recountBadge();
     assert.equal(badges.at(-1), 1, "counted again as the re-sign ended");
+    await new Promise((f) => setTimeout(f, 5));
+    // the shell learns the rows with each count, so it can drop one at its hand-off while this page sleeps
+    assert.deepEqual(resigns.slice(-2), ["a,b", "b"]);
 
     // an older count (both still needing a re-sign) answers after a newer one (both re-signed): the newer stands
     answer = { apps: [signed("a", -day), signed("b", -day)] };

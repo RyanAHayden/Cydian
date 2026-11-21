@@ -99,6 +99,24 @@ class Wiring(unittest.TestCase):
         self.assertIn("content.badge = NSNumber(value: badge)", self.src)
         self.assertIn("forKey: BackgroundCheck.pageCountKey", read("Sources", "Notifications.swift"))
 
+    def test_every_hand_off_drops_its_row(self):
+        # B264: every record of an app handed to iOS (the hosted link, This iPhone, the local link) takes its Changes
+        # row off the icon badge in the shell, since the page may be asleep in the background; the page tells the
+        # shell its Needs Re-sign rows with each count.
+        side = read("Sources", "Sideload.swift")
+        adds = side.count("saveRecords(SignedRecords.adding(record, to: records()))")
+        self.assertEqual(side.count("BackgroundCheck.appHandedOff(ids: [record.bundleID, record.originalBundleID], version: record.version)"),
+                         adds - 1)  # iFizBox's own This iPhone install goes through selfHandedOff
+        bg = read("Sources", "BackgroundCheck.swift")
+        self.assertIn('b.on("updates.resigns")', bg)
+        body = bg[bg.index("static func appHandedOff"):]
+        body = body[:body.index("\n    }\n")]
+        self.assertIn("UpdateCheck.afterHandOff(", body)
+        self.assertIn("Notifications.setIcon(", body)
+        with open(os.path.join(HERE, "..", "web", "app", "screens", "changes.js")) as f:
+            changes = f.read()
+        self.assertIn('"updates.resigns"', changes)
+
     def test_self_update_clears_its_badge(self):
         # B124: iFizBox's own update comes off the icon badge when it is handed to iOS (both routes). B178: the close
         # posts no notification, and nothing asks for notification permission before the hosted route's handoff.

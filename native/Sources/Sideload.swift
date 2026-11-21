@@ -454,6 +454,7 @@ enum Sideload {
             SignBridge.queue.async {
                 saveRecords(SignedRecords.adding(record, to: records()))
                 reschedule()
+                BackgroundCheck.appHandedOff(ids: [record.bundleID, record.originalBundleID], version: record.version) // B264
             }
             // B83: the link's status route, which says when iOS has the whole IPA (CloseForUpdate)
             let status = (json["manifest"] as? String).flatMap { m in
@@ -596,6 +597,7 @@ enum Sideload {
                     log?("iOS installed \(app.name) \(app.version)")
                     if !isSelf { saveRecords(SignedRecords.adding(record, to: records())) }
                     reschedule()
+                    if !isSelf { BackgroundCheck.appHandedOff(ids: [record.bundleID, record.originalBundleID], version: record.version) } // B264
                     opened(.success((app, record))); served?(true)
                 }
             }
@@ -750,6 +752,7 @@ enum Sideload {
         SignBridge.queue.async {
             saveRecords(SignedRecords.adding(record, to: records()))
             reschedule()
+            BackgroundCheck.appHandedOff(ids: [record.bundleID, record.originalBundleID], version: record.version) // B264
         }
         DispatchQueue.main.async {
             log?("Handing iOS the install link; it asks \"Install \(app.name)?\"")

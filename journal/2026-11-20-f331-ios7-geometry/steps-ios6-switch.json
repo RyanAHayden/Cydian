@@ -1,0 +1,4 @@
+[{"eval": "(()=>{localStorage.clear();localStorage.setItem('ifizbox.firstVisit','later');localStorage.setItem('ifizbox.device','iphoneos-arm64');localStorage.setItem('ifizbox.style','ios6');localStorage.setItem('ifizbox.appearance','light');return document.documentElement.dataset.style})()"},
+ {"nav": "#/home/settings/general", "ms": 6000},
+ {"eval": "(()=>{const s=[...document.querySelectorAll('.switch[aria-checked=false]')].pop();if(!s)return 'none';const k=s.querySelector('.sw-knob');const t=s.querySelector('.sw-track');return JSON.stringify({x:getComputedStyle(s).getPropertyValue('--x'),tr:getComputedStyle(s).getPropertyValue('--sw-travel'),k:getComputedStyle(k).transform,kd:getComputedStyle(k).display,kb:k.getBoundingClientRect(),b:getComputedStyle(t,'::before').transform,style:document.documentElement.dataset.style})})()"},
+ {"shot": "ios6-general-settled"}]

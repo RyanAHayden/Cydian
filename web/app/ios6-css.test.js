@@ -283,3 +283,27 @@ test("T61: packages.css's -webkit-box-reflect declarations all sit in look-only 
   const inside = stretchesOf(src).flatMap(reflects);
   for (const sel of [".store-icon", ".browse-hero-icon", ".browse-hero.is-loading .browse-hero-icon"]) assert.ok(inside.includes(sel), sel);
 });
+
+// F331: a geometry hook must not share a name with a look token (style.css's --sw-knob hook once overwrote ios6.css's
+// knob gradient, so iOS 6's knob drew 2px wide), and the switch, Theme's Mode and Home move only through their hooks.
+test("F331: era hooks don't reuse a look token's name, and the new geometry reads them", () => {
+  const hookBlocks = [...base.matchAll(/:root \{([^}]*)\}/g)].map((m) => m[1]).join("\n");
+  const hooks = new Set([...hookBlocks.matchAll(/(--[\w-]+)\s*:/g)].map((m) => m[1]));
+  const looks = new Set();
+  for (const f of readdirSync(new URL(".", import.meta.url)).filter((x) => x.endsWith(".css") && x !== "style.css" && !/^ios\d+\.css$/.test(x))) {
+    for (const m of readFileSync(new URL(f, import.meta.url), "utf8").matchAll(/(--[\w-]+)\s*:/g)) looks.add(m[1]);
+  }
+  for (const m of css.matchAll(/(--[\w-]+)\s*:/g)) if (m[1] !== "--x") looks.add(m[1]);
+  const clash = [...hooks].filter((h) => looks.has(h) && !["--tab-h", "--nav-h", "--safe-bottom"].includes(h));
+  assert.deepEqual(clash.filter((h) => /^--(sw|settings-seg|home)-/.test(h)), []);
+  for (const [sel, hook] of [[".switch", "--sw-w"], [".sw-knob", "--sw-knob-size"]]) {
+    assert.ok(new RegExp(`(^|\\n)\\${sel}\\s*\\{[^}]*var\\(${hook}\\)`).test(base), `${sel} uses ${hook}`);
+  }
+  assert.match(css, /\.switch\[aria-checked="true"\]\s*\{\s*--x:\s*var\(--sw-travel\)/);
+  const settings = readFileSync(new URL("./settings.css", import.meta.url), "utf8");
+  assert.match(settings, /\.store-segmented\.settings-segmented \{ margin: var\(--settings-seg-margin\);/);
+  const home = readFileSync(new URL("./home.css", import.meta.url), "utf8");
+  assert.match(home, /\.home-row \{ margin: 0 var\(--home-inset\)/);
+  const ios7 = readFileSync(new URL("./ios7.css", import.meta.url), "utf8");
+  for (const v of ["--sw-w: 51px", "--sw-h: 31px", "--sw-travel: 20px", "--settings-seg-margin: 0 15px", "--home-inset: 0px"]) assert.ok(ios7.includes(v), v);
+});

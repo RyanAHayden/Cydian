@@ -7,7 +7,10 @@ export function createSwitch({ label, checked = false, onToggle = () => {} }) {
   b.setAttribute("role", "switch");
   b.setAttribute("aria-label", label);
   b.innerHTML = '<span class="sw-track"></span><span class="sw-knob"></span>';
-  const TRAVEL = 50; // px the knob moves: 77px track, 25px knob 1px inside it (the kit's switch)
+  // px the knob moves: style.css's --sw-travel hook (iOS 6: 50, the kit's 77px track less its 27px knob; an era sets
+  // its own), read when a drag starts so a style change applies to switches already drawn
+  let TRAVEL = 50;
+  const travel = () => parseFloat(globalThis.getComputedStyle?.(b).getPropertyValue("--sw-travel")) || 50;
   const isOn = () => b.getAttribute("aria-checked") === "true";
   const set = (on) => {
     b.style.removeProperty("--x");
@@ -21,6 +24,7 @@ export function createSwitch({ label, checked = false, onToggle = () => {} }) {
   let drag = null;
   b.addEventListener("pointerdown", (e) => {
     const on = isOn();
+    TRAVEL = travel();
     drag = { id: e.pointerId, x0: e.clientX, start: on ? TRAVEL : 0, x: on ? TRAVEL : 0, moved: false };
     b.setPointerCapture?.(e.pointerId);
     b.classList.add("is-held");

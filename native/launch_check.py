@@ -20,7 +20,8 @@ THEMES = "LaunchThemes/"
 THEME_KEYS = ("classic", "sepia", "solarized", "oled", "gunmetal", "midnight", "linen", "nord", "dracula",
               "leather", "felt", "wood", "legalpad", "metal",
               "white",  # B231: iOS 7's White, the iOS 7 and iOS 13 styles' light theme (STYLE_PALETTES)
-              "oled7", "oled13")  # B235: iOS 7's and iOS 13's OLED Black, flat bars (STYLE_LAUNCH)
+              "oled7", "oled13",  # B235: iOS 7's and iOS 13's OLED Black, flat bars (STYLE_LAUNCH)
+              "white13")  # B237: iOS 13's White, #f2f2f7 ground and #f9f9f9 bars (STYLE_LAUNCH)
 
 
 def storyboard_problems(files, base, what):

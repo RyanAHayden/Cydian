@@ -180,7 +180,7 @@ class LaunchThemes(unittest.TestCase):
         light_tab = self.token(re.search(r"background:(.*?);", self.block(self.ios6, ".tabbar"), re.S).group(1))
         # B231: iOS 7's White; B235: iOS 7's and iOS 13's OLED Black. Flat bars, the hairline flattened over the bar
         eras = {"white": ("ios7", "light", "i7", ""), "oled7": ("ios7", "dark", "i7", "dk-"),
-                "oled13": ("ios13", "dark", "i13", "dk-")}
+                "oled13": ("ios13", "dark", "i13", "dk-"), "white13": ("ios13", "light", "i13", "")}  # B237
         if key in eras:
             era, tone, p, dk = eras[key]
             b = self.block(read("web", "app", era + ".css"), 'html[data-style="%s"][data-theme="%s"]' % (era, tone))

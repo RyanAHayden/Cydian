@@ -62,7 +62,7 @@ def stops(*pairs):
 #   tab_gloss:  the bar's 48 pt from 1 pt down; tab_base: the bar's colour under it and on its first point
 #   tab_shadow: the alpha the tab bar's 2.5 pt shadow starts at, when not 0.18 (White has none)
 # Besides Settings' palettes, the eras' own (core/settings.js STYLE_PALETTES): white, and their OLED Black's launch
-# sets (STYLE_LAUNCH): oled7, oled13.
+# sets (STYLE_LAUNCH): oled7, oled13, and iOS 13's White: white13.
 CLASSIC_TAB = dict(tab_line=("ffffff", 0.1), tab_gloss=stops((0, "2f2f2f"), (0.495, "151515"), (0.495, "000000"),
                                                             (1, "000000")), tab_base="000000")
 THEMES = {
@@ -112,6 +112,11 @@ THEMES = {
     "white": dict(pins=("efeff4", "efeff4"), nav_line="adadad", nav_hi=("f7f7f7", 1),
                   nav_gloss=stops((0, "f7f7f7"), (1, "f7f7f7")), nav_shadow=0, tab_line=("adadad", 1),
                   tab_gloss=stops((0, "f7f7f7"), (1, "f7f7f7")), tab_base="f7f7f7", tab_shadow=0),
+    # B237: iOS 13's White (ios13.css; core/settings.js STYLE_LAUNCH): a #f2f2f7 ground, flat #f9f9f9 bars, and their
+    # rgba(0,0,0,.3) hairline over the bar (#aeaeae) as the 1 pt line.
+    "white13": dict(pins=("f2f2f7", "f2f2f7"), nav_line="aeaeae", nav_hi=("f9f9f9", 1),
+                    nav_gloss=stops((0, "f9f9f9"), (1, "f9f9f9")), nav_shadow=0, tab_line=("aeaeae", 1),
+                    tab_gloss=stops((0, "f9f9f9"), (1, "f9f9f9")), tab_base="f9f9f9", tab_shadow=0),
     # B235: iOS 7's and iOS 13's OLED Black (ios7.css, ios13.css; core/settings.js STYLE_LAUNCH): a flat #000 ground and
     # bars, no highlight, gloss or shadows, and the bars' hairline (#262626, #38383a) as the 1 pt line views.
     "oled7": dict(pins=("000000", "000000"), nav_line="262626", nav_hi=("000000", 1),

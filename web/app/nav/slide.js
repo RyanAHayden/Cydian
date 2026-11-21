@@ -198,9 +198,15 @@ const measures = new WeakMap();  // root -> its last measure
 const slides = new WeakMap();    // el -> { anim, from } its running slide
 const ours = new WeakSet();      // our Animation objects
 const rootOf = new WeakMap();    // observed box -> its root
-const firstSeen = new WeakSet(); // observed, its first ResizeObserver report not in yet
+const firstSeen = new WeakMap(); // observed, its first ResizeObserver report not in yet -> its measured height
 const live = new Set();          // roots with a measure
 let ro = null;
+// A box first measured inside a ResizeObserver report (a viewport resize, a rotation) is observed on the next frame:
+// observed in the report, its first report would land shallower in the same broadcast and Chromium would raise
+// "ResizeObserver loop completed with undelivered notifications".
+let reporting = false;
+const pending = new Set();       // boxes waiting for that frame
+let flushQueued = false;
 let installed = false;
 
 const motionOk = () => !globalThis.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches
@@ -274,21 +280,46 @@ function fadeOut(root, box, top) {
   anim.oncancel = end;
 }
 
+function flushPending() {
+  flushQueued = false;
+  for (const el of pending) if (rootOf.has(el) && el.isConnected !== false) ro.observe(el);
+  pending.clear();
+}
+
+function unwatch(el) {
+  pending.delete(el);
+  rootOf.delete(el); // so it is observed again if it comes back
+  firstSeen.delete(el);
+  ro.unobserve(el);
+}
+
 function watchBoxes(root, prev, next) {
   if (!ro) return;
   const keep = new Set(next?.list.map((b) => b.el) ?? []);
-  for (const b of prev?.list ?? []) if (!keep.has(b.el)) ro.unobserve(b.el);
+  for (const b of prev?.list ?? []) if (!keep.has(b.el)) unwatch(b.el);
   for (const b of next?.list ?? []) {
     if (rootOf.get(b.el) === root) continue;
     rootOf.set(b.el, root);
-    firstSeen.add(b.el);
-    ro.observe(b.el);
+    firstSeen.set(b.el, b.height);
+    if (!reporting) { ro.observe(b.el); continue; }
+    pending.add(b.el);
+    if (flushQueued) continue;
+    flushQueued = true;
+    (globalThis.requestAnimationFrame ?? ((f) => setTimeout(f, 16)))(flushPending);
   }
+}
+
+// The first report of a box: skipped, unless it changed size since it was measured (a box observed a frame late).
+function firstReport(e) {
+  const h = firstSeen.get(e.target);
+  firstSeen.delete(e.target);
+  const now = e.borderBoxSize?.[0]?.blockSize;
+  return typeof now === "number" && Math.abs(now - h) >= 1;
 }
 
 function forget(root) {
   const m = measures.get(root);
-  if (ro) for (const b of m?.list ?? []) ro.unobserve(b.el);
+  if (ro) for (const b of m?.list ?? []) unwatch(b.el);
   measures.delete(root);
   live.delete(root);
 }
@@ -345,12 +376,13 @@ export function installSlides(doc = globalThis.document) {
       for (const e of entries) {
         const root = rootOf.get(e.target);
         if (!root) continue;
-        if (firstSeen.has(e.target)) { firstSeen.delete(e.target); continue; }
+        if (firstSeen.has(e.target) && !firstReport(e)) continue;
         // A box in a CSS height transition reports every frame: follow it without sliding against it.
         const still = Boolean(e.target.getAnimations?.().some((a) => !ours.has(a)));
         roots.set(root, (roots.get(root) ?? still) && still);
       }
-      for (const [root, still] of roots) update(root, still);
+      reporting = true;
+      try { for (const [root, still] of roots) update(root, still); } finally { reporting = false; }
     });
   }
   new MutationObserver((records) => {

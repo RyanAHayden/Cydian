@@ -46,3 +46,20 @@ own state" not in the diff (rows already have their own states: rowStatus, uncha
 long (fixed); `fail` off `SignBridge.queue` (safe, above). Nothing reverted.
 
 ## Phone check
+
+Prepared, not run. Built Lite from this branch (`make -C native package`, 0.18.3 build 3491, `installLaneNext` in the
+bundled `web/core/apprun.js`, Swift compiled), made three test apps with `mkapps.py` (the Tiny fixture's binary
+under `com.ryha.b263big` padded to 300 MB, `com.ryha.b263a`, `com.ryha.b263b`; source.json for an AltStore source)
+and served them with `slowserve.py` (big files at 5 MB/s, about 60 s, every request's start and end logged) behind
+`tailscale serve --https=8463`; source.json loaded over https from this desktop. `tools/ui-15.sh lock B263` said
+"locked by R55" from 01:56 to 02:28 (retried every minute for 30 min; R55 is a long multi-part phone test), so
+nothing ran on the phone. The server and the tailscale serve were stopped. Filed **R58** (after B263) to run the
+check from main with these two scripts: Install the 3 through Confirm with the big one first, then Re-sign All, and
+journal the order from the Log.
+
+## Not verified
+
+- **The iPhone 15 Pro run with 3+ apps, one big, and the order of events from its Log**: the phone's UI lock was held
+  by R55 for the whole session (30 min of retries). Filed as R58.
+- The shell's change (signing off `SignBridge.queue`) is checked only by the build compiling it and by reading the
+  code; no host test drives `SignAhead` (it needs the phone's keychain identity). R58 covers it on the phone.

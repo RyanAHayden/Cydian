@@ -39,7 +39,7 @@ def settings_palettes():
         block = re.search(r'key: "%s".*?options: \[(.*?)\}\],' % key, settings, re.S).group(1)
         out += re.findall(r'value: "([a-z]+)"', block)
     # B231: the eras' own themes (STYLE_PALETTES), e.g. iOS 7's White, which no theme list offers
-    table = re.search(r"export const STYLE_PALETTES = \{(.*?)\};", settings).group(1)
+    table = re.search(r"export const STYLE_PALETTES = \{(.*?)\};", settings, re.S).group(1)
     out += [v for v in re.findall(r'(?:light|dark): "([a-z]+)"', table) if v not in out]
     return sorted(set(out))
 

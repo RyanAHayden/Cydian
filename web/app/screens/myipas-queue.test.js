@@ -41,6 +41,7 @@ test("add({ library }): an install job with no url; Confirm groups it as Install
   const plan = appPlan(q.list());
   assert.deepEqual(plan.installs.map((x) => x.id), ["com.x.delta"]);
   assert.deepEqual(plan.reinstalls.map((x) => x.id), ["com.me.alpha"]);
+  assert.equal(plan.download, null); // B282: My IPAs files are on the phone already: nothing to download
   assert.throws(() => q.add({ id: "x" }), /no IPA/);
   assert.equal(q.add({ id: "y", url: "https://a/y.ipa" }).library, undefined);
 });

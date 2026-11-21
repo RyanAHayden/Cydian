@@ -1,7 +1,7 @@
 // F80: the sideload app's install queue (core/appqueue.js).
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { createAppQueue, appJob, appPlan, runOrder, appNavLabel, modifyActions, sizeText, SELF_ID } from "./appqueue.js";
+import { createAppQueue, appJob, appPlan, jobDownloads, runOrder, appNavLabel, modifyActions, sizeText, SELF_ID } from "./appqueue.js";
 
 const pkg = (id, versions, extra = {}) => ({ key: "alt:https://s/", row: { id, name: id.toUpperCase() },
   stanza: { kind: "ipa", ipa: { bundleIdentifier: id, name: id.toUpperCase(), sourceUrl: "https://s/apps.json", sourceName: "S",
@@ -48,6 +48,19 @@ test("appPlan: Confirm's groups (core/queue.js parseSimulation's shape) and the 
   assert.equal(plan.download, "4.0 MB");
   assert.equal(appPlan([]).download, null);
   assert.equal(sizeText(2048), "2 kB");
+});
+
+test("appPlan's download counts only jobs that download (B282)", () => {
+  const q = createAppQueue();
+  q.add({ id: "lib", version: "1", installed: "1", library: "Lib.ipa", size: 20480 }); // a My IPAs Reinstall
+  q.add({ id: "rs", version: "1", installed: "1", mode: "resign", size: 4096 }); // Re-sign from the record
+  q.add({ id: "mk", version: "1", installed: "1", mode: "resign", url: "https://s/mk.ipa", size: 1048576 }); // marked app
+  q.add({ id: "up", version: "2", installed: "1", url: "https://s/up.ipa", size: 1048576 });
+  q.add({ id: "gone", op: "remove", size: 999 });
+  assert.equal(appPlan(q.list()).download, "2.0 MB");
+  assert.equal(appPlan([q.get("lib"), q.get("rs")]).download, null);
+  assert.equal(jobDownloads(q.get("lib")), false);
+  assert.equal(jobDownloads(q.get("mk")), true);
 });
 
 test("runOrder: as queued, iFizBox itself last", () => {

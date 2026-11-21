@@ -13,7 +13,7 @@
 #                                     its bundle ID, like the app's own signer) and install it; --as-is: no signing
 #   tools/ui-15.sh ME home            Home
 #   tools/ui-15.sh ME lock-button     lock the screen;  ME wake: wake and unlock it (no passcode on this phone)
-#   tools/ui-15.sh ME reboot          restart the phone, wait for it, bring WDA back and unlock it (about 1.5 min)
+#   tools/ui-15.sh ME reboot          restart the phone, wait for it, bring WDA back and unlock it (about a minute)
 #   tools/ui-15.sh ME shot NAME       screenshot -> ref/15/screens/NAME.png
 #   tools/ui-15.sh ME source          the frontmost app's accessibility tree (XML)
 #   tools/ui-15.sh unlock ME          release it; always do this when done, even after a failure

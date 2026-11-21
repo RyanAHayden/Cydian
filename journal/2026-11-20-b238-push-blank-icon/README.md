@@ -71,6 +71,12 @@ switch both left it as it was).
 - Home showed "Signing Needs Setup" while Installation & Signing said "Ready to Install" through the Signing Server.
   B245.
 
+## Spec review
+
+Fixed: the docs/push.md section had split the entitlements paragraph off from its own section; restart time now
+reads "about a minute" everywhere. Left as is: no app change (nothing the app does refreshes iOS's copy; see
+above), and the B243-B245 lines in plan/TODO.md, which `run plan add` wrote.
+
 ## Not verified
 
 - **The user's phone.** I can't reach it. That its cached icon dates from a pre-0.17.1 build comes from the

@@ -156,10 +156,35 @@ const GUIDE_TILES = {
   filza: ["#ffc66b", "#e07e14", "<path d='M11 16h12l4 4h20v24H11z'/><g fill='none' stroke='#e07e14' stroke-width='3' stroke-linecap='round'><path d='M19 27v11h8M19 32h8'/></g><rect x='29' y='25' width='10' height='5' rx='1' fill='#e07e14'/><rect x='29' y='35' width='10' height='5' rx='1' fill='#e07e14'/>"],
 };
 
-// Home tiles a screen styles itself (home.css .home-glyph): the tile's colour, its gradient, the glyph SVG.
+// Home's tiles (home.css .home-glyph, .glyph-<name>): the tile's colour, its gradient (optional), the glyph SVG on
+// 24 units, drawn 21px on the 29px tile. No colour: the row gives it (the green row's --tile-glyph-green, the
+// certificate tile's ink). home.css holds every one but Why as homeGlyphRules("ios6") prints them (rowicons.test.js);
+// screens/why.js writes the Why tile's itself (homeTileCss).
+const HOME_SVG = "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'";
 const HOME_TILES = {
   why: { colour: "#d8820f", gradient: ["#f4b03f", "#d8820f"], // screens/why.js: the Why tile's star
     svg: "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path fill='#fff' d='M12 3.2l2.6 5.5 6 .7-4.4 4.1 1.2 5.9L12 16.5l-5.4 2.9 1.2-5.9-4.4-4.1 6-.7z'/></svg>" },
+  github: { colour: "#333", svg: `${HOME_SVG} fill='none' stroke='#fff' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'><path d='M8 6 2 12l6 6M16 6l6 6-6 6M14 4l-4 16'/></svg>` },
+  sources: { colour: "#5c7aa3", svg: `${HOME_SVG} fill='#fff'><path d='M3 4h18v4H3zM4 9h16v11H4zm5 3v2h6v-2z' fill-rule='evenodd'/></svg>` },
+  // the old blurple and Clyde
+  discord: { colour: "#7289da", svg: `${HOME_SVG}><path fill='#fff' d='M19.3 5.4A16.6 16.6 0 0 0 15.2 4l-.5 1a15.3 15.3 0 0 0-5.4 0l-.5-1a16.5 16.5 0 0 0-4.1 1.4C2.1 9.3 1.4 13.2 1.8 17a16.7 16.7 0 0 0 5 2.5l1.1-1.7a10.8 10.8 0 0 1-1.7-.8l.4-.3a11.9 11.9 0 0 0 10.8 0l.4.3a10.8 10.8 0 0 1-1.7.8l1.1 1.7a16.6 16.6 0 0 0 5-2.5c.5-4.4-.7-8.3-2.9-11.6zM8.5 14.6c-1 0-1.8-.9-1.8-2s.8-2 1.8-2 1.8.9 1.8 2-.8 2-1.8 2zm7 0c-1 0-1.8-.9-1.8-2s.8-2 1.8-2 1.8.9 1.8 2-.8 2-1.8 2z'/></svg>` },
+  featured: { colour: "#fc0", svg: `${HOME_SVG} fill='#fff'><path d='m12 1.5 3.2 6.9 7.3.8-5.4 5 1.5 7.3L12 17.8l-6.6 3.7 1.5-7.3-5.4-5 7.3-.8z'/></svg>` },
+  themes: { colour: "#1a82fb", svg: `${HOME_SVG} fill='#fff'><path d='M2 4h20v13H2zm2 2v9h16V6zM9 18h6l1 3H8z' fill-rule='evenodd'/></svg>` },
+  browse: { colour: "#f39c12", svg: `${HOME_SVG} fill='#fff'><path d='M3 3h8v8H3zm10 0h8v8h-8zM3 13h8v8H3zm10 0h8v8h-8z'/></svg>` },
+  signing: { colour: "#8e44ad", svg: `${HOME_SVG} fill='#fff'><path d='M4 3h12l4 4v8.5a5 5 0 0 0-2-1.2V8h-3V5H6v14h6.6a5 5 0 0 0 .7 2H4zm14 13a3.5 3.5 0 1 1-1.5 6.7L15 24v-3.4A3.5 3.5 0 0 1 18 16zM8 9h7v2H8zm0 4h5v2H8z'/></svg>` },
+  install: { colour: "#2c9b3c", svg: `${HOME_SVG} fill='#fff'><path d='M11 3h2v9.6l3.3-3.3 1.4 1.4L12 16.4l-5.7-5.7 1.4-1.4 3.3 3.3zM4 18h16v2H4z'/></svg>` },
+  send: { colour: "#2c9b3c", svg: `${HOME_SVG} fill='#fff'><path d='M3 11h12.2l-4.6-4.6L12 5l7 7-7 7-1.4-1.4 4.6-4.6H3z'/></svg>` },
+  // the green row's state tile (screens/home.js stateTile): the row colours them
+  add: { svg: `${HOME_SVG} fill='#fff'><path d='M10 3h4v7h7v4h-7v7h-4v-7H3v-4h7z'/></svg>` },
+  upgrades: { svg: `${HOME_SVG} fill='#fff'><path d='M12 2 3 11h6v10h6V11h6z'/></svg>` },
+  failed: { svg: `${HOME_SVG} fill='#fff'><path d='M10 3h4l-.6 12h-2.8zm0 15h4v3h-4z'/></svg>` },
+  current: { svg: `${HOME_SVG} fill='none' stroke='#fff' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'><path d='m4 12.5 5 5L20 6.5'/></svg>` },
+  changes: { svg: `${HOME_SVG} fill='none' stroke='#fff' stroke-width='2.6' stroke-linecap='round'><circle cx='12' cy='12' r='9'/><path d='M12 7v5l3.5 2.5'/></svg>` },
+  loading: { svg: `${HOME_SVG} fill='none' stroke='#fff' stroke-width='2.6' stroke-linecap='round'><circle cx='12' cy='12' r='9'/><path d='M12 7v5l3.5 2.5'/></svg>` },
+  // an open padlock (jailbreak's usual sign; not anyone's artwork) on a purple gradient
+  jailbreak: { colour: "#5b2fa3", gradient: ["#8a5cd0", "#5b2fa3"], svg: `${HOME_SVG}><path fill='none' stroke='#fff' stroke-width='2.2' stroke-linecap='round' d='M8 10.5V7.5a4 4 0 0 1 7.6-1.7'/><rect x='5' y='10.5' width='14' height='10' rx='2' fill='#fff'/><circle cx='12' cy='15' r='1.6' fill='#6f43b9'/><path d='M12 15.5v2.3' stroke='#6f43b9' stroke-width='1.4' stroke-linecap='round'/></svg>` },
+  // Home's Theme half (screens/home.js THEME_ICON): Settings > Theme's colour and contrast disc
+  theme: { colour: "#4650b4", svg: `${HOME_SVG}><path fill='#fff' fill-rule='evenodd' d='M12 2.5a9.5 9.5 0 1 1 0 19a9.5 9.5 0 0 1 0-19zM12 4.8a7.2 7.2 0 0 0 0 14.4z'/></svg>` },
 };
 
 // The tab bar's glyphs: masks over the tab's fill (ios6.css .tab-icon::before), reaching CSS as the `--glyph` token
@@ -267,10 +292,33 @@ const GUIDE_TILES_7 = {
   filza: ["#ffe066", "#ff9500", `${G7}<path d='M11 16h12l4 4h20v24H11z'/><path d='M23 26v12'/><path d='M23 30h4M23 34h4'/></g>`],
 };
 
-// The Why tile: iOS 7's flat orange, the line star.
+// Home's tiles: iOS 7's flat colours (no gradients) and line glyphs, the row glyphs' 1.9-unit line. A tile with no
+// colour keeps what the row or iOS 6's rule gives it (GitHub's near-black: the dark theme's own grey still wins).
+const home7 = (colour, parts) => ({ ...(colour ? { colour } : {}),
+  svg: `${HOME_SVG}>${glyphSvg(parts).replace(/"/g, "'")}</svg>` });
+const CLYDE = "M19.3 5.4A16.6 16.6 0 0 0 15.2 4l-.5 1a15.3 15.3 0 0 0-5.4 0l-.5-1a16.5 16.5 0 0 0-4.1 1.4C2.1 9.3 1.4 13.2 1.8 17a16.7 16.7 0 0 0 5 2.5l1.1-1.7a10.8 10.8 0 0 1-1.7-.8l.4-.3a11.9 11.9 0 0 0 10.8 0l.4.3a10.8 10.8 0 0 1-1.7.8l1.1 1.7a16.6 16.6 0 0 0 5-2.5c.5-4.4-.7-8.3-2.9-11.6z";
 const HOME_TILES_7 = {
+  // The Why tile: iOS 7's flat orange, the line star.
   why: { colour: "#ff9500", gradient: ["#ff9500", "#ff9500"],
     svg: `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='${star()}' fill='none' stroke='#fff' stroke-width='1.6' stroke-linejoin='round'/></svg>` },
+  github: home7(null, [ln("M8 6 2 12l6 6M16 6l6 6-6 6M14 4l-4 16")]),
+  sources: home7(C7.blue, GLYPHS_7.list),
+  discord: home7(C7.indigo, [ln(CLYDE, 1.6), dot(8.5, 12.6, 1.5), dot(15.5, 12.6, 1.5)]),
+  featured: home7(C7.gold, [STAR_7]),
+  themes: home7(C7.blue, [ln("M3 4.5h18v12H3z"), ln("M12 16.5v3.5M8 20.5h8")]),
+  browse: home7(C7.orange, GLYPHS_7.apps),
+  signing: home7(C7.purple, [ln("M13 21H5.5V3h8.5l4.5 4.5v3"), ln("M8.5 9h6M8.5 12.5h3.5"), ln(ring(17, 15.5, 2.8)),
+    ln("M15.4 17.8 14.8 22l2.2-1.1 2.2 1.1-.6-4.2")]),
+  install: home7(C7.green, GLYPHS_7.install),
+  send: home7(C7.green, [ln("M4 12h15M13 6l6 6-6 6")]),
+  add: home7(null, GLYPHS_7.plus),
+  upgrades: home7(null, [ln("M12 20V4.5M6 10.5l6-6 6 6")]),
+  failed: home7(null, [ln("M12 4v10", 2.2), dot(12, 19, 1.4)]),
+  current: home7(null, GLYPHS_7.check),
+  changes: home7(null, GLYPHS_7.clock),
+  loading: home7(null, GLYPHS_7.clock),
+  jailbreak: home7(C7.purple, [ln("M5.5 11h13v9.5h-13z"), ln("M8.5 11V7.8a3.5 3.5 0 0 1 6.8-1.2"), ln("M12 14.5v2.5")]),
+  theme: home7(C7.indigo, GLYPHS_7.contrast),
 };
 
 // The tab bar: thin outline glyphs (tabs), the same shapes filled on the chosen tab (tabsSelected), as the kit's
@@ -341,7 +389,20 @@ export function tabGlyphTokens(style = "ios6", kind = "tabs") {
 export function homeTileCss(name, style = iconStyle()) {
   const t = icon("home", name, style);
   if (!t) throw new Error(`no home tile ${name}`);
-  return `background-color: ${t.colour}; background-image: ${cssSvgUrl(t.svg)}, linear-gradient(${t.gradient.join(", ")});`;
+  const colour = t.colour ? `background-color: ${t.colour}; ` : "";
+  const gradient = t.gradient ? `, linear-gradient(${t.gradient.join(", ")})` : "";
+  return `${colour}background-image: ${cssSvgUrl(t.svg)}${gradient};`;
+}
+
+// Home's tile glyph rules for `style`, one `.glyph-<name>` rule per tile that style draws itself (Why apart: why.js
+// writes it): what home.css holds for iOS 6 and an era's stylesheet carries, under its html[data-style], for its own.
+export function homeGlyphRules(style = "ios6") {
+  const own = ICON_SETS[style]?.home;
+  if (!own) throw new Error(`no home tiles for ${style}`);
+  return Object.keys(own).filter((name) => name !== "why").map((name) => {
+    const size = own[name].gradient ? " background-size: 21px 21px, 100% 100%;" : "";
+    return `.glyph-${name} { ${homeTileCss(name, style)}${size} }`;
+  }).join("\n");
 }
 
 // The names of Copying Files' tiles, and one tile as a whole SVG: flat like Home's tiles (no gloss), the tile's

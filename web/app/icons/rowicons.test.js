@@ -195,3 +195,40 @@ test("F332: ios7.css carries iOS 7's tab glyphs, outline and (chosen) filled, fr
   assert.doesNotMatch(css, /:not\(\.active\) \{ --glyph/, "one glyph rule per tab and state");
   assert.throws(() => tabGlyphTokens("ios6", "tabsSelected"), "iOS 6 draws no separate chosen glyph");
 });
+
+test("F339: home.css's tile glyphs are the map's iOS 6 home tiles, and none is drawn outside it", async () => {
+  const { homeGlyphRules } = await import("./rowicons.js");
+  const css = readFileSync(new URL("../home.css", import.meta.url), "utf8");
+  const lines = homeGlyphRules("ios6").split("\n");
+  for (const line of lines) assert.ok(css.split("\n").includes(line), `home.css: ${line.slice(0, 60)}`);
+  // every .glyph-* rule painting a background is one of them (.glyph-loading's opacity is no glyph)
+  const painted = css.split("\n").filter((l) => /^\.glyph-[a-z]+.*background/.test(l));
+  assert.deepEqual(painted.filter((l) => !lines.includes(l)), []);
+});
+
+test("F339: iOS 7 redraws every Home tile flat, a line glyph in iOS 7's colours, and ios7.css carries them", async () => {
+  const { ICON_SETS, TO_C7, homeGlyphRules } = await import("./rowicons.js");
+  const six = ICON_SETS.ios6.home, seven = ICON_SETS.ios7.home;
+  assert.deepEqual(Object.keys(seven).sort(), Object.keys(six).sort(), "every tile redrawn");
+  const c7 = new Set(Object.values(TO_C7));
+  for (const [name, t] of Object.entries(seven)) {
+    if (name === "why") continue; // F332's, checked above
+    assert.equal(t.gradient, undefined, `${name}: flat`);
+    if (t.colour) assert.ok(c7.has(t.colour), `${name}: ${t.colour} is an iOS 7 colour`);
+    assert.match(t.svg, /stroke='#fff'/, `${name}: a line glyph`);
+    assert.notEqual(t.svg, six[name].svg, name);
+    assert.doesNotMatch(t.svg, /"/, `${name}: single quotes, for url("…")`);
+  }
+  const css = readFileSync(new URL("../ios7.css", import.meta.url), "utf8").split("\n");
+  for (const line of homeGlyphRules("ios7").split("\n")) assert.ok(css.includes(`html[data-style="ios7"] ${line}`), line.slice(0, 60));
+  assert.throws(() => homeGlyphRules("nope"));
+});
+
+test("F339: every glyph Home's tiles name is in the map", async () => {
+  const { ICON_SETS } = await import("./rowicons.js");
+  const src = readFileSync(new URL("../screens/home.js", import.meta.url), "utf8");
+  const names = new Set([...src.matchAll(/glyph: "([a-z]+)"/g), ...src.matchAll(/kind: "([a-z]+)", label/g)].map((m) => m[1]));
+  names.add("theme"); // THEME_ICON
+  assert.ok(names.size > 8, [...names].join(" "));
+  for (const n of names) assert.ok(ICON_SETS.ios6.home[n] && ICON_SETS.ios7.home[n], n);
+});

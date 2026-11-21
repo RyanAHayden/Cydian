@@ -1,7 +1,7 @@
 # F345: iOS 26 style with the real native controls (research and plan)
 
 User, 2026-11-21: "the ios 26 liquid style should just use the actual native input boxes if possible". This task is
-the research and the plan; the era itself is F203, and the native controls on top of it are filed as F345a–F345c
+the research and the plan; the era itself is F203, and the native controls on top of it are filed as F345a–F345d
 (below).
 
 ## What I did
@@ -15,6 +15,11 @@ the research and the plan; the era itself is F203, and the native controls on to
    rendering is in WebKit's RenderTheme and the pickers are WebKit's UI-process code, not Safari's), so what Safari
    shows is what the app's web view shows.
 3. Tapped the `<select>`, the date field and the search field and shot each.
+4. After the spec review asked for it: the same controls **inside iFizBox's own WKWebView** on the 15 Pro. I attached
+   with `pymobiledevice3 webinspector cdp`, laid a full-screen div of unstyled controls (`all: revert`) over the
+   running app page with `Runtime.evaluate`, shot it, tapped the `<select>`, and removed the div. Same results as
+   Safari: capsule search with magnifier, capsule select and date, iOS 26 switch (`switch` supported), pill-knob
+   slider, capsule button, and the glass UIMenu on tapping the select (`f345-app-probe.png`, `f345-app-select.png`).
 
 Shots (not committed: they hold iOS's own status bar, keyboard and Safari chrome): `ref/15/screens/f345-probe-1.png`,
 `f345-select.png`, `f345-date.png`, `f345-search-focus.png` in the main checkout's `ref/`.
@@ -87,7 +92,8 @@ Without it (iPhone 7, desktop Chrome, an old iPad) the same markup gets ios26.cs
 | Alerts and text prompts (`nav/alert.js` showAlert) | app: a bridge call `ui.alert` → UIAlertController (`.alert`), text field via `addTextField`, `cancel` → `.cancel`, `colors` red → `.destructive`, green → `preferredAction`; the page waits on its promise as today. Alerts using a countdown (F96) keep the CSS alert (UIAlertAction titles can't change); `input.paste` is dropped (the native field has Paste in its own menu) | CSS iOS 26 alert (34pt corners, glass ground, plain text buttons) |
 | Action sheets (`nav/actionsheet.js`) | app: `ui.actionSheet` → UIAlertController `.actionSheet`, its popover's `sourceRect` from the tapped element's rect | CSS |
 | Long-press menus (`nav/menu.js` showMenu) | app: `ui.menu` → a UIMenu at the anchor's rect: an invisible UIButton over that rect with `menu` and `showsMenuAsPrimaryAction`, opened with `performPrimaryAction()` (iOS 17.4+); if that doesn't open it, `UIEditMenuInteraction.presentEditMenu` (iOS 16+, public, at a point) | CSS menu |
-| Segmented controls (`nav/ui.js` segments / segmented, Theme's Mode) | **look-alike in every case**: iOS 26's capsule track with a sliding selected pill. A UISegmentedControl laid over the page would have to follow WebKit's scroll views frame by frame and sit under the page's own sheets and alerts; not worth it | same |
+| Segmented controls that stay put (the scope bar under the search bar, `nav/ui.js` segments, pinned by `searchbar.js` `pinned`) | app: a real UISegmentedControl through the bridge (`ui.segments`), laid over the web element's rect, hidden whenever a sheet, alert or push covers it or the page leaves; taps go back to the page's `onPick` | CSS look-alike: iOS 26's capsule track with a sliding selected pill |
+| Segmented controls inside a scroller (`segmented` on the app page, Theme's Mode) | look-alike: a native view over the page would have to follow WebKit's own scroll views frame by frame, and it can't; F345d says so if a pinned one proves smooth enough to try more | same |
 | Nav bar, bar buttons, tab bar | F203's: UIGlassEffect views from the shell on iOS 26+ (the user decided this there) | CSS blur plus edge highlights (iOS 15–25, the site) |
 
 Native calls are only made under `data-controls="native"` in the app (`hasNativeCall` and the shell answering the
@@ -99,6 +105,7 @@ method; an older shell without `ui.*` falls back to the CSS overlay), so iOS 6, 
 2. **F345a** the native controls hook plus native inputs, search field, switches, `<select>` menus, `<progress>`.
 3. **F345b** `ui.alert` (UIAlertController) behind showAlert.
 4. **F345c** `ui.actionSheet` and `ui.menu` (UIMenu) behind showActionSheet and showMenu.
+5. **F345d** `ui.segments`: a native UISegmentedControl for the pinned scope bar.
 
 Each checks on the iPhone 15 Pro (native) and the iPhone 7 (look-alike fallback).
 
@@ -115,9 +122,8 @@ Nothing failed. The phone was held by B272 and F346 for about ten minutes before
 
 ## Not verified
 
-- **The app's WKWebView itself.** I probed in Safari, not in iFizBox: building and installing a probe build of Lite
-  was more than the research needed, since form controls and their pickers are WebKit's, not Safari's. F345a's phone
-  check sees them in the app.
+- **The date picker, the search field's focus and dark mode in the app's own web view**: the in-app probe covered the
+  controls' look and the select menu, light only; the date picker and focus were seen in Safari only.
 - **iOS 26.0–26.x.** The phone runs iOS 27. The controls are expected to be the same on 26 (the shapes are the
   Liquid Glass ones 26 introduced), but no 26 phone is here.
 - **`performPrimaryAction()` opening a button's menu, and the action sheet's popover look on iOS 26** are from

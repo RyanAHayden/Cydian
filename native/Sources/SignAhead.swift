@@ -68,7 +68,7 @@ enum SignAhead {
             if let bid = c.params["record"] as? String, !bid.isEmpty {
                 guard let r = SignedRecords.only(Sideload.records(), bundleID: bid).first else {
                     job.end()
-                    return answer(nil, "not_signed:\(Brand.name) has no record of signing \(bid)")
+                    return answer(nil, "not_signed: \(Brand.name) has no record of signing \(bid)")
                 }
                 source = r.url
                 var o = SignOptions(r.options)

@@ -32,6 +32,12 @@ hold ends anyway.
 - `web/app/screens/apprun.test.js`: `runAppQueueRun` sends nothing when the walkthrough opens. A run sends
   Confirm's `{on}`, then one `{on}` per lane start, and `{on: false}` on the page's close.
 
+## Spec review
+
+- Fixed: a dropped space in the `not_signed: ` answer.
+- Checked: the first sign starts as soon as the run starts (`runAppRun` calls `run.start()` as setup ends), so Confirm's hold isn't let go by the 2 s idle time before a lane starts.
+- Kept: the hold lets go when no lane is busy (and when the page closes), not at the run's first end. The reason is above.
+
 ## What failed
 
 none

@@ -344,10 +344,12 @@ const isFlatDist = (dist) => !dist || String(dist).endsWith("/");
 // http://apt.thebigboss.org/repofiles/cydia/, and the other old Cydia repos laid out as `deb <uri> stable main`) is
 // added as that dist source, its components from the Release. Nothing there either: not_repository, as before.
 async function stableDistSource(backend, uri, opts) {
-  let release = null;
+  let release;
   try {
-    release = await releaseOf(backend, `${uri}dists/stable/`);
-  } catch { /* the flat check's not_repository stands */ }
+    release = await releaseOf(backend, `${uri}dists/stable/`); // null when the repo answered without one
+  } catch (e) {
+    throw verificationError(e); // refused, timeout, network: said as such, not as Did Not Find Repository
+  }
   if (!release) throw new SourceError("not_repository");
   return verifyDistSource(backend, { uri, dist: "stable" }, opts);
 }

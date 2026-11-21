@@ -81,6 +81,7 @@ test("the shell fetches http outside ATS: Apt.get hands http to PlainFetch, ATS 
   const apt = readFileSync(new URL("Sources/Apt.swift", native), "utf8");
   const get = apt.slice(apt.indexOf("static func get(_ url: URL"), apt.indexOf("static func packages("));
   assert.match(get, /url\.scheme\?\.lowercased\(\) == "http"\s*\{\s*return PlainFetch\.get\(url, done: done\)/);
+  assert.match(get, /task\.delegate = toHTTP/, "an https -> http redirect carries on in PlainFetch");
   const plain = readFileSync(new URL("Sources/PlainFetch.swift", native), "utf8");
   assert.match(plain, /NWConnection\(host:/);
   assert.match(plain, /Apt\.maxBody/);

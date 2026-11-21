@@ -19,7 +19,8 @@ Two different things, one per build:
 - `native/Sources/PlainFetch.swift` (new): an http GET into memory over Network.framework's plain TCP (not under
   ATS), decoded by `share/HTTPStream.swift`; same answer as the URLSession path (status, lower-cased headers, body),
   redirects followed (5; to https back to `Apt.get`), `Apt.maxBody` cap, 30 s idle / 120 s total timeout.
-- `native/Sources/Apt.swift` `Apt.get`: http URLs go to `PlainFetch.get`. ATS stays on app-wide (no
+- `native/Sources/Apt.swift` `Apt.get`: http URLs go to `PlainFetch.get`; an https URL that redirects to http is
+  stopped by a per-task delegate (`PlainRedirect`, iOS 15's `task.delegate`) and carries on in PlainFetch. ATS stays on app-wide (no
   NSAllowsArbitraryLoads), so nothing else in the app reaches http. The SSRF rules are the Worker's and unchanged
   (the app fetches from the phone itself, as before).
 - `web/app/core/sources.js` `verifySource`: when nothing flat is found, a Release under `dists/stable/` turns the
@@ -49,7 +50,14 @@ still not_repository; the Swift wiring (Apt.get → PlainFetch, no NSAllowsArbit
 - **PlainFetch on a phone.** The gate builds it (both native builds), but I didn't install a new build on the
   iPhone 15 or the 7: other slots overwrite the 7's .deb and the 15 was on another task's Pairing page. So BigBoss
   added and refreshed in the app (either build) is unchecked on a device; the ATS refusal it fixes was seen live.
-- **https → http redirects** in `Apt.get`'s URLSession path still fail under ATS (rare for repos; none seen). Not
-  changed.
+- **https → http redirects** (`PlainRedirect`): built, not run against a real redirecting host.
+- **SSRF in the app**: the shell fetches from the phone itself, as URLSession did; there were no address rules in
+  the app before and none were added. The Worker's rules (`worker/src/ssrf.js`, `ssrf-node.js`) are untouched.
+
+## Spec review
+
+Fixed: https → http redirects (above); `stableDistSource` now says a network/refused/timeout error as a
+Verification Error instead of Did Not Find Repository. Kept: the `dists/stable/` fallback (the review called it
+extra scope; without it BigBoss's URL can't be added on either build) and This Source Is Not Secure (see above).
 - The site's Add Source was run against the live proxy from node (verifySource with createHttpBackend), not by
   tapping in a browser; the deployed site gets the fallback only after release.

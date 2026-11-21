@@ -137,3 +137,16 @@ final class PlainFetch {
         finish(.success((st, stream.headers, body)))
     }
 }
+
+// Apt.get's URLSession task delegate: a redirect to http is stopped (ATS would fail it) and kept in `to`, for Apt.get
+// to fetch through PlainFetch; any other redirect goes on as URLSession does.
+final class PlainRedirect: NSObject, URLSessionTaskDelegate {
+    private(set) var to: URL?
+
+    func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
+                    newRequest request: URLRequest, completionHandler: @escaping (URLRequest?) -> Void) {
+        guard request.url?.scheme?.lowercased() == "http" else { return completionHandler(request) }
+        to = request.url
+        completionHandler(nil)
+    }
+}

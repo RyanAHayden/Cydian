@@ -268,7 +268,9 @@ enum Apt {
     static func get(_ url: URL, done: @escaping (Result<(Int, [String: String], Data), BridgeError>) -> Void) {
         // B261: plain http (BigBoss) outside ATS, which refuses it in URLSession (Sources/PlainFetch.swift).
         if url.scheme?.lowercased() == "http" { return PlainFetch.get(url, done: done) }
-        session.dataTask(with: url) { data, resp, err in
+        let toHTTP = PlainRedirect() // an https URL redirecting to http carries on in PlainFetch, which ATS would refuse
+        let task = session.dataTask(with: url) { data, resp, err in
+            if let to = toHTTP.to { return PlainFetch.get(to, redirects: PlainFetch.maxRedirects - 1, done: done) }
             if let e = err as? URLError {
                 return done(.failure(BridgeError(e.code == .timedOut ? "timeout" : "network", e.localizedDescription)))
             }
@@ -279,7 +281,9 @@ enum Apt {
             var headers: [String: String] = [:]
             for (k, v) in http.allHeaderFields { headers["\(k)".lowercased()] = "\(v)" }
             done(.success((http.statusCode, headers, body)))
-        }.resume()
+        }
+        task.delegate = toHTTP
+        task.resume()
     }
 
     // The first of names in dir that the repo serves, decompressed. Missing ones (HTTP >= 400, or a body that

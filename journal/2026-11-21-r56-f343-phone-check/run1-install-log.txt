@@ -1,0 +1,48 @@
+Installed
+Install IPAs
+Add an IPA
+Choose from Files
+Download from URL
+
+No IPAs yet. Choose one in Files, download one, share an .ipa to iFizBox from Files, Safari or Mail, or put IPAs in Files under On My iPhone > iFizBox.
+
+Home
+Sources
+Changes
+9
+Installed
+Search
+Complete
+Done
+Downloading
+Downloading https://omarchy-desktop.beetal-ling.ts.net:8475/probe.ipa
+Downloaded 20 KB in 0.1 s, 390 KB/s
+IPA SHA-256: 98aaa3721afe14b72c40eaa16f1d8eb95130b0eb7e7e06a989d497d301a45ae4
+Certificate: Apple Distribution: Ian Smith (S8NFX3A2LT) (team S8NFX3A2LT)
+Profile: sidedrop adhoc, Ad Hoc, app ID com.ryha.*, expires 2027-10-29T03:13:50Z
+This iPhone in the profile: in (2 devices listed)
+com.ryha.ifizbox.probe is installed under App ID S8NFX3A2LT.com.ryha.sideload
+Installed under App ID S8NFX3A2LT.com.ryha.sideload: signed with that (profile sidedrop adhoc)
+App Probe.app: com.ryha.ifizbox.probe, 6 files
+Kept its bundle ID; App ID S8NFX3A2LT.com.ryha.sideload in the entitlements
+Reading
+Read 4 files (135 KB), 1 Mach-O, 1 bundles to sign
+Group fix: group.org.example.probe.original -> the app's own folder; keychain groups stripped
+Signing
+Injected @rpath/ifizbox-groupfix.dylib
+Signed Probe.app (com.ryha.ifizbox.probe), with the profile's entitlements
+Signed Probe 1.0 as com.ryha.ifizbox.probe, 45 KB
+Keeping the IPA for Re-sign once it is installed (Caches/com.ryha.ifizbox.probe.ipa)
+Installing on this iPhone through Tailscale; nothing goes to a Signing Server
+Installing on this iPhone
+Copying the IPA to iOS (45 KB), then iOS installs it
+Connected to iOS through Tailscale (RemotePairing tunnel)
+Copying to iPhone
+Copying the IPA to iOS (0.0 MB)
+Copied 0.0 MB to iOS
+iOS is installing it
+Installing
+iOS installed Probe 1.0
+Installed Probe
+Return to iFizBox
+Open Probe

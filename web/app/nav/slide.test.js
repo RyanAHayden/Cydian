@@ -188,3 +188,17 @@ test("a resize report observes the boxes it finds on the next frame, not in the 
     for (const k of ["document", "Element", "MutationObserver", "ResizeObserver", "requestAnimationFrame", "getComputedStyle"]) delete globalThis[k];
   }
 });
+
+test("B195 fadesOf: a skeleton leaves without a fading copy; a page in its push fades nothing", async () => {
+  const { fadesOf } = await import("./slide.js");
+  const box = (cls) => ({ el: { matches: (sel) => sel.split(/,\s*/).some((s) => s === `.${cls}`) } });
+  const enters = [box("alt-app")];
+  const leaves = [{ box: box("ph"), top: 0 }, { box: box("cell"), top: 40 }];
+  const swap = fadesOf({ enters, leaves });
+  assert.deepEqual(swap.enters, [], "content replacing a skeleton comes in at once (no blank blink)");
+  assert.deepEqual(swap.leaves.map((l) => l.top), [40], "a row that went fades out, the skeleton doesn't");
+  const plain = fadesOf({ enters, leaves: leaves.slice(1) });
+  assert.deepEqual(plain.enters, enters, "with no skeleton, new content fades in at rest");
+  assert.equal(plain.leaves.length, 1);
+  assert.deepEqual(fadesOf({ enters, leaves }, true), { enters: [], leaves: [] }, "mid-push: content swaps at once");
+});

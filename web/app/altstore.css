@@ -118,7 +118,8 @@ html[data-theme="dark"] .perm-more .cell-label { color: var(--dk-link); }
 /* B54: the gallery's slot (screens/altstore.js previewSlot): a 44px row with iOS 6's grey spinner while the pictures
    load, then the gallery at once, faded in, while the page below slides down to its new place (nav/slide.js: a
    transform, never a height transition). flow-root keeps the group's margins inside the slot, so its measured height
-   is what the page below moves by. */
+   is what the page below moves by. B195: while it opens the slot clips its content and its bottom edge moves with
+   the rows below (altstore.js revealSlot), so the rows never sit over the pictures. */
 .preview-slot { display: flow-root; }
 .shots-loading { height: 44px; display: flex; align-items: center; justify-content: center; }
 .shots-spinner { width: 20px; height: 20px; animation: hud-spin .96s linear infinite; }

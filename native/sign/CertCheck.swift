@@ -112,8 +112,8 @@ enum Reminder {
     }
 }
 
-// Apps iFizBox signed and installed (F14), so Re-sign All can do them again and the reminder can name them. No IPA
-// is kept (no IPA library): Re-sign All downloads each from its URL again.
+// Apps iFizBox signed and installed (F14), so Re-sign All can do them again and the reminder can name them. Re-sign
+// signs from the IPA kept in Caches (OriginalIPA, F343), else downloads it from its URL again.
 struct SignedRecord: Codable, Equatable {
     var bundleID: String          // as installed
     var originalBundleID: String
@@ -125,6 +125,7 @@ struct SignedRecord: Codable, Equatable {
     var options: StoredOptions
     var appID: String? = nil      // B138: the application-identifier it was signed with; nil in older records
     var signer: SignerStamp? = nil // B259: the signer that made it; nil in records from before stamps (stale)
+    var sha256: String? = nil     // F343: the IPA kept for Re-sign (OriginalIPA), as it came; nil when none is kept
 
     struct StoredOptions: Codable, Equatable {
         var name: String?

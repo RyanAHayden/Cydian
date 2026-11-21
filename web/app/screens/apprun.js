@@ -270,6 +270,7 @@ export async function runAppRun(jobs, deps) {
   // iOS": an install iOS never fetched (B128) left the app recorded, and its Search row's swipe did nothing.
   // B170: a row the user cancelled, or one iOS never confirmed (no answer included), is never recorded. Each record
   // keeps the record it replaced, so iOS reporting the app missing later puts that one back (undoRecord).
+  // B236: on iOS 27 (no answer for any app) a row whose IPA iOS fetched in full is recorded on the no-answer.
   const store = deps.store ?? appStore;
   const recordOf = async (id) => {
     try { return (await (await store()).all()).find((x) => x.id === id) ?? null; } catch { return null; }

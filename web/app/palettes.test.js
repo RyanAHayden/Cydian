@@ -76,12 +76,12 @@ test("text stays readable: body text 7:1, subtitles, headers, details and links 
 // C49: eras (docs/eras.md) restyle the chrome through ios6.css's look tokens, so the light palettes set those tokens
 // rather than paint the nav bar, bar buttons, search bar and header band with rules an era rule could not outrank.
 // Brushed Metal's etched text is the one rule left on them, text only (its dark text skips Done and the red button,
-// which a token cannot); the App Store segmented control keeps rules until ios6.css gives it tokens.
+// which a token cannot). C56: the App Store segmented control rides ios6.css's --seg* tokens the same way.
 const rules = [...palettes.replace(/\/\*[\s\S]*?\*\//g, "").matchAll(/([^{}]+)\{([^}]*)\}/g)].map((m) => ({ sel: m[1].trim(), body: m[2] }));
 const packages = read("./packages.css");
 
-test("no palette rule paints the nav bar, bar buttons, search and scope bars or header band: they ride tokens", () => {
-  const chrome = /\.navbar|\.bar-button|\.search-(bar|scope|field|cancel)|\.scope-(segment|filter)|\.store-head/;
+test("no palette rule paints the nav bar, bar buttons, search and scope bars, header band or App Store segmented control: they ride tokens", () => {
+  const chrome = /\.navbar|\.bar-button|\.search-(bar|scope|field|cancel)|\.scope-(segment|filter)|\.store-(head|segment)/;
   for (const { sel, body } of rules) {
     if (!chrome.test(sel)) continue;
     assert.ok(sel.startsWith('html[data-theme="light"][data-palette="metal"] '), sel);
@@ -92,7 +92,7 @@ test("no palette rule paints the nav bar, bar buttons, search and scope bars or 
   const set = tokens(map.body);
   const expect = [
     [ios6, ["--nav-bar", "--bar-btn", "--bar-btn-edge", "--bar-btn-edge-top", "--bar-btn-pressed", "--bar-btn-pressed-edge",
-      "--bar-btn-pressed-edge-top", "--bar-back", "--bar-back-pressed"]],
+      "--bar-btn-pressed-edge-top", "--bar-back", "--bar-back-pressed", "--seg", "--seg-pressed", "--seg-edge", "--seg-divider"]],
     [packages, ["--search-bar", "--search-bar-scoped", "--search-scope", "--search-field-edge", "--search-field-edge-top",
       "--search-cancel", "--search-cancel-pressed", "--search-cancel-edge", "--search-cancel-edge-top", "--search-cancel-edge-bottom",
       "--scope-seg", "--scope-seg-edge", "--scope-seg-edge-top", "--scope-seg-edge-bottom", "--scope-seg-divider",
@@ -103,6 +103,9 @@ test("no palette rule paints the nav bar, bar buttons, search and scope bars or 
     assert.match(css, new RegExp(`var\\(${k}\\)`), `read: ${k}`);
     assert.match(set.get(k) ?? "", /var\(--lt-[\w-]+\)/, `${k} from an --lt-* token`);
   }
+  // the segmented control's unselected text is the palette's table label colour, as the dark kit's is
+  assert.match(ios6, /var\(--seg-text\)/);
+  assert.equal(set.get("--seg-text"), "var(--head)");
 });
 
 test("token blocks weigh no more than html plus two attributes, so an era's tone block linked later wins", () => {

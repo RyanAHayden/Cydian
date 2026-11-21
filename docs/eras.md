@@ -96,15 +96,14 @@ the app supports iOS 15.0, so cascade layers are out.
 - **Dark** keeps `ios6.css`'s dark rules, which paint with `--dk-*` tokens (`--dk-nav-bar`, `--dk-tabbar`,
   `--dk-btn`, `--dk-back`, …): the era sets those in its dark block, plus the shared tokens (`--table`, `--head`, …).
 - **Palettes** set the same tokens from `html[data-theme][data-palette]` (the light ones map their `--lt-*` colours
-  onto `--nav-bar`, `--bar-btn*`, `--bar-back*`, `--search-*`, `--scope-seg*` and `--store-head*` in one
+  onto `--nav-bar`, `--bar-btn*`, `--bar-back*`, `--seg*`, `--search-*`, `--scope-seg*` and `--store-head*` in one
   `html[data-theme="light"]:is(…)` block), never heavier than html plus two attributes: the weight of an era's tone
   block, which wins because it is linked later (`palettes.test.js` holds both). So every token an era sets beats
   every palette, light or dark, and the era's dark block needs no extra weight. The tokens it does not set would
   still come from the palette, half-painting it, so **an era offers only its own themes** (White and OLED Black):
   the theme menu must hide the palettes while an era is chosen, and the app set no `data-palette` under it (a saved
-  palette waits for iOS 6). Two palette rules still paint chrome: the App Store segmented control (`ios6.css`'s
-  reads `--seg*` tokens, but the palettes still paint it with rules) and Brushed Metal's etched text; with the
-  palettes hidden they never meet an era.
+  palette waits for iOS 6). One palette rule still paints chrome: Brushed Metal's etched text; with the
+  palettes hidden it never meets an era.
 - **Order**: link `ios<N>.css` after `palettes.css`; `wide.css` is layout and can stay last.
 
 ## Hooks
@@ -337,15 +336,10 @@ their `:root` blocks win over an era's bare `:root`. An era sets them on `html[d
 the way it sets colours, never on bare `:root`.
 
 The light palettes in `palettes.css` paint the chrome through tokens: their shared `html[data-theme="light"]` block
-maps the `--lt-*` colours onto `ios6.css`'s `--nav-bar`, `--bar-btn*`, `--bar-back*` and `packages.css`'s
+maps the `--lt-*` colours onto `ios6.css`'s `--nav-bar`, `--bar-btn*`, `--bar-back*`, `--seg*` and `packages.css`'s
 `--search-*`, `--scope-seg*`, `--store-head*` (see Palettes under [Writing an era](#writing-an-era)). Brushed
 Metal's etched text stays a rule on purpose: its dark text skips Done, the red button, My IPAs' Delete and the
 console, which one token cannot.
-
-Not yet clean, each queued as its own cleanup:
-
-- the light palettes' App Store segmented-control rules in `palettes.css` (`ios6.css`'s control reads `--seg*`
-  tokens; the palettes still paint it with rules of their own).
 
 The screens' inline SVG art comes from the icon map below; the overlays `nav/` draws take theirs from CSS tokens
 ([Overlays](#overlays-nav)).

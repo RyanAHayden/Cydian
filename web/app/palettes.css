@@ -797,8 +797,8 @@ html[data-theme="light"][data-palette="metal"] {
 }
 
 /* The light palettes' chrome: ios6.css's nav bar, bar buttons and back arrow (--nav-bar, --bar-btn*, --bar-back*)
-   and packages.css's search bar, scope bar, Cancel and package header band (--search-*, --scope-seg*, --store-head*)
-   read look tokens, and here they take the --lt-* colours above, so no rule of this file paints that chrome and an
+   and App Store segmented control (--seg*: its blue selected segment stays the kit's), and packages.css's search
+   bar, scope bar, Cancel and package header band (--search-*, --scope-seg*, --store-head*) read look tokens, and here they take the --lt-* colours above, so no rule of this file paints that chrome and an
    era's own rules and tokens are never outranked by one (docs/eras.md). Shapes and shadows stay theirs; a pressed
    button, Cancel or scope segment keeps its unpressed edges, and the scope bar draws its segments as bar buttons
    (one edge colour all round, dividers included); the blue Done and Filter's Done, and the red button (ios6.css, from
@@ -827,17 +827,9 @@ html[data-theme="light"]:is([data-palette="sepia"], [data-palette="solarized"], 
   --scope-seg-selected-edge: var(--lt-btn-edge); --scope-seg-selected-edge-top: var(--lt-btn-edge-top);
   --scope-seg-selected-edge-bottom: var(--lt-btn-edge); --scope-seg-selected-divider: var(--lt-btn-edge);
   --store-head: var(--lt-store-head); --store-head-edge: var(--lt-store-edge);
+  --seg: var(--lt-seg); --seg-pressed: var(--lt-seg-pressed); --seg-text: var(--head);
+  --seg-edge: var(--lt-seg-edge); --seg-divider: var(--lt-seg-edge);
 }
-/* ios6.css's App Store segmented control (its blue selected segment stays the kit's): rules until it has tokens */
-html[data-theme="light"]:is([data-palette="sepia"], [data-palette="solarized"], [data-palette="legalpad"], [data-palette="metal"]) .store-segmented { border-color: var(--lt-seg-edge); }
-html[data-theme="light"]:is([data-palette="sepia"], [data-palette="solarized"], [data-palette="legalpad"], [data-palette="metal"]) .store-segment:not(.selected) {
-  color: var(--head); background: var(--lt-seg); background-origin: border-box;
-}
-html[data-theme="light"]:is([data-palette="sepia"], [data-palette="solarized"], [data-palette="legalpad"], [data-palette="metal"]) .store-segment:not(.selected) + .store-segment:not(.selected) { border-left-color: var(--lt-seg-edge); }
-html[data-theme="light"]:is([data-palette="sepia"], [data-palette="solarized"], [data-palette="legalpad"], [data-palette="metal"]) .store-segment:active:not(.selected) {
-  background: var(--lt-seg-pressed); background-origin: border-box;
-}
-
 /* F218: the red bar button (ios6.css .bar-button.red, Confirm's Cancel). Palettes with a published red use it in the
    UIKit art's steps (light: top 46% toward white, edge 74%; dark: gloss 39% / 6% toward white over the flat red, edge
    55%; pressed darker the same way); the others keep UIKit's red, as they keep the kit's blue Done. Both tones only

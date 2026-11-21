@@ -76,3 +76,11 @@ keychain, put it on the search list (`security list-keychains -d user -s tmp.key
   on iOS 27 opens Siri setup instead of locking.
 - **Other phones on the same USB are fine**: every `ios` call names this phone's UDID (`IFIZBOX_15_UDID`).
 - **Developer Mode** must stay on, and the phone must be trusted by this desktop (usbmuxd pairing record).
+- **Notification icons are cached until a restart.** After installing a build or switching the app icon, iOS keeps
+  drawing the old icon on notifications (old and new ones) until the phone restarts: `ui-15.sh ME reboot` (about a
+  minute; it brings WDA back and unlocks) before judging a notification's icon. The first push right after a
+  restart can take a minute to arrive.
+- **Test push**: `curl -X POST https://ifizbox.com/api/push/test -H 'Content-Type: application/json' -d
+  '{"token":"<token>"}'`. The token is in the push database: `npx wrangler d1 execute ifizbox-push --remote -c
+  wrangler.ifizbox.toml --command "SELECT token, version, ios, updated FROM push_devices ORDER BY updated DESC"`
+  in `worker/`; launching iFizBox on the phone re-registers it, so its row is the newest `updated` (docs/push.md).

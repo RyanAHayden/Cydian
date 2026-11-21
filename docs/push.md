@@ -83,6 +83,16 @@ The app's own entitlements (`native/entitlements-sideload.plist`) carry no `aps-
 profile's, and one that kept a binary's `aps-environment` under a profile without Push would make iOS refuse the
 install.
 
+## A blank icon on the push
+
+iOS draws a notification's icon from a copy it keeps of the app's icon, and refreshes that copy only when the
+iPhone restarts: not when the app is updated or reinstalled over itself, and not when it switches to another icon
+(Settings > Theme > App Icon). Builds before 0.17.1 had no asset catalog (`Assets.car`) for the `CFBundleIconName`
+their Info.plist names, so iOS kept its blank grid placeholder for them; an iPhone that showed one of their
+notifications keeps that blank icon on later versions' pushes until it restarts. Restarting the iPhone fixes it.
+
+iFizBox's own Clear icon (a white square with a thin globe) looks much like that placeholder at notification size.
+
 ## The server
 
 `worker/src/push.js`: `POST /api/push/register`, `/unregister`, `/status`, `/test`, `GET /api/push`; devices in the

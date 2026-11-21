@@ -74,7 +74,7 @@ test("B169: Install IPAs from Home still pushes after a visit to Installed > Ins
 });
 
 test("B169: Home's What's New tile pushes Changes onto Home's stack, and Back pops it", () => {
-  for (const tile of [stateTile({ sources: [{}], upgrades: 0 }), stateTile({ sources: [{}], upgrades: 2 }), stateTile({ sources: [{}], upgrades: null })]) {
+  for (const tile of [stateTile({ sources: [{}], upgrades: 0 }), stateTile({ sources: [{}], upgrades: 2 })]) {
     const { win, tap, results, stacks } = setup();
     assert.equal(tile.href, "#/home/~changes");
     const r = tap(tile.href);
@@ -87,6 +87,20 @@ test("B169: Home's What's New tile pushes Changes onto Home's stack, and Back po
     assert.equal(results.at(-1).kind, "pop");
     assert.equal(win.location.hash, "#/home");
   }
+});
+
+test("B266: the More Sources tile (where What's New was) pushes Sources > More onto Home's stack, and Back pops it", () => {
+  const tile = stateTile({ sources: [{}], upgrades: null });
+  assert.equal(tile.kind, "more");
+  const { win, tap, results, stacks } = setup();
+  const r = tap(tile.href);
+  assert.equal(r.kind, "push", tile.label);
+  assert.equal(win.location.hash, "#/home/~sources/more");
+  assert.deepEqual(mounted({ tab: "home", path: ["~sources", "more"] }), { tab: "sources", path: ["more"] });
+  assert.deepEqual(stacks.stack("home").map((e) => e.path.join("/")), ["", "~sources/more"]);
+  win.history.back();
+  assert.equal(results.at(-1).kind, "pop");
+  assert.equal(win.location.hash, "#/home");
 });
 
 test("B169: What's New pushes even right after a visit to the Changes tab, and a package from it pushes too", () => {

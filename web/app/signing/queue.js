@@ -26,7 +26,7 @@ import { recordSelfUpdate } from "../core/selfupdate.js";
 import { showAlert } from "../nav/alert.js";
 import { askInsecure, bridge, keepIpaHash, refusing, storageOf } from "./common.js";
 import { getServer } from "./identity.js";
-import { chooseRoute } from "./route.js";
+import { chooseRoute, holdApp } from "./route.js";
 export { hereLabel, shownName, finishHere } from "./common.js";
 
 export const ASK_WAIT = 600; // seconds the queue waits for Install on iOS's prompt before the row fails
@@ -160,6 +160,40 @@ export function herePhase(ev) {
 export async function repromptPrepared(row, native) {
   if (!row?.bundleId) return false;
   try { return Boolean((await bridge(native).call("signing.reprompt", { bundleId: row.bundleId }))?.reopened); } catch { return false; }
+}
+
+// B257: the sign-ahead run keeps the app running in the background (signing.hold, Sideload.hold) from Confirm until it
+// ends, so leaving the app right after Confirm doesn't stop the route check before signing.open or the gaps between
+// the shell's own holds. heldLanes(lanes) -> the same lanes, whose sign and install send signing.hold {on} as each
+// starts (which also renews the shell's 10 minute limit) and {on: false} once none has run for `idleMs`; it starts
+// held (Confirm already sent {on}: hold()). release() lets go at once (the run's page closed).
+export const HOLD_IDLE = 2000; // ms with no sign or install running before the hold ends (a retry soon after reuses it)
+export function heldLanes(lanes, { native, keep = holdApp, idleMs = HOLD_IDLE, later = setTimeout, clear = clearTimeout } = {}) {
+  let busy = 0;
+  let held = true;
+  let timer = null;
+  const stopTimer = () => { if (timer !== null) { clear(timer); timer = null; } };
+  const off = () => { stopTimer(); if (held) { held = false; keep(native, false); } };
+  const idle = () => {
+    stopTimer();
+    timer = later(() => { timer = null; if (!busy) off(); }, idleMs);
+    timer?.unref?.(); // node: don't hold tests open
+  };
+  const wrap = (f) => (...args) => {
+    busy += 1;
+    stopTimer();
+    held = true;
+    keep(native, true);
+    let p;
+    try { p = Promise.resolve(f(...args)); } catch (e) { p = Promise.reject(e); }
+    const done = () => { busy -= 1; if (!busy) idle(); };
+    p.then(done, done);
+    return p;
+  };
+  idle(); // held from Confirm: lets go if no lane starts
+  const out = { ...lanes, release: off };
+  for (const k of ["sign", "install"]) if (typeof lanes?.[k] === "function") out[k] = wrap(lanes[k]);
+  return out;
 }
 
 export function discardPrepared(token, native) {

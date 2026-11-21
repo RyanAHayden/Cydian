@@ -181,6 +181,9 @@ const HOME_TILES = {
   current: { svg: `${HOME_SVG} fill='none' stroke='#fff' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'><path d='m4 12.5 5 5L20 6.5'/></svg>` },
   changes: { svg: `${HOME_SVG} fill='none' stroke='#fff' stroke-width='2.6' stroke-linecap='round'><circle cx='12' cy='12' r='9'/><path d='M12 7v5l3.5 2.5'/></svg>` },
   loading: { svg: `${HOME_SVG} fill='none' stroke='#fff' stroke-width='2.6' stroke-linecap='round'><circle cx='12' cy='12' r='9'/><path d='M12 7v5l3.5 2.5'/></svg>` },
+  // B266: More Sources in the state tile's slot: its row tile's blue and white plus (ROW_ICONS moreSources), which
+  // home.css keeps over the green row's glyph colour
+  more: { colour: C.blue, svg: `${HOME_SVG} fill='#fff'><path d='M10.2 3h3.6v7.2H21v3.6h-7.2V21h-3.6v-7.2H3v-3.6h7.2z'/></svg>` },
   // an open padlock (jailbreak's usual sign; not anyone's artwork) on a purple gradient
   jailbreak: { colour: "#5b2fa3", gradient: ["#8a5cd0", "#5b2fa3"], svg: `${HOME_SVG}><path fill='none' stroke='#fff' stroke-width='2.2' stroke-linecap='round' d='M8 10.5V7.5a4 4 0 0 1 7.6-1.7'/><rect x='5' y='10.5' width='14' height='10' rx='2' fill='#fff'/><circle cx='12' cy='15' r='1.6' fill='#6f43b9'/><path d='M12 15.5v2.3' stroke='#6f43b9' stroke-width='1.4' stroke-linecap='round'/></svg>` },
   // Home's Theme half (screens/home.js THEME_ICON): Settings > Theme's colour and contrast disc
@@ -317,6 +320,7 @@ const HOME_TILES_7 = {
   current: home7(null, GLYPHS_7.check),
   changes: home7(null, GLYPHS_7.clock),
   loading: home7(null, GLYPHS_7.clock),
+  more: home7(C7.blue, GLYPHS_7.plus), // B266: More Sources in the state tile's slot, its row tile's blue plus
   jailbreak: home7(C7.purple, [ln("M5.5 11h13v9.5h-13z"), ln("M8.5 11V7.8a3.5 3.5 0 0 1 6.8-1.2"), ln("M12 14.5v2.5")]),
   theme: home7(C7.indigo, GLYPHS_7.contrast),
 };

@@ -18,7 +18,8 @@ test("Home state tile: the text and target follow the sources and upgrades", () 
   assert.equal(stateTile({ sources: [src({ error: "x" })] }).label, "1 Source Failed to Load");
   assert.deepEqual(stateTile({ sources: [src()], upgrades: 0 }), { kind: "current", label: "Everything Up to Date", href: "#/home/~changes" });
   // Unknown upgrade count (the site has no installed list): never claims up to date.
-  assert.deepEqual(stateTile({ sources: [src()], upgrades: null }), { kind: "changes", label: "See What's New", href: "#/home/~changes" });
+  // B266: More Sources takes See What's New's place, opening Sources > More on Home's stack (router mountLink).
+  assert.deepEqual(stateTile({ sources: [src()], upgrades: null }), { kind: "more", label: "More Sources", href: "#/sources/more" });
 });
 
 test("Home pages: titles below the root, and curated sources are flat repos with Cydia keys", () => {
@@ -113,8 +114,8 @@ test("F123: every Settings link in the screens goes through settingsRoute (Home'
 
 test("a refresh leaves the green tile as it was, and hides old failures meanwhile", () => {
   const src = (o = {}) => ({ uri: "https://a/", ...o });
-  assert.equal(stateTile({ sources: [src()], refreshing: 2 }).label, "See What's New");
-  assert.equal(stateTile({ sources: [src({ error: "x" })], refreshing: 1 }).label, "See What's New");
+  assert.equal(stateTile({ sources: [src()], refreshing: 2 }).label, "More Sources");
+  assert.equal(stateTile({ sources: [src({ error: "x" })], refreshing: 1 }).label, "More Sources");
   assert.equal(stateTile({ sources: [src()], upgrades: 0, refreshing: 1 }).kind, "current");
 });
 
@@ -122,4 +123,19 @@ test("the Home icon tells the website and Lite what they can't do; the jailbreak
   assert.match(versionLimits("web").message, /tweaks/);
   assert.match(versionLimits("sideload").message, /update itself/);
   assert.equal(versionLimits("jailbreak"), null);
+});
+
+test("B266: the More Sources row leaves Home's list only while the state tile is More Sources", async () => {
+  const { homeLinks, showsMoreSourcesRow, MORE_SOURCES_HREF, MORE_SOURCES_ROW, openWhileLocked } = await import("./home.js");
+  const row = homeLinks().flatMap((g) => g.rows).find((r) => r.cls === MORE_SOURCES_ROW);
+  assert.equal(row.label, "More Sources");
+  assert.equal(row.href, MORE_SOURCES_HREF);
+  const src = (o = {}) => ({ uri: "https://a/", ...o });
+  const kinds = [stateTile(), stateTile({ sources: [] }), stateTile({ sources: [src()], upgrades: 2 }),
+    stateTile({ sources: [src({ error: "x" })] }), stateTile({ sources: [src()], upgrades: 0 })].map((t) => t.kind);
+  assert.deepEqual(kinds, ["loading", "add", "upgrades", "failed", "current"]);
+  for (const k of kinds) assert.equal(showsMoreSourcesRow(k), true, k);
+  assert.equal(showsMoreSourcesRow(stateTile({ sources: [src()] }).kind), false);
+  // the locked website keeps More Sources locked, as row and as tile
+  assert.equal(openWhileLocked(MORE_SOURCES_HREF), false);
 });

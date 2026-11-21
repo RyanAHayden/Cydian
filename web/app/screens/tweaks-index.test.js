@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { loadTweakIndex, cachedTweakInfo, rowInfo, appTweakRows, checkForApp, openAddTweaks, madeForRows, sellerKeys,
   tweakInfo, checkTweakRows } from "./tweaks.js";
 import { memoryIpaStore } from "../core/myipas.js";
-import { DEBS } from "../core/fixtures/tweaks/index-debs.js";
+import { DEBS } from "../core/fixtures/tweaks/index-debs.test-helper.js";
 import { fakeDocument, tick, withDocument } from "../fakes.test-helper.js";
 
 const storage = () => { const m = new Map(); return { getItem: (k) => m.get(k) ?? null, setItem: (k, v) => m.set(k, String(v)), m }; };

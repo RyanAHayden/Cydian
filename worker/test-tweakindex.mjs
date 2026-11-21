@@ -1,5 +1,5 @@
 // F344: the tweak index (src/tweakindex.js, GET /api/tweaks and the cron) against Node's SQLite with D1's API
-// (src/d1-sqlite.js) and a fake source serving the fixture .debs (web/app/core/fixtures/tweaks/index-debs.js).
+// (src/d1-sqlite.js) and a fake source serving the fixture .debs (web/app/core/fixtures/tweaks/index-debs.test-helper.js).
 // SPDX-License-Identifier: GPL-3.0-or-later
 import assert from "node:assert/strict";
 import { gzipSync } from "node:zlib";
@@ -7,7 +7,7 @@ import { tweakIndex, indexPass, scheduled, isTweakIndexPath, forBundle, DEB_MAX 
 import { d1 } from "./src/d1-sqlite.js";
 import { indexSource, indexQuery } from "../web/app/core/tweakindex.js";
 import w from "./src/index.js";
-import { DEBS, PACKAGES } from "../web/app/core/fixtures/tweaks/index-debs.js";
+import { DEBS, PACKAGES } from "../web/app/core/fixtures/tweaks/index-debs.test-helper.js";
 
 const ROOT = "https://repo.example/";
 const asked = [];

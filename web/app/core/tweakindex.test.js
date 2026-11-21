@@ -6,7 +6,7 @@ import { indexSource, indexQuery, sourceFromQuery, indexTweaks, indexEntry, paid
   worksInLine } from "./tweakindex.js";
 import { inspectTweakDeb, appNameOf } from "./tweaks.js";
 import { parseControl } from "./apt.js";
-import { DEBS, PACKAGES, makeDeb } from "./fixtures/tweaks/index-debs.js";
+import { DEBS, PACKAGES, makeDeb } from "./fixtures/tweaks/index-debs.test-helper.js";
 
 test("indexSource: one canonical key per source; refuses what isn't a plain http(s) repo", () => {
   const a = indexSource({ uri: "https://repo.example/", dist: "./" });

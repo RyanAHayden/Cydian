@@ -45,7 +45,8 @@ writing; `tweaks-index.test.js` covers it. This was already possible with B269's
 ## Checks
 
 - Node: `web/app/core/tweakindex.test.js`, `web/app/screens/tweaks-index.test.js` (fixture debs built in
-  `web/app/core/fixtures/tweaks/index-debs.js`: a YouTube tweak, a SpringBoard tweak, a UIKit-wide one, a paid one),
+  `web/app/core/fixtures/tweaks/index-debs.test-helper.js`, named so the concept bundler skips its `node:zlib`
+  import, as the gate's first run showed: a YouTube tweak, a SpringBoard tweak, a UIKit-wide one, a paid one),
   `worker/test-tweakindex.mjs` (the endpoint against SQLite-backed D1 and a fake source: on-demand pass, budgets,
   newest version only, paid never downloaded, `bundle=` filter, new version re-checked, oversized .deb left alone,
   cron seeding from ASSETS' tweak-sources.json, private hosts refused).

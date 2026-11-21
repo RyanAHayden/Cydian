@@ -48,7 +48,9 @@ N s`, the page's speed summary) tell these apart on the next real install.
 
 ## Not verified
 
-- **No phone run at all.** The iPhone 15 Pro was not on USB during this session (`lsusb` showed no Apple device,
+(Superseded below: the user plugged the 15 Pro in and set Tailscale up mid-session.)
+
+- **No phone run at all (first half of the session).** The iPhone 15 Pro was not on USB during this session (`lsusb` showed no Apple device,
   usbmuxd inactive), and even plugged in it has no route for this: on 2026-11-20 it was unpaired, with neither
   LocalDevVPN nor the Tailscale app installed (installing either needs the owner's Apple ID, and Tailscale's sign-in
   the owner's account). So none of: a big IPA leaving the app mid-copy and mid-install, front vs background copy
@@ -56,3 +58,29 @@ N s`, the page's speed summary) tell these apart on the next real install.
   folder, whether installd keeps installing after our installation_proxy socket drops (the user's case says it did),
   whether `AfcRw` + seek on a PublicStaging file resumes correctly. Filed as R53 (after B246) for a person with a phone.
 - The cause of the background slowdown (part 2) is not pinned down; see the list above.
+
+## Part 3 (added mid-task by the user): the 15 Pro stuck on "No Answer" over Tailscale
+
+The user plugged the 15 Pro in (iPhone16,1, iOS 27.0.1) with Tailscale set up. The app sat on Install Apps With with
+the alert "No Answer: This iPhone didn't answer through Tailscale (read tcp 100.81.244.3:25186: connection reset by
+peer)", and Pairing said Not Paired.
+
+Phone log during a fresh Test Connection (`pymobiledevice3 syslog live -e "iFizBox|tsnet|remotepairing"`):
+
+- the app's tsnet node came up, got the network map (17 peers) and reached the phone's own node directly
+  (`disco: node [CGkiG] now using 192.168.0.194:41641`, via=direct), so Tailscale and the policy are fine;
+- `probe 100.109.186.91:49152: connected`;
+- remotepairingdeviced: `NetworkControlChannelService: accepted connected socket from peer`, then
+  `Not configuring launchd-managed TCP control channel due to no hosts being paired` and `Rejecting TCP control
+  channel connection from launchd-managed socket as launchd-managed TCP control channels are not enabled`, and
+  resets it; the app logs `no RemotePairing answer: read tcp …: connection reset by peer`.
+
+So the route works and the phone answers; it has no RemotePairing host paired at all, and the test called that "No
+Answer". USB and LAN can't help here: an app can't use the phone's own USB, and plain sockets to its own Wi-Fi
+address are reset by iOS (`../../native/sideload/tailscale/README.md`); the phone only serves RemotePairing over the
+network once a host is paired, whichever route reaches it.
+
+Fix: `Tailscale.test()` turns a reset after connecting into code `not_paired` (with `paired`: whether the app still
+holds a pairing the phone forgot). The page (`tailscaleTestResult`) says "Not Paired Yet" / "Pair Again" with a Pair
+button that opens Pairing; after a sign-in, `not_paired` ends the 30 s of retries at once (`FINAL_CODES`), and with a
+kept pairing it runs the same check as `refused` (forget and pair again). Test: `web/app/screens/installroute-b246.test.js`.

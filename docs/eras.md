@@ -20,7 +20,14 @@ An era is clean when all of these hold:
      properties;
    - every look-only stretch in any `web/app/*.css` (below) contains only look properties;
    - the nav bar, bar button, tab bar and grouped table selectors have no rule in `ios6.css` outside a look-only
-     stretch, with or without an `html[…]` qualifier in front.
+     stretch, with or without an `html[…]` qualifier in front;
+   - `ios6.css` sets no layout at all and holds no `@keyframes` or `@media` (motion and reduced motion are
+     `style.css`'s); every rule outside its look-only stretches is `body` or a token block (`:root` or `html[…]`
+     setting only custom properties and `color-scheme`);
+   - no rule in `ios6.css` writes a decoration itself: no `gradient(` or `url()` art in a value (the Share button's
+     glyph is the one `url()`, an icon), and `text-shadow` (the emboss), `filter` and `border-image` are only
+     `var(…)`, `none` or (`filter`) `brightness(…)`. The values live in custom properties, so an era swaps them
+     instead of undoing them.
 4. **No visible change in iOS 6.** Splitting a component for eras keeps every pixel and every computed style of the
    iOS 6 page: check it with a 3x screenshot and computed-style diff against main
    (`journal/2026-11-20-c44-era-readiness/shots.mjs` then `diff.py`, both themes and every palette).

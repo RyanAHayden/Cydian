@@ -1,0 +1,14 @@
+[
+ {"wait": 3000},
+ {"eval": "localStorage.setItem('ifizbox.firstVisit','later'); localStorage.setItem('ifizbox.style','ios6'); 'ok'"},
+ {"nav": "#/home", "ms": 2000},
+ {"eval": "location.reload(); 'ok'"},
+ {"wait": 4000},
+ {"nav": "#/sources/manage/find", "ms": 9000},
+ {"shot": "find"},
+ {"eval": "document.querySelector('.page.is-top .find-directory').scrollIntoView(); 'ok'"},
+ {"wait": 800},
+ {"shot": "find-bottom"},
+ {"nav": "#/sources/more/apps", "ms": 8000},
+ {"shot": "apps"}
+]

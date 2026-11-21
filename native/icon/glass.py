@@ -17,7 +17,7 @@ Each icon's layers are the globe of tools/icon.svg.in, flat, as Icon Composer wa
 Colours come from tools/icon_themes.py's THEMES (the PNG icons' own table), so a theme's glass icon matches its
 picture icon. A set's dark appearance (a light x dark pair, or AppIcon's Gunmetal) is the dark icon's layers and fill
 through icon.json's *-specializations; a one-icon set names the same icon for both, as its PNG set does. Clear is
-white lines on frosted white glass, as icon/clear/clear.svg. The LITE sash is a picture, not glass: the .icon is the
+icon/clear/clear.svg's: bold white lines on a smoked slate sphere in a frosted rim, on frosted glass. The LITE sash is a picture, not glass: the .icon is the
 same in both builds, so iOS 26+ shows no sash on the Lite build's Home Screen icon (the PNG sizes iOS 26 uses for
 Settings and notifications come from the .icon too).
 
@@ -67,7 +67,10 @@ def fill_of(stops):
     return [at(stops, .12), at(stops, .5)]
 
 
-CLEAR = {"fill": ["f6f7f9", "c8cdd5"], "rim": ("ffffff", .55), "sphere": ("ffffff", .2), "grid": ("ffffff", 1)}
+# icon/clear/clear.svg's: the frosted glass's ramp, the frosted ring's middle, the smoked slate sphere's middle, white
+# lines. All opaque: the old white-on-white (a faint sphere, white lines) read as iOS's blank placeholder at 20 pt.
+CLEAR = {"fill": ["f6f7f9", "c8cdd5"], "rim": ("e7eaee", 1), "sphere": ("5f6c7e", 1), "grid": ("ffffff", 1)}
+CLEAR_STROKE = 34  # clear.svg's bold lines, so the globe still reads at 20 pt
 
 
 def colours(icon):
@@ -98,6 +101,7 @@ def svg(body):
 def layer_svgs(icon):
     """{layer name: SVG text} for an icon."""
     c = colours(icon)
+    stroke = CLEAR_STROKE if icon == alternates.CLEAR else STROKE
     disc = lambda r, col: svg('  <circle cx="%d" cy="%d" r="%d" fill="#%s"/>' % (CX, CY, r, col))  # noqa: E731
     # tools/icon.svg.in's grid, moved up to the canvas centre (its globe sits at 512,520)
     d = -8
@@ -109,7 +113,7 @@ def layer_svgs(icon):
                '  <g clip-path="url(#g)"><g transform="rotate(%d %d %d)" fill="none" stroke="#%s" stroke-width="%d" '
                'stroke-linecap="round">\n%s  </g></g>\n'
                '  <circle cx="%d" cy="%d" r="%d" fill="none" stroke="#%s" stroke-width="%d"/>'
-               % (CX, CY, R_SPHERE, TILT, CX, CY, c["grid"][0], STROKE, lines, CX, CY, R_SPHERE, c["grid"][0], STROKE))
+               % (CX, CY, R_SPHERE, TILT, CX, CY, c["grid"][0], stroke, lines, CX, CY, R_SPHERE, c["grid"][0], stroke))
     return {"grid": grid, "sphere": disc(R_SPHERE, c["sphere"][0]), "rim": disc(R_RIM, c["rim"][0])}
 
 

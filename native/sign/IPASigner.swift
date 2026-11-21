@@ -243,12 +243,13 @@ final class IPASigner {
         var tweaks = options.tweaks
         if oldID != SignOptions.selfBundleID, let exe = main.plist["CFBundleExecutable"] as? String, files[appDir + exe] != nil,
            let plan = GroupFix.plan(original: Inspect.entitlements(try contents(appDir + exe, files, zip)),
-                                    profile: profile.entitlements(for: entID),
+                                    profile: profile.entitlements(for: entID, keptID: keep ? newID : nil),
                                     previous: files[appDir + GroupFix.configPath] == nil ? nil : try? contents(appDir + GroupFix.configPath, files, zip)),
            let dylib = GroupFix.dylib() {
             tweaks = try GroupFix.adding(plan, dylib: dylib, to: tweaks)
             log("Group fix: \(plan.groups.isEmpty ? "no app groups" : plan.groups.joined(separator: ", ")) -> "
                 + (plan.target.isEmpty ? "the app's own folder" : plan.target) + (plan.keychain ? "; keychain groups stripped" : ""))
+            if let lost = plan.lost { log("Warning: this profile has no \(lost), where the app kept its shared data until now; iOS keeps that folder from it") }
         }
         // F288: the tweaks' files go in (over any the app has at those paths); their frameworks are bundles to sign
         if let t = tweaks {
@@ -325,7 +326,7 @@ final class IPASigner {
                     for i in injected { log("Injected \(i)") }
                 }
                 let params = CodeSignParams(identifier: id, team: profile.team,
-                                            entitlements: isApp ? profile.entitlements(for: keep || id == newID ? entID : id) : nil,
+                                            entitlements: isApp ? profile.entitlements(for: keep || id == newID ? entID : id, keptID: keep ? newID : nil) : nil,
                                             infoPlist: infoData, codeResources: resources)
                 let m = mode(exe, files)
                 files[exe] = try hold(try MachO.sign(consume data, params, identity, time: time), mode: m, sealed: dir != appDir)

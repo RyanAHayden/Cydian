@@ -235,7 +235,10 @@ On a jailbreak, an installer with root can install an IPA directly. There's no i
   in Security.framework. With Keep Bundle IDs on (the default) the app keeps its bundle ID with any profile, and
   only the entitlements carry the profile's App ID; with a profile that has Push (and, for some apps, App Groups
   and Communication and Time Sensitive Notifications) it gets its own server's notifications, whoever signed it (docs/signing.md, "Keep Bundle IDs"). Off, an explicit profile renames the app
-  into a copy without notifications. Feather's arm64e fix-up (via LiveContainer) runs on every Mach-O.
+  into a copy without notifications. Feather's arm64e fix-up (via LiveContainer) runs on every Mach-O. Re-signs keep
+  each app's data: its own keychain group (`TEAM.<its bundle ID>`, never one shared by every app under the App ID)
+  and its original App Groups mapped to a folder of its own (docs/signing.md, "Keeping an app's data across
+  re-signs"; docs/developer-account.md, "Keep your apps' data", for what a team or App ID change costs).
 - **Installing**: Feather's Semi Local split, with iFizBox's own Signing Server (`worker/`, sign.ifizbox.com by
   default, or the user's own) in api.palera.in's place: the manifest comes from the server over HTTPS, the signed
   IPA from a plain HTTP server on 127.0.0.1. The server sees the app's bundle ID, name and version. A hand-trusted

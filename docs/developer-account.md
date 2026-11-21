@@ -72,12 +72,13 @@ Sensitive Notifications, such an app gets no notifications at all. With the grou
 it gets them. Set up all three together.
 
 One App ID set up like this covers every app's notifications: iOS registers each app for push under its own
-Info.plist ID, not the App ID. Apps signed with the same App ID do share a keychain and App Groups, so they can see
-each other's sign-ins; make an App ID (and a profile) per app only if you want those kept apart.
+Info.plist ID, not the App ID. It doesn't mix apps' data either: iFizBox gives each app a keychain group named after
+its own bundle ID (the profile's `TEAM.*` keychain entry allows it) and keeps the App Group data the app asks for in a
+folder of its own. Only the profile's own `group.` folders are shared, by the apps that use those IDs directly.
 
 Any change to an App ID's capabilities or groups makes every profile made from it invalid. Make the profile again
 (step 5), import the new one into iFizBox (step 6: iFizBox keeps using the identity it holds until you do) and re-sign
-the apps with it.
+the apps with it. That keeps every app's data (see "Keep your apps' data" below).
 
 ## 4. Register your iPhones
 
@@ -121,6 +122,21 @@ Delete the App Store copy of the app first (iOS won't sign over it), install, an
 
 <p align="center"><img src="img/crop-web-certificate.png" alt="Settings > Signing: Import Certificate" width="320"></p>
 
+## Keep your apps' data
+
+An app's sign-ins and settings live in its data folder, its keychain and its App Groups. Re-signing keeps all three
+when it stays on the same team and App ID:
+
+- **Fine**: a new certificate from the same account, a profile made again (new iPhones, capabilities or groups added),
+  re-signing as often as you like, with **Keep Bundle IDs** on.
+- **Loses the app's data**: a profile from **another team** (another account or signing service), or one for
+  **another App ID**. iOS refuses it as an update, and the only way on is deleting the app, which deletes its data
+  (the keychain is tied to the team too). The sideload app stops before signing and says so. Before you switch
+  accounts, back up what the app can export, or sign it from the new account as a fresh install.
+- **Keep Bundle IDs off** makes a copy beside the app, with empty data of its own.
+- Keep the App ID's keychain entry as Apple makes it (`TEAM.*` in the profile): that's what lets each app have its
+  own keychain group.
+
 ## When it doesn't work
 
 - **"Unable to install … integrity could not be verified"**: this iPhone isn't in the profile. Add its UDID (step 4),
@@ -132,6 +148,10 @@ Delete the App Store copy of the app first (iOS won't sign over it), install, an
   before the App ID last changed (invalid: make it again and re-sign), Keep Bundle IDs was off when the app was
   signed, or the app was never allowed to send notifications. Some services push only while you're away elsewhere:
   Discord sends to the phone only while its desktop and web clients are inactive, so quit those when testing.
+- **An app forgot its sign-in or settings**: it was signed from another team or App ID and deleted to get it on
+  (above), signed with Keep Bundle IDs off (a copy), or signed by a tool that puts every app in one shared keychain
+  and doesn't map the app's own App Groups. Re-signing with iFizBox keeps its data from then on; what was lost
+  before stays lost.
 - **Every app stops opening at once**: the certificate expired or was revoked. Make a new one (step 2) and a new
   profile (step 5), then re-sign. In the sideload app, Home shows a tile when the certificate or profile is about to
   expire (Settings > Installation & Signing > Show Expiry Warning sets how early).

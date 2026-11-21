@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { profileInfo, targetBundleId, appEntitlements, plistXml, identityPlist, zsignArgs, zsignError, appInfo, isZip } from "./websign.js";
+import { profileInfo, targetBundleId, appEntitlements, keychainGroups, plistXml, identityPlist, zsignArgs, zsignError, appInfo, isZip } from "./websign.js";
 import { parsePlist } from "./signing.js";
 
 const fx = (n) => new Uint8Array(readFileSync(new URL(`./fixtures/signing/${n}`, import.meta.url)));
@@ -27,6 +27,14 @@ test("entitlements narrowed to the app, never debuggable", () => {
   const e = appEntitlements({ teamId: "T1", entitlements: { "application-identifier": "T1.*", "keychain-access-groups": ["T1.*"], "get-task-allow": true, "aps-environment": "development" } }, "com.you.delta");
   assert.deepEqual(e, { "application-identifier": "T1.com.you.delta", "keychain-access-groups": ["T1.com.you.delta"], "get-task-allow": false, "aps-environment": "development" });
   assert.equal(appEntitlements({ entitlements: { "com.apple.developer.team-identifier": "T2" } }, "a.b")["application-identifier"], "T2.a.b");
+});
+
+test("keychainGroups (B227): the app's own ID first when the profile allows it, the App ID's group after", () => {
+  assert.deepEqual(keychainGroups(["T.*", "com.apple.token"], "T", "com.me.sideload", "com.burbn.instagram"), ["T.com.burbn.instagram", "T.com.me.sideload"]);
+  assert.deepEqual(keychainGroups(["T.*"], "T", "com.you.delta", "com.you.delta"), ["T.com.you.delta"]);
+  assert.deepEqual(keychainGroups(["T.com.me.*"], "T", "com.me.sideload", "com.burbn.instagram"), ["T.com.me.sideload"], "not allowed: as before");
+  assert.deepEqual(keychainGroups(["T.com.burbn.instagram"], "T", "com.me.sideload", "com.burbn.instagram"), ["T.com.burbn.instagram", "T.com.me.sideload"]);
+  assert.deepEqual(keychainGroups(undefined, "T", "a.b", "c.d"), ["T.a.b"]);
 });
 
 test("XML plists read back (core/signing.js parsePlist), data and escapes included", () => {

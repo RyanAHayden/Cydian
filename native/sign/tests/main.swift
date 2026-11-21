@@ -290,7 +290,9 @@ test("sign with an explicit profile, bundle ID kept") {
         let s = readSignature(f[bin]!)!
         let e = try PropertyListSerialization.propertyList(from: s.ents.subdata(in: 8..<s.ents.count), format: nil) as? [String: Any]
         check(e?["application-identifier"] as? String == "\(team).com.me.fixture", "\(what): application-identifier \(String(describing: e?["application-identifier"]))")
-        check(e?["keychain-access-groups"] as? [String] == ["\(team).com.me.fixture"], "\(what): keychain group")
+        // B227: the app's own keychain group first (one App ID signs every app), the App ID's after
+        check(e?["keychain-access-groups"] as? [String] == ["\(team).dev.ifizbox.fixture", "\(team).com.me.fixture"],
+              "\(what): keychain group \(String(describing: e?["keychain-access-groups"]))")
         check(e?["get-task-allow"].flatMap(plistBool) == false, "\(what): not debuggable")
     }
     // a prefix wildcard narrows the App ID in the entitlements, Info.plist still keeps the app's
@@ -830,7 +832,18 @@ test("B211: group fix") {
                                 "com.apple.security.application-groups": ["group.com.burbn.instagram"],
                                 "keychain-access-groups": ["OLDTEAM.com.burbn.instagram"]]
     let mine = ["com.apple.security.application-groups": ["group.com.me.box"]]
-    check(GroupFix.plan(original: insta, profile: mine) == GroupFix.Plan(groups: ["group.com.burbn.instagram"], target: "group.com.me.box", keychain: true), "to the profile's group")
+    // B227: to the app's own folder whatever the profile has; the older rule's group (the profile's first) as legacy
+    check(GroupFix.plan(original: insta, profile: mine) == GroupFix.Plan(groups: ["group.com.burbn.instagram"], target: "", keychain: true,
+                                                                         legacy: "group.com.me.box"), "to the app's own folder, legacy copied")
+    let was = try PropertyListSerialization.data(fromPropertyList: ["groups": ["group.com.burbn.instagram"], "target": "group.com.me.box", "keychain": true],
+                                                 format: .xml, options: 0)
+    check(GroupFix.plan(original: insta, profile: mine, previous: was)?.target == "group.com.me.box", "an earlier sign's profile group stays")
+    check(GroupFix.plan(original: insta, profile: ["com.apple.security.application-groups": ["group.other"]], previous: was)?.lost == "group.com.me.box",
+          "a profile without it: reported lost")
+    check(Profile.keychainGroups(["T.*", "com.apple.token"], team: "T", bundleID: "com.me.sideload", keptID: "com.burbn.instagram")
+          == ["T.com.burbn.instagram", "T.com.me.sideload"], "keychain group named after the kept ID")
+    check(Profile.keychainGroups(["T.com.me.*"], team: "T", bundleID: "com.me.sideload", keptID: "com.burbn.instagram") == ["T.com.me.sideload"],
+          "a kept ID the profile's groups don't allow: as before")
     check(GroupFix.plan(original: insta, profile: [:]) == GroupFix.Plan(groups: ["group.com.burbn.instagram"], target: "", keychain: true), "to the app's own folder")
     check(GroupFix.plan(original: insta, profile: ["com.apple.security.application-groups": ["group.com.burbn.instagram"]])?.groups == [], "a group the profile has stays")
     check(GroupFix.plan(original: ["application-identifier": "OLD.x"], profile: mine) == nil, "nothing to fix")

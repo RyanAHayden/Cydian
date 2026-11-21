@@ -4,7 +4,8 @@
 //   profileInfo(bytes)                      { appId, teamId, entitlements } from a .mobileprovision
 //   targetBundleId(appId, bundleId)         the ID the app is signed as (a com.you.* profile signs any app)
 //   signingIds(appId, bundleId, { keep })   F237: Info.plist's ID and the entitlements' (Keep Bundle IDs)
-//   appEntitlements(info, bundleId)         the profile's entitlements narrowed to that app (Xcode's way)
+//   appEntitlements(info, bundleId, keptId) the profile's entitlements narrowed to that app (Xcode's way), its
+//                                           keychain group named after its own ID (keychainGroups)
 //   plistXml(value)                         an XML plist (dict, array, string, integer, real, bool, data, date)
 //   identityPlist({ p12, password, profile })   iFizBox's own IPA's ifizbox-identity.plist (native BundledIdentity)
 //   zsignArgs({ ... })                      zsign's command line in the worker's in-memory files
@@ -113,15 +114,27 @@ export function targetBundleId(appId, bundleId) {
 
 // zsign would otherwise copy a wildcard profile's application-identifier (TEAM.com.you.*) and keychain group into
 // the app verbatim, and iOS then refuses it ("Unable to Install"). Never debuggable (get-task-allow false).
-export function appEntitlements({ entitlements = {}, teamId = null }, bundleId) {
+// The keychain group comes first from the app's own ID (keptId, Info.plist's: TEAM.com.burbn.instagram), when the
+// profile's keychain groups allow it (TEAM.* does): an explicit profile signs every app under one App ID, and a
+// group named after that ID was one keychain shared by all of them (one app clearing its items cleared the others').
+// Keychain items go to the first group, the app's alone, under any profile or certificate of the same team.
+// TEAM.<App ID> stays second, so items an earlier signature put there are still the app's.
+export function appEntitlements({ entitlements = {}, teamId = null }, bundleId, keptId = bundleId) {
   const ents = { ...entitlements };
   const team = ents["com.apple.developer.team-identifier"] || teamId;
   if (team) {
     ents["application-identifier"] = `${team}.${bundleId}`;
-    if ("keychain-access-groups" in ents) ents["keychain-access-groups"] = [`${team}.${bundleId}`];
+    if ("keychain-access-groups" in ents) ents["keychain-access-groups"] = keychainGroups(ents["keychain-access-groups"], team, bundleId, keptId);
   }
   ents["get-task-allow"] = false;
   return ents;
+}
+
+// [TEAM.keptId, TEAM.bundleId] (once when they're the same), the first only when the profile's groups allow it.
+export function keychainGroups(allowed, team, bundleId, keptId = bundleId) {
+  const ok = (g) => (Array.isArray(allowed) ? allowed : []).some((p) => typeof p === "string" && (p === g || (p.endsWith("*") && g.startsWith(p.slice(0, -1)))));
+  const own = `${team}.${keptId}`, app = `${team}.${bundleId}`;
+  return own !== app && ok(own) ? [own, app] : [app];
 }
 
 const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");

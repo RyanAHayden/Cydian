@@ -44,9 +44,10 @@ test("machoEntitlements reads the original signature's XML slot, thin or fat; nu
   assert.ok(asked.every(([, n]) => n <= 4096), "reads pieces, not the whole file");
 });
 
-test("groupFixPlan: the original's groups go to the profile's own group, or to a folder of the app's when it has none", () => {
+test("groupFixPlan: the original's groups go to a folder of the app's own, whatever groups the profile has", () => {
   const withGroup = { "com.apple.security.application-groups": ["group.com.me.box"] };
-  assert.deepEqual(groupFixPlan(INSTA, withGroup), { groups: ["group.com.burbn.instagram", "group.com.burbn.shared"], target: "group.com.me.box", keychain: true });
+  // legacy: the profile group the older rule picked, copied into the app's own folder once (an app signed that way)
+  assert.deepEqual(groupFixPlan(INSTA, withGroup), { groups: ["group.com.burbn.instagram", "group.com.burbn.shared"], target: "", keychain: true, legacy: "group.com.me.box" });
   assert.deepEqual(groupFixPlan(INSTA, { "keychain-access-groups": ["T.*"] }), { groups: ["group.com.burbn.instagram", "group.com.burbn.shared"], target: "", keychain: true });
   // a group the profile has stays as it is
   assert.deepEqual(groupFixPlan(INSTA, { "com.apple.security.application-groups": ["group.com.burbn.shared"] }).groups, ["group.com.burbn.instagram"]);
@@ -56,8 +57,27 @@ test("groupFixPlan: the original's groups go to the profile's own group, or to a
   // signed again: the executable now has the profile's groups, the config left by the first sign keeps the originals
   const previous = readConfig(groupFixTweaks(groupFixPlan(INSTA, {}), new Uint8Array(4)).files[1].data);
   assert.deepEqual(groupFixPlan({ "keychain-access-groups": ["T.com.burbn.instagram"] }, withGroup, previous),
-    { groups: ["group.com.burbn.instagram", "group.com.burbn.shared"], target: "group.com.me.box", keychain: true });
+    { groups: ["group.com.burbn.instagram", "group.com.burbn.shared"], target: "", keychain: true });
   assert.equal(readConfig(new Uint8Array([1, 2])), null);
+});
+
+test("groupFixPlan (B227): the same folder whatever the profile's groups or their order; an earlier profile group kept or reported lost", () => {
+  const a = groupFixPlan(INSTA, { "com.apple.security.application-groups": ["group.x.1", "group.x.4", "group.x.2"] });
+  const b = groupFixPlan(INSTA, { "com.apple.security.application-groups": ["group.x.2", "group.x.1"] });
+  const none = groupFixPlan(INSTA, {});
+  assert.equal(a.target, "");
+  assert.equal(b.target, "");
+  assert.equal(none.target, "");
+  // an app an earlier (B211) sign mapped onto a profile group keeps it while the profile has it
+  const was = { groups: ["group.com.burbn.instagram"], target: "group.x.1", keychain: true };
+  assert.equal(groupFixPlan(INSTA, { "com.apple.security.application-groups": ["group.x.4", "group.x.1"] }, was).target, "group.x.1");
+  const gone = groupFixPlan(INSTA, { "com.apple.security.application-groups": ["group.x.4"] }, was);
+  assert.equal(gone.target, "");
+  assert.equal(gone.lost, "group.x.1", "the folder iOS now keeps from the app is named, for a warning");
+  // the config carries legacy for the dylib
+  const cfg = readConfig(groupFixTweaks(a, new Uint8Array(4)).files[1].data);
+  assert.equal(cfg.legacy, "group.x.1");
+  assert.equal(readConfig(groupFixTweaks(none, new Uint8Array(4)).files[1].data).legacy, undefined);
 });
 
 test("machoEntitlements reads the first 64-bit slice of a fat armv7+arm64 file", () => {
@@ -75,6 +95,11 @@ test("appEntitlements keeps the profile's own app groups (the fix maps the app's
     "keychain-access-groups": ["T.*"] } }, "com.burbn.instagram");
   assert.deepEqual(ents["com.apple.security.application-groups"], ["group.com.me.box"]);
   assert.deepEqual(ents["keychain-access-groups"], ["T.com.burbn.instagram"]);
+  // B227: an explicit App ID (every app under one ID): the keychain group named after the app's own, kept ID first
+  const kept = appEntitlements({ teamId: "T", entitlements: { "application-identifier": "T.com.me.sideload", "keychain-access-groups": ["T.*", "com.apple.token"] } },
+    "com.me.sideload", "com.burbn.instagram");
+  assert.equal(kept["application-identifier"], "T.com.me.sideload");
+  assert.deepEqual(kept["keychain-access-groups"], ["T.com.burbn.instagram", "T.com.me.sideload"]);
 });
 
 test("groupFixTweaks / withGroupFix: the dylib and its config under Frameworks/, injected after the user's tweaks", () => {

@@ -158,7 +158,8 @@ test("website signing keeps the app's ID: no -b, entitlements with the profile's
   assert.equal(seen.args.includes("-b"), false, "zsign takes Info.plist's ID");
   const ents = parsePlist(seen.files.get("/w/ents.plist"));
   assert.equal(ents["application-identifier"], "TEAM.com.you.youtube");
-  assert.deepEqual(ents["keychain-access-groups"], ["TEAM.com.you.youtube"]);
+  // B227: the app's own keychain group first (not one shared by every app under the App ID), the App ID's after
+  assert.deepEqual(ents["keychain-access-groups"], ["TEAM.com.google.ios.youtube", "TEAM.com.you.youtube"]);
   assert.equal(ents["aps-environment"], "production");
   assert.equal(ents["get-task-allow"], false);
 });

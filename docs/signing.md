@@ -434,8 +434,8 @@ cross-compiled into the app; this way neither. It writes what Apple's `codesign`
   optional), `embedded.mobileprovision` in apps and extensions, the entitlements narrowed per bundle, as the website does
   (`application-identifier` and the keychain group set to the bundle's ID, `get-task-allow` off);
 - the bundle ID rules (see "Keep Bundle IDs" below): kept, Info.plist and every code signature keep the app's and
-  its extensions' own IDs, and the app and its extensions all carry the profile's App ID as `application-identifier`
-  and keychain group. The old way, a wildcard profile keeps the app's ID (a `com.you.*` one moves it under the prefix
+  its extensions' own IDs, and the app and its extensions all carry the profile's App ID as `application-identifier`,
+  with the app's own keychain group first ("Keeping an app's data across re-signs" below). The old way, a wildcard profile keeps the app's ID (a `com.you.*` one moves it under the prefix
   if it doesn't fit), an explicit one renames the app and **leaves out its extensions and Watch apps** (one profile,
   one app ID), and says which in `removed`. Extensions' IDs follow the app's;
 - an app already on the phone keeps the `application-identifier` it was installed with (installd refuses an update
@@ -560,9 +560,9 @@ with the bundle ID, and keys the app's data by the bundle ID:
 
 - **On**: Info.plist's `CFBundleIdentifier` and the code signature's identifier stay the app's own (or the ID typed in
   Custom Install), extensions keep theirs (prefixed by the app's, as installd requires) and stay in with an explicit
-  profile. Only the entitlements change: `application-identifier` and the keychain group are `TEAM.<App ID>`, the
-  profile's explicit App ID, or a wildcard narrowed (`com.you.*` -> `com.you.<last part>`), for the app and every
-  extension; `aps-environment` comes from the profile. So the app replaces the original instead of sitting beside
+  profile. Only the entitlements change: `application-identifier` is `TEAM.<App ID>`, the profile's explicit App ID,
+  or a wildcard narrowed (`com.you.*` -> `com.you.<last part>`), for the app and every extension; the keychain groups
+  are `TEAM.<the app's own ID>` then `TEAM.<App ID>` (below); `aps-environment` comes from the profile. So the app replaces the original instead of sitting beside
   it, and with an Ad Hoc profile whose App ID has Push it can get its own notifications.
 - **Off** (the old way, asked first: `OLD_WAY_ALERT`): the app becomes a copy under the profile's ID; its
   notifications won't work and sign-in, iCloud or shared data tied to its ID may not.
@@ -578,8 +578,8 @@ Notifications:
   both notification capabilities works (which of the three is decisive isn't known; set up all of them).
   docs/developer-account.md has the steps and how to check a profile.
 - One explicit App ID set up like that in an Ad Hoc profile covers every app's notifications. A signing service's
-  `.p12` and profile work as well as your own account's. One App ID per app is not needed for push: it only keeps
-  apps' keychains and App Groups apart.
+  `.p12` and profile work as well as your own account's. One App ID per app is not needed for push, nor to keep apps'
+  keychains and App Group data apart: iFizBox does that under one App ID (below).
 - Changing an App ID's capabilities or groups makes its profiles invalid: make the profile again, import it (iFizBox
   keeps the identity it holds until a new one is imported) and re-sign.
 - With an App Store Connect API key (Settings > Signing > Apple Developer Account, see "Own provisioning profiles"
@@ -615,6 +615,45 @@ Notifications:
 - The guide: Home > User Guides > Notifications for Signed Apps (`screens/guides.js`, route `guides/keep-bundle-id`),
   linked from those warnings: an explicit App ID with Push (one for every app), the iPhones' UDIDs, an Ad Hoc
   profile, import it. (docs/developer-account.md adds the App Groups and notification capabilities some apps need.) With a signing service's `.p12` and Push profile, only the last two steps apply.
+
+### Keeping an app's data across re-signs
+
+An app keeps its data in three places, and a re-sign must leave each where the app finds it:
+
+- **Its data container** (Documents, Library, its preferences): iOS keys it by the Info.plist bundle ID, so Keep
+  Bundle IDs keeps it across any re-sign iOS accepts as an update.
+- **The keychain**: items go to the first of the signature's `keychain-access-groups`. Both signers write
+  `TEAM.<the app's own bundle ID>` first, when the profile's keychain entry allows it (`TEAM.*`, which every Apple
+  profile has), and `TEAM.<App ID>` second (`Profile.keychainGroups`, `core/websign.js keychainGroups`). So apps
+  signed under one explicit App ID no longer write into one keychain, where one app clearing its keychain on a fresh
+  install cleared the others' sign-ins. Items an earlier signature put in `TEAM.<App ID>` stay readable through the
+  second group; until the app writes them again they stay where every app under that App ID can reach them. An app that names a group of its own (Instagram's
+  `MH9GU9K5PX.*`) gets the group fix below; one that builds it from its team prefix and bundle ID finds
+  `TEAM.<its ID>` entitled.
+- **App Groups**: a re-signed app still asks for its original groups (`group.com.burbn.instagram`), which the profile
+  can't give. When the original signature names groups or keychain groups the profile lacks, both signers inject
+  the group fix (`native/groupfix/groupfix.m`, committed built in `web/app/vendor/groupfix/`, planned by
+  `core/groupfix.js` and `GroupFix.swift`; never into iFizBox's own IPA): those groups' folder becomes
+  `Library/AppGroups/<group>/` in the app's own container and their suite `ifizbox.appgroup.<group>` in its own
+  preferences, and keychain calls lose `kSecAttrAccessGroup` (items land in the app's own group). That place is the
+  same under any profile, whatever groups it has or in what order, and no other app shares it. An app an earlier
+  sign mapped onto the profile's first group gets that folder and suite copied into its own once (`legacy` in
+  `ifizbox-groupfix.plist`; only for an app that had run before it got this fix, never a fresh install, which would
+  take in what other apps left in that shared group). The signer's log says `Group fix: ...`.
+
+What iOS doesn't let a re-sign keep:
+
+- **Another team, or another App ID**: installd refuses the update (`MismatchedApplicationIdentifierEntitlement`),
+  and deleting the app to get past that deletes its data; the keychain's groups also start with the team. The app's
+  signer stops before signing with words saying so (`AppIDMatch.swift`, with the profiles it holds); the website
+  can't see what is installed, so iOS's refusal is what the user gets there.
+- **A profile group the app used directly** (an app built for it, or one an earlier sign mapped there) that the new
+  profile doesn't have: iOS keeps that group's folder from the app. When the IPA being signed carries the earlier
+  sign's `ifizbox-groupfix.plist`, the signers say so (the native log, the website job's `warnings`); a sign from the
+  original IPA can't tell.
+
+`tools/resignprobe/` checks all of this on the iPhone 15 Pro: a probe app writes a marker to each place and shows
+which it still reads after each re-sign (`run.sh`: our two signers, any identity).
 
 ### Is this iPhone in the profile?
 

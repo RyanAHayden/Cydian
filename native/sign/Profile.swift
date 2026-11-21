@@ -64,16 +64,31 @@ struct Profile {
         return (keep ? appBundleID : ent, ent)
     }
 
-    // The profile's entitlements narrowed to one bundle, the way Xcode signs (I5's app_entitlements).
-    func entitlements(for bundleID: String) -> [String: Any] {
+    // The profile's entitlements narrowed to one bundle, the way Xcode signs (I5's app_entitlements). The keychain
+    // group comes first from the app's own ID (keptID, its Info.plist's) when the profile's groups allow it (TEAM.*
+    // does): an explicit profile signs every app under one App ID, and a group named after it was one keychain shared
+    // by all of them. Items go to the first group, the app's alone, under any profile or certificate of the same
+    // team; TEAM.<App ID> stays second for items an earlier signature put there. The website's signer does the same
+    // (core/websign.js keychainGroups).
+    func entitlements(for bundleID: String, keptID: String? = nil) -> [String: Any] {
         var e = entitlements
         let t = e["com.apple.developer.team-identifier"] as? String ?? team
         if !t.isEmpty {
             e["application-identifier"] = "\(t).\(bundleID)"
-            if e["keychain-access-groups"] != nil { e["keychain-access-groups"] = ["\(t).\(bundleID)"] }
+            if e["keychain-access-groups"] != nil {
+                e["keychain-access-groups"] = Profile.keychainGroups(e["keychain-access-groups"], team: t, bundleID: bundleID, keptID: keptID ?? bundleID)
+            }
         }
         e["get-task-allow"] = false
         return e
+    }
+
+    // [TEAM.keptID, TEAM.bundleID] (once when they're the same), the first only when the profile's groups allow it.
+    static func keychainGroups(_ allowed: Any?, team: String, bundleID: String, keptID: String) -> [String] {
+        let own = "\(team).\(keptID)", app = "\(team).\(bundleID)"
+        let ok = (allowed as? [Any] ?? []).compactMap { $0 as? String }
+            .contains { $0 == own || ($0.hasSuffix("*") && own.hasPrefix(String($0.dropLast()))) }
+        return own != app && ok ? [own, app] : [app]
     }
 
     // Why this certificate can't sign with this profile, or nil when it can.

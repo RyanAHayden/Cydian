@@ -1,6 +1,6 @@
 # R61 Lite on the iPhone 15 Pro: This iPhone after delete + reinstall (B284's phone check)
 
-**Result: passes.** On a fresh container (iFizBox deleted and reinstalled), the first `signing.status` read 3 s
+**Result: passes.** On a fresh container (iFizBox deleted and reinstalled), the first `signing.status` read 5 s
 after launch already had the profile's `device` at `state: "in"` with this phone's UDID, and Signing > Certificate
 showed **This iPhone: In Profile**, "This iPhone is in the profile." (`fresh-certificate.jpg`). Nothing used the
 pairing before that: no `iFizBox install:` line in the syslog and no `Caches/idevice.log` in the new container
@@ -27,10 +27,10 @@ as `<private>` (see below). Filed **B286** (low) to log it with `os_log` `%{publ
 
 | Step | What | Result |
 | --- | --- | --- |
-| 1 | Over-install of 3678 with `ui-15.sh R61 install` (container kept), launch | `signing.status`: identity + profile, device `state: "in"`, UDID (`status-1-overinstall.json`). This launch is when B284 copies the UserDefaults UDID into the Keychain (it logs only a refusal; none seen, though an NSLog refusal would be `<private>` too). |
+| 1 | Over-install of 3678 with `ui-15.sh R61 install` (container kept), launch | `signing.status`: identity + profile, device `state: "in"`, UDID (`status-1-overinstall.json`). This launch is when B284 copies the UserDefaults UDID into the Keychain. It logs only a refusal, as an NSLog, which would be `<private>` here too, so the syslog can't say it worked; step 3 shows it did. |
 | 2 | `ios uninstall com.ryha.ifizbox` (05:15:47); afterwards `afcclient` found no container. Install 3678 again: fresh container (`Library` held Caches, SplashBoard and an empty Preferences; no Application Support) | |
 | 3 | Launch 05:16:11; `signing.status` at 05:16:16, before any tap | identity + profile back (B276), **device `state: "in"`, `udid` this phone, `shared: 1`** (`status-2-fresh-container.json`). R59's step 5 read `state: "unknown"`, `shared: 2` (the embedded profile's two devices) here. |
-| 4 | Settings > Installation & Signing > Certificate (05:18) | **This iPhone: In Profile** (`fresh-certificate.jpg`). `device.udid` = `{udid, source: "lockdown"}` (`device-udid-fresh.json`). The new container's Preferences plist holds `ifizbox.phone.udid` = this phone's UDID, which only the Keychain branch of `PhoneID.read()` writes without a pairing. |
+| 4 | Settings > Installation & Signing > Certificate (05:18) | **This iPhone: In Profile** (`fresh-certificate.jpg`). `device.udid` = `{udid, source: "lockdown"}` (`device-udid-fresh.json`): `PhoneID.source` reads "lockdown" whenever UserDefaults holds `ifizbox.phone.udid`, and the Keychain branch writes it there, so a restored UDID reports the source it was first learned from (B284 kept this on purpose: "`source` then reads "lockdown" as before"). It does not mean lockdown was asked this time. The new container's Preferences plist holds `ifizbox.phone.udid` = this phone's UDID, which only the Keychain branch of `PhoneID.read()` writes without a pairing. |
 
 Installation & Signing shows "Checking…" when opened, but the container still had no `idevice.log` after the
 Certificate shot and the syslog had no `iFizBox install:` line from launch to then: the pairing was not used before

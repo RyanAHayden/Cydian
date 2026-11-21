@@ -5,26 +5,11 @@ import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { fakeDocument } from "./fakedom.test-helper.js";
 
 const APP = join(dirname(fileURLToPath(import.meta.url)), "..");
 
-function make(tag) {
-  const e = {
-    tagName: String(tag).toUpperCase(), children: [], attrs: {}, listeners: {}, dataset: {}, hidden: false, _cls: new Set(), textContent: "",
-    get className() { return [...e._cls].join(" "); },
-    set className(v) { e._cls = new Set(String(v).split(/\s+/).filter(Boolean)); },
-    classList: {
-      add: (...c) => c.forEach((x) => e._cls.add(x)), contains: (c) => e._cls.has(c),
-      toggle: (c, on = !e._cls.has(c)) => { if (on) e._cls.add(c); else e._cls.delete(c); return on; },
-    },
-    setAttribute(k, v) { e.attrs[k] = String(v); }, getAttribute: (k) => e.attrs[k] ?? null,
-    append(...c) { e.children.push(...c); },
-    addEventListener(t, f) { (e.listeners[t] ??= []).push(f); },
-    click() { for (const f of e.listeners.click ?? []) f(); },
-  };
-  return e;
-}
-globalThis.document = { createElement: make };
+globalThis.document = fakeDocument();
 const { segments, segmented } = await import("./ui.js");
 const selected = (bs) => bs.filter((b) => b._cls.has("selected")).map((b) => b.textContent);
 

@@ -8,6 +8,7 @@ import { openProgress, progressHUD, lockSelfUpdate, CLOSING_LABEL, LOCK_LIMIT } 
 import { installOnDevice } from "./signing-client.js";
 import { resignApp } from "./screens/queue.js";
 import { NAME, BUNDLE_ID } from "./brand.js";
+import { fakeNative } from "./fakes.test-helper.js";
 
 // ---- a fake DOM, enough for nav/progress.js (as install-cancel.test.js's) ---------------------------------------
 function fakeDom() {
@@ -151,7 +152,6 @@ test("lockSelfUpdate: a HUD without finish ends on Done after 1.2 s as before", 
 
 // ---- the callers ---------------------------------------------------------------------------------------------------
 
-const fakeNative = (answers) => ({ mode: "sideload", async call(m) { return answers[m] ?? null; } });
 const recHud = (finished) => () => ({ set() {}, hide() {}, done() {}, finish: (o) => finished.push(o), page: null });
 
 test("installOnDevice: iFizBox's own IPA (by URL or by the ID iOS gets) ends locked; another app doesn't", async () => {

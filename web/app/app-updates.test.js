@@ -8,7 +8,7 @@ import { withAppUpgrades, shellWatch, rememberedApps } from "./app-updates.js";
 import { createNativeBackend } from "./backend-native.js";
 import { createQueue } from "./core/queue.js";
 import { createFakeNative, makeFixture } from "../../native/fake/fake-native.mjs";
-import { fakeIndexedDB } from "../../native/fake/fake-indexeddb.mjs";
+import { fakeIndexedDB } from "./fakes.test-helper.js";
 import { memoryAppStore } from "./core/installed.js";
 import { SELF_ALT_URL } from "./core/essential.js";
 

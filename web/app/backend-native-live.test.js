@@ -5,7 +5,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createNativeBackend } from "./backend-native.js";
 import { createFakeNative, makeFixture } from "../../native/fake/fake-native.mjs";
-import { fakeIndexedDB } from "../../native/fake/fake-indexeddb.mjs";
+import { fakeIndexedDB } from "./fakes.test-helper.js";
 
 const PROCURSUS = "deb:https://apt.procurs.us/:1800";
 const HAVOC = "deb:https://havoc.app/:./";

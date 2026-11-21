@@ -12,7 +12,7 @@ import { createCatalog, ALL } from "./core/catalog.js";
 import { repoLayout } from "./core/apt.js";
 import { createQueue, parseStatusLine, finishOf } from "./core/queue.js";
 import { createFakeNative, makeFixture } from "../../native/fake/fake-native.mjs";
-import { fakeIndexedDB } from "../../native/fake/fake-indexeddb.mjs";
+import { fakeIndexedDB } from "./fakes.test-helper.js";
 
 // apt-get update already ran: the remote lists are in apt's lists directory (plus an older Example Tweak).
 function setup(t, { env = {}, mode = "jailbreak" } = {}) {

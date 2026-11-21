@@ -6,6 +6,7 @@ import assert from "node:assert/strict";
 import { rowAppJob, appOnPhone } from "./altstore.js";
 import { rowSwipeAction } from "./browse.js";
 import { createAppQueue } from "../core/appqueue.js";
+import { fakeNative as bridge } from "../fakes.test-helper.js";
 
 const ID = "io.github.fizl0.openmx";
 const pkg = { key: "alt:https://s/", row: { id: ID, name: "openMX" },
@@ -13,16 +14,14 @@ const pkg = { key: "alt:https://s/", row: { id: ID, name: "openMX" },
     versions: [{ version: "1.2", downloadURL: "https://s/openmx.ipa" }] } } };
 const storeOf = (recs) => async () => ({ all: async () => recs });
 const item = { id: ID, name: "openMX", version: "1.2", kind: "ipa", key: "alt:https://s/" };
-const fakeNative = (answer) => {
-  const calls = [];
-  return { calls, call: async (method, params) => { calls.push([method, params]); if (answer instanceof Error) throw answer; return answer; } };
-};
+// The shared bridge, apps.isInstalled answering `answer` (an Error: thrown).
+const fakeNative = (answer) => bridge({ "apps.isInstalled": answer });
 
 test("B136: a recorded app iOS doesn't have: not installed, the row's swipe queues Install", async () => {
   const native = fakeNative({ installed: { [ID]: false } });
   const store = storeOf([{ id: ID, version: "1.2" }]); // left by the failed install
   const st = await rowAppJob(pkg, null, { store, mode: "sideload", onPhone: (id) => appOnPhone(id, native) });
-  assert.deepEqual(native.calls, [["apps.isInstalled", { bundleIds: [ID] }]]);
+  assert.deepEqual(native.calls, [{ method: "apps.isInstalled", params: { bundleIds: [ID] } }]);
   assert.equal(st.installed, null);
   assert.equal(st.job.installed, null);
   const a = rowSwipeAction(item, { apps: true, ...st, id: ID });

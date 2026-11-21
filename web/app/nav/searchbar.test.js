@@ -4,36 +4,26 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { searchBar, pinned, scrollerOf } from "./searchbar.js";
 
-// Just enough DOM for the bar: elements with classes, attributes, children and listeners.
+import { fakeDocument as sharedDocument } from "./fakedom.test-helper.js";
+
+// The shared fake document; its elements also track focus, and fire() runs the listeners at once and says whether
+// one called preventDefault().
 function fakeDocument() {
-  const make = (tag) => {
-    const listeners = {};
-    const classes = new Set();
-    const node = {
-      tagName: tag.toUpperCase(), children: [], parentNode: null, attrs: {}, dataset: {}, value: "", focused: false,
-      get className() { return [...classes].join(" "); },
-      set className(v) { classes.clear(); for (const c of String(v).split(/\s+/).filter(Boolean)) classes.add(c); },
-      classList: { add: (c) => classes.add(c), remove: (c) => classes.delete(c), contains: (c) => classes.has(c) },
-      setAttribute(k, v) { this.attrs[k] = String(v); },
-      hasAttribute(k) { return k in this.attrs; },
-      append(...kids) { for (const k of kids) { k.parentNode = this; this.children.push(k); } },
-      addEventListener(type, fn) { (listeners[type] ??= []).push(fn); },
-      fire(type, extra = {}) {
-        let prevented = false;
-        const e = { type, preventDefault: () => { prevented = true; }, ...extra };
-        for (const fn of listeners[type] ?? []) fn(e);
-        return prevented;
-      },
-      blur() { this.focused = false; },
-      focus() { this.focused = true; },
-      querySelector(sel) {
-        const want = sel.replace(/^:scope > \./, "");
-        return this.children.find((k) => k.classList.contains(want)) ?? null;
-      },
+  const doc = sharedDocument();
+  const make = doc.createElement;
+  doc.createElement = (tag) => {
+    const node = make(tag);
+    node.focused = false;
+    node.focus = () => { node.focused = true; };
+    node.blur = () => { node.focused = false; };
+    node.fire = (type, extra = {}) => {
+      let prevented = false;
+      node.dispatchEvent({ type, preventDefault: () => { prevented = true; }, ...extra });
+      return prevented;
     };
     return node;
   };
-  return { createElement: make };
+  return doc;
 }
 
 test("C10: searchBar builds Search's bar with Cancel and the page's placeholder", () => {

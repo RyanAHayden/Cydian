@@ -2,30 +2,23 @@
 // tap; a hold ends when the pane scrolls or iOS cancels the touch, and it takes HOLD_MS (not 500 ms).
 import { test, mock } from "node:test";
 import assert from "node:assert/strict";
+import { fakeDocument } from "./fakedom.test-helper.js";
 
-function fakeTarget(extra = {}) {
+// Listeners kept by phase in `on` ("<type>c" for capture, "<type>b" for bubble), for dispatch() below.
+function phased(target) {
   const on = {};
-  return {
-    on,
-    addEventListener(t, f, o) { const c = o === true || o?.capture ? "c" : "b"; (on[t + c] ??= new Set()).add(f); },
-    removeEventListener(t, f, o) { const c = o === true || o?.capture ? "c" : "b"; on[t + c]?.delete(f); },
-    ...extra,
-  };
+  target.on = on;
+  target.addEventListener = (t, f, o) => { const c = o === true || o?.capture ? "c" : "b"; (on[t + c] ??= new Set()).add(f); };
+  target.removeEventListener = (t, f, o) => { const c = o === true || o?.capture ? "c" : "b"; on[t + c]?.delete(f); };
+  return target;
 }
 
-function fakeEl(tag = "div") {
-  const el = fakeTarget({
-    tagName: tag.toUpperCase(), children: [], parent: null, style: {}, textContent: "", offsetWidth: 120, offsetHeight: 40,
-    classList: { set: new Set(), add(c) { this.set.add(c); }, remove(c) { this.set.delete(c); }, contains(c) { return this.set.has(c); },
-      toggle(c, v) { (v ?? !this.set.has(c)) ? this.set.add(c) : this.set.delete(c); } },
-    setAttribute() {}, click() {}, remove() { if (el.parent) el.parent.children = el.parent.children.filter((c) => c !== el); },
-    append(...k) { for (const c of k) { c.parent = el; el.children.push(c); } },
-    contains(x) { for (let n = x; n; n = n.parent) if (n === el) return true; return false; },
-    closest(sel) { for (let n = el; n; n = n.parent) if (n.classList.contains(sel.slice(1))) return n; return null; },
+// The shared fake DOM's element with a menu's size and a row's place on screen.
+function fakeEl(make, tag = "div") {
+  return Object.assign(phased(make(tag)), {
+    offsetWidth: 120, offsetHeight: 40,
     getBoundingClientRect: () => ({ left: 0, top: 300, width: 320, height: 44, bottom: 344 }),
-    animate: () => ({ finished: Promise.resolve() }),
   });
-  return el;
 }
 
 // Dispatch as a browser would: capture on the document, then the target and its ancestors (capture, then bubble).
@@ -33,7 +26,7 @@ function dispatch(doc, target, type, e = {}) {
   const ev = { type, target, detail: 1, pointerId: 1, isPrimary: true, clientX: 100, clientY: 320, defaultPrevented: false, stopped: false,
     preventDefault() { this.defaultPrevented = true; }, stopPropagation() { this.stopped = true; }, ...e };
   const path = [];
-  for (let n = target; n; n = n.parent) path.push(n);
+  for (let n = target; n; n = n.parentNode) path.push(n);
   const run = (node, phase) => { for (const f of [...(node.on[type + phase] ?? [])]) f(ev); };
   run(doc, "c");
   for (const n of [...path].reverse()) { if (ev.stopped) return ev; run(n, "c"); }
@@ -42,12 +35,14 @@ function dispatch(doc, target, type, e = {}) {
 }
 
 function setup() {
-  const body = fakeEl("body");
-  const doc = fakeTarget({ body, createElement: (t) => fakeEl(t) });
+  const doc = phased(fakeDocument());
+  const make = doc.createElement;
+  doc.createElement = (t) => fakeEl(make, t);
+  const body = Object.assign(phased(doc.body), { offsetWidth: 120, offsetHeight: 40 });
   globalThis.document = doc;
   globalThis.innerWidth = 320;
-  const list = fakeEl("ul");
-  const row = fakeEl("li");
+  const list = doc.createElement("ul");
+  const row = doc.createElement("li");
   row.classList.add("pkg-row");
   list.append(row);
   return { doc, body, list, row };
@@ -119,7 +114,7 @@ test("the click ending a hold is eaten wherever it lands (a sheet under the fing
   t.mock.timers.enable({ apis: ["setTimeout"] });
   const { longPress, HOLD_MS } = await import("./menu.js");
   const { doc, body, list, row } = setup();
-  const sheetButton = fakeEl("button");
+  const sheetButton = doc.createElement("button");
   body.append(sheetButton);
   let taps = 0;
   sheetButton.addEventListener("click", () => { taps++; });

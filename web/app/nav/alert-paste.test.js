@@ -3,27 +3,15 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { showAlert } from "./alert.js";
+import { fakeDocument } from "./fakedom.test-helper.js";
 
+// The shared fake document, keeping every element it makes in `all`.
 function fakeDom() {
-  const make = (tag) => {
-    const el = {
-      tag, children: [], listeners: {}, style: {}, attrs: {}, className: "", value: "",
-      classList: { add() {}, remove() {}, contains: () => false },
-      append(...kids) { el.children.push(...kids); }, remove() {}, setAttribute(k, v) { el.attrs[k] = v; },
-      addEventListener(t, f) { (el.listeners[t] ??= []).push(f); }, removeEventListener() {},
-      animate: () => ({ finished: Promise.resolve() }), focus() {}, blur() {},
-    };
-    return el;
-  };
+  const document = fakeDocument();
   const all = [];
-  return {
-    all,
-    document: {
-      createElement: (tag) => { const e = make(tag); all.push(e); return e; },
-      body: { append() {} }, documentElement: { scrollTop: 0 },
-      addEventListener() {}, removeEventListener() {},
-    },
-  };
+  const make = document.createElement;
+  document.createElement = (tag) => { const e = make(tag); all.push(e); return e; };
+  return { all, document };
 }
 
 async function tapPaste({ native, clipboard }) {

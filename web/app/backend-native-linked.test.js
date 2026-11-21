@@ -11,7 +11,7 @@ import { createHash } from "node:crypto";
 import { createQueue, debUrlOf, debLinkOf } from "./core/queue.js";
 import { aptVersionList } from "./core/catalog.js";
 import { createFakeNative, makeFixture } from "../../native/fake/fake-native.mjs";
-import { fakeIndexedDB } from "../../native/fake/fake-indexeddb.mjs";
+import { fakeIndexedDB } from "./fakes.test-helper.js";
 
 const URL_DEB = "https://github.com/example/hookkit/releases/download/1.0/hookkit-rootless.deb";
 const DEB = "!<arch>\nPackage: com.example.linked\nVersion: 1.0\nArchitecture: iphoneos-arm64\nDepends: bash\nName: Linked\n";

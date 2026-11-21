@@ -5,25 +5,19 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { showSheet } from "./sheet.js";
+import { fakeDocument } from "./fakedom.test-helper.js";
 
+// The shared fake document. Its elements track focus and record each animation in doc.anims, finished only when
+// the test calls end(); with animate: false they have no animate() at all.
 function fakeDom({ animate = true } = {}) {
   const anims = [];
-  const make = (tag) => {
-    const e = {
-      tagName: String(tag).toUpperCase(), children: [], attrs: {}, listeners: {}, parentNode: null, _text: "", type: "",
-      _cls: new Set(), focused: false,
-      get className() { return [...e._cls].join(" "); },
-      set className(v) { e._cls = new Set(String(v).split(/\s+/).filter(Boolean)); },
-      get textContent() { return e._text + e.children.map((c) => c.textContent).join(""); },
-      set textContent(v) { e._text = String(v); e.children = []; },
-      setAttribute(k, v) { e.attrs[k] = String(v); },
-      append(...c) { for (const x of c) { x.remove?.(); x.parentNode = e; e.children.push(x); } },
-      remove() { if (e.parentNode) e.parentNode.children = e.parentNode.children.filter((y) => y !== e); e.parentNode = null; },
-      addEventListener(t, f) { (e.listeners[t] ??= []).push(f); },
-      click() { for (const f of e.listeners.click ?? []) f({}); },
-      focus() { e.focused = true; },
-    };
-    if (animate) {
+  const doc = fakeDocument();
+  const make = doc.createElement;
+  const own = (e) => {
+    e.focused = false;
+    e.focus = () => { e.focused = true; };
+    if (!animate) delete e.animate;
+    else {
       e.animate = (frames, opts) => {
         let done;
         const a = { frames, opts, finished: new Promise((r) => { done = r; }), end: () => done(a) };
@@ -33,10 +27,10 @@ function fakeDom({ animate = true } = {}) {
     }
     return e;
   };
-  const doc = { createElement: make, body: make("body"), listeners: {}, anims,
-    addEventListener(t, f) { (doc.listeners[t] ??= []).push(f); },
-    removeEventListener(t, f) { doc.listeners[t] = (doc.listeners[t] ?? []).filter((g) => g !== f); },
-    key(k) { for (const f of doc.listeners.keydown ?? []) f({ key: k }); } };
+  doc.createElement = (tag) => own(make(tag));
+  own(doc.body);
+  doc.anims = anims;
+  doc.key = (k) => { for (const f of doc.listeners.keydown ?? []) f({ key: k }); };
   return doc;
 }
 

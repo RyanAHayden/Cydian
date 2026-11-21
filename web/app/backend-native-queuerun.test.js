@@ -5,7 +5,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createNativeBackend, queueFetch } from "./backend-native.js";
 import { createQueue } from "./core/queue.js";
-import { fakeIndexedDB } from "../../native/fake/fake-indexeddb.mjs";
+import { fakeIndexedDB } from "./fakes.test-helper.js";
 
 // call(method, params, onEvent) answering from `answers` (method -> fn(params, onEvent)), recording every call.
 function bridge(answers = {}) {

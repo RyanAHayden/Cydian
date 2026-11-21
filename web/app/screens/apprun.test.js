@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import { runAppRun, phoneLanes } from "./apprun.js";
 import { createAppQueue, SELF_ID } from "../core/appqueue.js";
 import { prepareParams, prepareOnDevice, openPrepared, repromptPrepared } from "../signing-client.js";
-import { fakeDocument as fakeDom } from "../fakes.test-helper.js";
+import { fakeDocument as fakeDom, fakeNative } from "../fakes.test-helper.js";
 
 function fakePage() {
   const p = {
@@ -162,17 +162,8 @@ test("iFizBox's own IPA goes last and ends the page locked on Closing", () => wi
 
 // ---- the phone lanes against a fake bridge ----
 
-function fakeNative(script = {}) {
-  const calls = [];
-  return {
-    calls,
-    call(method, params, onEvent) {
-      calls.push([method, params]);
-      const f = script[method];
-      return f ? f(params, onEvent) : Promise.resolve({});
-    },
-  };
-}
+// The shared fakeNative's calls as [method, params] pairs.
+const sent = (native) => native.calls.map((c) => [c.method, c.params]);
 
 test("prepareParams: url with edits, a record for a plain re-sign, a My IPAs file", () => {
   assert.deepEqual(prepareParams({ id: "a", mode: "install", url: "u" }), { url: "u" });
@@ -196,7 +187,7 @@ test("a stop sends signing.cancel with that app's tag and nothing else", async (
   for (let i = 0; i < 50 && !native.calls.length; i++) await new Promise((r) => setTimeout(r, 0));
   ctl.abort();
   await assert.rejects(p, (e) => e.code === "cancelled");
-  assert.deepEqual(native.calls, [["signing.prepare", { url: "u", tag: "a#1" }], ["signing.cancel", { tag: "a#1" }]]);
+  assert.deepEqual(sent(native), [["signing.prepare", { url: "u", tag: "a#1" }], ["signing.cancel", { tag: "a#1" }]]);
   assert.deepEqual(seen, [["downloading", 0.3]]);
   assert.deepEqual(logs, ["Downloading u"]);
   release({});
@@ -210,10 +201,10 @@ test("openPrepared opens the kept copy, then waits for iOS's install under the s
   const seen = [];
   const r = await openPrepared({ id: "a", name: "Alpha", token: "t1" }, { tag: "a#2", native, progress: (ph, f) => seen.push([ph, f]) });
   assert.deepEqual(r, { installed: true, expires: "2026-12-03T00:00:00Z" });
-  assert.equal(native.calls[0][0], "signing.open");
-  assert.equal(native.calls[0][1].token, "t1");
-  assert.equal(native.calls[0][1].tag, "a#2");
-  assert.deepEqual(native.calls[1], ["signing.progress", { bundleId: "com.a", wait: 600, tag: "a#2" }]);
+  assert.equal(sent(native)[0][0], "signing.open");
+  assert.equal(sent(native)[0][1].token, "t1");
+  assert.equal(sent(native)[0][1].tag, "a#2");
+  assert.deepEqual(sent(native)[1], ["signing.progress", { bundleId: "com.a", wait: 600, tag: "a#2" }]);
   assert.deepEqual(seen, [["asking", 0], ["installing", 0.5]]);
 });
 
@@ -309,7 +300,7 @@ test("B76: phoneLanes asks apps.isInstalled; no bridge or a failed call is unkno
   const native = fakeNative({ "apps.isInstalled": async (p) => ({ installed: { [p.bundleIds[0]]: true } }) });
   const l = phoneLanes({}, { native });
   assert.deepEqual(await l.isInstalled(["com.a"]), { "com.a": true });
-  assert.deepEqual(native.calls, [["apps.isInstalled", { bundleIds: ["com.a"] }]]);
+  assert.deepEqual(sent(native), [["apps.isInstalled", { bundleIds: ["com.a"] }]]);
   const bad = phoneLanes({}, { native: fakeNative({ "apps.isInstalled": async () => { throw new Error("x"); } }) });
   assert.deepEqual(await bad.isInstalled(["com.a"]), {});
 });
@@ -387,8 +378,8 @@ test("B91: openPrepared with again asks signing.reprompt, not signing.open, then
   const row = { id: "a", name: "Alpha", bundleId: "com.a", expires: "2026-12-01" };
   const r = await openPrepared(row, { tag: "a#2", native, again: true, progress: (...a) => seen.push(a) });
   assert.deepEqual(r, { installed: true, expires: "2026-12-01" });
-  assert.deepEqual(native.calls.map((c) => c[0]), ["signing.reprompt", "signing.progress"]);
-  assert.deepEqual(native.calls[1][1], { bundleId: "com.a", wait: 600, tag: "a#2" });
+  assert.deepEqual(sent(native).map((c) => c[0]), ["signing.reprompt", "signing.progress"]);
+  assert.deepEqual(sent(native)[1][1], { bundleId: "com.a", wait: 600, tag: "a#2" });
   assert.deepEqual(seen[0], ["asking", 0]);
   reopened = false;
   await assert.rejects(openPrepared(row, { tag: "a#2", native, again: true }), (e) => e.code === "gone");
@@ -405,7 +396,7 @@ test("B85: openPrepared passes the shell's dismissed; repromptPrepared asks sign
   assert.equal(await repromptPrepared({ id: "a", bundleId: "com.a" }, native), true);
   assert.equal(await repromptPrepared({ id: "b", bundleId: "com.b" }, native), false);
   assert.equal(await repromptPrepared({ id: "c" }, native), false); // no bundle ID: nothing to ask
-  assert.deepEqual(native.calls.slice(2), [["signing.reprompt", { bundleId: "com.a" }], ["signing.reprompt", { bundleId: "com.b" }]]);
+  assert.deepEqual(sent(native).slice(2), [["signing.reprompt", { bundleId: "com.a" }], ["signing.reprompt", { bundleId: "com.b" }]]);
   const broken = fakeNative({ "signing.reprompt": () => Promise.reject(new Error("x")) });
   assert.equal(await repromptPrepared({ id: "a", bundleId: "com.a" }, broken), false);
   // phoneLanes hands the row to it

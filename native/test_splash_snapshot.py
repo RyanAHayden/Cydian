@@ -31,9 +31,10 @@ class SnapshotRoute(unittest.TestCase):
 
     def test_only_this_apps_snapshot_entries(self):
         snap = SRC[SRC.index("enum Snapshot"):]
-        names = re.findall(r'where (name == id \|\| .*?) \{', SRC)
-        self.assertEqual(len(names), 2, "clearSnapshots and Snapshot.files")
-        self.assertEqual(names[0], names[1], "Snapshot.files picks the same entries clearSnapshots drops")
+        files = body("files")
+        # only the launch group, never the app switcher's sceneID:<id>-default pictures
+        self.assertIn('where name.hasPrefix("\\(id) - ")', files)
+        self.assertNotIn("sceneID", files.split("static func files")[1])
         self.assertIn('"/Library/SplashBoard/Snapshots"', body("files"))
         self.assertIn('hasSuffix(".ktx")', body("files"))
         self.assertNotIn("removeItem", snap, "the snapshot route never deletes a snapshot (R46: denylist)")

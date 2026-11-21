@@ -167,15 +167,16 @@ enum Snapshot {
         }
     }
 
-    // This app's snapshot files: the *.ktx under the Snapshots entries named for its bundle ID (the names
-    // Splash.clearSnapshots drops; a jailbreak app shares mobile's Library, so never another app's).
+    // This app's launch snapshots: the *.ktx under "<bundle ID> - {DEFAULT GROUP}" (SplashBoard's launch group, its
+    // GeneratedDefault images; a jailbreak app shares mobile's Library, so never another app's). Not
+    // "sceneID:<id>-default": that holds the app switcher's pictures of the last screen (SceneContent), which iOS
+    // replaces and reaps on its own (seen on the iPhone 15 Pro, iOS 27).
     static func files() -> [String] {
         guard let id = Bundle.main.bundleIdentifier else { return [] }
         let root = NSHomeDirectory() + "/Library/SplashBoard/Snapshots"
         let fm = FileManager.default
         var out: [String] = []
-        for name in (try? fm.contentsOfDirectory(atPath: root)) ?? []
-        where name == id || name.hasPrefix("sceneID:\(id)-") || name.hasPrefix("\(id) - ") {
+        for name in (try? fm.contentsOfDirectory(atPath: root)) ?? [] where name.hasPrefix("\(id) - ") {
             for p in (fm.enumerator(atPath: root + "/" + name)?.allObjects as? [String]) ?? [] where p.hasSuffix(".ktx") {
                 out.append(root + "/" + name + "/" + p)
             }

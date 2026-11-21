@@ -24,8 +24,11 @@ compile() {
   mkdir -p "$1/out"
   # F324: each set's Icon Composer document (icon/glass.py), same name as its .appiconset: iOS 26+ draws the .icon
   # in Liquid Glass, iOS 15-25 the PNGs.
-  local glass=()
-  [ -d "$1/glass" ] && glass=($(cd "$1/glass" && ls -d *.icon 2>/dev/null | sed "s|^|$1/glass/|"))
+  # glass.py car leaves glass/ empty while CAR_SETS is: no documents, not an error (nullglob, so no ls to fail).
+  local glass=() doc
+  shopt -s nullglob
+  for doc in "$1"/glass/*.icon; do glass+=("$doc"); done
+  shopt -u nullglob
   xcrun actool --compile "$1/out" --platform iphoneos --minimum-deployment-target 15.0 --target-device iphone \
     --app-icon AppIcon "${alts[@]}" --output-partial-info-plist "$1/partial.plist" \
     --errors --warnings --output-format human-readable-text "$1/Assets.xcassets" ${glass[@]+"${glass[@]}"} > "$1/actool.log" 2>&1 ||

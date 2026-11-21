@@ -635,9 +635,36 @@ function appIconGroups() {
   const off = settings.onChange((key) => {
     if (key !== "iconMatch") return;
     if (!pickGroup.isConnected) { off(); return; }
+    redrawPicks(pickGroup, picks.rows);
     follow();
   });
   return frag;
+}
+
+// B226: the picks group is drawn while Match Theme may be on (iconOf then gives the themes' icons); when the
+// switch turns, each row's detail and thumbnail follow what iconOf gives now.
+function redrawPicks(pickGroup, rows) {
+  const cells = pickGroup.querySelectorAll(".cell-inner");
+  rows.forEach((r, i) => {
+    const cell = cells[i];
+    if (!cell) return;
+    const name = iconOf(defOf(r.key).iconTone);
+    const detail = cell.querySelector(".cell-detail");
+    if (detail) detail.textContent = iconLabel(name);
+    const box = cell.querySelector(".cell-icon");
+    if (!box) return;
+    const src = iconSrc(name);
+    let img = box.querySelector("img");
+    if (img && img.getAttribute("src") === src) return;
+    if (!img) { // dropped after a failed load: a new one, as nav/ui.js draws it
+      img = document.createElement("img");
+      img.alt = "";
+      img.onload = () => img.classList.add("loaded");
+      img.onerror = () => img.remove();
+      box.append(img);
+    }
+    img.src = src;
+  });
 }
 
 // Theme > App Icon > Light / Dark: a grid of icons in groups (core/settings.js iconGroups: this mode's themes, then

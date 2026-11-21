@@ -38,10 +38,19 @@
   it again once the new icon appears"). It says it switches to your icon when you open it again.
 - The Re-sign of a `self:bundle` record signs the running bundle, not the release IPA, so the picture survives it.
 
+## Checks
+
+- `tools/check.sh` passed (both native builds compile; the new Swift signer test, the page's pickOwn tests and the
+  icon size test run in it). The built IPA holds `web/icons/sash-lite.png` where `OwnIcons.sashFile` reads it.
+- Spec review: no wrong code found. Its points: the phone check (below); the alert's wording and the a/b slot (both
+  deliberate, see Choices); `app.icon.ready`, the `self:bundle` Re-sign and the redraw after Add are what the flow
+  needs, so kept; a pick left behind when iOS fails the install later is added to B240.
+
 ## Not verified
 
 - **Nothing on a phone.** The whole flow (pick → alert → re-sign → hosted or This iPhone install → reopen → iOS's
-  icon alert → Home Screen shows the picture with its sash) wasn't run on the iPhone 15 Pro: see the task's CONFIRM.
+  icon alert → Home Screen shows the picture with its sash) wasn't run on the iPhone 15 Pro: its UI lock was held by
+  B238 the whole time I waited (over 15 minutes), so the task is blocked with a CONFIRM.
   Unknowns only the phone answers: whether installd accepts the bundle-made IPA (it is the signer's usual input
   shape, checked by the Linux signer test), whether the alternate icon name survives the update, and whether
   SpringBoard draws the new picture for a set after the update.

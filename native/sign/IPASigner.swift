@@ -238,6 +238,9 @@ final class IPASigner {
             }
         }
         if let icon = options.icon { for f in options.iconFiles { files[appDir + f] = .data(icon, mode: 0o100644) } }
+        // F329a: your own icon over the own-icon sets' files (Info.plist untouched: its alternate icons stay)
+        for (f, png) in options.ownIconFiles.sorted(by: { $0.key < $1.key }) { files[appDir + f] = .data(png, mode: 0o100644) }
+        if !options.ownIconFiles.isEmpty { log("Own icon: \(options.ownIconFiles.count) files of the own-icon sets replaced") }
         // B211: the original signature's app groups and keychain groups, read before signing, decide whether the app
         // gets the group fix (GroupFix.swift) beside the user's tweaks; never iFizBox's own IPA.
         var tweaks = options.tweaks

@@ -23,6 +23,7 @@ SIZES = {
     HERE / "icon-glossy-76.png": 76,
     HERE / "icon-glossy-152.png": 152,
     HERE / "icon-glossy-228.png": 228,
+    HERE / "sash-lite.png": 1024,  # F329a: the LITE sash alone, over your own icon in the Lite app
     ROOT / "native/icon/AppIcon60x60.png": 60,
     ROOT / "native/icon/AppIcon60x60@2x.png": 120,
     ROOT / "native/icon/AppIcon60x60@3x.png": 180,

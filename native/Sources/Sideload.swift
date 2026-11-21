@@ -237,6 +237,24 @@ enum Sideload {
                 return false
             }
         }
+        // F329a: {selfIcon: <own icon>}: iFizBox re-signs its own bundle with that picture in an own-icon set
+        // (AppIcon.swift OwnIcons.selfSource) and installs it as its own update (host: true or This iPhone)
+        if let own = c.params["selfIcon"] as? String {
+            guard OwnIcons.isOwn(own) else { job.end(); return Apt.reply(c, nil, "bad_params: selfIcon is an own icon") }
+            DispatchQueue.main.async {
+                let current = UIApplication.shared.alternateIconName
+                SignBridge.queue.async {
+                    log("Making an IPA of this app (\(Brand.name) \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?")) with your icon")
+                    do {
+                        let src = try OwnIcons.selfSource(own, current: current) { job.cancelled }
+                        var o = options
+                        o.ownIconFiles = src.files
+                        signAndOpen(src.ipa, url: SelfIPA.url, id: id, profile: profile, options: o, servers: servers, emit: emit, log: log, job: job, opened: finish, step: step)
+                    } catch { finish(.failure(error)) }
+                }
+            }
+            return
+        }
         if let tok = c.params["token"] as? String {
             SignBridge.queue.async {
                 guard let p = prepared.removeValue(forKey: tok) else {
@@ -981,6 +999,14 @@ enum Sideload {
                                         next()
                                     }
                                 })
+                }
+                // F329a: iFizBox signed from its own bundle (your own icon) signs from it again; the bundle keeps the picture
+                if r.url == SelfIPA.url {
+                    let out = SignBridge.work.appendingPathComponent("\(SignBridge.token())-self.ipa")
+                    do { try SelfIPA.make(app: Bundle.main.bundleURL, to: out) { job.cancelled }; return signThat(out) } catch {
+                        try? FileManager.default.removeItem(at: out)
+                        fail(error); return next()
+                    }
                 }
                 // F77: an app installed from My IPAs signs from the library's file, not a download.
                 if MyIPAs.fileOf(r.url) != nil {

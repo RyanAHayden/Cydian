@@ -196,3 +196,10 @@ html[data-theme="dark"] [data-check="fail"] .check-mark { color: var(--dk-bad); 
 .crop-preview-photo { position: absolute; left: 0; top: 0; max-width: none; transform-origin: 0 0; }
 .crop-preview-label { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px;
   text-shadow: 0 1px 2px #000; }
+/* F329a: the Lite app's LITE sash over the square and the preview, and its switch under the title */
+.crop-mask.has-sash { overflow: hidden; }
+.crop-sash-over { position: absolute; inset: 0; width: 100%; height: 100%; max-width: none; pointer-events: none; }
+.crop-sash { position: absolute; left: 0; right: 0; top: calc(env(safe-area-inset-top, 0px) + 52px); display: flex;
+  align-items: center; justify-content: center; gap: 12px; padding-block: 8px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  background: rgba(0, 0, 0, .5); font-size: 15px; font-weight: bold; text-shadow: 0 -1px 0 #000; }

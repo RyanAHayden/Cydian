@@ -15,6 +15,15 @@ struct SignOptions {
     var keepBundleID = true
     // F288: tweaks to inject (Tweaks.swift), unpacked and prepared by the page; nil for none.
     var tweaks: TweakSet?
+    // F329a: the Lite app's own re-sign with your own icon (AppIcon.swift OwnIcons.selfSource): files of Info.plist's
+    // own-icon sets (IconOwnA60x60@2x.png, …) replaced by these PNGs. Unlike `icon`, Info.plist stays as it is, so
+    // CFBundleAlternateIcons (every set, the own ones too) is kept. Never stored: the signed bundle holds the picture.
+    var ownIconFiles: [String: Data] = [:] {
+        didSet { ownIconFiles = ownIconFiles.filter { SignOptions.isOwnIconFile($0.key) && SignOptions.isPNG($0.value) } }
+    }
+    static func isOwnIconFile(_ name: String) -> Bool {
+        name.range(of: "^IconOwn[A-Z][0-9]{1,3}x[0-9]{1,3}@[23]x\\.png$", options: .regularExpression) != nil
+    }
 
     init() {}
 

@@ -1,7 +1,7 @@
 // F329: your own app icon: Move and Scale's crop maths and the stored list (screens/appicon.js).
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { cropStart, clampCrop, panCrop, zoomCrop, cropRect, readList, labelFor, picksOf, missingPicks, dropMissing, ownIconsOffered, OUT, ZOOM } from "./appicon.js";
+import { cropStart, clampCrop, panCrop, zoomCrop, cropRect, readList, labelFor, picksOf, missingPicks, dropMissing, ownIconsOffered, pickOwn, resignMessage, RESIGN_TITLE, OUT, ZOOM } from "./appicon.js";
 import { createSettings, iconFor, isOwnIcon } from "../core/settings.js";
 
 const near = (a, b, msg) => assert.ok(Math.abs(a - b) < 1e-9, `${msg ?? ""} ${a} != ${b}`);
@@ -113,10 +113,66 @@ test("Light and Dark take an own icon; iconFor gives it; deleting it puts the pi
   assert.equal(s.get("lightIcon"), "ownabc");
 });
 
-test("Add is offered in the jailbreak app only (Lite can't apply one yet), and never without a bridge", () => {
+test("Add is offered in both apps (Lite re-signs itself to apply one), and never without a bridge", () => {
   const native = { call: async () => ({}) };
   assert.equal(ownIconsOffered("jailbreak", native), true);
-  assert.equal(ownIconsOffered("sideload", native), false);
+  assert.equal(ownIconsOffered("sideload", native), true);
   assert.equal(ownIconsOffered("site", native), false);
   assert.equal(ownIconsOffered("jailbreak", undefined), false);
+});
+
+// F329a: Lite applies a picture by re-signing itself first, after asking.
+function fakes({ ready = null, tap = 1, ok = true, readyFails = false } = {}) {
+  const calls = [], alerts = [], installs = [];
+  const values = { lightIcon: "theme" };
+  const store = { get: (k) => values[k], set: (k, v) => { values[k] = v; } };
+  const native = { call: async (m, p) => { calls.push([m, p]); if (readyFails) throw new Error("no such call"); return ready; } };
+  const alert = async (a) => { alerts.push(a); return { index: tap }; };
+  const install = async (o) => { installs.push(o); return ok; };
+  return { calls, alerts, installs, values, store, native, alert, install };
+}
+
+test("the jailbreak app, or Lite with the picture in its bundle already, picks it straight away", async () => {
+  const jb = fakes();
+  assert.equal(await pickOwn("lightIcon", "owna1", jb.store, { native: jb.native, mode: "jailbreak", alert: jb.alert, install: jb.install }), "set");
+  assert.equal(jb.values.lightIcon, "owna1");
+  assert.deepEqual(jb.calls, [], "no question to the shell");
+  const lite = fakes({ ready: { ready: true, canResign: true } });
+  assert.equal(await pickOwn("lightIcon", "owna1", lite.store, { native: lite.native, mode: "sideload", alert: lite.alert, install: lite.install }), "set");
+  assert.deepEqual(lite.calls, [["app.icon.ready", { name: "owna1" }]]);
+  assert.equal(lite.alerts.length + lite.installs.length, 0);
+  assert.equal(await pickOwn("lightIcon", "owna1", lite.store, { native: lite.native, mode: "sideload" }), "same");
+});
+
+test("Lite asks before re-signing itself, and Install hands the picture to its own update", async () => {
+  const f = fakes({ ready: { ready: false, canResign: true } });
+  assert.equal(await pickOwn("lightIcon", "owna1", f.store, { native: f.native, mode: "sideload", alert: f.alert, install: f.install }), "installing");
+  assert.equal(f.alerts[0].title, RESIGN_TITLE);
+  assert.deepEqual(f.alerts[0].buttons, ["Cancel", "Install"]);
+  assert.match(f.alerts[0].message, /about as long as an update/);
+  assert.match(f.alerts[0].message, /open .* again/);
+  assert.deepEqual(f.installs[0].params, { selfIcon: "owna1" });
+  assert.equal(f.installs[0].host, true);
+  assert.equal(f.values.lightIcon, "owna1", "kept for the reopened app to switch to");
+});
+
+test("Lite's Cancel changes nothing; a failed re-sign puts the pick back; an old build says so", async () => {
+  const no = fakes({ ready: { ready: false, canResign: true }, tap: 0 });
+  assert.equal(await pickOwn("lightIcon", "owna1", no.store, { native: no.native, mode: "sideload", alert: no.alert, install: no.install }), "cancelled");
+  assert.equal(no.values.lightIcon, "theme");
+  assert.equal(no.installs.length, 0);
+  const bad = fakes({ ready: { ready: false, canResign: true }, ok: false });
+  assert.equal(await pickOwn("lightIcon", "owna1", bad.store, { native: bad.native, mode: "sideload", alert: bad.alert, install: bad.install }), "failed");
+  assert.equal(bad.values.lightIcon, "theme");
+  const old = fakes({ ready: { ready: false, canResign: false } });
+  assert.equal(await pickOwn("lightIcon", "owna1", old.store, { native: old.native, mode: "sideload", alert: old.alert, install: old.install }), "old");
+  assert.equal(old.alerts[0].title, "Can't Use This Icon");
+  assert.equal(old.values.lightIcon, "theme");
+  const older = fakes({ readyFails: true });
+  assert.equal(await pickOwn("lightIcon", "owna1", older.store, { native: older.native, mode: "sideload", alert: older.alert, install: older.install }), "set");
+});
+
+test("the re-sign message names the app and says it switches once opened again", () => {
+  assert.match(resignMessage("Box"), /^Box puts your icon in by re-signing itself/);
+  assert.match(resignMessage("Box"), /when you open Box again it switches to your icon\.$/);
 });

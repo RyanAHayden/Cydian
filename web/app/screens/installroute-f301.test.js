@@ -160,7 +160,9 @@ test("Check Connection on the Pairing page: VPN off by the time it's tapped, the
   const box = make("div");
   await drawInstallation(box, "pair", { store: store(), native, alert: async (a) => { alerts.push(a.title); return { index: 0 }; } });
   await tap(box, "Check Connection");
-  assert.deepEqual(alerts, ["Turn On LocalDevVPN"]);
+  // B258: signed in to Tailscale with Connect With: Automatic is set up with Tailscale (setUpWithTailscale), so
+  // with neither VPN on it names Tailscale, as the status cell does (Tailscale Is Off)
+  assert.deepEqual(alerts, ["Turn On Tailscale"]);
   assert.ok(!native.calls.includes("idevice.verify"), "idevice.verify isn't asked");
   leave();
 });

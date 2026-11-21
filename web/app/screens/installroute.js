@@ -1005,8 +1005,9 @@ async function check(native, alert, redraw, store, mark = null) {
   if (mark?.spinning()) return; // a second tap while it checks
   mark?.reset();
   const stop = mark?.spin() ?? (() => {});
+  let st = null; // B258: the failure names the VPN this check went through
   try {
-    const st = await status(native);
+    st = await status(native);
     rememberStatus(st);
     if (st && !vpnOn(st)) { stop(); throw Object.assign(new Error("connect_failed: neither LocalDevVPN nor Tailscale is on"), { code: "connect_failed" }); }
     try { await within(call(native, "idevice.verify"), TIMEOUTS.verify); } finally { stop(); }
@@ -1015,7 +1016,7 @@ async function check(native, alert, redraw, store, mark = null) {
   } catch (e) {
     const why = isLate(e)
       ? { title: NOT_RESPONDING, message: `This iPhone didn't answer in ${TIMEOUTS.verify / 1000} seconds. Check that ${VPN} (or Tailscale) is on, then check again.`, again: false }
-      : verifyFailure(e);
+      : verifyFailure(e, st);
     mark?.show(false);
     try {
       if (!why.again) return await alert({ title: why.title, message: why.message, buttons: ["OK"] });

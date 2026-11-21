@@ -26,6 +26,13 @@
   the hold sheet's button and the app page's row. "uninstall" keeps its sheet, "installed" its alert. Manage's bulk
   Delete (`runManage`) has its own confirm and is untouched (the correction in the brief).
 
+- Decision (spec review raised it): `confirmDelete` is shared, so two more single-row paths skip the sheet for
+  Remove from List: the app page's Remove from List row and the jailbreak Modify sheet's Remove for an app that's gone
+  (`altstore.js` removeAppFromPhone). Kept: each is the same single-row Remove from List after a tap on a button
+  named for it, and splitting them would give one action two behaviours. The sheet's one line ("Deleting the app
+  itself is done from the Home Screen.") no longer shows on those paths; the app page's footer still says it.
+- Follow-up filed: B279, the same doubled fill in My IPAs' Edit (myipas.css).
+
 ## Checks
 - Static Chromium harness (scratchpad): plain list with normal / picked / pressed / picked+pressed rows in light iOS 6,
   dark iOS 6, light iOS 7 and dark iOS 13. All show one fill edge to edge, pressed the same as picked, white icon

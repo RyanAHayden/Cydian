@@ -174,6 +174,128 @@ const TAB_GLYPHS = {
   settings: "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28' fill='none' stroke='#000'><circle cx='14' cy='14' r='7.4' stroke-width='5.2'/><circle cx='14' cy='14' r='10.9' stroke-width='3.4' stroke-dasharray='4.28 4.28'/></svg>",
 };
 
+// F332: iOS 7's icons, after the Teehan+Lax iOS 7 kit (ref/teehanlax/ios7/sheet.svg, its Settings table "Table View
+// 1"): flat tiles 58px @2x with 13px corners (29pt, 6.5pt), the system colours, and white line glyphs ~20pt across.
+// Our own drawings, never Apple's glyphs. Row names, glyph names and tab names are iOS 6's; only the art changes.
+const C7 = {
+  grey: "#8e8e93", blue: "#007aff", sky: "#34aadc", green: "#4cd964", red: "#ff3b30", orange: "#ff9500",
+  purple: "#c86edf", indigo: "#5856d6", dark: "#4a4a4f", teal: "#5ac8fa", gold: "#ffcc00", brown: "#a2845e",
+  pink: "#ff2d55",
+};
+// Keyed by iOS 6's hex, which is unique per name (rowicons.test.js), so no two iOS 6 colours collide here.
+export const TO_C7 = Object.fromEntries(Object.keys(C).map((k) => [C[k], C7[k]]));
+// Every row keeps its glyph and takes the iOS 7 colour of its iOS 6 colour.
+const ROW_ICONS_7 = Object.fromEntries(Object.entries(ROW_ICONS).map(([name, [colour, glyph]]) => [name, [TO_C7[colour], glyph]]));
+
+const W7 = 1.9; // the line, in 24ths of the glyph: ~1.6pt
+const ln = (d, w = W7) => ["s", d, w];
+const ring = (cx, cy, r) => `M${cx} ${cy - r}a${r} ${r} 0 1 1 0 ${2 * r}a${r} ${r} 0 1 1 0 ${-2 * r}z`;
+const dot = (cx, cy, r) => ["f", ring(cx, cy, r)];
+function gear7() {
+  const pts = [];
+  const teeth = 8, ro = 10, ri = 7.7;
+  for (let i = 0; i < teeth * 4; i++) {
+    const a = (i / (teeth * 4)) * Math.PI * 2 - Math.PI / 2 + Math.PI / (teeth * 4);
+    const r = i % 4 < 2 ? ro : ri;
+    pts.push(`${(12 + r * Math.cos(a)).toFixed(2)} ${(12 + r * Math.sin(a)).toFixed(2)}`);
+  }
+  return `M${pts.join("L")}z`;
+}
+const STAR_7 = ["s", star(), 1.7];
+const eye7 = [ln("M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6S2.5 12 2.5 12z"), ln(ring(12, 12, 3))];
+const fileOutline = ln("M5.5 3h8.5l4.5 4.5V21h-13z");
+const GLYPHS_7 = {
+  person: [ln(ring(12, 8, 4)), ln("M4 20.5c.6-4.2 3.8-6.6 8-6.6s7.4 2.4 8 6.6")],
+  personPlus: [ln(ring(9.5, 8, 3.8)), ln("M2.5 20.5c.5-3.9 3.3-6.2 7-6.2s6.5 2.3 7 6.2"), ln("M19 6v6M16 9h6")],
+  gear: [ln(gear7(), 1.6), ln(ring(12, 12, 3.2), 1.6)],
+  contrast: [ln(ring(12, 12, 9)), ["f", "M12 3a9 9 0 0 0 0 18z"]],
+  download: [ln(ring(12, 12, 9)), ln("M12 7v9M8 12.5l4 4 4-4")],
+  refresh: [ln("M19 12a7 7 0 1 1-2.05-4.95"), ln("M14 8.4h4.4V4")],
+  arrows: [ln("M19.2 9.2A7.6 7.6 0 0 0 5.2 8.6"), ln("M4.4 4.8v4.6H9"), ln("M4.8 14.8a7.6 7.6 0 0 0 14 .6"), ln("M19.6 19.2v-4.6H15")],
+  pen: [ln("M15.4 4.6l4 4L9 19l-5 1 1-5z"), ln("M13.2 6.8l4 4")],
+  terminal: [ln("M5 7.5l4.5 4.5L5 16.5"), ln("M12 17h7")],
+  install: [ln("M12 3.5v11M7.5 10.5l4.5 4.5 4.5-4.5"), ln("M4 19.5h16")],
+  list: [dot(5, 6, 1.4), dot(5, 12, 1.4), dot(5, 18, 1.4), ln("M9.5 6h11M9.5 12h11M9.5 18h11")],
+  transfer: [ln("M8 20V4.5M4 8.5l4-4 4 4"), ln("M16 4v15.5M12 15.5l4 4 4-4")],
+  eyeSlash: [...eye7, ln("M4.5 19.5l15-15")],
+  eye: eye7,
+  star: [STAR_7],
+  phone: [ln("M8 2.5h8a2 2 0 0 1 2 2v15a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2v-15a2 2 0 0 1 2-2z"), dot(12, 18.4, 1.1)],
+  info: [ln(ring(12, 12, 9)), ln("M12 10.5v6.5"), dot(12, 7.4, 1.2)],
+  check: [ln("M4.5 12.5l4.8 4.8L19.5 7", 2.2)],
+  checkCircle: [ln(ring(12, 12, 9)), ln("M7.5 12.3l3 3 6-6.3")],
+  home: [ln("M3 11.5l9-8 9 8"), ln("M5.5 9.5v11h4.5v-6h4v6h4.5v-11")],
+  minusCircle: [ln(ring(12, 12, 9)), ln("M7 12h10")],
+  bell: [ln("M12 3.2c3.4 0 5.8 2.6 5.8 6v4.6l2 2.6v1.1H4.2v-1.1l2-2.6V9.2c0-3.4 2.4-6 5.8-6z"), ln("M9.8 20.2a2.3 2.3 0 0 0 4.4 0")],
+  bolt: [ln("M13.5 2.5L5 13.5h6l-1 8 8.5-11h-6z", 1.7)],
+  battery: [ln("M3.5 7.5h14a1.5 1.5 0 0 1 1.5 1.5v6a1.5 1.5 0 0 1-1.5 1.5h-14A1.5 1.5 0 0 1 2 15V9a1.5 1.5 0 0 1 1.5-1.5z"),
+    ln("M21.5 10.5v3"), ["f", "M11.6 9.2l-3.6 3.4h2.7l-1 2.2 3.6-3.4h-2.7z"]],
+  lock: [ln("M5.5 10.5h13v10h-13z"), ln("M8.5 10.5V7.8a3.5 3.5 0 0 1 7 0v2.7")],
+  clock: [ln(ring(12, 12, 9)), ln("M12 6.5V12l3.6 2.4")],
+  calendar: [ln("M3.5 5h17v15.5h-17z"), ln("M3.5 9.5h17"), ln("M8 2.8v4M16 2.8v4"), ["f", "M7 12h3v3H7z"]],
+  hourglass: [ln("M6 3h12M6 21h12"), ln("M7.5 3c0 4.4 4.5 6.4 4.5 9s-4.5 4.6-4.5 9M16.5 3c0 4.4-4.5 6.4-4.5 9s4.5 4.6 4.5 9")],
+  link: [ln("M10.2 13.8a4 4 0 0 0 5.7 0l3.6-3.6a4 4 0 0 0-5.7-5.7l-1.3 1.3"), ln("M13.8 10.2a4 4 0 0 0-5.7 0l-3.6 3.6a4 4 0 0 0 5.7 5.7l1.3-1.3")],
+  question: [ln("M8.8 8.8a3.3 3.3 0 1 1 4.8 2.9c-1 .6-1.6 1.3-1.6 2.5v.8"), dot(12, 18.6, 1.3)],
+  globe: [ln(ring(12, 12, 9), 1.6), ln("M12 3c-2.6 2.5-3.9 5.5-3.9 9s1.3 6.5 3.9 9c2.6-2.5 3.9-5.5 3.9-9S14.6 5.5 12 3z", 1.6),
+    ln("M3 12h18", 1.6)],
+  cloud: [ln("M7 18.8a4.3 4.3 0 0 1-.4-8.6 5.6 5.6 0 0 1 10.8-.9 4.8 4.8 0 0 1 .3 9.5z")],
+  pulse: [ln("M2 12.5h4.2l2.6-6.2 4.2 12 2.6-5.8H22")],
+  share: [ln("M8.5 9.5H6v11h12v-11h-2.5"), ln("M12 15V3.5"), ln("M8.5 7l3.5-3.5L15.5 7")],
+  copy: [ln("M9 8h10v13H9z"), ln("M15 5V3H5v13h2")],
+  save: [fileOutline, ln("M12 10v7M9 14l3 3 3-3")],
+  qr: [ln("M3.5 3.5h6.5v6.5H3.5zM14 3.5h6.5v6.5H14zM3.5 14h6.5v6.5H3.5z", 1.6),
+    ["f", "M5.8 5.8h2v2h-2zM16.2 5.8h2v2h-2zM5.8 16.2h2v2h-2zM14 14h2.4v2.4H14zM18 14h2.5v2.4H18zM16 16.2h2.2v2.2H16zM14 18.2h2.4v2.4H14zM18 18.2h2.5v2.4H18z"]],
+  file: [fileOutline, ln("M14 3v4.5h4.5")],
+  clipboard: [ln("M8 4.5H5.5v16.5h13V4.5H16"), ln("M9 3h6v3H9z")],
+  key: [ln(ring(15, 9, 5.2)), dot(16.4, 7.6, 1.2), ln("M11.3 12.7 3.5 20.5"), ln("M6.2 17.8l2 2"), ln("M8.4 15.6l1.6 1.6")],
+  seal: [ln(ring(12, 9, 6)), ln("M8.6 14.2 7 21l3-1.3 2 2.1 2-2.1 3 1.3-1.6-6.8")],
+  power: [ln("M7.6 6.6a7.6 7.6 0 1 0 8.8 0"), ln("M12 3v8")],
+  apps: [ln("M4 4h6.5v6.5H4zM13.5 4H20v6.5h-6.5zM4 13.5h6.5V20H4zM13.5 13.5H20V20h-6.5z", 1.6)],
+  plus: [ln("M12 4.5v15M4.5 12h15", 2)],
+};
+
+// Copying Files' tiles in iOS 7's colours, the glyphs drawn as 2.6-unit lines.
+const G7 = "<g fill='none' stroke='#fff' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'>";
+const GUIDE_TILES_7 = {
+  files: ["#5ac8fa", "#007aff", `${G7}<path d='M12 18h12l4 4h18v22H12z'/><path d='M12 26h34'/></g>`],
+  airdrop: ["#5ac8fa", "#34aadc", `<circle cx='29' cy='38' r='3.5'/>${G7}<path d='M20 31a12 12 0 0 1 18 0'/><path d='M14 25a20 20 0 0 1 30 0'/><path d='M9 19a28 28 0 0 1 40 0'/></g>`],
+  localsend: ["#a4eab4", "#4cd964", `${G7}<path d='M21 44V15m-7 7 7-7 7 7'/><path d='M37 14v29m-7-7 7 7 7-7'/></g>`],
+  pairdrop: ["#b9b8f0", "#5856d6", `${G7}<rect x='10' y='15' width='14' height='28' rx='3'/><rect x='34' y='15' width='14' height='28' rx='3'/><path d='M27 29h4'/></g><circle cx='17' cy='38' r='1.6'/><circle cx='41' cy='38' r='1.6'/>`],
+  mac: ["#e5e5ea", "#8e8e93", `${G7}<rect x='9' y='12' width='40' height='27' rx='3'/><path d='M24 39l-2 7h14l-2-7M18 46.5h22'/></g>`],
+  windows: ["#5ac8fa", "#007aff", `${G7}<rect x='9' y='13' width='40' height='32' rx='3'/><path d='M9 20h40M29 24v17M13 32.5h32'/></g>`],
+  linux: ["#8e8e93", "#48484a", `${G7}<ellipse cx='29' cy='35' rx='12' ry='13.5'/><circle cx='29' cy='19' r='8'/><path d='M17 48h9M32 48h9'/></g><circle cx='26' cy='18' r='1.5'/><circle cx='32' cy='18' r='1.5'/><path d='M26 22h6l-3 3z'/>`],
+  filza: ["#ffe066", "#ff9500", `${G7}<path d='M11 16h12l4 4h20v24H11z'/><path d='M23 26v12'/><path d='M23 30h4M23 34h4'/></g>`],
+};
+
+// The Why tile: iOS 7's flat orange, the line star.
+const HOME_TILES_7 = {
+  why: { colour: "#ff9500", gradient: ["#ff9500", "#ff9500"],
+    svg: `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='${star()}' fill='none' stroke='#fff' stroke-width='1.6' stroke-linejoin='round'/></svg>` },
+};
+
+// The tab bar: thin outline glyphs (tabs), the same shapes filled on the chosen tab (tabsSelected), as the kit's
+// Phone tab bar ("Tab Bar": Favorites, Recents, Contacts).
+const T7 = "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'";
+const TAB_GLYPHS_7 = {
+  home: `${T7} fill='none' stroke='#000' stroke-width='1.6' stroke-linejoin='round'><path d='M3.5 13.5 14 4l10.5 9.5'/><path d='M6.5 11v14h5.5v-7h4v7h5.5V11'/></svg>`,
+  sources: `${T7} fill='none' stroke='#000' stroke-width='1.6'><rect x='3.8' y='3.8' width='20.4' height='4.9' rx='1.6'/><rect x='3.8' y='11.55' width='20.4' height='4.9' rx='1.6'/><rect x='3.8' y='19.3' width='20.4' height='4.9' rx='1.6'/></svg>`,
+  changes: `${T7} fill='none' stroke='#000' stroke-width='1.6'><circle cx='14' cy='14' r='11.2'/><path d='M14 7.5V14l4.6 3.3'/></svg>`,
+  installed: `${T7} fill='none' stroke='#000' stroke-width='1.6' stroke-linejoin='round'><path d='M14 2.5v13M9 10.5l5 5 5-5'/><path d='M2.8 17.8h5.4l2 3h7.6l2-3h5.4v7.4H2.8z'/></svg>`,
+  search: `${T7} fill='none' stroke='#000'><circle cx='11.5' cy='11.5' r='8.2' stroke-width='1.6'/><path d='m17.4 17.4 7.6 7.6' stroke-width='2.2'/></svg>`,
+  settings: `${T7} fill='none' stroke='#000'><circle cx='14' cy='14' r='4.2' stroke-width='1.6'/><circle cx='14' cy='14' r='9' stroke-width='1.6'/><circle cx='14' cy='14' r='11.3' stroke-width='2.6' stroke-dasharray='3.6 5.27'/></svg>`,
+};
+// Filled: the outline's shapes painted solid; lines inside a solid shape (the clock's hands, the gear's hole) cut
+// out with an even-odd path (no SVG <mask>: WebKit's support for one inside a CSS mask image is unchecked), since
+// the tab paints only where the glyph is opaque.
+const TAB_GLYPHS_SELECTED_7 = {
+  home: `${T7} stroke='#000' stroke-width='1.6' stroke-linejoin='round'><path d='M3.5 13.5 14 4l10.5 9.5z'/><path d='M6.5 11v14h5.5v-7h4v7h5.5V11z'/></svg>`,
+  sources: `${T7} stroke='#000' stroke-width='1.6'><rect x='3.8' y='3.8' width='20.4' height='4.9' rx='1.6'/><rect x='3.8' y='11.55' width='20.4' height='4.9' rx='1.6'/><rect x='3.8' y='19.3' width='20.4' height='4.9' rx='1.6'/></svg>`,
+  changes: `${T7}><path fill-rule='evenodd' d='M14 2a12 12 0 1 1 0 24a12 12 0 0 1 0-24zM13.1 7.5h1.8v6.04l4.22 3.03-1.05 1.46-4.97-3.57z'/></svg>`,
+  installed: `${T7} stroke='#000' stroke-width='1.6' stroke-linejoin='round'><path d='M12.6 2.5h2.8v8.6h3.9L14 16.6l-5.3-5.5h3.9z'/><path d='M2.8 17.8h5.4l2 3h7.6l2-3h5.4v7.4H2.8z'/></svg>`,
+  search: `${T7}><circle cx='11.5' cy='11.5' r='9'/><path d='m17.4 17.4 7.6 7.6' stroke='#000' stroke-width='3' stroke-linecap='round'/></svg>`,
+  settings: `${T7}><path fill-rule='evenodd' d='M14 3.8a10.2 10.2 0 1 1 0 20.4a10.2 10.2 0 0 1 0-20.4zM14 9.8a4.2 4.2 0 1 0 0 8.4a4.2 4.2 0 0 0 0-8.4z'/><circle cx='14' cy='14' r='11.3' fill='none' stroke='#000' stroke-width='2.6' stroke-dasharray='3.6 5.27'/></svg>`,
+};
+
 // C51: the per-style icon map (docs/eras.md, "Icon map"). Every inline SVG the screens draw from JS comes from here,
 // keyed by kind and icon name, so an era (outline or filled icons) ships its own set beside iOS 6's:
 //   rows    name -> [tile colour, glyph name]   29pt row tiles (tileSvg, rowIcon)
@@ -181,11 +303,14 @@ const TAB_GLYPHS = {
 //   guides  name -> [light, colour, body]       Copying Files' 58-unit tiles (guideSvg)
 //   home    name -> { colour, gradient, svg }   Home tiles drawn by a screen's own CSS (homeTileCss)
 //   tabs    tab -> SVG                          the tab bar's --glyph tokens (tabGlyphTokens)
+//   tabsSelected  tab -> SVG                    the chosen tab's glyph, when an era draws it apart (iOS 7: filled)
 //   tile    the row tile's size, corners and glyph size
 // An era's set names only what it redraws: anything it leaves out falls back to iOS 6's entry.
 export const ICON_SETS = {
   ios6: { rows: ROW_ICONS, glyphs: GLYPHS, guides: GUIDE_TILES, home: HOME_TILES, tabs: TAB_GLYPHS,
     tile: { size: SIZE, radius: R, glyph: 19 } },
+  ios7: { rows: ROW_ICONS_7, glyphs: GLYPHS_7, guides: GUIDE_TILES_7, home: HOME_TILES_7, tabs: TAB_GLYPHS_7,
+    tabsSelected: TAB_GLYPHS_SELECTED_7, tile: { size: SIZE, radius: 6.5, glyph: 20 } },
 };
 
 // The style the page shows: <html data-style="ios7"> (docs/eras.md), iOS 6 when none is set.
@@ -204,9 +329,12 @@ export function icon(kind, name, style = iconStyle()) {
 export const cssSvgUrl = (svg) => `url("data:image/svg+xml,${svg.replace(/</g, "%3C").replace(/>/g, "%3E").replace(/#/g, "%23")}")`;
 
 // The tab bar's glyph tokens for `style`, one rule per tab: what ios6.css holds for iOS 6 and an era's stylesheet
-// carries for its own set.
-export function tabGlyphTokens(style = "ios6") {
-  return Object.keys(TAB_GLYPHS).map((tab) => `.tab[data-tab="${tab}"] { --glyph: ${cssSvgUrl(icon("tabs", tab, style))}; }`).join("\n");
+// carries for its own set. `kind` "tabsSelected" prints the chosen tab's (`.tab[data-tab].active`) for a style that
+// draws it apart; iOS 6 has none (its chosen tab is the same glyph, coloured).
+export function tabGlyphTokens(style = "ios6", kind = "tabs") {
+  const sel = kind === "tabsSelected" ? ".active" : "";
+  if (sel && !ICON_SETS[style]?.tabsSelected) throw new Error(`${style} draws no selected tabs`);
+  return Object.keys(TAB_GLYPHS).map((tab) => `.tab[data-tab="${tab}"]${sel} { --glyph: ${cssSvgUrl(icon(kind, tab, style))}; }`).join("\n");
 }
 
 // A Home tile's paint (home.css .home-glyph): its colour, then the glyph over its gradient.

@@ -34,7 +34,7 @@ enum ASC {
 
     // ---- the key, in the Keychain (this device only, no backup; read at sign time, so no Face ID)
 
-    private static var query: [String: Any] {
+    static var query: [String: Any] {
         [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service, kSecAttrAccount as String: "key"]
     }
     static func key() -> Key? {
@@ -47,7 +47,7 @@ enum ASC {
     }
     static func save(_ k: Key) throws {
         SecItemDelete(query as CFDictionary)
-        var add = query
+        var add = OwnKeychain.scoped(query)
         add[kSecValueData as String] = try JSONEncoder().encode(k)
         add[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
         let st = SecItemAdd(add as CFDictionary, nil)

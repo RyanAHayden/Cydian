@@ -37,8 +37,8 @@ enum SignStore {
         let der = SecCertificateCopyData(cert) as Data
         if let problem = profile.problem(with: der) { throw problem }
         removeIdentity()
-        let add: [String: Any] = [kSecValueRef as String: identity, kSecAttrLabel as String: label,
-                                  kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly]
+        let add = OwnKeychain.scoped([kSecValueRef as String: identity, kSecAttrLabel as String: label,
+                                      kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly])
         var st = SecItemAdd(add as CFDictionary, nil)
         if st == errSecDuplicateItem { // the same identity imported before: keep that one
             st = errSecSuccess
@@ -57,6 +57,17 @@ enum SignStore {
         var out: CFTypeRef?
         guard SecItemCopyMatching(q as CFDictionary, &out) == errSecSuccess, let all = out as? [SecIdentity] else { return nil }
         return all.first { certificateDER($0).map { sha256($0).base64EncodedString() } == want }
+    }
+
+    // The identity in use as its two Keychain items, the certificate and its key (matched by the public key's SHA-1,
+    // as iOS fills kSecAttrPublicKeyHash and kSecAttrApplicationLabel), for OwnKeychain.move. Empty without one.
+    static func identityQueries() -> [[String: Any]] {
+        var c: SecCertificate?
+        guard let id = identity(), SecIdentityCopyCertificate(id, &c) == errSecSuccess, let cert = c,
+              let pub = SecCertificateCopyKey(cert), let ext = SecKeyCopyExternalRepresentation(pub, nil) as Data? else { return [] }
+        let hash = sha1(ext)
+        return [[kSecClass as String: kSecClassCertificate, kSecAttrPublicKeyHash as String: hash],
+                [kSecClass as String: kSecClassKey, kSecAttrApplicationLabel as String: hash]]
     }
 
     static func certificateDER(_ id: SecIdentity) -> Data? {
@@ -100,7 +111,7 @@ enum SignStore {
         deleteP12()
         let blob = try PropertyListSerialization.data(fromPropertyList: ["p12": p12, "password": password, "cert": certSHA256],
                                                       format: .binary, options: 0)
-        var add = p12Query
+        var add = OwnKeychain.scoped(p12Query)
         add[kSecValueData as String] = blob
         add[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
         add[kSecAttrLabel as String] = "\(Brand.name) signing .p12"

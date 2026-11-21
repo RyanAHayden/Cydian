@@ -194,6 +194,7 @@ enum Keychain {
     static func get(_ key: String, prompt: String) throws -> String? {
         var q = query(key)
         q[kSecReturnData as String] = true
+        q[kSecReturnAttributes as String] = true
         q[kSecMatchLimit as String] = kSecMatchLimitOne
         let ctx = LAContext()
         ctx.localizedReason = prompt
@@ -202,8 +203,13 @@ enum Keychain {
         let st = SecItemCopyMatching(q as CFDictionary, &out)
         switch st {
         case errSecSuccess:
-            guard let d = out as? Data else { return nil }
-            return String(decoding: d, as: UTF8.self)
+            guard let item = out as? [String: Any], let d = item[kSecValueData as String] as? Data else { return nil }
+            let value = String(decoding: d, as: UTF8.self)
+            // OwnKeychain: one written before into a group other apps share moves to ours, now that it's been read
+            if let g = OwnKeychain.group, let old = item[kSecAttrAccessGroup as String] as? String, old != g {
+                moveIn(key, value, from: old)
+            }
+            return value
         case errSecItemNotFound: return nil
         case errSecUserCanceled, errSecAuthFailed: throw BridgeError("keychain", "cancelled: the passcode or Face ID check didn't pass")
         default: throw BridgeError("keychain", "the Keychain refused (\(st))")
@@ -212,7 +218,21 @@ enum Keychain {
 
     static func set(_ key: String, _ value: String) throws {
         try remove(key)
-        var add = query(key)
+        let st = add(key, value)
+        guard st == errSecSuccess else { throw BridgeError("keychain", "the Keychain refused the secret (\(st))") }
+    }
+
+    // OwnKeychain: a secret read from another group goes into ours first; the old copy goes only once that worked.
+    static func moveIn(_ key: String, _ value: String, from old: String) {
+        let st = add(key, value)
+        guard st == errSecSuccess || st == errSecDuplicateItem else { return }
+        var q = query(key)
+        q[kSecAttrAccessGroup as String] = old
+        SecItemDelete(q as CFDictionary)
+    }
+
+    static func add(_ key: String, _ value: String) -> OSStatus {
+        var add = OwnKeychain.scoped(query(key))
         add[kSecValueData as String] = Data(value.utf8)
         // Behind the passcode / Face ID when the phone has a passcode. Without one, .userPresence items can't be
         // added at all: keep it to this device, unlocked only, so buying still works.
@@ -223,8 +243,7 @@ enum Keychain {
         } else {
             add[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlockedThisDeviceOnly
         }
-        let st = SecItemAdd(add as CFDictionary, nil)
-        guard st == errSecSuccess else { throw BridgeError("keychain", "the Keychain refused the secret (\(st))") }
+        return SecItemAdd(add as CFDictionary, nil)
     }
 
     static func remove(_ key: String) throws {

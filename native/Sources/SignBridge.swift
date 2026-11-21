@@ -104,6 +104,7 @@ enum SignBridge {
         guard AppMode.current == .sideload else { return }
         queue.async {
             SignStore.removeOldInstallCA()
+            OwnKeychain.moveAll() // B233: our secrets out of a Keychain group other apps share
             guard let url = Bundle.main.url(forResource: "ifizbox-identity", withExtension: "plist"),
                   let data = try? Data(contentsOf: url) else { return }
             let digest = BundledIdentity.digest(data)
@@ -154,8 +155,8 @@ enum SignBridge {
             SecItemDelete([kSecClass as String: kSecClassKey, kSecAttrApplicationLabel as String: hash] as CFDictionary)
         }
         SecItemDelete([kSecClass as String: kSecClassCertificate, kSecAttrLabel as String: SignStore.label] as CFDictionary)
-        let st = SecItemAdd([kSecValueRef as String: identity, kSecAttrLabel as String: SignStore.label,
-                             kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly] as CFDictionary, nil)
+        let st = SecItemAdd(OwnKeychain.scoped([kSecValueRef as String: identity, kSecAttrLabel as String: SignStore.label,
+                             kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly]) as CFDictionary, nil)
         guard st == errSecSuccess || st == errSecDuplicateItem, SignStore.identity() != nil else {
             throw SignError("keychain", "The Keychain took the certificate but doesn't pair it with its key (\(st)). Remove the certificate and import it again.")
         }

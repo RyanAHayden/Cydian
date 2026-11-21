@@ -412,23 +412,23 @@ html[data-theme="dark"] .scope-segment + .scope-segment, html[data-theme="dark"]
 .action-scrim { position: fixed; inset: 0; z-index: 30; }
 .action-dim { position: absolute; inset: 0; }
 .action-sheet {
-  position: absolute; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column; gap: 11px;
-  padding: 21px 21px calc(22px + var(--safe-bottom)); max-height: calc(100% - 20px - env(safe-area-inset-top));
+  position: absolute; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column; gap: var(--action-gap);
+  padding: var(--action-sheet-pad) calc(var(--action-sheet-pad-bottom) + var(--safe-bottom)); max-height: calc(100% - 20px - env(safe-area-inset-top));
   overflow: hidden; will-change: transform;
 }
 /* The choices scroll here, Cancel pinned below; the padding keeps the buttons' outer shadow from clipping */
 .action-list {
-  display: flex; flex-direction: column; gap: 11px; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
-  margin: -2px -2px; padding: 2px; scrollbar-width: none;
+  display: flex; flex-direction: column; gap: var(--action-list-gap); min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+  margin: calc(-1 * var(--action-list-bleed)); padding: var(--action-list-bleed); scrollbar-width: none;
 }
 .action-list::-webkit-scrollbar { display: none; }
 body:has(.action-scrim) .scroll-indicator { z-index: 31; } /* the iOS 6 indicator (nav/scroller.js) over the sheet */
-.action-title { margin: -6px 0 2px; white-space: pre-line; overflow-wrap: anywhere; }
+.action-title { margin: var(--action-title-margin); padding: var(--action-title-pad); white-space: pre-line; overflow-wrap: anywhere; }
 .action-button {
   flex: none; height: 44px; min-height: 44px; padding: 0 12px; margin: 0; cursor: pointer; touch-action: manipulation;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.action-button.cancel { margin-top: 14px; }
+.action-button.cancel { margin-top: var(--action-cancel-gap); }
 /* ==== look-only { ==== The action sheet */
 .action-dim { background: var(--action-dim); }
 .action-sheet { background: var(--action-sheet); }

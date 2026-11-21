@@ -131,13 +131,18 @@ the app supports iOS 15.0, so cascade layers are out.
 | `--sw-w`, `--sw-h`, `--sw-knob-size`, `--sw-travel` | 77px, 27px, 27px, 50px | the switch's box, its knob and the knob's travel (`ios6.css`'s on `--x`; `nav/switch.js` reads it when a drag starts) |
 | `--settings-seg-margin` | 0 | Settings > Theme's Mode, inside its group (`settings.css`) |
 | `--home-inset`, `--home-tile-pad` | 10px, 0 10px 0 6px | Home's head and tile rows from the screen's sides, and a tile's padding (`home.css`) |
+| `--action-sheet-pad`, `--action-sheet-pad-bottom` | 21px 21px, 22px | the action sheet's panel: its top and sides, and its bottom over the safe area (`packages.css`) |
+| `--action-gap`, `--action-list-gap`, `--action-list-bleed` | 11px, 11px, 2px | between the sheet's title, choices and Cancel; between the choices; the room around the choices for iOS 6's button shadow |
+| `--action-title-margin`, `--action-title-pad`, `--action-cancel-gap` | -6px 0 2px, 0, 14px | the sheet's title, and the extra space over Cancel |
+| `--alert-w`, `--alert-pad` | 340px, 16px 12px 11px | the alert box (`sources.css`) |
+| `--alert-buttons-margin`, `--alert-buttons-gap`, `--alert-stacked-gap`, `--alert-button-h` | 4px 0 0, 8px, 9px, 43px | the alert's button row (a negative side margin takes it to the box's edges), two side by side, stacked buttons, a button's height |
 
 A hook never reuses a look token's name (`ios6-css.test.js` checks the switch, Mode and Home hooks): the knob's size is
 `--sw-knob-size` because `--sw-knob` is the knob's paint.
 
 No hook yet, on purpose: the reload and undo bars' 44pt, the share sheet's grid, the pull area and the placeholders.
-`packages.css` and the other component stylesheets keep their layout in their own rules; only Home's and Theme's
-Mode take the hooks above.
+`packages.css` and the other component stylesheets keep their layout in their own rules; only Home's, Theme's
+Mode, the action sheet and the alert take the hooks above.
 
 The bars' own heights (`--nav-h`, `--tab-h`) are layout that every screen depends on; an era that changes them
 (large titles, a floating tab bar) does it through a nav hook, not by setting them.

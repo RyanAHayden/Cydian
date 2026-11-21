@@ -326,7 +326,6 @@ test("F333: ios7.css draws the kit's alert, action sheet, menu, counts and keyli
   const rule = (sel) => [...ios7.matchAll(/([^{}]+)\{([^}]*)\}/g)].filter(([, s]) => s.split(",").map((x) => x.trim()).includes(sel)).map(([, , d]) => d).join(";");
   const alert = rule('html[data-style="ios7"] .alert');
   assert.match(alert, /border-radius: 7px/);
-  assert.match(alert, /calc\(100% - 56px\) \/ 100% \.5px/, "the line over the buttons, drawn from the box's bottom");
   assert.match(alert, /box-shadow: none/);
   assert.match(rule('html[data-style="ios7"] .alert-button'), /background: none[\s\S]*font-size: 17px; font-weight: 400; color: var\(--i7-tint\)/);
   assert.match(rule('html[data-style="ios7"] .alert-button:last-child:not(.cancel)'), /font-weight: 600/);
@@ -341,4 +340,38 @@ test("F333: ios7.css draws the kit's alert, action sheet, menu, counts and keyli
   assert.match(ios7, /--i7-keyline: linear-gradient\(to top, var\(--keyline\) \.5px, transparent \.5px\);/);
   assert.match(rule('html[data-style="ios7"] .plain .cell'), /background-image: var\(--i7-keyline\); background-position: 15px 0; background-size: calc\(100% - 15px\) 100%; background-repeat: no-repeat;/);
   assert.match(rule('html[data-style="ios7"] .pkg-row'), /var\(--i7-keyline\) 51px 0/);
+});
+
+// F341: the action sheet's and the alert's geometry are era hooks (style.css, iOS 6's values; packages.css and
+// sources.css read them), and iOS 7 sets the kit's: the sheet's choices one 3pt block split by .5pt, 8pt from the
+// sides and over Cancel; the alert 270pt with its buttons edge to edge in a 44pt row, each drawing its own lines.
+test("F341: action sheet and alert geometry are era hooks; iOS 7 sets the kit's", () => {
+  const base = readFileSync(new URL("./style.css", import.meta.url), "utf8");
+  const pk = readFileSync(new URL("./packages.css", import.meta.url), "utf8");
+  const src = readFileSync(new URL("./sources.css", import.meta.url), "utf8");
+  const ios7 = readFileSync(new URL("./ios7.css", import.meta.url), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+  for (const v of ["--action-sheet-pad: 21px 21px", "--action-sheet-pad-bottom: 22px", "--action-gap: 11px", "--action-list-gap: 11px",
+    "--action-list-bleed: 2px", "--action-title-margin: -6px 0 2px", "--action-title-pad: 0", "--action-cancel-gap: 14px",
+    "--alert-w: 340px", "--alert-pad: 16px 12px 11px", "--alert-buttons-margin: 4px 0 0", "--alert-buttons-gap: 8px",
+    "--alert-stacked-gap: 9px", "--alert-button-h: 43px"]) assert.ok(base.includes(v), `style.css ${v}`);
+  assert.match(pk, /\n\.action-sheet \{[^}]*gap: var\(--action-gap\);[^}]*padding: var\(--action-sheet-pad\) calc\(var\(--action-sheet-pad-bottom\) \+ var\(--safe-bottom\)\)/);
+  assert.match(pk, /\n\.action-list \{[^}]*gap: var\(--action-list-gap\);[^}]*margin: calc\(-1 \* var\(--action-list-bleed\)\); padding: var\(--action-list-bleed\);/);
+  assert.match(pk, /\n\.action-title \{ margin: var\(--action-title-margin\); padding: var\(--action-title-pad\);/);
+  assert.match(pk, /\n\.action-button\.cancel \{ margin-top: var\(--action-cancel-gap\); \}/);
+  assert.match(src, /\n\.alert \{[^}]*width: min\(var\(--alert-w\), 100%\);[^}]*padding: var\(--alert-pad\);/);
+  assert.match(src, /\n\.alert-buttons \{[^}]*gap: var\(--alert-buttons-gap\); margin: var\(--alert-buttons-margin\);/);
+  assert.match(src, /\n\.alert-buttons\.stacked \{[^}]*gap: var\(--alert-stacked-gap\);/);
+  assert.match(src, /\n\.alert-button \{[^}]*height: var\(--alert-button-h\);/);
+  for (const v of ["--action-sheet-pad: 8px 8px", "--action-sheet-pad-bottom: 8px", "--action-gap: 8px", "--action-list-gap: 0px",
+    "--action-list-bleed: 0px", "--action-title-margin: 0 0 -8px", "--action-title-pad: 14px 16px", "--action-cancel-gap: 0px",
+    "--alert-w: 270px", "--alert-pad: 18px 16px 0", "--alert-buttons-margin: 8px -16px 0", "--alert-buttons-gap: 0px",
+    "--alert-stacked-gap: 0px", "--alert-button-h: 44px"]) assert.ok(ios7.includes(v), `ios7.css ${v}`);
+  // the lines are the buttons' own now, not drawn on the box from its bottom
+  assert.doesNotMatch(ios7, /calc\(100% - \d+(\.\d+)?px\) \/ 100% \.5px/);
+  assert.match(ios7, /\.alert-button:disabled \{\s*border: 0; border-radius: 0; box-shadow: inset 0 \.5px 0 var\(--i7-alert-line\);/);
+  assert.match(ios7, /\.alert-buttons:not\(\.stacked\) > \.alert-button \+ \.alert-button \{\s*box-shadow: inset 0 \.5px 0 var\(--i7-alert-line\), inset \.5px 0 0 var\(--i7-alert-line\);/);
+  assert.match(ios7, /\.action-list \{ border-radius: 3px; \}/);
+  assert.match(ios7, /\.action-list > \.action-button \{ border-width: 0; border-radius: 0; \}/);
+  // the sheet's separators are the buttons' own .5pt lines (a .5pt flex gap lands on half pixels and Chromium drops some)
+  assert.match(ios7, /\.action-title \+ \.action-list > \.action-button:first-child \{ box-shadow: inset 0 \.5px 0 var\(--i7-action-line\); \}/);
 });

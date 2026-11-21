@@ -317,3 +317,28 @@ test("F338: the row tile's place is an era hook; iOS 7 puts it 15pt in, the labe
   assert.match(ios7, /--row-icon-in: 0px; --row-icon-after: 7px;/); // 15 + 0 = 15pt in; 7 + --cell-gap 8 = 15pt after
   assert.match(ios7, /\.cell-icon\.row-icon\) \{\s*background-position: calc\(15px \+ var\(--row-icon-in\) \+ 29px \+ var\(--row-icon-after\) \+ var\(--cell-gap\)\) 0;/);
 });
+
+// F333: iOS 7's controls after the Teehan+Lax iOS 7 kit (ref/teehanlax/ios7/sheet.svg): the alert, action sheet, callout
+// menu, counts and plain-table keylines are iOS 7's, and the plain keyline is a full-height tile (a .5pt tile at a row's
+// bottom is not painted at 3x; the package list is virtual, so no sibling selector can draw it).
+test("F333: ios7.css draws the kit's alert, action sheet, menu, counts and keylines", () => {
+  const ios7 = readFileSync(new URL("./ios7.css", import.meta.url), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+  const rule = (sel) => [...ios7.matchAll(/([^{}]+)\{([^}]*)\}/g)].filter(([, s]) => s.split(",").map((x) => x.trim()).includes(sel)).map(([, , d]) => d).join(";");
+  const alert = rule('html[data-style="ios7"] .alert');
+  assert.match(alert, /border-radius: 7px/);
+  assert.match(alert, /calc\(100% - 56px\) \/ 100% \.5px/, "the line over the buttons, drawn from the box's bottom");
+  assert.match(alert, /box-shadow: none/);
+  assert.match(rule('html[data-style="ios7"] .alert-button'), /background: none[\s\S]*font-size: 17px; font-weight: 400; color: var\(--i7-tint\)/);
+  assert.match(rule('html[data-style="ios7"] .alert-button:last-child:not(.cancel)'), /font-weight: 600/);
+  assert.match(rule('html[data-style="ios7"] .action-button'), /font-size: 21px; font-weight: 400; border-radius: 3px/);
+  assert.match(ios7, /--action-btn: #f3f3f3;/);
+  assert.match(ios7, /--action-cancel: #ebebeb;/);
+  assert.match(ios7, /--callout-h: 36px;/);
+  assert.match(ios7, /--menu: #232323;/);
+  assert.match(rule('html[data-style="ios7"] .menu-items'), /border-radius: 8px/);
+  assert.match(rule('html[data-style="ios7"] .cell-count'), /background: none/);
+  assert.match(rule('html[data-style="ios7"] .group-header'), /font-size: 14px/);
+  assert.match(ios7, /--i7-keyline: linear-gradient\(to top, var\(--keyline\) \.5px, transparent \.5px\);/);
+  assert.match(rule('html[data-style="ios7"] .plain .cell'), /background-image: var\(--i7-keyline\); background-position: 15px 0; background-size: calc\(100% - 15px\) 100%; background-repeat: no-repeat;/);
+  assert.match(rule('html[data-style="ios7"] .pkg-row'), /var\(--i7-keyline\) 51px 0/);
+});

@@ -105,9 +105,11 @@ test("Install: inspect, the sheet's edits, signing.install {token, ...edits}, th
     { native, hud: ui.hud, alert: ui.alert, install, sheet, later: ui.later });
   assert.equal(ok, true);
   assert.equal(shown, INFO);
-  assert.deepEqual(native.calls.map((c) => c.method), ["signing.inspect", "signing.install"]);
+  // B252: Confirm holds the app awake (signing.hold) until signing.install has answered
+  assert.deepEqual(native.calls.map((c) => c.method), ["signing.inspect", "signing.hold", "signing.install", "signing.hold"]);
   assert.deepEqual(native.calls[0].params, { url: "https://example.com/Delta.ipa" });
-  const { manifestServer, ...sent } = native.calls[1].params;
+  assert.deepEqual([native.calls[1].params, native.calls[3].params], [{ on: true }, { on: false }]);
+  const { manifestServer, ...sent } = native.calls[2].params;
   assert.deepEqual(sent, { token: "tok1", name: "Delta 2", bundleId: "com.me.delta", removeExtensions: ["PlugIns/DeltaWidget.appex"] });
   assert.match(manifestServer, /^https:\/\//);
   assert.deepEqual(installed, [{ bundleId: "com.me.delta", name: "Delta 2" }]);

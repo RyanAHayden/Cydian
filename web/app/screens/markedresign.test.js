@@ -79,8 +79,8 @@ test("Confirm's run: a marked app's resign job downloads its source IPA through 
     alert: async () => assert.fail("alert"), later: () => {}, follow: () => {} };
   const job = createAppQueue().add(markedResignJob(A, "1"));
   assert.equal(await resignApp(job, { sc, native: n, deps }), true);
-  assert.deepEqual(calls.map((c) => c[0]), ["signing.install"]);
-  assert.equal(calls[0][1].url, "https://s/a1.ipa");
+  assert.deepEqual(calls.map((c) => c[0]), ["signing.hold", "signing.install", "signing.hold"]); // B252: held from Confirm
+  assert.equal(calls[1][1].url, "https://s/a1.ipa");
   assert.equal(ui.labels[0], "Downloading");
 });
 

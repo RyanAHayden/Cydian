@@ -201,6 +201,9 @@ enum Sideload {
         let options: SignOptions
         do { options = try SignOptions(json: c.params) } catch { return Apt.reply(c, nil, SignBridge.text(error)) }
         let job = SignJob.begin() // F196: what signing.cancel stops
+        // B252: KeepAlive from the call to its answer, so leaving the app right after Confirm doesn't stop the run
+        // while the IPA is signed (download, serving and This iPhone's copy add holds of their own)
+        let released = holdUntilAnswer()
         let throttle = Throttle()
         let emit = { (phase: String, p: Double) in
             if throttle.pass(phase, p) { c.emitOnMain([["phase": phase, "progress": p]]) }
@@ -215,6 +218,7 @@ enum Sideload {
         let refuse = IPAHash.refuse(c.params) // F292
         var ipaSha: String? = nil // F292: set (IPAHash.check) before signAndOpen, read once it answers
         let finish = { (r: Result<(SignedApp, SignedRecord), Error>) in
+            released()
             switch r {
             case .failure(let e):
                 job.end()
@@ -240,7 +244,7 @@ enum Sideload {
         // F329a: {selfIcon: <own icon>}: iFizBox re-signs its own bundle with that picture in an own-icon set
         // (AppIcon.swift OwnIcons.selfSource) and installs it as its own update (host: true or This iPhone)
         if let own = c.params["selfIcon"] as? String {
-            guard OwnIcons.isOwn(own) else { job.end(); return Apt.reply(c, nil, "bad_params: selfIcon is an own icon") }
+            guard OwnIcons.isOwn(own) else { job.end(); released(); return Apt.reply(c, nil, "bad_params: selfIcon is an own icon") }
             DispatchQueue.main.async {
                 let current = UIApplication.shared.alternateIconName
                 SignBridge.queue.async {
@@ -258,7 +262,7 @@ enum Sideload {
         if let tok = c.params["token"] as? String {
             SignBridge.queue.async {
                 guard let p = prepared.removeValue(forKey: tok) else {
-                    job.end()
+                    job.end(); released()
                     return Apt.reply(c, nil, "gone: that IPA was looked at more than 15 minutes ago; start again")
                 }
                 log("Using the IPA downloaded for the look-first sheet (\(p.url))")
@@ -267,7 +271,7 @@ enum Sideload {
             }
             return
         }
-        guard let url = Apt.httpURL(c.params["url"]) else { job.end(); return Apt.reply(c, nil, "bad_url: not an http(s) URL") }
+        guard let url = Apt.httpURL(c.params["url"]) else { job.end(); released(); return Apt.reply(c, nil, "bad_url: not an http(s) URL") }
         log("Downloading \(url.absoluteString)")
         let started = Date()
         let d = download(url, http: httpPolicy(c), emit: emit) { res in
@@ -280,6 +284,43 @@ enum Sideload {
             }
         }
         job.onCancel { d.cancel() }
+    }
+
+    // ---- B252: kept running from Confirm on
+
+    // One KeepAlive hold, taken now; the function returned gives it back, once however often it is called.
+    static func holdUntilAnswer() -> () -> Void {
+        KeepAlive.shared.begin()
+        let once = Once()
+        return { if once.first() { KeepAlive.shared.end() } }
+    }
+
+    // signing.hold {on}: the page's own hold, from Confirm until its signing.install has answered, so the route check
+    // before the call (idevice.status) and the call's start run with the app in the background. One hold at most;
+    // it lets go by itself after `pageHoldLimit`, so a page that never says off can't keep the app awake.
+    static let pageHoldLimit: TimeInterval = 10 * 60
+    private static var pageHold: (release: () -> Void, serial: Int)? // main queue only
+    private static var pageHolds = 0
+
+    static func hold(_ c: Bridge.Call) {
+        guard AppMode.current != .jailbreak else { return Apt.reply(c, nil, "jailbreak: the jailbreak app installs IPAs through its helper") }
+        let on = c.params["on"] as? Bool ?? true
+        DispatchQueue.main.async {
+            if on {
+                if pageHold == nil { pageHold = (holdUntilAnswer(), 0) }
+                pageHolds += 1
+                let serial = pageHolds
+                pageHold?.serial = serial
+                DispatchQueue.main.asyncAfter(deadline: .now() + pageHoldLimit) {
+                    guard let h = pageHold, h.serial == serial else { return }
+                    DeviceLog.say("\(Brand.name) KeepAlive: the page's hold let go after \(Int(pageHoldLimit / 60)) min")
+                    h.release(); pageHold = nil
+                }
+            } else {
+                pageHold?.release(); pageHold = nil
+            }
+            c.reply(["held": pageHold != nil], nil)
+        }
     }
 
     // ---- F196: the progress page's Cancel (web/app/signing-client.js stopNative)

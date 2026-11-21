@@ -136,7 +136,9 @@ test("Install: the HUD follows the phases, then Installing, and records the app"
   const ui = fakeUI();
   let recorded = null;
   assert.equal(await installOnDevice({ url: "https://e.example/x.ipa", name: "X", onInstalled: (r) => { recorded = r; } }, { native: n, ...ui.deps }), true);
-  assert.deepEqual(n.calls[0], { method: "signing.install", params: { url: "https://e.example/x.ipa", manifestServer: "https://sign.ifizbox.com" } }); // the manifest from the signing server
+  assert.deepEqual(n.calls[0], { method: "signing.hold", params: { on: true } }); // B252: held from Confirm
+  assert.deepEqual(n.calls[1], { method: "signing.install", params: { url: "https://e.example/x.ipa", manifestServer: "https://sign.ifizbox.com" } }); // the manifest from the signing server
+  assert.deepEqual(n.calls[2], { method: "signing.hold", params: { on: false } });
   assert.deepEqual(ui.labels, ["Downloading", "Downloading 50%", "Downloading", "Reading", "Signing 25%", "Installing", "Installing"]);
   assert.equal(recorded, done);
   assert.equal(ui.alerts.length, 0);
@@ -161,7 +163,7 @@ test("Install: the real followInstall ends on Done once iOS has the link, withou
   const hud = (t) => ({ set: (x) => ui.labels.push(x), hide: () => { ui.hidden++; }, finish: (f) => finished.push(f) });
   assert.equal(await installOnDevice({ url: "https://e.example/x.ipa", name: "X" }, { native: n, ...ui.deps, hud }), true);
   for (let i = 0; i < 20 && !finished.length; i++) await new Promise((r) => setTimeout(r, 0));
-  assert.deepEqual(n.calls.map((c) => c.method), ["signing.install"]);
+  assert.deepEqual(n.calls.map((c) => c.method), ["signing.hold", "signing.install", "signing.hold"]);
   assert.equal(finished[0]?.status, "Sent to iOS. Press Home to watch it install."); // F252
   assert.equal(ui.hidden, 0);
 });

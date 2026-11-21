@@ -14,7 +14,6 @@ import { isAltKey, neverLoaded } from "./altstore.js";
 import { releaseTime, fingerprint, healthFields, withTimeout, pool, REFRESH_TIMEOUT, REFRESH_CONCURRENCY } from "./health.js";
 import { githubApiRepo, isGithubSource, refreshGithubSource } from "./github.js"; // F304
 import { githubTweakUri } from "./github.js"; // F344a
-import { indexQuery } from "./tweakindex.js"; // F344a
 
 // F72: iFizBox's own repo names the oldest iFizBox that may run without upgrading first (core/essential.js).
 const MIN_FIELD = "x-ifizbox-minimum-version";
@@ -790,6 +789,7 @@ export function tweakSourceVerdict(answer, appIds = []) {
 
 export async function askTweakIndex(source, { get = (u, o) => globalThis.fetch(u, o), base, timeout = 6000 } = {}) {
   if (!source || isGithubSource(source)) return null;
+  const { indexQuery } = await import("./tweakindex.js"); // lazily: not in app.js's startup closure (module-graph.test.js)
   const q = indexQuery(source);
   if (!q || !base) return null;
   const ac = typeof AbortController === "function" ? new AbortController() : null;

@@ -229,6 +229,36 @@ function infoStore(storage = globalThis.localStorage) {
 
 export function cachedTweakInfo(st, { storage } = {}) { return st?.package ? infoStore(storage).get(debKey(st)) : null; }
 
+// B269: a Tweak Source's list rows without the tweaks whose .deb was checked on this device and can't go into an app
+// (for iOS itself, a library, a daemon…), so no row leads to that refusal again. Unchecked rows stay.
+export function addableTweakRows(rows, { storage } = {}) {
+  return (rows ?? []).filter((r) => cachedTweakInfo({ package: r?.id, version: r?.version }, { storage })?.ok !== false);
+}
+
+// B269: the rows of a Tweak Source's list not checked yet on this device, checked in the background (tweakInfo, the
+// same check Add to App makes; each verdict is cached), `limit` at a time. onRefused(ids) after each refusal with every
+// id refused so far, so the list drops those rows; a failed download or a paid tweak counts as nothing (asked again
+// later). `stop()` -> true ends it (the page went away). -> the ids refused.
+export async function checkTweakRows(rows, { pkg = async (r) => (await (await import("../catalog.js")).catalog.package(r.id, r.key))?.stanza,
+  check = (st) => tweakInfo(st), onRefused = () => {}, stop = () => false, limit = 2, storage } = {}) {
+  const todo = (rows ?? []).filter((r) => r?.id && !cachedTweakInfo({ package: r.id, version: r.version }, { storage }));
+  const refused = [];
+  let i = 0;
+  const worker = async () => {
+    while (i < todo.length && !stop()) {
+      const r = todo[i++];
+      try {
+        const st = await pkg(r);
+        if (!st || stop()) continue;
+        const info = await check(st);
+        if (info && info.ok === false) { refused.push(r.id); onRefused([...refused]); }
+      } catch { /* not downloaded or paid: left listed */ }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.max(1, limit) }, worker));
+  return refused;
+}
+
 async function defaultFetchDeb(url) {
   const { getBackend } = await import("../backend.js");
   const r = await getBackend().fetch(url);

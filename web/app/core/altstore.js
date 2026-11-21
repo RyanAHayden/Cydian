@@ -59,6 +59,34 @@ export function installOptions(version, sourceUrl) {
   return { itms, download, open };
 }
 
+// B269: whether an IPA source's app entry can be signed and installed (the sideload build's lists hide the rest).
+//   signableDownload(url)  -> { ok, why }   one version's downloadURL, as installOptions reads it
+//   signableApp(stanza)    -> { ok, why }   a catalog app record (appStanza: kind "ipa", ipa): its newest runnable version
+// The install page's check is core/appqueue.js appJob (an http(s) download from installOptions, never itms-services),
+// which asks signableDownload too: a row the lists keep queues a job, a row Install would refuse is left out.
+// why: "no-ipa" (none, or only an itms-services / manifest link), "deb" (a tweak), "app-store" (an App Store page),
+// "web-clip" (.mobileconfig), "not-app". An iOS range this phone isn't in needs nothing here: appStanza keeps only the
+// versions that run on it, and none means no entry at all.
+const APP_STORE_HOST = /^(apps|itunes|geo\.itunes)\.apple\.com$/i;
+export function signableDownload(url) {
+  const download = installOptions({ downloadURL: url }, null).download;
+  let u = null;
+  try { u = download ? new URL(download) : null; } catch { u = null; }
+  if (!u) return { ok: false, why: "no-ipa" };
+  let path = u.pathname;
+  try { path = decodeURIComponent(path); } catch { /* keep it encoded */ }
+  path = path.toLowerCase();
+  if (APP_STORE_HOST.test(u.hostname)) return { ok: false, why: "app-store" };
+  if (path.endsWith(".deb")) return { ok: false, why: "deb" };
+  if (/\.(mobileconfig|webclip)$/.test(path)) return { ok: false, why: "web-clip" };
+  return { ok: true, why: null };
+}
+export function signableApp(st) {
+  if (st?.kind !== "ipa" || !st.ipa) return { ok: false, why: "not-app" };
+  const v = st.ipa.versions?.[0];
+  return v ? signableDownload(v.downloadURL) : { ok: false, why: "no-ipa" };
+}
+
 // News items flagged notify: true that haven't been pushed (sentIds: identifiers already sent), newest first.
 export function newsToNotify(source, sentIds = []) {
   const sent = new Set(sentIds);

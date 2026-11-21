@@ -1,0 +1,47 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>F345 control probe</title>
+<style>
+  body { margin: 0; font: 15px -apple-system, system-ui; }
+  .half { padding: 10px 14px; }
+  .light { color-scheme: light; background: #f2f2f7; color: #000; }
+  .dark { color-scheme: dark; background: #000; color: #fff; }
+  .row { display: flex; align-items: center; gap: 10px; margin: 6px 0; flex-wrap: wrap; }
+  .row b { width: 84px; font-weight: 500; font-size: 13px; }
+  input[type=text], input[type=search], textarea { width: 200px; }
+</style>
+</head>
+<body>
+<script>
+// The same block twice: once under color-scheme light, once dark.
+const block = `
+<div class="row"><b>text</b><input type="text" placeholder="Placeholder"></div>
+<div class="row"><b>search</b><input type="search" placeholder="Search"></div>
+<div class="row"><b>select</b><select id="SEL"><option>Newest</option><option>Name</option><option>Size</option></select></div>
+<div class="row"><b>date</b><input type="date" value="2026-11-21"> <input type="time" value="09:41"></div>
+<div class="row"><b>switch</b><input type="checkbox" switch checked> <input type="checkbox" switch></div>
+<div class="row"><b>checkbox</b><input type="checkbox" checked> <input type="checkbox"> <input type="radio" name="rRAD" checked> <input type="radio" name="rRAD"></div>
+<div class="row"><b>range</b><input type="range" value="60"></div>
+<div class="row"><b>progress</b><progress value="0.4"></progress> <meter value="0.7"></meter></div>
+<div class="row"><b>button</b><button>Button</button> <input type="submit" value="Submit"></div>
+<div class="row"><b>color</b><input type="color" value="#0a84ff"> <input type="file"></div>
+<div class="row"><b>textarea</b><textarea rows="2">Text area</textarea></div>
+<div class="row"><b>datalist</b><input list="dlDL" placeholder="datalist"><datalist id="dlDL"><option value="BigBoss"><option value="Chariz"></datalist></div>
+`;
+for (const tone of ["light", "dark"]) {
+  const d = document.createElement("div");
+  d.className = "half " + tone;
+  d.innerHTML = `<div class="row"><b>${tone}</b><span id="ua-${tone}"></span></div>` +
+    block.replaceAll("SEL", "sel-" + tone).replaceAll("RAD", tone).replaceAll("DL", tone);
+  document.body.append(d);
+}
+document.getElementById("ua-light").textContent = navigator.userAgent.replace(/^Mozilla\/5.0 /, "").slice(0, 70);
+const sw = document.createElement("input"); sw.type = "checkbox"; sw.setAttribute("switch", "");
+document.getElementById("ua-dark").textContent = "switch attr: " + ("switch" in sw ? "yes" : "no") +
+  ", appearance: " + getComputedStyle(document.querySelector("input[switch]")).appearance;
+</script>
+</body>
+</html>

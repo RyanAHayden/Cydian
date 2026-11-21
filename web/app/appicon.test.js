@@ -114,3 +114,69 @@ test("a Clear pick saved earlier counts as the theme's icon where Clear isn't of
   assert.equal(iconFor("dark", readIcons(raw, false)), "gunmetal");
   assert.deepEqual(iconState(readIcons(raw, false), "dark"), { light: "classic", dark: "gunmetal", onScreen: "gunmetal" });
 });
+
+// B243: Light = Clear with Match Theme off, then Match Theme back on: the switch back to the themes' icons is sent,
+// and sent again when iOS refuses it, until it goes through; a newer change or another kind of refusal stops it.
+test("turning Match Theme back on after a Clear pick switches back, and a refused switch is retried", async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const flush = () => new Promise((r) => setImmediate(r));
+  const s = store("sideload");
+  const calls = [];
+  let refuse = 0;
+  const native = { call: (m, p) => {
+    calls.push(p);
+    return refuse-- > 0 ? Promise.reject(new Error("failed: The operation couldn’t be completed. (NSPOSIXErrorDomain error 35.)")) : Promise.resolve({});
+  } };
+  globalThis.ifizboxNative = native;
+  try {
+    resetTold();
+    s.set("iconMatch", false);
+    s.set("lightIcon", "clear");
+    assert.equal(tellIcon("light", s, native, 0), true);
+    await flush();
+    assert.deepEqual(calls.at(-1), { light: "clear", dark: "gunmetal", onScreen: "clear" });
+    s.set("iconMatch", true);
+    refuse = 2;
+    assert.equal(tellIcon("light", s, native), true);
+    const back = { light: "classic", dark: "gunmetal", onScreen: "classic" };
+    assert.deepEqual(calls.at(-1), back);
+    await flush();
+    t.mock.timers.tick(1000);
+    await flush();
+    assert.equal(calls.length, 3);
+    t.mock.timers.tick(3000);
+    await flush();
+    assert.equal(calls.length, 4); // the third try goes through
+    assert.deepEqual(calls.at(-1), back);
+    t.mock.timers.tick(20000);
+    await flush();
+    assert.equal(calls.length, 4);
+    assert.equal(tellIcon("light", s, native), false); // sent: nothing to repeat
+
+    // A newer change while a retry waits: only the newer one goes out
+    s.set("darkTheme", "oled");
+    refuse = 1;
+    tellIcon("light", s, native);
+    await flush();
+    s.set("darkTheme", "gunmetal");
+    tellIcon("light", s, native);
+    await flush();
+    t.mock.timers.tick(20000);
+    await flush();
+    assert.equal(calls.length, 6);
+    assert.deepEqual(calls.at(-1), back);
+
+    // Not an iOS refusal (an older shell): no retry, but the next change sends again
+    native.call = (m, p) => { calls.push(p); return Promise.reject(new Error("unknown method app.icon")); };
+    s.set("darkTheme", "oled");
+    tellIcon("light", s, native);
+    await flush();
+    t.mock.timers.tick(20000);
+    await flush();
+    assert.equal(calls.length, 7);
+    assert.equal(tellIcon("light", s, native), true);
+  } finally {
+    resetTold();
+    delete globalThis.ifizboxNative;
+  }
+});

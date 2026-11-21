@@ -16,6 +16,7 @@ struct SignedApp {
                                    // B162: loose 32-bit-only Mach-Os, also sealed as resources
     var appID: String? = nil       // B138: the application-identifier it was signed with (TEAM.id)
     var injected: [String] = []    // F288: load paths added to the app's executable (Tweaks.swift)
+    var groupFix: String? = nil    // B259: the group fix dylib's hash (SignerStamp.hash) when the app got it
 }
 
 final class IPASigner {
@@ -244,12 +245,14 @@ final class IPASigner {
         // B211: the original signature's app groups and keychain groups, read before signing, decide whether the app
         // gets the group fix (GroupFix.swift) beside the user's tweaks; never iFizBox's own IPA.
         var tweaks = options.tweaks
+        var groupFix: String? = nil // B259: kept in the record's SignerStamp
         if oldID != SignOptions.selfBundleID, let exe = main.plist["CFBundleExecutable"] as? String, files[appDir + exe] != nil,
            let plan = GroupFix.plan(original: Inspect.entitlements(try contents(appDir + exe, files, zip)),
                                     profile: profile.entitlements(for: entID, keptID: keep ? newID : nil),
                                     previous: files[appDir + GroupFix.configPath] == nil ? nil : try? contents(appDir + GroupFix.configPath, files, zip)),
            let dylib = GroupFix.dylib() {
             tweaks = try GroupFix.adding(plan, dylib: dylib, to: tweaks)
+            groupFix = SignerStamp.hash(dylib)
             log("Group fix: \(plan.groups.isEmpty ? "no app groups" : plan.groups.joined(separator: ", ")) -> "
                 + (plan.target.isEmpty ? "the app's own folder" : plan.target) + (plan.keychain ? "; keychain groups stripped" : ""))
             if let lost = plan.lost { log("Warning: this profile has no \(lost), where the app kept its shared data until now; iOS keeps that folder from it") }
@@ -371,7 +374,7 @@ final class IPASigner {
                          name: main.plist["CFBundleDisplayName"] as? String ?? main.plist["CFBundleName"] as? String ?? "",
                          version: main.plist["CFBundleShortVersionString"] as? String ?? main.plist["CFBundleVersion"] as? String ?? "",
                          removed: removed.sorted(), fixedArm64e: fixedArm64e.sorted(), skipped: skipped.sorted(),
-                         appID: "\(profile.team).\(entID)", injected: injected)
+                         appID: "\(profile.team).\(entID)", injected: injected, groupFix: groupFix)
     }
 
     private struct Read { let sha1: Data, sha256: Data, macho: Bool }

@@ -124,6 +124,7 @@ struct SignedRecord: Codable, Equatable {
     var expires: Date?            // the earlier of the certificate's and the profile's expiry
     var options: StoredOptions
     var appID: String? = nil      // B138: the application-identifier it was signed with; nil in older records
+    var signer: SignerStamp? = nil // B259: the signer that made it; nil in records from before stamps (stale)
 
     struct StoredOptions: Codable, Equatable {
         var name: String?
@@ -150,6 +151,7 @@ struct SignedRecord: Codable, Equatable {
                                 "url": url, "signed": ISO8601DateFormatter().string(from: signed)]
         if let x = expires { j["expires"] = ISO8601DateFormatter().string(from: x) }
         if let t = options.tweaks, !t.names.isEmpty { j["tweaks"] = t.names } // F302a: Installed's "N Tweaks"
+        if let s = signer { j["signer"] = s.json } // B259: Needs Re-sign compares it with signing.installed's own
         // B247: core/installed.js matches on it first; its name is the one shown (the user's rename wins)
         if var c = options.credit { c.name = shownName; j["credit"] = c.json }
         return j

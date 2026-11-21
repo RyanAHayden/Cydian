@@ -20,7 +20,8 @@
 //        the Signing Server's link once iOS froze iFizBox). Only the user's tap: iFizBox never re-opens by itself
 //   signing.selfUpdate (stream: {state}) -> {state}: B83, iFizBox's own update after iOS's prompt (CloseForUpdate):
 //        prompt | waiting | downloading, then finished (it exits) | notStarted | stalled | guessed; null: none running
-//   signing.installed            -> {apps: [record], next: {expires, apps} | null}
+//   signing.installed            -> {apps: [record], next: {expires, apps} | null, signer: {version, groupFix}}
+//        (B259: each record's `signer` is the stamp it was signed with, the top one this build's: SignerStamp.swift)
 //   signing.openApp {bundleId}   -> {opened: true | false}: F155, launches an installed app (the progress page's Open)
 //   signing.forget {bundleId}    -> {apps}
 //   signing.isInstalled {bundleIds} -> {installed: {bundleId: true | false | null}}: B46, what iOS has now
@@ -509,7 +510,7 @@ enum Sideload {
         let record = SignedRecord(bundleID: app.bundleID, originalBundleID: app.originalBundleID, name: app.name,
                                   version: app.version, url: url, signed: Date(),
                                   expires: profile.signatureExpiry(certificate: identity.certificate), options: options.stored,
-                                  appID: app.appID)
+                                  appID: app.appID, signer: app.stamp) // B259
         if servers.local { // "Installing on this iPhone" (phase "here"), not iOS's own install
             installHere(output, app: app, record: record, emit: emit, log: log, job: job, opened: opened, served: served, step: step)
             return
@@ -1121,6 +1122,7 @@ enum Sideload {
         if let (x, names) = SignedRecords.nextExpiry(list) {
             out["next"] = ["expires": ISO8601DateFormatter().string(from: x), "apps": names]
         } else { out["next"] = NSNull() }
+        out["signer"] = SignerStamp.now.json // B259: records with an older stamp are listed under Needs Re-sign
         return out
     }
 

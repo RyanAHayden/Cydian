@@ -895,6 +895,47 @@ test("B211: group fix") {
 
     let own = try IPASigner(profile: p, identity: identity).sign(try ipa("own.ipa", id: SignOptions.selfBundleID), to: work.appendingPathComponent("own-signed.ipa"))
     check(own.injected.isEmpty, "iFizBox's own IPA: \(own.injected)")
+    // B259: the stamp names the dylib the app got; another dylib build makes only such apps stale
+    check(app.groupFix == SignerStamp.hash(dylib) && app.stamp == SignerStamp.now && !app.stamp.isStale(), "stamp \(app.stamp)")
+    check(own.groupFix == nil && own.stamp.groupFix == nil, "no fix, no hash")
+    let other = SignerStamp(version: SignerStamp.version, groupFix: SignerStamp.hash(Data([1])))
+    check(app.stamp.isStale(against: other) && !own.stamp.isStale(against: other), "a new dylib: only apps with the fix")
+}
+
+// B259: Needs Re-sign's signer stamp on records and My IPAs' signed copies
+test("B259: signer stamp") {
+    let cur = SignerStamp.now
+    check(cur.version == SignerStamp.version && cur.groupFix == nil, "no bundled dylib here: \(cur)")
+    check(SignerStamp(version: SignerStamp.version - 1, groupFix: nil).isStale(), "an earlier version")
+    check(!SignerStamp(version: SignerStamp.version, groupFix: "abc").isStale(against: cur), "no current dylib: the hash can't tell")
+    check(SignerStamp.hash(Data("x".utf8)).count == 16, "16 hex digits")
+    var o = SignOptions()
+    o.name = "D"
+    var r = SignedRecord(bundleID: "a", originalBundleID: "a", name: "A", version: "1", url: "https://x/a.ipa",
+                         signed: Date(timeIntervalSince1970: 0), expires: nil, options: o.stored, signer: cur)
+    let back = SignedRecords.decode(try SignedRecords.encode([r]))
+    check(back.first?.signer == cur, "kept in the record")
+    let j = r.json["signer"] as? [String: Any]
+    check(j?["version"] as? Int == SignerStamp.version && j?["groupFix"] is NSNull && JSONSerialization.isValidJSONObject(r.json), "json \(String(describing: j))")
+    r.signer = nil
+    check(r.json["signer"] == nil, "no stamp: left out (needsResign lists it)")
+    // 0.18.0's record shape decodes with no stamp
+    let old = SignedRecords.decode(Data(#"[{"bundleID":"a","originalBundleID":"a","name":"A","version":"1","url":"u","signed":"2026-11-17T00:00:00Z","options":{"removeExtensions":[],"fixArm64e":true}}]"#.utf8))
+    check(old.count == 1 && old[0].signer == nil, "old record: no stamp")
+
+    // My IPAs: a signed copy from before stamps (or an older stamp) is signed again, not installed as it is
+    let lib = IPALibrary(root: work.appendingPathComponent("lib259/Documents"), store: work.appendingPathComponent("lib259/Store"))
+    let a = try lib.add(fixtures.appendingPathComponent("rich.ipa"), name: "Rich.ipa", move: false)
+    let profile = try Profile(try fixture("profile.mobileprovision"))
+    let s = try lib.sign(a, signer: IPASigner(profile: profile, identity: identity), certificate: identity.certificate, expires: nil, work: work)
+    check(s.signer == cur && lib.signed(a, certificate: identity.certificate)?.signer == cur, "the copy keeps its stamp")
+    let sidePath = lib.store.appendingPathComponent(a + ".signed.json")
+    if var dict = (try? JSONSerialization.jsonObject(with: Data(contentsOf: sidePath))) as? [String: Any] {
+        dict["signer"] = nil
+        try JSONSerialization.data(withJSONObject: dict).write(to: sidePath)
+        check(lib.signed(a, certificate: identity.certificate) == nil, "a copy with no stamp: sign it again")
+    } else { check(false, "signed side file not found at \(sidePath.path)") }
+    try lib.delete(a)
 }
 
 // F329a: the Lite app re-signs itself with your own icon: an IPA made from the installed bundle (SelfIPA), the own-icon

@@ -419,6 +419,8 @@ enum Launch {
     static let metal = striped(0xc6cbd2, 0xcbd0d6)
     // B221: iOS 7's White (F201), plain #f7f7f7 like its bar, no pinstripe
     static let white = Ground(pattern: rgb(0xf7f7f7), plain: rgb(0xf7f7f7))
+    // B237: iOS 13's White (launch set white13), plain #f9f9f9 like its bar
+    static let white13 = Ground(pattern: rgb(0xf9f9f9), plain: rgb(0xf9f9f9))
 
     // The ground for a tone and its palette: the light one (F214: Classic, Sepia or Solarized Light) or the dark
     // one; a name this build doesn't know takes the tone's default (Classic, OLED Black).
@@ -430,6 +432,7 @@ enum Launch {
             case "legalpad": return legalpad
             case "metal": return metal
             case "white": return white
+            case "white13": return white13
             default: return light
             }
         }

@@ -54,9 +54,9 @@ test("applyTheme posts app.theme to the bridge once per change", () => {
   applyTheme(doc, win);
   assert.deepEqual(sent.at(-1).params, { style: "dark", theme: "dark", darkPalette: "oled7", lightPalette: "white" });
   assert.equal(doc.documentElement.dataset.palette, "oled");
-  settings.set("style", "ios13"); // B235: iOS 13's, its #38383a hairline
+  settings.set("style", "ios13"); // B235: iOS 13's, its #38383a hairline; B237: and its White (white13: #f2f2f7)
   applyTheme(doc, win);
-  assert.deepEqual(sent.at(-1).params, { style: "dark", theme: "dark", darkPalette: "oled13", lightPalette: "white" });
+  assert.deepEqual(sent.at(-1).params, { style: "dark", theme: "dark", darkPalette: "oled13", lightPalette: "white13" });
   settings.set("style", "ios6");
   applyTheme(doc, win); // back in iOS 6, the pick again
   assert.deepEqual(sent.at(-1).params, { style: "dark", theme: "dark", darkPalette: "gunmetal", lightPalette: "classic" });

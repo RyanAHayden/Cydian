@@ -338,7 +338,13 @@ enum Sideload {
                          done: @escaping (Result<URL, Error>) -> Void) -> DebFetch {
         let file = SignBridge.work.appendingPathComponent("\(SignBridge.token())-in.ipa")
         let progress = { (p: Double) in emit("downloading", p) }
+        // R49: KeepAlive (silent audio, mixed with others) while the IPA downloads. Without it iOS 27 suspended
+        // iFizBox 16 s after the user left it, and on return the download failed ("The network connection was
+        // lost"); with it, the download carries on in the background at full speed, as Safari's does.
+        KeepAlive.shared.begin()
+        let released = Once()
         let finished = { (err: String?) in
+            if released.first() { KeepAlive.shared.end() }
             if let e = err { try? FileManager.default.removeItem(at: file); return done(.failure(Failed(text: e))) }
             SignBridge.queue.async { done(.success(file)) }
         }

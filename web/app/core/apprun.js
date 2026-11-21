@@ -61,10 +61,10 @@
 //                              appIdMismatchText; any other UnknownErrorType: "iOS refused to install it: <why>")
 //
 // Two lanes. Signing: `ahead` apps at a time in the run's order are downloaded and signed. Installing: one app at a
-// time, strictly in order: the first row that hasn't ended is handed to iOS once it is signed, and the next waits for
-// iOS to finish it (or for it to fail or be stopped). iFizBox's own IPA is last (runOrder), so iOS closing iFizBox to
-// install it can't cut the others off. A download or signing phase that sends no progress for `stallMs` fails its row
-// ("stopped at Signing 50%"), and that app's job is aborted, so the queue moves on. The log gets one line per phase per
+// time: the first signed row is handed to iOS (installLaneNext, B263: never held by a row ahead of it that is still
+// downloading or signing), and the next waits for iOS to finish it (or for it to fail or be stopped). iFizBox's own
+// IPA goes only after every other row has ended, so iOS closing iFizBox to install it can't cut the others off.
+// A download or signing phase that sends no progress for `stallMs` fails its row ("stopped at Signing 50%"), and that app's job is aborted, so the queue moves on. The log gets one line per phase per
 // app (Downloading Delta 48 MB, Signed Delta, Asked iOS to install Delta, Installed Delta / the reason it failed);
 // percents only move the row's bar and the bottom status.
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -197,6 +197,16 @@ export function stallText(row, limit = APP_STALL) {
   const p = pct(row?.fraction);
   const where = `${PHASE_WORD[row?.phase] ?? "the start"}${p > 0 && p < 100 ? ` ${p}%` : ""}`;
   return `stopped at ${where}: nothing moved for ${span}`;
+}
+
+// B263: the row the install lane hands to iOS next: the first signed row in the run's order, whatever the rows ahead
+// of it are still doing (a big app still downloading or signing holds nobody). iFizBox's own row only once every
+// other row has ended, since installing it closes iFizBox. null: nothing is ready.
+export function installLaneNext(rows = []) {
+  const next = rows.find((r) => r.state === "signed" && !isSelf(r));
+  if (next) return next;
+  const self = rows.find((r) => r.state === "signed" && isSelf(r));
+  return self && rows.every((r) => r === self || ended(r)) ? self : null;
 }
 
 export function createAppRun({ rows, sign, install, discard = () => {}, reprompt = null, ahead = 2, stallMs = APP_STALL,
@@ -392,10 +402,10 @@ export function createAppRun({ rows, sign, install, discard = () => {}, reprompt
         if (busy >= ahead) break;
         if (r.state === "waiting") { busy++; startSign(r); }
       }
-      // the install lane: the first row that hasn't ended, once signed; nothing while one is with iOS
+      // the install lane: nothing while one is with iOS; else the first signed row (installLaneNext)
       if (!rows.some((r) => WITH_IOS.has(r.state))) {
-        const next = rows.find((r) => !ended(r));
-        if (next?.state === "signed") startInstall(next);
+        const next = installLaneNext(rows);
+        if (next) startInstall(next);
       }
     }
     if (rows.every(ended) && !flights.size) {

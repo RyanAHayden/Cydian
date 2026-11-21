@@ -39,24 +39,22 @@ test("signs ahead (2 at a time), installs one at a time in order, iFizBox last",
   const end = run.start();
   await flush();
   assert.deepEqual(ph.events, ["sign:a", "sign:b"]);
-  ph.signed("b");
-  await flush();
-  // b is signed, but a isn't yet: nothing goes to iOS before a; c starts signing in b's place
-  assert.deepEqual(ph.events, ["sign:a", "sign:b", "sign:c"]);
-  assert.equal(rows[1].state, "signed");
-  assert.equal(rowStatus(rows[1]), "Signed");
   ph.signed("a");
   await flush();
-  assert.deepEqual(ph.events.slice(3), ["sign:" + SELF_ID, "install:a"]);
+  // a goes to iOS; c starts signing in a's place
+  assert.deepEqual(ph.events.slice(2), ["sign:c", "install:a"]);
   assert.equal(rowStatus(rows[0]), "Tap Install on the iOS prompt");
+  ph.signed("b");
   ph.signed("c");
-  ph.signed(SELF_ID);
   await flush();
-  // b waits for a's install, even though everything is signed
+  assert.equal(rows[1].state, "signed");
+  assert.equal(rowStatus(rows[1]), "Signed");
+  // b waits for a's install, even though it is signed
   assert.equal(ph.events.filter((e) => e.startsWith("install")).length, 1);
   ph.installed("a");
   await flush();
   assert.deepEqual(ph.events.filter((e) => e.startsWith("install")), ["install:a", "install:b"]);
+  ph.signed(SELF_ID);
   ph.installed("b");
   await flush();
   ph.installed("c");
@@ -66,6 +64,46 @@ test("signs ahead (2 at a time), installs one at a time in order, iFizBox last",
   await end;
   assert.equal(run.running, false);
   assert.equal(summaryLine(rows), "4 installed");
+});
+
+// B263: Re-sign All with one big app: the apps behind it go to iOS as each is signed, never held by its download
+test("a row still downloading holds nobody: each signed app goes to iOS at once; iFizBox waits for every other", async () => {
+  const ph = phone();
+  const rows = appRows([...jobs("big", "b", "c", "d"), { id: SELF_ID, name: "Self", mode: "resign" }]);
+  const run = createAppRun({ rows, sign: ph.sign, install: ph.install, discard: ph.discard });
+  const end = run.start();
+  await flush();
+  assert.deepEqual(ph.events, ["sign:big", "sign:b"]);
+  ph.signed("b");
+  await flush();
+  // big is still downloading: b goes to iOS anyway, c signs in b's place
+  assert.deepEqual(ph.events.slice(2), ["sign:c", "install:b"]);
+  assert.equal(rows[0].state, "downloading");
+  ph.signed("c");
+  await flush();
+  assert.equal(rows[2].state, "signed"); // one with iOS at a time
+  assert.deepEqual(ph.events.filter((e) => e.startsWith("install")), ["install:b"]);
+  ph.installed("b");
+  await flush();
+  assert.deepEqual(ph.events.filter((e) => e.startsWith("install")), ["install:b", "install:c"]);
+  // a failed sign holds nobody either
+  ph.pending.sign.get("d").reject(new Error("bad IPA"));
+  await flush();
+  assert.equal(rows[3].state, "failed");
+  ph.installed("c");
+  ph.signed(SELF_ID);
+  await flush();
+  // iFizBox's own row is signed, but big hasn't ended: it waits (installing it closes iFizBox)
+  assert.deepEqual(ph.events.filter((e) => e.startsWith("install")), ["install:b", "install:c"]);
+  ph.signed("big");
+  await flush();
+  assert.deepEqual(ph.events.filter((e) => e.startsWith("install")), ["install:b", "install:c", "install:big"]);
+  ph.installed("big");
+  await flush();
+  assert.deepEqual(ph.events.filter((e) => e.startsWith("install")), ["install:b", "install:c", "install:big", `install:${SELF_ID}`]);
+  ph.installed(SELF_ID);
+  await end;
+  assert.equal(summaryLine(rows), "3 installed, 1 re-signed, 1 failed");
 });
 
 test("a row's stop cancels only that app, at any phase; the next goes on", async () => {

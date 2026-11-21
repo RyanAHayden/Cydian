@@ -23,6 +23,8 @@ import Foundation
 enum SignAhead {
     private struct Kept { let output: URL; let app: SignedApp; let record: SignedRecord }
     private static var kept = [String: Kept]() // on SignBridge.queue
+    // B263: the signer's own lane (one app at a time, as before), off SignBridge.queue so signing.open isn't held by it
+    private static let signer = DispatchQueue(label: "ifizbox.sign.ahead", qos: .userInitiated)
     static let life: TimeInterval = 30 * 60
 
     static func register(_ b: Bridge) {
@@ -91,8 +93,11 @@ enum SignAhead {
                 else { source = c.params["url"] as? String ?? "" }
                 options = o
             }
+            // B263: the hash and the signer run on `signer`, not SignBridge.queue, so another app's signing.open (the
+            // queue's next install) never waits for this one's signing; the kept copy and the answer go back there
             let signThat = { (file: URL) in
-                SignBridge.queue.async {
+                signer.async {
+                    let signed: (SignedApp, SignedRecord, URL, String?)
                     do {
                         // F292: the IPA's hash before signing; a known-malware one stops here
                         let sha: String?
@@ -102,6 +107,10 @@ enum SignAhead {
                         }
                         let (app, record, output) = try sign(file, url: source, id: id, profile: profile, options: options, emit: emit, log: log, job: job,
                                                              sha256: sha) // F343
+                        signed = (app, record, output, sha)
+                    } catch { return fail(error) }
+                    SignBridge.queue.async {
+                        let (app, record, output, sha) = signed
                         keepInLibrary(c, output: output, app: app, record: record, options: options, id: id, log: log) // B229
                         let tok = SignBridge.token()
                         kept[tok] = Kept(output: output, app: app, record: record)
@@ -113,7 +122,7 @@ enum SignAhead {
                         j["device"] = PhoneID.check(profile).json
                         if let s = sha { j["sha256"] = s } // F292
                         answer(j, nil)
-                    } catch { fail(error) }
+                    }
                 }
             }
             // F77: an app recorded from My IPAs signs from the library's file

@@ -1,5 +1,6 @@
-// node ev.mjs "<js expression>" : Runtime.evaluate in iFizBox's page via pymobiledevice3's CDP server on 9358
-const list = await (await fetch(`http://127.0.0.1:${process.env.CDP_PORT || 9358}/json`)).json();
+// CDP_PORT=9368 node ev.mjs "<js expression>" : Runtime.evaluate in iFizBox's page via pymobiledevice3's CDP server
+// (R58's ev.mjs with the port from CDP_PORT, default 9368 as R60 ran it, and the first page when none is titled)
+const list = await (await fetch(`http://127.0.0.1:${process.env.CDP_PORT || 9368}/json`)).json();
 const page = list.find((p) => p.title === "iFizBox" || (p.url || "").startsWith("ifizbox://")) || list.find((p) => p.type === "page");
 const ws = new WebSocket(page.webSocketDebuggerUrl);
 const t = setTimeout(() => { console.log("timeout"); process.exit(1); }, 15000);

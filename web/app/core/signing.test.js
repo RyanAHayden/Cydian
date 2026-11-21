@@ -99,3 +99,38 @@ test("signing server addresses", () => {
 test("bytes go to the bridge as base64", () => {
   assert.equal(toBase64(new Uint8Array([255, 0, 1])), "/wAB");
 });
+
+// B259: Needs Re-sign also lists apps an older signer signed (signing.installed's records against its own stamp).
+test("needsResign: an app with an older signer stamp (or none, as 0.18.0's records) is listed, saying why", async () => {
+  const { needsResign, olderSigner, OLDER_SIGNER_TEXT } = await import("./signing.js");
+  const now = new Date("2026-11-21T12:00:00Z");
+  const later = new Date(now.getTime() + 5 * 86400000).toISOString();
+  const soon = new Date(now.getTime() + 0.5 * 86400000).toISOString();
+  const signer = { version: 1, groupFix: "aaaa" };
+  const installed = { signer, apps: [
+    // 0.18.0's record shape: no signer at all
+    { bundleId: "old", originalBundleId: "old", name: "Old", version: "1.0", url: "https://x/old.ipa", signed: "2026-11-15T00:00:00Z", expires: later },
+    { bundleId: "v0", name: "Version Zero", version: "1.0", expires: later, signer: { version: 0, groupFix: null } },
+    { bundleId: "fix", name: "Old Fix", version: "1.0", expires: later, signer: { version: 1, groupFix: "bbbb" } },
+    { bundleId: "now", name: "Current", version: "1.0", expires: later, signer: { version: 1, groupFix: null } },
+    { bundleId: "nowfix", name: "Current Fix", version: "1.0", expires: later, signer: { version: 1, groupFix: "aaaa" } },
+    { bundleId: "soon", name: "Soon", version: "1.0", expires: soon },
+    { bundleId: "com.ryha.ifizbox", name: "Self", version: "0.18.0", expires: later },
+  ] };
+  const rows = needsResign(installed, { now, window: 2 });
+  assert.deepEqual(rows.map((r) => [r.id, r.sig, r.version, r.olderSigner ?? false]),
+    [["soon", "soon", "Today", true], ["old", "ok", "5 days", true], ["fix", "ok", "5 days", true], ["v0", "ok", "5 days", true]]);
+  assert.equal(rows[0].short, "Signature ends today"); // the end of the signature says more than its signer
+  assert.ok(rows.slice(1).every((r) => r.short === OLDER_SIGNER_TEXT && r.change === "resign"));
+  assert.match(OLDER_SIGNER_TEXT, /^Signed by an older iFizBox: /);
+  // with an upgrade, the upgrade re-signs it
+  assert.deepEqual(needsResign(installed, { now, window: 2, skip: new Set(["old", "fix", "v0", "soon"]) }), []);
+  // no current stamp (an older shell, the website): only expiry counts
+  assert.deepEqual(needsResign({ apps: installed.apps }, { now, window: 2 }).map((r) => r.id), ["soon"]);
+  // a stale record with no expiry is still listed, last
+  const noDate = needsResign({ signer, apps: [{ bundleId: "x", name: "X", expires: null }, installed.apps[0]] }, { now });
+  assert.deepEqual(noDate.map((r) => [r.id, r.version, r.sig]), [["old", "5 days", "ok"], ["x", "", null]]);
+  // a current dylib unknown (none bundled) can't make a record stale
+  assert.equal(olderSigner({ bundleId: "y", signer: { version: 1, groupFix: "bbbb" } }, { version: 1, groupFix: null }), false);
+  assert.equal(olderSigner({ bundleId: "y", signer: { version: 1, groupFix: "bbbb" } }, null), false);
+});

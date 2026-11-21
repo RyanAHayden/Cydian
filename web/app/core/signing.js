@@ -9,7 +9,7 @@
 //
 // Everything here reads bytes (Uint8Array or ArrayBuffer) and never leaves the phone.
 
-import { DOMAIN, SIGN_HOST } from "../brand.js";
+import { DOMAIN, SIGN_HOST, NAME, BUNDLE_ID } from "../brand.js";
 import { isAts, ATS_TITLE, atsText, INSECURE_IPA_ALERT, insecureText } from "./insecureipa.js"; // B104
 import { signingPage } from "./signingpage.js"; // C15: the sideload build's page is Installation & Signing
 import { developerModeFailure } from "./installroute.js"; // F300
@@ -720,7 +720,8 @@ export async function syncReminder(get, call) {
 //           page's row. ok: outside the window (green), soon: inside it (amber), expired (red).
 //   needsResign(installed, { now, window, skip })
 //        -> Changes' Needs Re-sign rows from signing.installed: every app inside the window or expired, soonest first,
-//           leaving out the ids in `skip` (apps with an upgrade, which re-signs them anyway)
+//           leaving out the ids in `skip` (apps with an upgrade, which re-signs them anyway); B259: also every app an
+//           older signer signed (olderSigner, below; the row says so and carries olderSigner: true)
 //   signedIndex(installed)               a Map from bundle ID (installed and original) to its signing.installed record
 
 export const RESIGN_WINDOW = 2;
@@ -759,13 +760,34 @@ export function needsResign(installed, { now = new Date(), window = RESIGN_WINDO
   for (const a of apps) {
     if (!a?.bundleId || skip.has(a.bundleId) || (a.originalBundleId && skip.has(a.originalBundleId))) continue;
     const sig = signatureState(a.expires, { now, window });
-    if (!sig || sig.state === "ok") continue;
-    out.push({ id: a.bundleId, name: a.name || a.bundleId, version: sig.text, installed: a.version || null, sig: sig.state,
-      short: sig.state === "expired" ? "Signature expired: re-sign it to open it again" : `Signature ends ${sig.days < 1 ? "today" : `in ${plural(sig.days, "day")}`}`,
-      expires: a.expires, change: "resign" });
+    const old = olderSigner(a, installed?.signer);
+    if (!old && (!sig || sig.state === "ok")) continue;
+    const short = sig?.state === "expired" ? "Signature expired: re-sign it to open it again"
+      : sig?.state === "soon" ? `Signature ends ${sig.days < 1 ? "today" : `in ${plural(sig.days, "day")}`}` : OLDER_SIGNER_TEXT;
+    out.push({ id: a.bundleId, name: a.name || a.bundleId, version: sig?.text ?? "", installed: a.version || null, sig: sig?.state ?? null,
+      short, expires: a.expires, change: "resign", ...(old ? { olderSigner: true } : {}) });
   }
-  const at = (r) => Date.parse(r.expires);
+  const at = (r) => { const t = Date.parse(r.expires ?? ""); return Number.isNaN(t) ? Infinity : t; };
   return out.sort((a, b) => at(a) - at(b) || String(a.name).localeCompare(String(b.name)));
+}
+
+// B259: an app signed before the signer's output last changed (B227's own keychain group, B233's group fix) keeps that
+// signature until it nears its end, so Needs Re-sign also lists it. Each signing.installed record carries the stamp it
+// was signed with (`signer`: { version, groupFix }, native/sign/SignerStamp.swift) and signing.installed the current
+// one: a record is older when it has no stamp (signed before stamps), an earlier version, or a group fix dylib other
+// than the current one. No current stamp (an older shell, the website): never. iFizBox's own record never counts: its
+// re-sign is an update of the app itself, offered on its own.
+//   olderSigner(record, current)   true when that record's signer is older than `current`
+//   OLDER_SIGNER_TEXT              the row's line under its name
+export const OLDER_SIGNER_TEXT = `Signed by an older ${NAME}: re-sign it so its data stays its own`;
+export function olderSigner(record, current) {
+  const cur = Number(current?.version);
+  if (!Number.isFinite(cur) || !record) return false;
+  if (record.bundleId === BUNDLE_ID || record.originalBundleId === BUNDLE_ID) return false;
+  const s = record.signer;
+  const v = Number(s?.version);
+  if (!Number.isFinite(v) || v < cur) return true;
+  return Boolean(s.groupFix && current.groupFix && s.groupFix !== current.groupFix);
 }
 
 // ---- F236: is this iPhone in the profile? -----------------------------------------------------------------------

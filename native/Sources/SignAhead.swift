@@ -164,7 +164,8 @@ enum SignAhead {
             try job.check()
             let record = SignedRecord(bundleID: app.bundleID, originalBundleID: app.originalBundleID, name: app.name,
                                       version: app.version, url: url, signed: Date(),
-                                      expires: profile.signatureExpiry(certificate: identity.certificate), options: options.stored)
+                                      expires: profile.signatureExpiry(certificate: identity.certificate), options: options.stored,
+                                      signer: app.stamp) // B259
             return (app, record, output)
         } catch {
             try? FileManager.default.removeItem(at: output)

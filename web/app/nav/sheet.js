@@ -16,7 +16,51 @@
 //   cls                          more classes on the .sheet ("confirm-sheet", "console progress-page")
 //   bodyCls                      more classes on the .sheet-body
 //   escape                       false: Escape does nothing (sheets whose close has more to do than slide down)
+//
+// Card sheets, a nav hook for eras (docs/eras.md, iOS 13 and later): with <html data-sheet="card"> the sheet stops a
+// gap below the status bar as a card with rounded top corners (packages.css's sheet hooks), and the page behind it
+// (the nav bar, the screens and the tab bar) scales back about the screen's centre and dims onto the black ground,
+// then comes back as the last card sheet goes. Transform and opacity only. Its numbers are custom properties on
+// <html>: --sheet-behind-scale, --sheet-behind-shift (px down) and --sheet-behind-opacity. Off (iOS 6) nothing
+// behind the sheet moves.
 import { EASE, DURATION, SHEET_IN } from "./motion.js";
+
+const PAGE = ["navbar", "screens", "tabbar"];  // index.html's page, under every sheet
+let behind = null;                            // the page's open card animations, while a card sheet is up
+let cards = 0;                                // card sheets up
+
+const cardSheets =(doc = globalThis.document) => doc?.documentElement?.getAttribute?.("data-sheet") === "card";
+
+// The page behind scales about the viewport's centre: each fixed piece gets the translate that, with its own centre
+// as the origin, lands it where scaling about the screen's centre would.
+function pushBack(doc) {
+  const root = doc.documentElement;
+  const css = globalThis.getComputedStyle?.(root);
+  const num = (name, dflt) => { const v = parseFloat(css?.getPropertyValue(name)); return Number.isFinite(v) ? v : dflt; };
+  const s = num("--sheet-behind-scale", 0.92), dy = num("--sheet-behind-shift", 0), op = num("--sheet-behind-opacity", 0.75);
+  const cx = (globalThis.innerWidth ?? 0) / 2, cy = (globalThis.innerHeight ?? 0) / 2;
+  const anims = [];
+  for (const id of PAGE) {
+    const el = doc.getElementById?.(id);
+    if (!el?.animate) continue;
+    const r = el.getBoundingClientRect?.() ?? { left: 0, top: 0, width: 0, height: 0 };
+    const tx = (cx - (r.left + r.width / 2)) * (1 - s), ty = (cy - (r.top + r.height / 2)) * (1 - s) + dy;
+    const to = { transform: `translate(${+tx.toFixed(2)}px, ${+ty.toFixed(2)}px) scale(${s})`, opacity: op };
+    anims.push({ el, to, a: el.animate([{ transform: "none", opacity: 1 }, to], { duration: SHEET_IN, easing: EASE, fill: "forwards" }) });
+  }
+  return anims;
+}
+
+// Back from wherever the page is now (a sheet closed mid push-back must not jump to the end first).
+function bringForward(anims) {
+  for (const { el, to, a } of anims) {
+    const cs = globalThis.getComputedStyle?.(el);
+    const now = cs?.transform ? { transform: cs.transform, opacity: Number(cs.opacity) } : to;
+    const back = el.animate([now, { transform: "none", opacity: 1 }], { duration: DURATION, easing: EASE, fill: "forwards" });
+    const end = () => { a.cancel?.(); back.cancel?.(); };
+    if (back?.finished) back.finished.then(end, end); else end();
+  }
+}
 
 export function showSheet({ title = "", body = null, onClose = () => {}, left = null, right, cls = "", bodyCls = "", escape = true } = {}) {
   const doc = globalThis.document;
@@ -54,12 +98,15 @@ export function showSheet({ title = "", body = null, onClose = () => {}, left = 
   doc.body.append(sheet);
 
   sheet.animate?.([{ transform: "translateY(100%)" }, { transform: "none" }], { duration: SHEET_IN, easing: EASE });
+  const card = cardSheets(doc);
+  if (card && cards++ === 0) behind = pushBack(doc);
 
   let gone = null;
   const onKey = (e) => { if (e.key === "Escape") close(); };
   function close() {
     if (gone) return gone;
     doc.removeEventListener?.("keydown", onKey);
+    if (card && --cards === 0 && behind) { bringForward(behind); behind = null; }
     gone = new Promise((resolve) => {
       const end = () => {
         sheet.remove();

@@ -139,3 +139,89 @@ test("showSheet: without Web Animations (an old WebView, a fake DOM) it opens an
   await close();
   assert.deepEqual([doc.body.children.length, gone], [0, true]);
 }));
+
+// The card hook (docs/eras.md): <html data-sheet="card"> scales the page behind back; off, nothing behind moves.
+async function withCardDom({ card, vars = {} }, fn) {
+  const saved = { document: globalThis.document, gcs: globalThis.getComputedStyle, w: globalThis.innerWidth, h: globalThis.innerHeight };
+  const doc = fakeDom();
+  doc.documentElement = { getAttribute: (k) => (k === "data-sheet" && card ? "card" : null) };
+  const rects = { navbar: [0, 0, 390, 91], screens: [0, 0, 390, 844], tabbar: [0, 761, 390, 83] };
+  const page = {};
+  for (const [id, [left, top, width, height]] of Object.entries(rects)) {
+    page[id] = doc.createElement("div");
+    page[id].getBoundingClientRect = () => ({ left, top, width, height });
+  }
+  doc.getElementById = (id) => page[id] ?? null;
+  globalThis.document = doc;
+  globalThis.getComputedStyle = () => ({ getPropertyValue: (k) => vars[k] ?? "" });
+  globalThis.innerWidth = 390; globalThis.innerHeight = 844;
+  try { await fn(doc, page); } finally {
+    globalThis.document = saved.document; globalThis.getComputedStyle = saved.gcs;
+    globalThis.innerWidth = saved.w; globalThis.innerHeight = saved.h;
+  }
+}
+const pageAnims = (doc) => doc.anims.filter((a) => a.frames.some((f) => "opacity" in f));
+
+test("showSheet card hook off (iOS 6): only the sheet animates, nothing behind it", () => withCardDom({ card: false }, async (doc) => {
+  const close = showSheet({ title: "Off" });
+  assert.equal(doc.anims.length, 1);
+  assert.equal(pageAnims(doc).length, 0);
+  const p = close();
+  doc.anims[1].end();
+  await p;
+  assert.equal(doc.anims.length, 2);
+}));
+
+test("showSheet card hook: the nav bar, screens and tab bar scale back about the screen's centre and dim, then come back", () => withCardDom({ card: true, vars: { "--sheet-behind-scale": " 0.9", "--sheet-behind-shift": "4", "--sheet-behind-opacity": "0.5" } }, async (doc, page) => {
+  const close = showSheet({ title: "Card" });
+  const back = pageAnims(doc);
+  assert.equal(back.length, 3);
+  // the tab bar's centre (195, 802.5) moves toward the screen's (195, 422) by 10%, plus the 4px shift
+  const tab = back[2];
+  assert.deepEqual(tab.frames, [{ transform: "none", opacity: 1 }, { transform: "translate(0px, -34.05px) scale(0.9)", opacity: 0.5 }]);
+  assert.deepEqual([tab.opts.duration, tab.opts.fill], [350, "forwards"]);
+  assert.equal(back[1].frames[1].transform, "translate(0px, 4px) scale(0.9)", "the full-screen page only scales (and shifts)");
+  for (const a of doc.anims) for (const f of a.frames) assert.deepEqual(Object.keys(f).filter((k) => k !== "transform" && k !== "opacity"), [], "transform and opacity only");
+
+  // a second card sheet over it leaves the page where it is; closing it does too
+  const second = showSheet({ title: "Over" });
+  assert.equal(pageAnims(doc).length, 3);
+  const p2 = second();
+  doc.anims.at(-1).end();
+  await p2;
+  assert.equal(pageAnims(doc).length, 3);
+
+  let cancelled = 0;
+  for (const a of back) a.cancel = () => { cancelled++; };
+  const p = close();
+  const forward = pageAnims(doc).slice(3);
+  assert.equal(forward.length, 3);
+  assert.deepEqual(forward[2].frames, [tab.frames[1], { transform: "none", opacity: 1 }]);
+  assert.deepEqual([forward[2].opts.duration, forward[2].opts.fill], [300, "forwards"]);
+  for (const a of forward) a.cancel = () => { cancelled++; };
+  for (const a of doc.anims) a.end();
+  await p;
+  await tick();
+  assert.equal(cancelled, 6, "the page's animations are dropped, leaving it as it was");
+}));
+
+test("showSheet card hook: defaults when the page sets no numbers", () => withCardDom({ card: true }, async (doc) => {
+  const close = showSheet({ title: "Card" });
+  assert.equal(pageAnims(doc)[1].frames[1].transform, "translate(0px, 0px) scale(0.92)");
+  assert.equal(pageAnims(doc)[1].frames[1].opacity, 0.75);
+  const p = close();
+  for (const a of doc.anims) a.end();
+  await p;
+}));
+
+test("showSheet card hook: closed mid push-back, the page comes back from where it is, not from the end", () => withCardDom({ card: true }, async (doc) => {
+  const close = showSheet({ title: "Quick" });
+  const mid = "matrix(0.96, 0, 0, 0.96, 0, 0)";
+  globalThis.getComputedStyle = () => ({ getPropertyValue: () => "", transform: mid, opacity: "0.875" });
+  const p = close();
+  const forward = pageAnims(doc).slice(3);
+  assert.equal(forward.length, 3);
+  for (const a of forward) assert.deepEqual(a.frames[0], { transform: mid, opacity: 0.875 });
+  for (const a of doc.anims) a.end();
+  await p;
+}));

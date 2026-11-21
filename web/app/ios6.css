@@ -479,7 +479,7 @@ html[data-theme="dark"] .pair-button.delete-button:is(:active, .is-pressed) {
   --sw-track-shadow-dark: inset 0 1px 3px rgba(0,0,0,.8); /* the dark themes' sunken track */
 }
 .switch { --x: 0px; border: 0; background: none; }
-.switch[aria-checked="true"] { --x: 50px; }
+.switch[aria-checked="true"] { --x: var(--sw-travel); }
 .sw-track {
   border: 1px solid var(--sw-edge); border-radius: 13.5px;
   background: var(--sw-track); font-size: 16px; font-weight: bold;

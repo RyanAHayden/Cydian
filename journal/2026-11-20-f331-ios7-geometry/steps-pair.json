@@ -1,0 +1,3 @@
+[{"eval": "(()=>{localStorage.clear();localStorage.setItem('ifizbox.firstVisit','later');localStorage.setItem('ifizbox.device','iphoneos-arm64');localStorage.setItem('ifizbox.style','ios7');localStorage.setItem('ifizbox.appearance','light');return 1})()"},
+ {"nav": "#/home", "ms": 5000},
+ {"eval": "(()=>{const c=document.querySelector('.home-pair > .cell + .cell');if(!c)return 'none';const s=getComputedStyle(c),i=getComputedStyle(c.firstElementChild);return JSON.stringify({cls:c.className,bg:s.backgroundImage.slice(0,60),bt:s.borderTop,ishadow:i.boxShadow,ibg:i.backgroundImage.slice(0,80),ibt:i.borderTop,inner:c.firstElementChild.className})})()"}]

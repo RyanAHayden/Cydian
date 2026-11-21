@@ -112,12 +112,20 @@ html.native .navbar, html.native .tabbar { display: none; }
   --hud-w: 180px; --hud-pad: 28px 12px 22px;                        /* the Reloading Data HUD */
   --callout-h: 38px;                                                /* the menu callout and the queue hint */
   --banner-pad: 6px 12px 7px;                                       /* the notification banner */
+  /* F331: the switch's box (the kit's 77 x 27 track, its 27pt knob) */
+  --sw-w: 77px; --sw-h: 27px; --sw-knob-size: 27px;
   /* C54: large titles (nav/navbar.js setLargeTitles), drawn only under html[data-nav="large"] */
   --large-title-h: 52px; --large-title-pad: 3px 16px 8px;           /* the big title at the top of a root page */
   /* C52: the floating tab bar (nav/tabbar.js setFloatingTabbar), used only under html[data-tabbar="float"] */
   --tabbar-float-h: 62px; --tabbar-float-pad: 4px;                  /* the pill's height (and the circle's), inside */
   --tabbar-float-inset: 21px; --tabbar-float-gap: 10px;             /* from the screen's sides; pill to circle */
   --tabbar-float-bottom: max(12px, calc(var(--safe-bottom) - 13px)); /* from the screen's bottom */
+}
+/* F331: era hooks read outside style.css (ios6.css, nav/switch.js, settings.css, home.css), iOS 6's values. */
+:root {
+  --sw-travel: 50px;                                                /* the switch knob's travel: its on --x */
+  --settings-seg-margin: 0; --settings-seg-h: 44px;                 /* Settings > Theme's Mode, inside its group */
+  --home-inset: 10px; --home-tile-pad: 0 10px 0 6px;                /* Home's head and tiles from the sides; in a tile */
 }
 /* Large titles: the root page's title, big, bold and left, at the top of its body; it scrolls with the content and
    fades into the nav bar's own title (navbar.js writes only its opacity). Never drawn in iOS 6. */
@@ -213,17 +221,17 @@ a.cell-inner, button.cell-inner { cursor: pointer; }
 /* B164: a bare label before a switch takes the row's room, so the switch sits at the right edge as in Settings. */
 .cell-inner.has-switch > .cell-label { flex: 1; min-width: 0; }
 .switch {
-  position: relative; flex: none; width: 77px; height: 27px; padding: 0; cursor: pointer; touch-action: none;
+  position: relative; flex: none; width: var(--sw-w); height: var(--sw-h); padding: 0; cursor: pointer; touch-action: none;
   -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent;
 }
 .sw-track { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
 .sw-track::before {
-  position: absolute; top: 0; bottom: 0; left: 0; width: 77px; padding-left: 25.5px; box-sizing: border-box;
-  transform: translateX(calc(var(--x) - 63.5px));
+  position: absolute; top: 0; bottom: 0; left: 0; width: var(--sw-w); padding-left: 25.5px; box-sizing: border-box;
+  transform: translateX(calc(var(--x) + var(--sw-knob-size) / 2 - var(--sw-w)));
 }
 .sw-track::after { position: absolute; top: 0; right: 12px; transform: translateX(var(--x)); }
 .sw-knob {
-  position: absolute; top: 0; left: 0; width: 27px; height: 27px; box-sizing: border-box;
+  position: absolute; top: 0; left: 0; width: var(--sw-knob-size); height: var(--sw-knob-size); box-sizing: border-box;
   transform: translateX(var(--x)); pointer-events: none;
 }
 .sw-track::before, .sw-track::after, .sw-knob { transition: transform .2s ease; }

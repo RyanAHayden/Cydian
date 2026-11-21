@@ -353,14 +353,14 @@ enum Sideload {
             return Download.start(url, to: file, max: SignBridge.maxIPA, progress: progress, done: finished)
         }
         if http == .allow {
-            NSLog("[sideload] plain http download (Install Anyway): %@", url.absoluteString)
+            DeviceLog.say("[sideload] plain http download (Install Anyway): " + url.absoluteString)
             return PlainDownload.start(url, to: file, max: SignBridge.maxIPA, progress: progress, done: finished)
         }
         let chain = HTTPChain()
         chain.set(Download.start(twin, to: file, max: SignBridge.maxIPA, timeout: twinTimeout, progress: progress) { err in
             guard let e = err else { return finished(nil) }
             if chain.cancelled || !twinMissing(e) { return finished(e) }
-            NSLog("[sideload] no https twin for %@ (%@)", url.absoluteString, e)
+            DeviceLog.say("[sideload] no https twin for \(url.absoluteString) (\(e))")
             guard http == .fallback else {
                 return finished("insecure: \(url.host ?? url.absoluteString) offers this IPA only over plain http, without encryption")
             }
@@ -887,7 +887,7 @@ enum Sideload {
                 // such a row Sent to iOS, as isInstalled is unreliable on iOS 27 and for re-signed apps)
                 let why = "B146 watch \(bid): not installed; progress seen \(seen), last \(last)%, away \(away), "
                     + "after \(Int(Date().timeIntervalSince(start))) s, isInstalled now \(Workspace.isInstalled(bid).map { String($0) } ?? "unknown")"
-                NSLog("\(Brand.name) " + why.replacingOccurrences(of: "%", with: "%%"))
+                DeviceLog.say("\(Brand.name) " + why)
             }
             if installed == false, lost(seen, away) { return finish(nil, true) }
             finish(installed, false)
@@ -1642,7 +1642,7 @@ final class HostUpload {
             let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
             if error == nil, code == 200, let j = json { return next(j) }
             if tries > 1, error != nil || code >= 500 {
-                NSLog("[sideload] %@ %@ failed (%@), trying again", method, url.path, error?.localizedDescription ?? "HTTP \(code)")
+                DeviceLog.say("[sideload] \(method) \(url.path) failed (\(error?.localizedDescription ?? "HTTP \(code)")), trying again")
                 return DispatchQueue.global().asyncAfter(deadline: .now() + 2) {
                     self.send(url, method, body, file: file, tries: tries - 1, failed: failed, next: next)
                 }

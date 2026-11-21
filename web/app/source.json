@@ -19,6 +19,14 @@
       "category": "utilities",
       "versions": [
         {
+          "version": "0.18.0",
+          "date": "2026-11-21T01:15:18Z",
+          "localizedDescription": "iOS 7 style, your own app icon, and an app icon that follows the theme.\nTheme > Style: pick iOS 6 (default) or iOS 7.\nTheme > App Icon: the icon follows your theme, or add your own picture (Photos or Files) and move and scale it.\nSigned apps keep their app-group folders and keychain.\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.18.0",
+          "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.18.0/iFizBox.ipa",
+          "size": 35344422,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "0.17.3",
           "date": "2026-11-20T23:04:23Z",
           "localizedDescription": "Fixes installs and updates stuck on a blank Running page.\nIn the sideload app every install, update and re-sign run stopped on \"Preparing\" with no buttons. If 0.17.1 or 0.17.2 hangs updating itself, install this version from ifizbox.com in Safari.\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.17.3",

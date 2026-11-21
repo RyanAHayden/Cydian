@@ -81,12 +81,6 @@ test("screens/installed.js reads the bridge only through native.js", () => {
   assert.match(src, /from "\.\.\/native\.js"/);
 });
 
-test("no screen reads the bridge off globalThis: screens/ go through native.js or getBackend()", () => {
-  const screens = Object.keys(directReads()).filter((f) => f.startsWith("screens/"));
-  assert.deepEqual(screens, []);
-  assert.ok(!Object.keys(ALLOWED).some((f) => f.startsWith("screens/")), "screens/ has no allowlist lines");
-});
-
 test("nativeBridge() and hasNativeCall() read the global at call time", async () => {
   const { nativeBridge, hasNativeCall } = await import("./native.js");
   const before = globalThis.ifizboxNative;

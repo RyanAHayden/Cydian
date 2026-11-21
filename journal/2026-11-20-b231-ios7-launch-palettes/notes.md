@@ -23,7 +23,7 @@ already knows `white` (B221).
   drawn as 1 pt #adadad (30 % black flattened over #f7f7f7). Half a point thicker than the page's line; the storyboard
   can't draw half a point without a Mac recompile.
 - iOS 7's dark theme uses the existing `oled` set, which is iOS 6's OLED Black frame (its bars have a dark gloss and a
-  #1a1a1c line, where iOS 7's are flat black with a #262626 hairline). Filed as a follow-up rather than changing
+  #1a1a1c line, where iOS 7's are flat black with a #262626 hairline). Filed as B235 rather than changing
   STYLE_PALETTES' keys here.
 
 ## Not verified

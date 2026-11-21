@@ -308,6 +308,16 @@ test("F331: era hooks don't reuse a look token's name, and the new geometry read
   for (const v of ["--sw-w: 51px", "--sw-h: 31px", "--sw-travel: 20px", "--settings-seg-margin: 0 15px", "--home-inset: 0px"]) assert.ok(ios7.includes(v), v);
 });
 
+// F336: Theme's Mode's height is a hook: iOS 6's 44pt row, iOS 7's own 29pt control; its text follows the height.
+test("F336: Theme's Mode height comes from --settings-seg-h", () => {
+  const settings = readFileSync(new URL("./settings.css", import.meta.url), "utf8");
+  const ios7 = readFileSync(new URL("./ios7.css", import.meta.url), "utf8");
+  assert.match(base, /--settings-seg-h: 44px;/);
+  assert.match(settings, /\.store-segmented\.settings-segmented \{[^}]*height: var\(--settings-seg-h\);/);
+  assert.match(settings, /\.settings-segmented \.store-segment \{[^}]*line-height: calc\(var\(--settings-seg-h\) - 2px\);/);
+  assert.match(ios7, /--settings-seg-h: 29px;/);
+});
+
 test("F338: the row tile's place is an era hook; iOS 7 puts it 15pt in, the label 15pt after, the separator there", () => {
   const base = readFileSync(new URL("./style.css", import.meta.url), "utf8");
   const ios7 = readFileSync(new URL("./ios7.css", import.meta.url), "utf8");

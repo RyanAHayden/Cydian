@@ -11,8 +11,9 @@
 .signing-page .sign-import { position: relative; }
 /* F199: Theme's Mode, the segmented control (nav/ui.js segmented(), ios6.css .store-segmented) at a settings
    group's full width: in iOS 6 no margins of its own (the group has them; --settings-seg-margin, an era's inset),
-   44px like a grouped row and its 9.5px corners. */
-.store-segmented.settings-segmented { margin: var(--settings-seg-margin); height: 44px; }
+   44px like a grouped row and its 9.5px corners. Its height is the --settings-seg-h hook: iOS 7 draws its own 29pt
+   control (ios7.css, with its 13px type and 4px corners). */
+.store-segmented.settings-segmented { margin: var(--settings-seg-margin); height: var(--settings-seg-h); }
 /* F199: a theme's swatch in Theme > Light / Dark: a small rounded tile, its bar colour over its ground (the gradient
    comes from core/settings.js `swatch`), with a hairline edge so OLED Black shows on a near-black row. */
 .cell-icon.theme-swatch { width: 24px; height: 24px; }
@@ -38,7 +39,7 @@
    loads with Signed Apps). */
 .signing-page .group-footer.sign-warning { color: #b5322c; text-shadow: none; }
 .store-segmented.settings-segmented { border-radius: 9.5px; }
-.settings-segmented .store-segment { font-size: 15px; line-height: 42px; }
+.settings-segmented .store-segment { font-size: 15px; line-height: calc(var(--settings-seg-h) - 2px); }
 .cell-icon.theme-swatch { border-radius: 5px; box-shadow: inset 0 0 0 1px rgba(127,127,127,.45); }
 /* The theme preview's iOS 6 decorations: its pinstripe ground and the shadow it casts up, and the grip.
    F231: the grip is iOS 6's Notification Center grabber, flipped (sampled from the 4S's ref/4s/screens/nc-grabber.png

@@ -126,6 +126,7 @@ html.native .navbar, html.native .tabbar { display: none; }
 :root {
   --sw-travel: 50px;                                                /* the switch knob's travel: its on --x */
   --settings-seg-margin: 0;                                         /* Settings > Theme's Mode, inside its group */
+  --settings-seg-h: 44px;                                           /* Theme's Mode's height: a grouped row's */
   --home-inset: 10px; --home-tile-pad: 0 10px 0 6px;                /* Home's head and tiles from the sides; in a tile */
 }
 /* F341: the action sheet (packages.css) and the alert (sources.css), iOS 6's values. */

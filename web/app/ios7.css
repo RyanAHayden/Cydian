@@ -22,6 +22,7 @@ html[data-style="ios7"] {
   --row-icon-in: 0px; --row-icon-after: 7px;  /* the kit's row tile 15pt in, its label 15pt after (gap 8 + 7) */
   --sw-w: 51px; --sw-h: 31px; --sw-knob-size: 31px; --sw-travel: 20px;  /* the kit's 51 x 31 switch, its knob the track's height */
   --settings-seg-margin: 0 15px;                                   /* Theme's Mode, inset like a label */
+  --settings-seg-h: 29px;                                          /* Theme's Mode at the kit's 29pt control, not a 44pt row */
   --home-inset: 0px; --home-tile-pad: 0 15px;                      /* Home's tiles edge to edge, content 15pt in */
 }
 /* Home's tiles take the tables' flat edges: square, the table hairline (Home sets these on .home). */

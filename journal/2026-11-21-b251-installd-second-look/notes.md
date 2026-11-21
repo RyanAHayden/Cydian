@@ -8,8 +8,8 @@ reconnect asked iOS and found the app installed. Right end, three minutes late.
 
 - `HereRecheck.SecondLook` (pure, tested on Linux): while installd's step is quiet, a look is due after
   `lookAfter` (30 s) of quiet and every `lookEvery` (30 s) after; installd's next percentage (the step moving)
-  starts the looks over. `saw(verdict)` says when iOS has the copy: `.installed` at once, `.cannotTell` once it
-  held for `settle` (30 s), as askInstalled does after a drop. A look that couldn't ask iOS changes nothing.
+  starts the looks over. `ends(verdict)`: only `.installed` (the new copy listed) ends the wait. A look that
+  couldn't ask iOS, or got `.notYet`, `.sameAsBefore` or `.cannotTell`, changes nothing.
 - `IDevice.Watch` gets a per-step quiet hook (`whileQuiet`, cleared by `begin`) that the watchdog calls on
   every 0.5 s tick, and `stop(_:step:then:)`: the watchdog then closes the tunnel, gives the waiting call
   `Limit.grace`, and throws `stopped`.
@@ -34,6 +34,16 @@ reconnect asked iOS and found the app installed. Right end, three minutes late.
 - Run 7 with this change: VPN back at 16 s, first look at 30 s of quiet. If installd had finished by then (run 7's
   copy was a small app), the look sees the new folder and the install ends at ~30 s instead of ~182 s; otherwise
   the next look 30 s later.
+
+- **`cannotTell` never ends the wait here** (spec review). The first version counted it once it held 30 s, as
+  askInstalled does after a drop. But the first connection may still be alive: when the same version is reinstalled,
+  or what was there before is unknown, the old copy reads `cannotTell` from the first look. So it ended a live install
+  at 60 s of quiet while installd was still verifying. Those cases keep B246's path (the 180 s limit, then a reconnect
+  and askInstalled).
+- When the waiting call comes back on its own during the stop's grace wait with success, `watched` returns that
+  success rather than `stopped` (spec review).
+- A look that sees the new copy removes the staged IPA itself: the first connection's tunnel is closed right
+  after, so the install's own removal can't run.
 
 ## Tried and dropped
 

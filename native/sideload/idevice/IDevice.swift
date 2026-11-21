@@ -436,6 +436,9 @@ enum IDevice {
                 let closed = w.closeTunnel()
                 if out.done.wait(timeout: .now() + Limit.grace) == .timedOut {
                     ilog("the waiting call didn't come back (tunnel closed: \(closed)); leaving it")
+                } else if case .success(let v)? = out.result {
+                    ilog("\(what): done in \(String(format: "%.1f", Date().timeIntervalSince(t0))) s (finished on its own)")
+                    return v
                 }
                 throw Failure(code: "stopped", text: why)
             }
@@ -1074,11 +1077,8 @@ enum IDevice {
             ilog("installd quiet for \(Int(quiet)) s: asking iOS for \(bid) \(version) on a second connection")
             let th = Thread {
                 let v = secondLook(run, bid: bid, version: version)
-                looker.lock.lock()
-                let have = looker.state.saw(v, quiet: quiet)
-                looker.busy = false
-                looker.lock.unlock()
-                guard have else { return }
+                looker.lock.lock(); looker.busy = false; looker.lock.unlock()
+                guard HereRecheck.SecondLook.ends(v) else { return }
                 let stopped = w.stop("iOS lists \(bid) \(version) (asked on a second connection)", step: step) {
                     run.lookedInstalled = true
                 }

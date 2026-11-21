@@ -35,6 +35,10 @@ html[data-style="ios7"] .home-links .home-pair > .cell + .cell { border-left-wid
    The .glyph-* rules are homeGlyphRules("ios7") from icons/rowicons.js (rowicons.test.js fails if they drift); a
    tile with no colour of its own takes the row's: the green row's token, the certificate tile's stage ink. */
 html[data-style="ios7"] .home { --tile-glyph-green: #4cd964; }
+/* the tile itself: the row tiles' 6.5pt corners (rowicons.js ICON_SETS ios7 tile) and a 20pt glyph, on Home and on
+   Settings > Signing's Install iFizBox App row, whose tile is iOS 7 green there too */
+html[data-style="ios7"] .home-glyph { border-radius: 6.5px; background-size: 20px 20px; }
+html[data-style="ios7"] .app-offer .home-glyph { background-color: #4cd964; }
 html[data-style="ios7"] .home-row.cert.soon { --cert-ink: #ff9500; }
 html[data-style="ios7"] .home-row.cert.close { --cert-ink: #ff3b30; }
 html[data-style="ios7"][data-theme="dark"] .glyph-github { background-color: var(--dk-glyph); } /* outweighs the rule below */

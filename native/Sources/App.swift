@@ -442,6 +442,7 @@ enum Launch {
         case "leather": return leather
         case "felt": return felt
         case "wood": return wood
+        case "oled7", "oled13": return oled // B235: iOS 7's and iOS 13's OLED Black (own launch sets), black too
         default: return oled
         }
     }

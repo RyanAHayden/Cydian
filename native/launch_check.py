@@ -19,7 +19,8 @@ THEMES = "LaunchThemes/"
 # Every theme Settings offers (web/app/core/settings.js; native/test_launch_grounds.py keeps this in step).
 THEME_KEYS = ("classic", "sepia", "solarized", "oled", "gunmetal", "midnight", "linen", "nord", "dracula",
               "leather", "felt", "wood", "legalpad", "metal",
-              "white")  # B231: iOS 7's White, the iOS 7 and iOS 13 styles' light theme (STYLE_PALETTES)
+              "white",  # B231: iOS 7's White, the iOS 7 and iOS 13 styles' light theme (STYLE_PALETTES)
+              "oled7", "oled13")  # B235: iOS 7's and iOS 13's OLED Black, flat bars (STYLE_LAUNCH)
 
 
 def storyboard_problems(files, base, what):

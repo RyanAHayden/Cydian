@@ -21,6 +21,7 @@ import { settings } from "../settings-store.js";
 import { createSwitch } from "../nav/switch.js";
 import { detectMode, themeState, paletteFor, DARK_THEME_KEY, SETTINGS, SIGNING_GROUPS } from "../core/settings.js";
 import { hooksOf } from "../core/settings.js"; // F202
+import { launchKey } from "../core/settings.js"; // B235
 import { showAlert, alertOK } from "../nav/alert.js";
 import { showHUD } from "../nav/hud.js";
 import { parseProfile, checkP12Password, deviceSummary, deviceError, summary, profileKind, deviceCheck, deviceCheckText } from "../core/signing.js";
@@ -855,7 +856,9 @@ export function applyTheme(doc = document, win = window) {
   const lightPalette = themeState({ style, appearance: "light", lightTheme, darkTheme: darkPalette }, false).palette;
   // B231: the dark one likewise (iOS 7: OLED Black, not the iOS 6 pick's ground).
   const eraDark = themeState({ style, appearance: "dark", lightTheme, darkTheme: darkPalette }, true).palette;
-  tellShell(preview ? theme : appearance, theme, win, eraDark, lightPalette, DARK_TEXT_BARS.has(palette));
+  // B235: the era's own launch set where it has one (iOS 7's OLED Black: oled7, flat bars), not iOS 6's of that name.
+  tellShell(preview ? theme : appearance, theme, win, launchKey(style, eraDark), launchKey(style, lightPalette),
+    DARK_TEXT_BARS.has(palette));
   // F323: the Home Screen icon follows, once the theme lists are left (a tap through them would switch it each time,
   // with iOS's alert in the sideload build); the icons the page shows follow at once.
   if (!preview) tellIcon(theme);

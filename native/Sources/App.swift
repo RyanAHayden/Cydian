@@ -288,8 +288,9 @@ final class WebController: UIViewController, WKNavigationDelegate, WKUIDelegate 
         }
     }
 
-    // The nav bar under the status bar is iOS 6 blue, so light text.
-    override var preferredStatusBarStyle: UIStatusBarStyle { .lightContent }
+    // The nav bar under the status bar is iOS 6 blue (or a dark palette's), so light text; B221: dark text on a light
+    // bar (iOS 7's White), as the page's app.theme says (Theme.darkText).
+    override var preferredStatusBarStyle: UIStatusBarStyle { Theme.darkText ? .darkContent : .lightContent }
 }
 
 enum Web {
@@ -416,6 +417,8 @@ enum Launch {
     static let wood = striped(0x633e21, 0x66401f)
     static let legalpad = striped(0xf3e397, 0xf9eba0)
     static let metal = striped(0xc6cbd2, 0xcbd0d6)
+    // B221: iOS 7's White (F201), plain #f7f7f7 like its bar, no pinstripe
+    static let white = Ground(pattern: rgb(0xf7f7f7), plain: rgb(0xf7f7f7))
 
     // The ground for a tone and its palette: the light one (F214: Classic, Sepia or Solarized Light) or the dark
     // one; a name this build doesn't know takes the tone's default (Classic, OLED Black).
@@ -426,6 +429,7 @@ enum Launch {
             case "solarized": return solarized
             case "legalpad": return legalpad
             case "metal": return metal
+            case "white": return white
             default: return light
             }
         }

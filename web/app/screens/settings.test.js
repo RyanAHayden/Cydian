@@ -43,6 +43,16 @@ test("applyTheme posts app.theme to the bridge once per change", () => {
   applyTheme(doc, win);
   assert.deepEqual(sent.at(-1).params, { style: "auto", theme: "dark", darkPalette: "gunmetal", lightPalette: "solarized" });
   settings.set("lightTheme", "classic");
+  // B221: iOS 7 sends its own pair (White, OLED Black) for the launch ground, and dark status-bar text on White's bar
+  settings.set("style", "ios7");
+  settings.set("appearance", "light");
+  applyTheme(doc, win);
+  assert.deepEqual(sent.at(-1).params, { style: "light", theme: "light", darkPalette: "oled", lightPalette: "white", statusBar: "dark" });
+  settings.set("appearance", "dark");
+  applyTheme(doc, win);
+  assert.deepEqual(sent.at(-1).params, { style: "dark", theme: "dark", darkPalette: "oled", lightPalette: "white" });
+  settings.set("style", "ios6");
+  settings.set("appearance", "auto");
   // the site: no handler, no throw
   applyTheme(doc, { matchMedia: () => ({ matches: false }) });
 });

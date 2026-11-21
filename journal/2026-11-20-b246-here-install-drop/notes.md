@@ -84,3 +84,42 @@ Fix: `Tailscale.test()` turns a reset after connecting into code `not_paired` (w
 holds a pairing the phone forgot). The page (`tailscaleTestResult`) says "Not Paired Yet" / "Pair Again" with a Pair
 button that opens Pairing; after a sign-in, `not_paired` ends the 30 s of retries at once (`FINAL_CODES`), and with a
 kept pairing it runs the same check as `refused` (forget and pair again). Test: `web/app/screens/installroute-b246.test.js`.
+
+After pairing (Settings > Privacy & Security > Developer Mode > Pair with iFizBox, code typed through WDA), Test
+Connection said "Connected: reached this iPhone through Tailscale in 13 ms".
+
+## Phone runs on the 15 Pro (iOS 27.0.1, Tailscale route, 2026-11-20 23:00-23:30)
+
+Setup: the app had no certificate. The `com.ryha.*` development p12 + profile from `~/sync/default/signing/dev/`
+imported through the bridge (`signing.import` via Web Inspector) signed fine, but installd refused every app signed
+with it: `ApplicationVerificationFailed … 0xe8008015 (A valid provisioning profile for this executable was not
+found.)` (203), for the Tiny fixture and for a real arm64 executable alike; the profile does list this phone and
+its certificate matches the p12. Not looked into further (not this task). The team's distribution p12 with the
+`com.ryha.*` ad hoc profile (`~/sync/default/signing/cert.p12`, `adhoc.mobileprovision`) installs fine; it is what
+the app has now. Those 203 refusals were reported at once as failures, as they should be (a real installd error).
+
+Test IPA: `com.ryha.b246test`, Lite's own arm64 executable plus 340 MB of random padding (368.6 MB signed; the copy
+is 351.5 MiB), in versions 2.0-5.0 so each run is an update. Built in the scratchpad, put into the app's Documents
+with `afcclient --container`, never launched. Timings from the os_log lines (`iFizBox install:`):
+
+| Run | What I did | Copy | Install | Result |
+| --- | --- | --- | --- | --- |
+| 1 (2.0, new app) | stayed in the app | 351.5 MiB in 19.4 s, 18.1 MB/s in front | installd 4 s, all 24.8 s | installed |
+| 2 (3.0) | Home Screen 6 s into the copy, stayed away | 20.1 s: 18.2 MB/s in front, 17.3 MB/s in the background | 4 s, all 26.9 s | installed |
+| 3 (4.0) | locked the phone 6 s into the copy | 23.2 s: 17.7 MB/s in front, 14.4 MB/s locked | 5 s, all 29.8 s | installed |
+| 4 (5.0) | Tailscale's VPN off in iOS Settings 7 s into the copy, on again 12 s later | dropped at 102 MB: `Socket(Kind(TimedOut)) (1)` | - | failed: see below |
+
+So on the 15 Pro with this build, leaving the app or locking it doesn't slow the copy much (17.3 and 14.4 MB/s
+against 18 in front) and nothing stalls. The user's slow install (iOS 26+, their phone) didn't reproduce here;
+KeepAlive held the app every time (no "suspended" line). What differs from their run: another iOS version and phone,
+a 383.7 MB RyukGram, and whatever they switched to (an app that takes the audio session would stop KeepAlive's loop;
+not tried here: the 15 Pro has no sound and no Apple ID for other apps).
+
+Run 4 found two bugs in the first reconnect version, fixed after it:
+- the drop was caught ("dropped during the copy (102.0 MB of 351.5 MB) … try 1 of 4"), but the reconnect 2 s later
+  went through **LocalDevVPN**: Connect With is Automatic, and with Tailscale's VPN still coming back
+  `Tailscale.useForInstall()` said no. Now a reconnect keeps the first session's route (`Session(tailscale:)`), and
+  says "Tailscale isn't back on yet" until it is.
+- that connect failed with `connect_failed: InternalError("connect: Operation Timeout") (16)`, which isn't a drop
+  code, so the install ended. Now, once it is already connecting again, a `connect_failed` is tried again too
+  (`HereRecheck.shouldReconnect`), within the same 4 tries (pauses 2, 4, 8, 15 s).

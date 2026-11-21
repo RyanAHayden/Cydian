@@ -460,6 +460,7 @@ enum IDevice {
     private final class HereRun {
         let ipa: URL, size: Int, remote: String, bundleID: String?, version: String?
         var connected = false   // the first try got as far as a session: later drops are worth connecting again
+        var tailnet: Bool?      // the route the first session took; later tries keep it
         var before: HereRecheck.Before?  // what iOS listed before the install; nil until asked
         var sent = 0            // bytes of the IPA iOS has
         var copied = false      // the whole IPA is in PublicStaging
@@ -624,21 +625,30 @@ enum IDevice {
         private var beating = false
         private let watch: Watch
         private var viaTailscale = false
+        private let pinnedTailscale: Bool? // B246: the route a reconnect must use (nil: Tailscale.useForInstall)
         let kind: Kind
         var via: String { viaTailscale ? "Tailscale" : "LocalDevVPN" }
+        var tailnet: Bool { viaTailscale }
 
         /// Where to connect for `port`: LocalDevVPN's 10.7.0.1, or (Tailscale.useForInstall) a 127.0.0.1 relay that
         /// reaches this phone's own Tailscale address over the app's tailnet node (native/sideload/tailscale).
         private func endpoint(_ port: UInt16) throws -> (String, UInt16) {
-            guard Tailscale.useForInstall() else { return (address, port) }
+            let tailnet = Tailscale.useForInstall()
+            // B246: connecting again after a drop keeps the first connection's route. Automatic chose LocalDevVPN
+            // while Tailscale's VPN was coming back (the 15 Pro), and that connect could only fail.
+            if let want = pinnedTailscale, want != tailnet {
+                throw Failure(code: "connect_failed", text: want ? "Tailscale isn't back on yet" : "Tailscale came on; this install started over LocalDevVPN")
+            }
+            guard tailnet else { return (address, port) }
             watch.begin("starting Tailscale", Limit.tunnel)
             let local = try Tailscale.beginInstall(port: port)
             viaTailscale = true
             return ("127.0.0.1", local)
         }
 
-        init(watch: Watch) throws {
+        init(watch: Watch, tailscale pinned: Bool? = nil) throws {
             self.watch = watch
+            self.pinnedTailscale = pinned
             guard let (kind, data) = IDevice.pairing() else {
                 throw Failure(code: "not_paired", text: "pair this iPhone first (Settings > Installation)")
             }
@@ -868,7 +878,7 @@ enum IDevice {
                     try installTry(run, watch: w, note: note, progress: progress)
                 }
                 return
-            } catch let f as Failure where f.dropped && run.connected {
+            } catch let f as Failure where run.connected && HereRecheck.shouldReconnect(code: f.code, lib: f.lib, reconnecting: firstDrop != nil) {
                 attempt += 1
                 if firstDrop == nil { firstDrop = f }
                 let stage = run.installSent ? "while iOS was installing it" : run.copied ? "after the copy" : "during the copy (\(mb(run.sent)) of \(mb(size)))"
@@ -887,8 +897,9 @@ enum IDevice {
     /// after a drop, ask iOS whether the install it was sent landed.
     private static func installTry(_ run: HereRun, watch w: Watch, note: @escaping (String) -> Void,
                                    progress: @escaping (Step) -> Void) throws {
-        let s = try Session(watch: w)
+        let s = try Session(watch: w, tailscale: run.tailnet)
         let route = s.kind == .remotePairing ? "\(s.via) (RemotePairing tunnel)" : "\(s.via) (lockdown)"
+        if run.tailnet == nil { run.tailnet = s.tailnet }
         if !run.connected {
             note("Connected to iOS through \(route)")
             progress(.connected)
@@ -1025,7 +1036,8 @@ enum IDevice {
     }
 
     private static func describe(_ s: HereRecheck.AppState) -> String {
-        "\(s.shortVersion ?? "?") (\(s.version ?? "?")) at \(s.path.map { ($0 as NSString).lastPathComponent } ?? "?")"
+        // the bundle container's folder (…/Application/<UUID>/X.app): a new install gets a new one
+        "\(s.shortVersion ?? "?") (\(s.version ?? "?")) in \(s.path.map { (($0 as NSString).deletingLastPathComponent as NSString).lastPathComponent } ?? "?")"
     }
 
     /// Whether the IPA is still in PublicStaging (installd may have taken it).

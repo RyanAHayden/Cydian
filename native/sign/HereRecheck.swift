@@ -28,6 +28,13 @@ enum HereRecheck {
         code == "timeout" || lib.map { droppedCodes.contains($0) } == true
     }
 
+    /// Whether install() connects again after this failure. A drop always; once it is already connecting again, a
+    /// connect that fails too (the route still coming back: Tailscale's VPN reconnecting refused or timed out the
+    /// connect on the iPhone 15 Pro) is tried again as well, up to `reconnects`. A refused or rejected pairing never.
+    static func shouldReconnect(code: String, lib: Int32?, reconnecting: Bool) -> Bool {
+        isDropped(code: code, lib: lib) || (reconnecting && code == "connect_failed")
+    }
+
     /// What iOS lists for the app (installation_proxy Browse).
     struct AppState: Equatable {
         var path: String?          // the app's bundle folder; a new install gets a new one

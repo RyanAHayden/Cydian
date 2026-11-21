@@ -17,13 +17,13 @@ test("the row JS gives My IPAs' rows .manage-row, so the shared rules reach them
 });
 
 for (const [file, sel] of [
-  ["./packages.css", ".managing .manage-row:is(.picked, :has(> .cell-inner.is-pressed))"],
-  ["./ios7.css", 'html[data-style="ios7"][data-theme] .managing .manage-row:is(.picked, :has(> .cell-inner.is-pressed))'],
-  ["./ios13.css", 'html[data-style="ios13"][data-theme] .managing .manage-row:is(.picked, :has(> .cell-inner.is-pressed))'],
+  ["./packages.css", ".managing .manage-row:is(.picked, :has(> .cell-inner.is-pressed)) {"],
+  ["./ios7.css", 'html[data-style="ios7"][data-theme] .managing .manage-row.picked,\nhtml[data-style="ios7"][data-theme] .managing .manage-row:has(> .cell-inner.is-pressed) {'],
+  ["./ios13.css", 'html[data-style="ios13"][data-theme] .managing .manage-row.picked,\nhtml[data-style="ios13"][data-theme] .managing .manage-row:has(> .cell-inner.is-pressed) {'],
 ]) {
   test(`${file}: the Manage fill is on the row, held as picked, never on its .cell-inner`, () => {
     const css = stripComments(read(file));
-    assert.ok(css.includes(`${sel} {`), `no rule ${sel}`);
+    assert.ok(css.includes(sel), `no rule ${sel}`);
     assert.doesNotMatch(css, /\.(manage|myipa)-row\.picked \.cell-inner/);
   });
 }

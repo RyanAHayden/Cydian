@@ -281,7 +281,8 @@ function trackingSection(app, pkg, source, body = null) {
     const byHand = handMarking(); // F242: the jailbreak app knows what's installed: no marking rows there
     const rows = rec
       ? [{ label: "Installed Version", detail: rec.version || "Unknown" },
-        ...(byHand && versions.length > 1 ? [{ label: "Change Installed Version", onClick: () => pick() }] : []),
+        // B232: installs another of the source's versions (Install Which Version?), as Version History does
+        ...(byHand && versions.length > 1 ? [{ label: "Change Installed Version", onClick: () => installWhichVersion(app, pkg, source, { installed: rec.version || "" }) }] : []),
         ...(byHand ? [{ label: MARK_NOT_INSTALLED_LABEL, onClick: () => apps().then((store) => removeInstall(store, app.bundleIdentifier)).then(draw, () => {}) }] : [])]
       : byHand ? [{ label: MARK_INSTALLED_LABEL, onClick: () => (versions.length > 1 ? pick() : mark(versions[0] ?? "")) }] : [];
     // The nav bar's button says what it will do, as Cydia's does: Upgrade when a newer version is out than the one
@@ -302,7 +303,7 @@ function trackingSection(app, pkg, source, body = null) {
   }
   async function pick() {
     const versions = app.versions.map((x) => x.version).filter(Boolean);
-    const i = await showActionSheet({ title: "Which version is installed?", buttons: versions });
+    const i = await showActionSheet({ title: MARK_WHICH_TITLE, buttons: versions });
     if (i >= 0) mark(versions[i]);
   }
   draw();
@@ -316,6 +317,39 @@ function trackingSection(app, pkg, source, body = null) {
     if (e.type === "clearAll" || e.id === app.bundleIdentifier || e.job?.id === app.bundleIdentifier) draw();
   });
   return box;
+}
+
+// ---- B232: the Installed section's Change Installed Version: install another of the source's versions ----------------
+// An action sheet of the source's versions, newest first, the installed one marked and left alone (the nav bar's
+// Reinstall covers it); a pick installs that version as Version History (browse.js renderVersions) and Modify's
+// Downgrade do: the sideload app queues that version's job (appPageAction's `version`, then Confirm), the website signs
+// it in the browser (siteInstallVersion). Recording a version installed some other way is Mark as Installed's picker.
+export const INSTALL_WHICH_TITLE = "Install Which Version?";
+export const MARK_WHICH_TITLE = "Which Version Did You Install?";
+
+// -> { buttons, versions } : the sheet's labels and, at the same index, the version entry a tap installs (null for the
+// installed one). Versions without a number are left out; the order is newest first.
+export function installWhichButtons(app, installed = "") {
+  const list = (app?.versions ?? []).filter((x) => x?.version);
+  const sorted = list.map((x, i) => [x, i]).sort((a, b) => compareVersions(b[0].version, a[0].version) || a[1] - b[1]).map(([x]) => x);
+  return {
+    buttons: sorted.map((x) => (installed && x.version === installed ? `${x.version} (Installed)` : x.version)),
+    versions: sorted.map((x) => (installed && x.version === installed ? null : x)),
+  };
+}
+
+// The sheet and the install. -> the version entry installed (queued or signed), or null (Cancel, the installed row).
+export async function installWhichVersion(app, pkg, source, { installed = "", ask = showActionSheet, mode = detectMode(),
+  queueVersion = (v) => appPageAction(pkg, source, { version: v.version }), siteInstall = (v) => siteInstallVersion(pkg, v, source) } = {}) {
+  const { buttons, versions } = installWhichButtons(app, installed);
+  if (!buttons.length) return null;
+  const i = await ask({ title: INSTALL_WHICH_TITLE, buttons });
+  const v = i >= 0 ? versions[i] : null;
+  if (!v) return null;
+  if (mode === "sideload") await queueVersion(v);
+  else if (mode === "site") await siteInstall(v);
+  else return null;
+  return v;
 }
 
 // ---- F210: the nav bar's one-tap Installed toggle, left of Install / Modify ----------------------------------------

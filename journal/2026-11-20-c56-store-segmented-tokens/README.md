@@ -27,7 +27,10 @@
   branch for Classic, the four light palettes and OLED Black: `diff -r` identical. Spot-checked that the held
   segment shows the pressed gradient and Sepia's values differ from Classic's (so the probe sees the palette).
 - C49's `shots.mjs` (routes; Settings shows the Mode segmented control) on main and branch for Classic and the four
-  light palettes, compared with C44's `diff.py`: see result below.
+  light palettes, compared with C44's `diff.py`: 37 shots (7 app routes × 5 themes + 2 site routes), all
+  "0 px, 0 style differences", "same".
+- Spec review (fresh subagent): no missing or wrong mapping; asked to re-wrap one overlong comment line in
+  palettes.css (done). It noted `probe.mjs` keeps C49's unused helpers (DUMP, PRESS, ROUTES): left as copied.
 - `tools/check.sh`: run by `done`.
 
 ## Slips
@@ -37,6 +40,8 @@
 
 ## Not verified
 
+- Dark palettes other than OLED Black (probe only): the change touches only the light block's selector, so the
+  dark ones cannot match it.
 - Not checked on a phone or in Safari: Chromium only. The change is plain custom properties, no new syntax.
 - No era stylesheet exists yet, so an era overriding `--seg*` is not rendered, only implied by the token block's
   weight (pinned by the existing test).

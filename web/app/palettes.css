@@ -798,8 +798,8 @@ html[data-theme="light"][data-palette="metal"] {
 
 /* The light palettes' chrome: ios6.css's nav bar, bar buttons and back arrow (--nav-bar, --bar-btn*, --bar-back*)
    and App Store segmented control (--seg*: its blue selected segment stays the kit's), and packages.css's search
-   bar, scope bar, Cancel and package header band (--search-*, --scope-seg*, --store-head*) read look tokens, and here they take the --lt-* colours above, so no rule of this file paints that chrome and an
-   era's own rules and tokens are never outranked by one (docs/eras.md). Shapes and shadows stay theirs; a pressed
+   bar, scope bar, Cancel and package header band (--search-*, --scope-seg*, --store-head*) read look tokens, and
+   here they take the --lt-* colours above, so no rule of this file paints that chrome and an era's own rules and tokens are never outranked by one (docs/eras.md). Shapes and shadows stay theirs; a pressed
    button, Cancel or scope segment keeps its unpressed edges, and the scope bar draws its segments as bar buttons
    (one edge colour all round, dividers included); the blue Done and Filter's Done, and the red button (ios6.css, from
    the --lt-red* each block sets), are their own rules. html stays at two attributes, the weight of an era's tone

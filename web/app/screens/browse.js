@@ -82,6 +82,7 @@ import { APP_MODE_LABEL } from "../core/appqueue.js";
 import { rowAppJob, queueOriginalCheck } from "./altstore.js";
 import { queueApp } from "./queue.js";
 import { worksInGroup, addToApp, addableTweakRows, checkTweakRows } from "./tweaks.js"; // F302
+import { installWhichVersion, INSTALL_WHICH_TITLE } from "./altstore.js"; // F346: a hold on Install
 
 // B269: in the sideload build a Tweak Source's list leaves out the tweaks already checked and refused on this device.
 export const sideloadListRows = (rows, mode = detectMode()) => (mode === "sideload" ? addableTweakRows(rows) : rows);
@@ -163,7 +164,8 @@ export function nav(route, sourceName = () => null) {
     case "author": return { title: p.value || "Author", style: "plain" };
     // F29: Install (Modify once the page knows it's installed) opens the action sheet of what can be done here.
     case "package": return { title: names.get(p.value) || p.value,
-      right: { label: "Install", onClick: (e) => packageActions(route, e.currentTarget) } };
+      right: { label: "Install", onClick: (e) => packageActions(route, e.currentTarget),
+        onHold: () => installVersionHold(route).catch(() => {}) } }; // F346: a hold picks the version
     case "versions": return { title: "Versions" };
     default: return { title: "Not Found" };
   }
@@ -1397,6 +1399,70 @@ async function sheet(title, actions) {
   const i = await showActionSheet({ title, buttons: actions.map((a) => a.label),
     destructive: actions.flatMap((a, j) => (a.red ? [j] : [])) });
   if (i >= 0) actions[i].run();
+}
+
+// ---- F346: a hold on Install (Modify, Upgrade, Reinstall, the price) picks the version to install ---------------
+// The nav bar's button held (app.js button: nav/menu.js holdButton) opens Install Which Version?, the sheet of
+// Change Installed Version (altstore.js installWhichVersion): the source's versions newest first, the installed one
+// marked and left alone. An app's pick installs as Version History does (the sideload app queues that version, the
+// website signs it, the jailbreak app queues its IPA through the helper or runs its first install row); a package's
+// pick goes in the install queue as Modify > Downgrade's list does, and on the website it is that version's .deb.
+// A tap is unchanged. Add to App (a sideload tweak) and pages with nothing to offer get no sheet.
+
+// A package's sheet: -> { buttons, versions } as installWhichButtons, from its Version History (`history`, newest
+// first): versions some source still offers, the installed one marked "(Installed)" with null at its index.
+// `canInstall(v)`: whether a pick could do anything with it (the queue, or the .deb on the website).
+export function packageWhichButtons(history, { canInstall = (v) => v.keys?.length > 0 } = {}) {
+  const installed = history?.versions?.find((v) => v.installed)?.version ?? null;
+  const list = (history?.versions ?? []).filter((v) => v?.version && (v.version === installed || canInstall(v)));
+  return {
+    buttons: list.map((v) => (v.version === installed ? `${v.version} (Installed)` : v.version)),
+    versions: list.map((v) => (v.version === installed ? null : v)),
+  };
+}
+
+// The hold's sheet and install for a package page. -> the version picked (installed, queued or downloaded), or null.
+// `queue`: the install queue's add (undefined: the backend's; null: none, as on the website).
+export async function packageWhichVersion(page, { ask = showActionSheet, queue = undefined, site = undefined,
+  download = downloadDeb, vendorPaid = (st, source) => soldByVendor(st, source) } = {}) {
+  const { id, pkg, source, history } = page;
+  const st = pkg.stanza;
+  const pid = st.package || id;
+  const installed = installedOf(history);
+  const q = queue === undefined ? queueOf({ installed, name: pkg.row?.name }) : queue;
+  site ??= getBackend().kind === "http";
+  if (q && isPaid(st) && await vendorPaid(st, source)) return null; // B11: apt can't fetch what a vendor sells
+  const canInstall = (v) => (q ? v.keys?.length > 0 : site && Boolean(v.debUrl) && !isPaid(st));
+  const { buttons, versions } = packageWhichButtons(history, { canInstall });
+  if (!versions.some(Boolean)) return null;
+  const i = await ask({ title: INSTALL_WHICH_TITLE, buttons });
+  const v = i >= 0 ? versions[i] : null;
+  if (!v) return null;
+  if (q) await q({ op: "install", id: pid, version: v.version });
+  else download(v.debUrl, pid);
+  return v;
+}
+
+// The hold itself, for the page at `route`.
+export async function installVersionHold(route, { pages = packagePages, mode = detectMode(), store = apps, ask = showActionSheet } = {}) {
+  const page = pages.get(format(route));
+  if (!page || !page.body.isConnected) return null;
+  const { pkg, source } = page;
+  const st = pkg.stanza;
+  if (isSideloadTweak(st, mode)) return null; // F302: Add to App picks apps, not versions
+  if (st.kind !== "ipa" || !st.ipa) return packageWhichVersion(page, { ask });
+  const app = st.ipa;
+  let installed = "";
+  try { installed = (await (await store()).all()).find((r) => r?.id === app.bundleIdentifier)?.version ?? ""; } catch { installed = ""; }
+  // The jailbreak app: that version's IPA into the app queue (Confirm) where the helper runs it, else its first row.
+  const jailbreakInstall = async (v) => {
+    const jbq = jbAppQueue() ? jbModifyQueue(pkg, source) : null;
+    if (jbq && appJob(pkg, { version: v.version })) return jbq.install(v);
+    const row = installRows(v, app.sourceUrl, undefined, recordApp(pkg, source, v), undefined, app.name,
+      { bundleId: appBundleId(app, pkg.row?.id ?? page.id), iconUrl: app.iconURL }).rows[0];
+    return row?.onClick();
+  };
+  return installWhichVersion(app, pkg, source, { installed, ask, mode, jailbreakInstall });
 }
 
 async function packageActions(route, button) {

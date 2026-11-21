@@ -38,7 +38,7 @@ export const LINKS = {
   installed: { label: "Installed", href: (on) => format(on ? rootOn("installed", on) : { tab: "installed" }) },
   ipas: { label: "Install IPAs", href: () => format({ tab: "installed", path: ["myipas"] }) },
   add: { label: "Add a Source", href: () => format({ tab: "sources", path: ["manage", "sources"] }) },
-  more: { label: "Recommended Sources", href: () => format({ tab: "sources", path: ["manage", "recommended"] }) },
+  more: { label: "More Sources", href: () => format({ tab: "sources", path: ["more"] }) },
   help: { label: "Upgrading & Jailbreaking Help", href: () => format({ tab: "home", path: ["help"] }) },
   openssh: { label: "OpenSSH Access How-To", href: () => format({ tab: "home", path: ["guides", "openssh"] }) },
   password: { label: "Root Password How-To", href: () => format({ tab: "home", path: ["guides", "password"] }) },
@@ -122,7 +122,7 @@ export const FAQ = [
   },
   {
     id: "addsource", group: "Sources", q: "Adding a source",
-    a: "Sources > Manage > Sources > Add, then type the source's address. Recommended Sources lists a few to start "
+    a: "Sources > Manage > Sources > Add, then type the source's address. More Sources lists a few to start "
       + "with: one tap adds one.",
     next: ["add", "more"],
   },
@@ -134,7 +134,7 @@ export const FAQ = [
   },
   {
     id: "moresources", group: "Sources", q: "Where do I find more sources?",
-    a: "Recommended Sources lists ones we checked. Developers often post their source's address on their site.",
+    a: "More Sources lists ones we checked. Developers often post their source's address on their site.",
     next: ["more", "add"],
   },
 ];

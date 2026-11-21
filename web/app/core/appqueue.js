@@ -20,6 +20,8 @@
 //   libraryJob(entry, { installed }) -> such a job for a My IPAs entry, its Sign Options as options.edits
 //   appPlan(jobs)     -> core/queue.js parseSimulation's shape: { installs, reinstalls, upgrades, downgrades, removes,
 //                        essential, download }, so Confirm draws apps with the jailbreak queue's own groups
+//   jobDownloads(job) -> B282: whether the run downloads it (it has a url and is not a My IPAs file):
+//                        only those count toward download
 //   runOrder(jobs)    -> the order Confirm installs in: as queued, iFizBox itself last (installing it closes the app)
 //   appNavLabel({ queued, installed, newest }) -> the app page's nav button: Modify while the app is queued (Cydia),
 //                        else Install, Upgrade or Reinstall
@@ -156,20 +158,30 @@ export function installedOnPhone(rec, onPhone) {
   return rec.version || "";
 }
 
+// B282: whether Confirm's run downloads this job's IPA, so its size counts toward Statistics' Downloading. A My IPAs
+// file (job.library) is already on the phone; a Re-sign with no url signs from the phone's record (the IPA kept at
+// install, else the record's own download, which the page can't size). A Re-sign with a url is a marked app's
+// (markedResignJob): it has no signing record, so no IPA is kept for it and the url is downloaded. A Remove has no url.
+// The test is the url alone, so a record's Re-sign that ever gets one counts.
+export function jobDownloads(job) {
+  return Boolean(job && job.url && !job.library);
+}
+
 // Confirm's Modifications and Statistics, from the queue alone: every app and what it needs, under its mode.
 export function appPlan(jobs = []) {
   const out = { installs: [], reinstalls: [], upgrades: [], downgrades: [], removes: [], resigns: [], essential: [], download: null };
   const seen = new Set();
   let bytes = 0;
-  const put = (e, mode) => {
+  const put = (e, mode, downloads) => {
     if (!e?.id || seen.has(e.id)) return;
     seen.add(e.id);
     out[`${mode}s`].push({ id: e.id, from: e.installed ?? null, to: e.version ?? null });
-    bytes += Number(e.size) || 0;
+    if (downloads) bytes += Number(e.size) || 0;
   };
   const queued = new Set(jobs.map((j) => j.id)); // a dependency that is queued itself counts as its own job
-  for (const j of jobs) for (const d of j.deps ?? []) if (!queued.has(d?.id)) put(d, modeOf({ op: "install", version: d.version, installed: d.installed }));
-  for (const j of jobs) put(j, j.mode);
+  // a dependency (none are made yet) carries a size but no url of its own: it counts unless it is a My IPAs file
+  for (const j of jobs) for (const d of j.deps ?? []) if (!queued.has(d?.id)) put(d, modeOf({ op: "install", version: d.version, installed: d.installed }), !d.library);
+  for (const j of jobs) put(j, j.mode, jobDownloads(j));
   out.download = sizeText(bytes);
   return out;
 }

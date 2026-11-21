@@ -624,11 +624,10 @@ An app keeps its data in three places, and a re-sign must leave each where the a
   Bundle IDs keeps it across any re-sign iOS accepts as an update.
 - **The keychain**: items go to the first of the signature's `keychain-access-groups`. Both signers write
   `TEAM.<the app's own bundle ID>` first, when the profile's keychain entry allows it (`TEAM.*`, which every Apple
-  profile has), and `TEAM.<App ID>` second (`Profile.keychainGroups`, `core/websign.js keychainGroups`). So an app's
-  items stay its own across certificates, profiles made again and App IDs of the same team, and apps signed under one
-  explicit App ID no longer write into one keychain, where one app clearing its keychain on a fresh install cleared
-  the others' sign-ins. Items an earlier signature put in `TEAM.<App ID>` stay readable through the second group,
-  which every app under that App ID still has. An app that names a group of its own (Instagram's
+  profile has), and `TEAM.<App ID>` second (`Profile.keychainGroups`, `core/websign.js keychainGroups`). So apps
+  signed under one explicit App ID no longer write into one keychain, where one app clearing its keychain on a fresh
+  install cleared the others' sign-ins. Items an earlier signature put in `TEAM.<App ID>` stay readable through the
+  second group; until the app writes them again they stay where every app under that App ID can reach them. An app that names a group of its own (Instagram's
   `MH9GU9K5PX.*`) gets the group fix below; one that builds it from its team prefix and bundle ID finds
   `TEAM.<its ID>` entitled.
 - **App Groups**: a re-signed app still asks for its original groups (`group.com.burbn.instagram`), which the profile
@@ -639,7 +638,8 @@ An app keeps its data in three places, and a re-sign must leave each where the a
   preferences, and keychain calls lose `kSecAttrAccessGroup` (items land in the app's own group). That place is the
   same under any profile, whatever groups it has or in what order, and no other app shares it. An app an earlier
   sign mapped onto the profile's first group gets that folder and suite copied into its own once (`legacy` in
-  `ifizbox-groupfix.plist`, only for an app that has run before). The signer's log says `Group fix: ...`.
+  `ifizbox-groupfix.plist`; only for an app that had run before it got this fix, never a fresh install, which would
+  take in what other apps left in that shared group). The signer's log says `Group fix: ...`.
 
 What iOS doesn't let a re-sign keep:
 
@@ -648,8 +648,9 @@ What iOS doesn't let a re-sign keep:
   signer stops before signing with words saying so (`AppIDMatch.swift`, with the profiles it holds); the website
   can't see what is installed, so iOS's refusal is what the user gets there.
 - **A profile group the app used directly** (an app built for it, or one an earlier sign mapped there) that the new
-  profile doesn't have: iOS keeps that group's folder from the app. The signers say so in the log and in the
-  website job's `warnings`.
+  profile doesn't have: iOS keeps that group's folder from the app. When the IPA being signed carries the earlier
+  sign's `ifizbox-groupfix.plist`, the signers say so (the native log, the website job's `warnings`); a sign from the
+  original IPA can't tell.
 
 `tools/resignprobe/` checks all of this on the iPhone 15 Pro: a probe app writes a marker to each place and shows
 which it still reads after each re-sign (`run.sh`: our two signers, any identity).

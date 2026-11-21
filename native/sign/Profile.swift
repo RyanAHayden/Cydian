@@ -67,9 +67,9 @@ struct Profile {
     // The profile's entitlements narrowed to one bundle, the way Xcode signs (I5's app_entitlements). The keychain
     // group comes first from the app's own ID (keptID, its Info.plist's) when the profile's groups allow it (TEAM.*
     // does): an explicit profile signs every app under one App ID, and a group named after it was one keychain shared
-    // by all of them. Items go to the first group, so they stay with the app across profiles, App IDs and
-    // certificates of the same team; TEAM.<App ID> stays second for items an earlier signature put there. The
-    // website's signer does the same (core/websign.js keychainGroups).
+    // by all of them. Items go to the first group, the app's alone, under any profile or certificate of the same
+    // team; TEAM.<App ID> stays second for items an earlier signature put there. The website's signer does the same
+    // (core/websign.js keychainGroups).
     func entitlements(for bundleID: String, keptID: String? = nil) -> [String: Any] {
         var e = entitlements
         let t = e["com.apple.developer.team-identifier"] as? String ?? team

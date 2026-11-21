@@ -7,7 +7,8 @@ random times, not right after a re-sign; YouMod (YouTube), signed the same way, 
 
 `tools/resignprobe/`: `probe.m` (a tiny UIKit app, bundle ID `<brand>.probe`, never iFizBox's), `build.sh` (clang +
 the iOS SDK; its "original" signature, made ad hoc with zsign, asks for another team's keychain group
-`ABCDE12345.<id>` and app group `group.com.ryha.probe.original`, the way a store app does), `sign-web.mjs` (the
+`ABCDE12345.<id>` and app group `group.org.example.probe.original` (`group.com.ryha.probe.original` in the runs
+logged in `probe-runs.jsonl`, renamed after for the brand check), the way a store app does), `sign-web.mjs` (the
 website's signer exactly: `websign-job.js runSignJob` with the WebAssembly zsign and the committed group fix, in
 Node), `run.sh` (sign, install over the copy on the 15 Pro, launch with go-ios, pull `Documents/probe-log.jsonl`).
 The native signer runs as `signbench-linux` (`native/sign/bench`, the same Swift sources as the app's signer); the
@@ -43,6 +44,8 @@ Before = main's signers (B211), after = this branch. Every row is a re-sign inst
 | the same (after) | kept | kept | kept (own) | kept (own) | kept | kept | kept |
 | before -> after (an app B211 signed, re-signed from its original IPA) | kept | kept | kept (copied in once) | kept (copied in once) | kept | kept | kept |
 | relaunch, lock + unlock, reboot (after) | kept | kept | kept | kept | kept | kept | kept |
+| iFizBox on the phone (this branch's Lite build, SideDrop's identity): Install IPAs > Sign > Install over the web-signed probe | kept | kept | kept | kept | kept | kept | kept |
+| the same app's Re-sign (Installed > Probe > Re-sign; new bundle path, so really reinstalled) | kept | kept | kept | kept | kept | kept | kept |
 
 Findings:
 
@@ -102,6 +105,10 @@ Instagram's calls lose their access group and land in `TEAM.com.burbn.instagram`
 with no lookup that can fail while locked; its original groups go to folders of its own. Extensions keep their
 original groups unmapped (only the main executable gets the fix, as before).
 
+YouMod under the fix (not inspected; YouTube's usual entitlements): its own groups (if any) map to folders of its
+own like any app's, and its keychain items go to `TEAM.com.google.ios.youtube` instead of the shared group. Nothing
+it relied on moves: data it wrote before stays readable through the second keychain group.
+
 ## The fix
 
 - Keychain: both signers write `keychain-access-groups = [TEAM.<the app's own bundle ID>, TEAM.<App ID>]` when the
@@ -111,8 +118,17 @@ original groups unmapped (only the main executable gets the fix, as before).
   suite `ifizbox.appgroup.<group>` in the app's own container, under any profile. An app an earlier sign mapped to a
   profile group keeps it while the profile has it, `lost` when not (logged by the native signer, `warnings` in the
   website job's result). `legacy` (the group the old rule would have picked) makes the dylib copy that folder (not
-  Library/Caches) and suite into the app's own once, only when the app has run before (its own preferences aren't
-  empty): checked on the phone (before -> after row).
+  Library/Caches) and suite into the app's own once, only when the app had run before it got the fix (its own
+  preferences weren't empty at that first launch; a fresh install marks itself `ifizbox.groupfix.fresh` and never
+  copies, so it can't take in what other apps left in the shared group): checked on the phone (before -> after row).
+  An app that had run before but never used that group still gets the other apps' leftovers copied once: they shared
+  that folder already.
+- Not fixed by this: keychain items written before the fix stay in `TEAM.<App ID>` until the app writes them again,
+  where any app under that App ID can still delete them (the "after" isolation row used fresh items). iFizBox's own
+  secrets are there too (follow-up B233).
+- The `lost` warning only fires when the IPA being signed carries the earlier sign's config; re-signs from the
+  original IPA (Install, Re-sign, auto re-sign) can't tell. The website's `warnings` aren't shown by any page yet
+  (follow-up F334).
 - Team / App ID change: installd refuses it; the app's signer already stops first (`AppIDMatch`, B138). The website
   can't see what is installed (follow-up filed).
 - Docs: `docs/signing.md` "Keeping an app's data across re-signs", `docs/developer-account.md` "Keep your apps'
@@ -122,10 +138,19 @@ original groups unmapped (only the main executable gets the fix, as before).
 
 ## SideDrop
 
-SideDrop is another project (its repo on the TrueNAS host); not changed here. Its `sign_ipa`/`app_entitlements`
-need the same two changes (filed): `keychain-access-groups = [f"{team}.{bundle ID kept}", appid]` and the group fix
-(or at least no shared app-group target), plus the same docs section. Its `regen_profile` keeps the App ID, so
+SideDrop is another project (its repo on the TrueNAS host); **neither its code nor its docs were changed here**: this
+task commits only to iFizBox's repo, and SideDrop is a live server. Its `sign_ipa`/`app_entitlements` need the same
+two changes (C58, waiting for the user's go-ahead): `keychain-access-groups = [f"{team}.{bundle ID kept}", appid]`
+and the group fix (or at least no shared app-group target), plus the same docs section. Its `regen_profile` keeps the App ID, so
 making the profile again (new iPhone, new capability) loses nothing by itself.
+
+## Left behind
+
+- On the 15 Pro: the probe (`<brand>.probe`), iFizBox Lite from this branch (over 0.17.3; it was granted Local
+  Network on the way). The second probe was removed.
+- In team S8NFX3A2LT: the ad hoc profile "ifizbox B227 probe certB" (`com.ryha.sideload`, the second distribution
+  certificate, the 15 Pro), made for the new-certificate row.
+- `probe-runs.jsonl`: every probe report of the three passes (the step it belongs to in `step`).
 
 ## Failed on the way
 
@@ -137,12 +162,19 @@ making the profile again (new iPhone, new capability) loses nothing by itself.
 
 ## Not verified
 
-- **The app's own on-phone signing** (KeychainIdentity, SignBridge, This iPhone/Signing Server routes) and **a
-  background auto re-sign**: the native rows used the same Swift signer built for Linux (`signbench-linux`), not
-  iFizBox on the phone; the entitlements and group fix come from the same code (`Profile.entitlements`,
-  `GroupFix.plan`), and auto re-sign signs from the original IPA through `IPASigner` like Install does.
+- **A background auto re-sign**: not triggered. The app's own signing was driven on the phone (this branch's Lite
+  build installed with `ui-15.sh install`, the probe pushed into its Documents with `ios fsync`, Install IPAs > Sign >
+  Install through the Signing Server prompt, then Installed > Re-sign), and Re-sign runs the same `Sideload.resign`
+  path Re-sign All uses; what starts it in the background wasn't. The phone can't reach the desktop's LAN port
+  (`ifizbox://install?url=http://192.168.0.118:...` timed out), hence the Documents route. That Lite build had the
+  group fix from before the `ifizbox.groupfix.fresh` change (only the copy-in rule differs; the probe's own folder
+  already existed). The other native rows used `signbench-linux` (the same Swift signer, openssl for the key).
 - **Profile groups changing or reordered on one App ID**: Apple's API can't change groups; unit tests only.
 - **Data protection**: the 15 Pro has no passcode, so "before first unlock" and "while locked" reads can't fail
   there; RyukGram's prefix lookup failing before the first unlock is a reading of its imports, not observed.
 - **RyukGram itself** on a phone (not installed: the user's apps stay alone, and the 15 Pro has no Instagram login).
-- **Hours-long run**: relaunch, lock/unlock and one reboot only (see below if a later check was added).
+- **Hours-long run**: relaunch, lock/unlock, one reboot and checks spread over about half an hour only; the run had
+  to end before hours passed.
+- **Profile groups changing on SideDrop's App ID** ("regenerated SideDrop profile, changed app groups"): the two
+  profiles of `com.ryha.sideload` used (A, A2, and B's made through the API) all carry the same five groups; a
+  profile made again keeps the App ID, and a new App ID is refused by installd (BW).

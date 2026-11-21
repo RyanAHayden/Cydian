@@ -29,7 +29,8 @@ static NSSet<NSString *> *groups;
 static NSString *target;
 // B227: the profile group an older fix mapped these groups to (its first one), whose folder and suite are copied into
 // the app's own the first time, so an app signed that way keeps its data; nil for none. Only for an app that ran
-// before (its own preferences aren't empty): a fresh install has nothing to bring.
+// before this fix (its own preferences weren't empty at its first launch with it): a fresh install has nothing to
+// bring, and must not take in what other apps left in that shared group.
 static NSString *legacy;
 
 static NSURL *(*origContainer)(id, SEL, NSString *);
@@ -208,8 +209,16 @@ __attribute__((constructor)) static void groupfixInit(void) {
         target = [t isKindOfClass:[NSString class]] && t.length ? t : nil;
         NSString *l = c[@"legacy"];
         if (!target && [l isKindOfClass:[NSString class]] && l.length) {
+            // A fresh install (no preferences yet) is marked at once, so it never copies the shared group in later.
+            CFStringRef fresh = CFSTR("ifizbox.groupfix.fresh");
+            CFPropertyListRef was = CFPreferencesCopyValue(fresh, kCFPreferencesCurrentApplication, kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
             CFArrayRef keys = CFPreferencesCopyKeyList(kCFPreferencesCurrentApplication, kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
-            if (keys && CFArrayGetCount(keys) > 0) legacy = l;
+            if (was) CFRelease(was);
+            else if (keys && CFArrayGetCount(keys) > 0) legacy = l;
+            else {
+                CFPreferencesSetValue(fresh, kCFBooleanTrue, kCFPreferencesCurrentApplication, kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
+                CFPreferencesSynchronize(kCFPreferencesCurrentApplication, kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
+            }
             if (keys) CFRelease(keys);
         }
         if (groups.count) {

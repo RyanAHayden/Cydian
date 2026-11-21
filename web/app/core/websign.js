@@ -117,8 +117,8 @@ export function targetBundleId(appId, bundleId) {
 // The keychain group comes first from the app's own ID (keptId, Info.plist's: TEAM.com.burbn.instagram), when the
 // profile's keychain groups allow it (TEAM.* does): an explicit profile signs every app under one App ID, and a
 // group named after that ID was one keychain shared by all of them (one app clearing its items cleared the others').
-// Keychain items go to the first group, so they stay with the app across profiles, App IDs and certificates of the
-// same team. TEAM.<App ID> stays second, so items an earlier signature put there are still the app's.
+// Keychain items go to the first group, the app's alone, under any profile or certificate of the same team.
+// TEAM.<App ID> stays second, so items an earlier signature put there are still the app's.
 export function appEntitlements({ entitlements = {}, teamId = null }, bundleId, keptId = bundleId) {
   const ents = { ...entitlements };
   const team = ents["com.apple.developer.team-identifier"] || teamId;

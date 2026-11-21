@@ -1,0 +1,23 @@
+<!doctype html>
+<html data-style="ios13" data-theme="light">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="ios6.css">
+<link rel="stylesheet" href="sources.css">
+<link rel="stylesheet" href="packages.css">
+<link rel="stylesheet" href="ios7.css">
+<link rel="stylesheet" href="ios13.css">
+</head>
+<body style="padding:20px 0">
+<ul class="grouped">
+  <li class="cell source-row is-failed"><a class="cell-inner chevron"><span class="cell-text"><span class="cell-label">Example Repo</span><span class="cell-subtitle cell-error">Not Responding</span></span><span class="cell-count row-failed-badge">!</span></a></li>
+  <li class="cell source-row"><a class="cell-inner chevron"><span class="cell-text"><span class="cell-label">Other Repo</span><span class="cell-subtitle">https://example.com/</span></span><span class="cell-count">128</span></a></li>
+</ul>
+<script>
+const p = new URLSearchParams(location.search);
+if (p.get("style")) document.documentElement.dataset.style = p.get("style");
+if (p.get("theme")) document.documentElement.dataset.theme = p.get("theme");
+</script>
+</body>
+</html>

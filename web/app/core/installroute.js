@@ -201,6 +201,16 @@ export function tailscaleTestResult(r) {
     case "not_paired": return r.paired
       ? { title: "Pair Again", message: `Tailscale reached this iPhone, but it no longer has ${NAME}'s pairing. Pair again, then apps install over Tailscale.`, pair: true }
       : { title: "Not Paired Yet", message: `Tailscale reached this iPhone. Pair ${NAME} with it once, then apps install over Tailscale.`, pair: true };
+    // B274: Tailscale reached iOS, then connecting with the kept pairing (idevice.verify through Tailscale) failed.
+    // A pairing the phone no longer accepts (refused, turned down, the channel reset during pair-verify) is Pair Again
+    // (`again`: forget it and pair); anything else says the connection didn't go through.
+    case "verify_failed": {
+      // (only those: verifyFailure's catch-all Pairing Didn't Work also offers it for a timeout, which isn't proof)
+      const raw = String(r.detail || "");
+      const pair = verifyFailure({ message: raw }).unusable || /^bad_pairing:/.test(raw) || (/^connect_failed:/.test(raw) && earlyEOF(raw));
+      if (pair) return { title: "Pair Again", message: `Tailscale reached this iPhone, but it no longer accepts ${NAME}'s pairing. Pair again, then apps install over Tailscale.`, again: true };
+      return { title: "Couldn't Connect", message: `Tailscale reached this iPhone, but connecting with ${NAME}'s pairing didn't work${d}. Try again.` };
+    }
     case "no_answer": return { title: "No Answer", message: `This iPhone didn't answer through Tailscale${d}. Try again.` };
     default: return { title: "Couldn't Connect", message: `Tailscale didn't connect${d}. Check the internet connection and try again.` };
   }

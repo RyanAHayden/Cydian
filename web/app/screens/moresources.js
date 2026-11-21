@@ -229,10 +229,6 @@ export function renderApps(body, ctx) {
 export async function drawApps(box, ctx, { rows: load = appSourceRows, preview = loadPreview } = {}) {
   const rows = await load();
   const redraw = () => drawApps(box, ctx);
-  if (!rows.length) {
-    box.replaceChildren(note("No app sources to show."));
-    return;
-  }
   box.replaceChildren(recGroups(rows, ctx, redraw),
     el("p", "group-footer rec-foot", "App sources from their developers and from mod makers. Tap one to see its apps "
       + "before adding. Piracy sources are never listed."));

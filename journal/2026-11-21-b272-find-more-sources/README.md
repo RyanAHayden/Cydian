@@ -52,6 +52,17 @@ unlock); AppTesters, CyPwn, WuXu, Nabzclan (IPA libraries of decrypted/tweaked a
 alt.thatstel.la (invalid JSON), alt.ignited.app (TLS error), purei.org, ppsspp.org, melonx, qnblackcat, NeoFreeBird,
 Enmity guesses (404).
 
+## Spec review
+
+A fresh reviewer read the diff and the brief. Fixed: Find App Sources showed "No app sources to show." for an empty
+list, which goes against "an empty-state message only when the fetch really fails"; dropped (the directory is
+built in, so an empty list can't happen anyway). Kept, judgment calls: the directory rests on my own check because
+F344's research isn't done yet. uYouEnhanced and YTLitePlus are their maintainers' own builds, like Recommended's
+YouMod. Add All's HUD counts ("Adding 2 of 9") where Import says "Adding Sources". Add All doesn't ask Unknown Source
+for each repo (the one confirm the brief asks for). The cause of the empty page: the installed build drew all 17
+rows on the phone (Web Inspector, above), which rules out a failed fetch or a sideload-only filter; what's left is
+the `!r.added` filter.
+
 ## Checks
 
 - `node --test web/app`: 2779 pass, with new `screens/findmore-addall.test.js` (Add All, the drawn mark, plain text)
@@ -61,9 +72,20 @@ Enmity guesses (404).
   AltStore data: `shots-ios6/`, `shots-ios7/`, `shots-ios13/` (`find.png` top of Find More with Add All and ADD /
   ADDED, `find-bottom.png` the directory row with its mark in place, `apps.png` Find App Sources).
 
+- iPhone 15 Pro (iOS 27, this branch's sideload IPA from `native/build.sh ipa`, installed with `tools/ui-15.sh`,
+  pages opened by setting `location.hash` over Web Inspector), in `iphone15/`: `find.png` (iOS 6 dark theme: Add All,
+  ADD / ADDED, nothing beside Limneos Repo), `find-bottom.png`, `addall-sheet.png` (tapped Add All: "Add the 14 repos
+  listed here that aren't in your sources yet?", then Cancel; nothing added), `apps.png` and `apps-bottom.png`
+  (Find App Sources: every source with its icon loaded live, the five new ones included, footer), `find-ios7.png`
+  (iOS 7 dark: the flat tinted outline). The phone's style was set back to its default afterwards.
+
 ## Not verified
 
-- **iPhone 15 Pro shots**: see the end of this file (filled in once the phone's lock was free, or why not).
+- **Add All running to the end on the phone**: cancelled at the sheet to leave the shared test phone's sources alone;
+  the add loop, counting HUD and failure alert are covered by `findmore-addall.test.js`.
+- **The ios-repo-updates.com row on the phone**: in `find-bottom.png` it sits under the tab bar; Web Inspector put
+  its top at y=801pt, on its own row (Chromium's `find-bottom.png` shows it drawn).
+- **iOS 13 on the phone**: Chromium only (`shots-ios13/`).
 - **Pressed state rendered**: the :active rules are in place for all three styles (iOS 6 the price button's pressed
   gradient and inset shadow, iOS 7 tint fill, iOS 13 darker capsule), but no shot holds a finger down: the capture
   script has no pressed-state step.

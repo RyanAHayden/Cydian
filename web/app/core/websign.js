@@ -12,8 +12,9 @@
 //   zsignError(lines)                       the line of zsign's output that says what went wrong
 //   appInfo(plist)                          { bundleId, name, version } from an app's Info.plist (as JSON)
 //   isZip(bytes)                            starts with PK (an IPA is a zip)
+//   WEB_SIGNER_VERSION, webSignerStamp, groupFixHash, signatureEnd   F342: the signer stamp and end a record keeps
 // SPDX-License-Identifier: GPL-3.0-or-later
-import { parsePlist } from "./signing.js";
+import { parsePlist, parseProfile } from "./signing.js";
 
 export const IPA_MAX = 512 * 1024 * 1024; // the Worker's own cap (worker/src/index.js MAX_UPLOAD)
 
@@ -190,3 +191,31 @@ export function appInfo(plist) {
 }
 
 export const isZip = (b) => b?.length >= 4 && b[0] === 0x50 && b[1] === 0x4b;
+
+// F342: which website signer made a signed app, and when its signature ends, kept on the install record
+// (core/installed.js appRecord) so Installed shows its days left and Changes lists it under Needs Re-sign
+// (core/signing.js needsResign, olderSigner) as the app does with native/sign/SignerStamp.swift.
+//   WEB_SIGNER_VERSION        bump it by hand whenever websign-job.js's output changes in a way installed apps should get
+//   groupFixHash(bytes)       the group fix dylib's hash: the first 16 hex digits of its SHA-256 (null without crypto.subtle)
+//   webSignerStamp(groupFix)  { version, groupFix }: groupFix the hash when the app got the dylib, else null
+//   signatureEnd(profile)     ISO date the signature ends: the profile's expiry, or its certificates' latest end when
+//                             that is earlier (the signing certificate is one of them); null when unknown
+// 1: own keychain group first and the group fix's own folders (B227, B211), as the app's SignerStamp 1.
+export const WEB_SIGNER_VERSION = 1;
+export async function groupFixHash(bytes) {
+  if (!bytes?.length) return null;
+  try {
+    const d = new Uint8Array(await globalThis.crypto.subtle.digest("SHA-256", bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes)));
+    return Array.from(d, (b) => b.toString(16).padStart(2, "0")).join("").slice(0, 16);
+  } catch { return null; }
+}
+export const webSignerStamp = (groupFix = null) => ({ version: WEB_SIGNER_VERSION, groupFix: groupFix || null });
+export function signatureEnd(profile) {
+  let p;
+  try { p = parseProfile(profile instanceof Uint8Array ? profile : new Uint8Array(profile)); } catch { return null; }
+  const ends = (p.certs ?? []).map((c) => c?.notAfter).filter((d) => d instanceof Date && Number.isFinite(d.getTime()));
+  const cert = ends.length ? new Date(Math.max(...ends.map((d) => d.getTime()))) : null;
+  const prof = p.expires instanceof Date && Number.isFinite(p.expires.getTime()) ? p.expires : null;
+  const end = prof && cert ? (cert < prof ? cert : prof) : prof ?? cert;
+  return end ? end.toISOString() : null;
+}

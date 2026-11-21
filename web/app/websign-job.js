@@ -3,7 +3,8 @@
 //
 //   await runSignJob(createZsign, { ipa, p12, password, profile, bring, appBundleId, keepBundleId, tweaks, groupFix, refuseSha256 }, { progress })
 //     -> { ipa: Uint8Array (signed), bundleId (signed as), originalId, name, version, sha256 (of the IPA as it came),
-//          injected?, warnings? (B227: data iOS keeps from the app after this signature, in words) }
+//          injected?, warnings? (B227: data iOS keeps from the app after this signature, in words),
+//          signer (F342: core/websign.js webSignerStamp), expires? (F342: ISO, core/websign.js signatureEnd) }
 //   Throws Error with .code: bad_ipa (not an IPA, no app inside), bad_profile, sign_failed (zsign's own reason),
 //   malware (F292: the IPA's SHA-256 is in refuseSha256, core/malicious.js malwareHashes).
 //
@@ -18,6 +19,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { isZip, profileInfo, signingIds, appEntitlements, plistXml, identityPlist, zsignArgs, zsignError, appInfo,
   IFIZBOX_ID, IDENTITY_FILE, TRANSFER_FILE } from "./core/websign.js";
+import { webSignerStamp, groupFixHash, signatureEnd } from "./core/websign.js"; // F342
 import { injectInto } from "./core/tweaks.js";
 import { entitlementsRead, groupFixPlan, withGroupFix, readConfig, GROUPFIX } from "./core/groupfix.js";
 import { MALWARE_REFUSED } from "./core/malicious.js";
@@ -127,7 +129,11 @@ export async function runSignJob(createZsign, { ipa, p12, password = "", profile
   if (!out?.length) throw fail("sign_failed", zsignError(log));
   // B227: what iOS will keep from the app after this signature (the group folder an earlier sign used, gone from this profile)
   const warnings = plan?.lost ? [`This profile has no ${plan.lost}, where ${info.name} kept its shared data until now: iOS keeps that folder from it.`] : [];
+  // F342: the signer stamp (the group fix dylib's hash when the app got it) and the signature's end, for the install record
+  const signer = webSignerStamp(injected.includes(GROUPFIX.inject) ? await groupFixHash(groupFix) : null);
+  const expires = signatureEnd(profile);
   return { ipa: out, bundleId, originalId: info.bundleId, name: info.name, version: info.version, ...(sha256 ? { sha256 } : {}),
+    signer, ...(expires ? { expires } : {}),
     ...(injected.length ? { injected } : {}), ...(warnings.length ? { warnings } : {}) };
 }
 

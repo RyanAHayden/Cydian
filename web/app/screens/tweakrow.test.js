@@ -5,7 +5,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { withDocument, tick } from "../fakes.test-helper.js";
-import { tweakListRow, tweakSubtitle } from "./tweakrow.js";
+import { tweakListRow, tweakSubtitle, isBanner } from "./tweakrow.js";
 import { searchAllRepos } from "./findmore.js";
 
 const spark = { id: "com.spark.snowboard", name: "SnowBoard", version: "1.2.74", author: "Spark", short: "Theme engine", section: "Tweaks",
@@ -15,7 +15,16 @@ test("tweakSubtitle: version · author, the repo only for results from several r
   assert.equal(tweakSubtitle(spark), "1.2.74 · Spark");
   assert.equal(tweakSubtitle(spark, { repo: true }), "1.2.74 · Spark · SparkDev");
   assert.equal(tweakSubtitle({ name: "X", short: "Does a thing" }), "Does a thing");
+  assert.equal(tweakSubtitle({ name: "X", description: "Canister's words" }), "Canister's words");
   assert.equal(tweakSubtitle({ name: "X" }), "");
+});
+
+test("isBanner: a header or featured art given as the icon is dropped, a square icon kept", () => {
+  assert.equal(isBanner(512, 512), false);
+  assert.equal(isBanner(120, 100), false);
+  assert.equal(isBanner(1200, 400), true);
+  assert.equal(isBanner(100, 300), true);
+  assert.equal(isBanner(0, 0), false);
 });
 
 test("tweakListRow: the package's icon in a 29pt box over its section's icon, name and subtitle", async () => {
@@ -56,6 +65,7 @@ test("wiring: Browse Tweak Sources, a repo's tweaks and Add to App are page scro
   assert.match(tweaks, /el\("div", "sheet-scroll page-body grouped tweak-pick tw-browse"\)/);
   assert.match(tweaks, /el\("div", "sheet-scroll page-body grouped tweak-pick"\); \/\/ B267/);
   assert.match(tweaks, /tweakListRow\(r, \{ onClick/);
+  assert.match(tweaks, /made\.map\(\(r\) => tweakListRow\(r, \{ right: addButton/, "Add Tweaks' Made for rows too");
   const find = readFileSync(new URL("./findmore.js", import.meta.url), "utf8");
   assert.match(find, /el\("div", "sheet-scroll page-body grouped tweak-pick find-tweak-list"\)/);
 });

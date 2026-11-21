@@ -5,7 +5,8 @@
 // Icon is drawn inside the 29pt box, cropped to it: a big logo or a depiction header never spills over the rows.
 // Styles: tweaks.css (.tw-list-row).
 //
-//   tweakListRow(r, { onClick, repo })   li.cell for r ({ name, id, version, author, short, section, icon, repo })
+//   tweakListRow(r, { onClick, repo, right })  li.cell for r ({ name, id, version, author, short, section, icon,
+//                                        repo }); right: a node at the row's end (Add Tweaks' ADD button)
 //   tweakSubtitle(r, { repo })           "1.2 · Spark" (+ " · <repo name>" with repo: true, for results from
 //                                        several repos); the description when there's no version or author
 import { el } from "../nav/ui.js";
@@ -16,7 +17,8 @@ import { encodeUrl } from "../core/urlencode.js";
 
 export function tweakSubtitle(r, { repo = false } = {}) {
   const parts = [r?.version, r?.author].filter(Boolean);
-  if (!parts.length && r?.short) parts.push(r.short);
+  const desc = r?.short || r?.description; // the catalog's short description, Canister's description
+  if (!parts.length && desc) parts.push(desc);
   if (repo && r?.repo?.name && r.repo.name !== r?.author) parts.push(r.repo.name);
   return parts.join(" · ");
 }
@@ -30,6 +32,9 @@ function iconUrl(u) {
   return null;
 }
 
+// Wider or taller than 4:3: a header or banner, not an icon.
+export const isBanner = (w, h) => w > 0 && h > 0 && Math.max(w / h, h / w) > 4 / 3;
+
 export function tweakIcon(r) {
   const look = packageIcon(r);
   const box = el("span", "cell-icon tw-icon");
@@ -39,7 +44,8 @@ export function tweakIcon(r) {
     const img = el("img");
     img.alt = "";
     img.decoding = "async";
-    img.onload = () => img.classList.add("loaded");
+    // a banner (a depiction header or featured art given as the icon) isn't an icon: the section icon stays
+    img.onload = () => { if (isBanner(img.naturalWidth, img.naturalHeight)) img.remove(); else img.classList.add("loaded"); };
     img.onerror = () => img.remove();
     img.src = src;
     box.append(img);
@@ -47,7 +53,7 @@ export function tweakIcon(r) {
   return box;
 }
 
-export function tweakListRow(r, { onClick = null, repo = false, chevron = true } = {}) {
+export function tweakListRow(r, { onClick = null, repo = false, chevron = true, right = null } = {}) {
   loadStyle("tweaks.css");
   const li = el("li", "cell tw-list-row");
   const b = el(onClick ? "button" : "div", `cell-inner${onClick && chevron ? " chevron" : ""}`);
@@ -57,6 +63,7 @@ export function tweakListRow(r, { onClick = null, repo = false, chevron = true }
   const sub = tweakSubtitle(r, { repo });
   if (sub) t.append(el("span", "cell-subtitle", sub));
   b.append(tweakIcon(r), t);
+  if (right) b.append(right);
   li.append(b);
   return li;
 }

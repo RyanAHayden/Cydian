@@ -966,7 +966,8 @@ export function openAddTweaks({ bundleId, name = "", rows = sourceTweakRows, sto
       const kept = await savedTweaks(bundleId, { store });
       const groups = [];
       if (made.length) {
-        groups.push(group(`Made for ${name || "This App"}`, made.map((r) => cell(r.name || r.id, [r.version, r.short].filter(Boolean).join(" · "), addButton(r, keptHas(kept, r.id))))));
+        // B267: Cydia's list rows (tweakrow.js: 29pt icon, version · author), the ADD button at the end
+        groups.push(group(`Made for ${name || "This App"}`, made.map((r) => tweakListRow(r, { right: addButton(r, keptHas(kept, r.id)) }))));
       }
       const others = kept.filter((x) => !made.some((r) => debOf(x.name)?.package === r.id));
       if (others.length) {

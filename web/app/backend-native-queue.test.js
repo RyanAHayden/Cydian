@@ -169,6 +169,22 @@ test("F64 cancelApply while apt downloads stops the run before dpkg: nothing cha
   assert.equal(readFileSync(join(fx.prefix, "var/lib/dpkg/status"), "utf8"), before);
 });
 
+// T62: under load the gate once saw Cancel's SIGTERM end the fake's shell but not its sleep, which held the pipes for
+// the whole wait. Here the wait ignores SIGTERM and SIGINT outright: Cancel still has to end the run at once.
+test("F64 cancelApply ends the run even when the download wait ignores SIGTERM", async (t) => {
+  const { backend } = setup(t, { env: { FAKE_DLWAIT: "20", FAKE_DLWAIT_STUBBORN: "1" } });
+  let cancelling = null;
+  const started = Date.now();
+  const r = await backend.apply([{ op: "install", id: "com.example.tweak", version: "0.9" }], (e) => {
+    // Only once the wait ignores SIGTERM: an earlier Cancel would kill the shell before the stubborn part exists.
+    if (e.fd === "out" && e.line.startsWith("Waiting, deaf") && !cancelling) cancelling = backend.cancelApply();
+  });
+  await cancelling;
+  assert.ok(cancelling, "the fake's stubborn wait started");
+  assert.equal(r.code, 130);
+  assert.ok(Date.now() - started < 15000, "Cancel ends the wait, not the fake's 20 s download");
+});
+
 test("F64 cancelApply: refused once dpkg runs, and when nothing runs", async (t) => {
   const { backend } = setup(t);
   await assert.rejects(backend.cancelApply(), (e) => e.code === "helper" && /no install is running/.test(e.message));

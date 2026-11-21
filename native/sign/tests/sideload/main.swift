@@ -467,4 +467,34 @@ test("This iPhone: a dropped connection is not a failed install (B246)") {
     check(fr.summary == "5.0 MB/s in front", "front only: \(fr.summary)")
 }
 
+test("This iPhone: a second look while installd is quiet (B251)") {
+    let after = HereRecheck.lookAfter, every = HereRecheck.lookEvery
+    check(after < 180 && every < 180, "looks come well before installd's 180 s limit")
+    var l = HereRecheck.SecondLook()
+    check(!l.due(quiet: after - 1), "not before \(after) s of quiet")
+    check(l.due(quiet: after), "a look at \(after) s of quiet")
+    check(!l.due(quiet: after + 1), "one look at a time")
+    check(!l.due(quiet: after + every - 1), "not again before \(every) s more")
+    check(l.due(quiet: after + every), "again \(every) s later")
+    // installd's next percentage starts the clock again: the looks start over
+    check(!l.due(quiet: 2), "the step moved: no look")
+    check(l.lastAt == nil, "and the looks start over")
+    check(l.due(quiet: after), "the first look comes again after \(after) s")
+
+    var s = HereRecheck.SecondLook()
+    check(!s.saw(nil, quiet: 30), "couldn't ask iOS: nothing changes, keep waiting on installd")
+    check(!s.saw(.notYet, quiet: 30), "not listed yet: keep waiting")
+    check(!s.saw(.sameAsBefore, quiet: 60), "still the earlier copy: keep waiting")
+    check(s.saw(.installed, quiet: 90), "the new copy listed: installed")
+
+    var u = HereRecheck.SecondLook()
+    check(!u.saw(.cannotTell, quiet: 30), "can't tell: not on the first look")
+    check(!u.saw(nil, quiet: 45), "a look that got no answer doesn't break the run")
+    check(u.saw(.cannotTell, quiet: 30 + HereRecheck.settle), "can't tell for \(HereRecheck.settle) s: installed, as after a drop")
+    var r = HereRecheck.SecondLook()
+    _ = r.saw(.cannotTell, quiet: 30)
+    _ = r.saw(.notYet, quiet: 60)
+    check(!r.saw(.cannotTell, quiet: 90), "a look in between that said not yet starts the run over")
+}
+
 if failures == 0 { print("all passed") } else { print("\(failures) failed"); exit(1) }

@@ -73,6 +73,44 @@ enum HereRecheck {
         }
     }
 
+    /// B251: while installd's step is quiet, a second look. A connection that dropped after "iOS is installing it" was
+    /// only noticed when installd's long quiet limit ran out (180 s, kept for a big app installd is still verifying).
+    /// After `lookAfter` of quiet, and every `lookEvery` while it stays quiet, a second connection asks
+    /// installation_proxy for the app; when iOS lists the new copy, the install is done. A look that can't reach iOS
+    /// or doesn't find the copy changes nothing: the long limit still decides. Times are the step's quiet seconds.
+    static let lookAfter: TimeInterval = 30
+    static let lookEvery: TimeInterval = 30
+
+    struct SecondLook {
+        private(set) var lastAt: TimeInterval?      // the quiet time of the last look
+        private(set) var unsureSince: TimeInterval? // the quiet time of the first look in a row that said cannotTell
+
+        /// Whether to look now, at `quiet` seconds of quiet (and if so, counts it as the look's time). The step
+        /// moving (quiet below the last look's) starts over.
+        mutating func due(quiet: TimeInterval) -> Bool {
+            if let l = lastAt, quiet < l { lastAt = nil; unsureSince = nil }
+            guard quiet >= HereRecheck.lookAfter else { return false }
+            if let l = lastAt, quiet - l < HereRecheck.lookEvery { return false }
+            lastAt = quiet
+            return true
+        }
+
+        /// What the look started at `quiet` found (nil: it couldn't ask iOS). True when iOS has the copy: listed as
+        /// new, or `cannotTell` held for HereRecheck.settle, as after a drop.
+        mutating func saw(_ v: Verdict?, quiet: TimeInterval) -> Bool {
+            guard let v = v else { return false } // no answer tells nothing either way: keep the run of cannotTell
+            switch v {
+            case .installed: return true
+            case .cannotTell:
+                if unsureSince == nil { unsureSince = quiet }
+                return quiet - unsureSince! >= HereRecheck.settle
+            case .notYet, .sameAsBefore:
+                unsureSince = nil
+                return false
+            }
+        }
+    }
+
     /// Where to carry on copying after a drop: iOS's file size, never past what was sent, down to a whole chunk so a
     /// chunk cut off mid-write is sent again.
     static func resumeAt(remoteSize: Int, sent: Int, chunk: Int) -> Int {

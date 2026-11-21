@@ -137,6 +137,9 @@ html[data-style="ios7"][data-theme="light"] {
   /* the reload bar (nav/reloadbar.js): a flat iOS 7 toolbar, the tab bar's #f7f7f7 under a hairline, black text */
   --reload-bar: linear-gradient(var(--i7-hairline), var(--i7-hairline)) top / 100% .5px no-repeat, #f7f7f7;
   --reload-text: #000; --reload-emboss: none; --i7-reload-spinner: var(--spinner-gray);
+  /* the undo bar after a row's swipe (nav/undobar.js): the same flat toolbar as the reload bar */
+  --undo-bar: linear-gradient(var(--i7-hairline), var(--i7-hairline)) top / 100% .5px no-repeat, #f7f7f7;
+  --undo-text: #000; --undo-emboss: none;
 }
 
 /* ---- OLED Black: the same shapes, white on black; ios6.css's dark rules read the --dk-* tokens ---- */
@@ -195,6 +198,8 @@ html[data-style="ios7"][data-theme="dark"] {
   --i7-banner-tint: #0a84ff;
   --reload-bar: linear-gradient(var(--i7-hairline), var(--i7-hairline)) top / 100% .5px no-repeat, #000;
   --reload-text: #fff; --reload-emboss: none; --i7-reload-spinner: var(--spinner-white);
+  --undo-bar: linear-gradient(var(--i7-hairline), var(--i7-hairline)) top / 100% .5px no-repeat, #000;
+  --undo-text: #fff; --undo-emboss: none;
 }
 
 /* ---- Look-only rules: type, and the shapes no token carries ---- */
@@ -358,12 +363,13 @@ html[data-style="ios7"][data-theme="dark"] .action-button.destructive { backgrou
 
 /* The bars over the page: the banner's Upgrade is bold tinted text centred in its 30pt box (the 44pt line-height of
    the nav bar's buttons pushed it down); the banner's title semibold, its icon iOS 7's rounder corner; the reload
-   bar's status line semibold over iOS 7's grey spinner in White. */
+   bar's status line semibold over iOS 7's grey spinner in White, and the undo bar's message the same. */
 html[data-style="ios7"] .banner .banner-action { font-size: 15px; font-weight: 600; line-height: 28px; color: var(--i7-banner-tint); }
 html[data-style="ios7"] .banner-text strong { font-weight: 600; }
 html[data-style="ios7"] .banner-icon { border-radius: 7px; }
 html[data-style="ios7"] .reload-text { font-size: 15px; font-weight: 600; }
 html[data-style="ios7"] .reload-spinner { background-image: var(--i7-reload-spinner); }
+html[data-style="ios7"] .undo-bar-text { font-size: 15px; font-weight: 600; }
 
 /* ---- F333: controls checked against the kit (ref/teehanlax/ios7/sheet.svg) ---- */
 /* Counts (a source's packages, More Sources): plain grey text as Mail's mailbox counts, no pill. */

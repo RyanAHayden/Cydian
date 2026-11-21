@@ -286,3 +286,69 @@ html[data-theme="dark"] .source-error-cell .cell-inner { /* the palette's cell, 
 html[data-theme="dark"] .source-error-text { color: var(--dk-bad); }
 html[data-theme="dark"] .source-error-remove .cell-label { color: var(--dk-remove); }
 /* ==== } look-only ==== */
+
+/* F327: More Sources (screens/moresources.js). The Find rows: a 40pt section icon (icons/sections/, Cydia's art)
+   with iOS 6's green plus badge over its corner. The Recommended header holds Add All, the nav bar's .bar-button.
+   Recommended's sub-groups take a smaller header; each row its source icon, name, two lines of why and the App Store
+   price button (myipas.css .price-btn's look, repeated here as tweaks.css does: that sheet loads with My IPAs only).
+   The Sources tab's and Home's More Sources row is icons/rowicons.js moreSources. */
+.more-find-row .cell-inner { min-height: 56px; }
+.cell-icon.more-find-icon { position: relative; width: 40px; height: 40px; margin: 0 1px 0 -4px; }
+.more-find-icon img { display: block; width: 40px; height: 40px; }
+.more-plus { position: absolute; right: -5px; bottom: -5px; width: 18px; height: 18px; box-sizing: border-box; }
+.more-plus::before, .more-plus::after { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); }
+.more-plus::before { width: 9px; height: 2.5px; }
+.more-plus::after { width: 2.5px; height: 9px; }
+.rec-head-title { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.rec-head-title > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rec-head-title .rec-add-all { flex: none; }
+.rec-head + .group { margin-top: 0; }
+.rec-sub > .group-header { margin-top: 12px; margin-bottom: 5px; }
+.rec-head + .rec-sub > .group-header { margin-top: 2px; }
+.rec-more-row { position: relative; }
+.rec-more-row .cell-inner { align-items: flex-start; padding-top: 9px; padding-bottom: 9px; padding-right: 84px; }
+.rec-more-row .cell-icon { position: relative; overflow: hidden; margin-top: 2px; }
+.rec-more-row .cell-icon img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.rec-more-row .cell-subtitle {
+  white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.rec-more-row .rec-add { /* the row's own selector: myipas.css .price-btn (position: relative) may load after this */
+  position: absolute; right: 10px; top: 11px;
+  display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box;
+  height: 24px; min-width: 62px; padding: 0 9px; margin: 0; cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.rec-add.added, .rec-add:disabled { cursor: default; }
+.rec-foot { margin-top: 10px; }
+
+/* ==== look-only { ==== the plus badge, the sub-group headers, ADD / ADDED */
+:root {
+  /* the App Store price button: myipas.css's tokens, the same values */
+  --price-btn: linear-gradient(#fdfdfe, #e2e6ec);
+  --price-btn-edge: #8f9aab;
+  --price-btn-emboss: 0 1px 0 #fff;
+  --price-btn-pressed: linear-gradient(#d6dbe3, #eceff3);
+  --price-btn-pressed-inset: inset 0 1px 2px rgba(0,0,0,.25);
+  /* ADDED: the price button greyed, as the App Store's INSTALLED */
+  --rec-added-text: #a3abb8; --rec-added-edge: #c4c9d2;
+  /* iOS 6's green plus badge: a glossy green disc in a white ring, a soft shadow under it */
+  --more-plus: linear-gradient(#7ad35f, #2f9a1f);
+  --more-plus-ring: #fff;
+  --more-plus-shadow: 0 1px 1px rgba(0,0,0,.35);
+}
+.cell-icon.more-find-icon { background: none; border-radius: 0; }
+.more-plus { border-radius: 50%; border: 1.5px solid var(--more-plus-ring); background: var(--more-plus); background-origin: border-box;
+  box-shadow: var(--more-plus-shadow); }
+.more-plus::before, .more-plus::after { content: ""; background: #fff; border-radius: 1px; }
+.rec-sub > .group-header { font-size: 13px; line-height: 16px; text-transform: uppercase; letter-spacing: .04em; }
+.rec-add {
+  border-radius: 4px;
+  font: bold 12px/1 "Helvetica Neue", Helvetica, sans-serif; letter-spacing: 0; color: #5d6b81; text-shadow: var(--price-btn-emboss);
+  border: 1px solid var(--price-btn-edge); background: var(--price-btn); background-origin: border-box;
+}
+.rec-add:active:not(:disabled) { background: var(--price-btn-pressed); background-origin: border-box; box-shadow: var(--price-btn-pressed-inset); }
+.rec-add.added, .rec-add:disabled { color: var(--rec-added-text); border-color: var(--rec-added-edge); opacity: 1; }
+html[data-theme="dark"] .rec-add { color: var(--text); text-shadow: none; border-color: var(--dk-btn-edge); background: var(--dk-btn); background-origin: border-box; }
+html[data-theme="dark"] .rec-add:active:not(:disabled) { background: var(--dk-btn-pressed); background-origin: border-box; }
+html[data-theme="dark"] .rec-add.added, html[data-theme="dark"] .rec-add:disabled { color: var(--subtitle); }
+html[data-theme="dark"] .more-plus { border-color: var(--dk-ground, #000); }
+/* ==== } look-only ==== */

@@ -287,14 +287,13 @@ test("Search All Repos: Canister's packages, tweaks for sideloaded apps only, al
   assert.match(s.el.textContent, /found by Canister/);
 });
 
-test("wiring: Sources ends its Tweak Sources group with Find More, Manage lists it and routes find/…, Search asks in the sideload app", () => {
+test("wiring: More Sources opens Find More (F327), Manage routes find/…, Search asks in the sideload app", () => {
   const read = (f) => readFileSync(new URL(f, import.meta.url), "utf8");
   const sources = read("./sources.js");
-  assert.match(sources, /\.\.\.tweakList\.map\(sourceRow\), \.\.\.\(tweakGroupOn \? find : \[\]\)/);
   assert.match(sources, /labelCanister\(li, source\)/);
   const manage = read("./manage.js");
   assert.match(manage, /findMore\.isFind\(route\)\) return findMore\.render/);
-  assert.match(manage, /label: "Find More Sources"/);
+  assert.match(read("./moresources.js"), /label: "Find Tweak Sources", subtitle: "[^"]+", href: findHref\(\)/);
   assert.match(read("./search.js"), /tweakSourcesOn\(settings\.deviceType\(\), detectMode\(\)\)\) \? q : ""/);
   assert.match(read("./home.js"), /label: "Canister"/);
 });

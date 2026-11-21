@@ -514,7 +514,7 @@ enum Sideload {
                                   expires: profile.signatureExpiry(certificate: identity.certificate), options: options.stored,
                                   appID: app.appID, signer: app.stamp, // B259
                                   sha256: keepOriginal(input, app: app, source: url, sha256: sha256, log: log)) // F343
-        // F343: an install that fails takes back the IPA just kept, unless a record already has that very file
+        // F343: an install that fails drops the IPA staged for it; the one kept before stays
         let answered = { (r: Result<(SignedApp, SignedRecord), Error>) in
             if case .failure = r { SignBridge.queue.async { dropOriginal(app.bundleID, sha256: record.sha256) } }
             opened(r)
@@ -1089,25 +1089,28 @@ enum Sideload {
     static func saveRecords(_ list: [SignedRecord]) {
         let before = records()
         try? SignedRecords.encode(list).write(to: recordsURL, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
-        for bid in OriginalIPA.dropped(old: before, new: list) { OriginalIPA.remove(bid) } // F343: removed with the record
+        // F343: an install's staged IPA replaces the kept one once its record is written; it goes with the record
+        for bid in OriginalIPA.dropped(old: before, new: list) { OriginalIPA.remove(bid) }
+        for r in list { if let s = r.sha256 { OriginalIPA.commit(r.bundleID, sha256: s) } }
     }
 
     // ---- F343: the IPA each app was signed from, kept for Re-sign (native/sign/OriginalIPA.swift)
 
-    // Once `input` is signed as `app` from `source`: moves it into Caches when that app keeps one. -> the record's
-    // sha256 (`sha256`, or hashed here); nil when nothing is kept (`input` stays for signAndOpen to delete).
+    // Once `input` is signed as `app` from `source`: staged in Caches when that app keeps one, to replace the kept one
+    // when the install is recorded. -> the record's sha256 (`sha256`, or hashed here); nil when nothing is kept
+    // (`input` stays for signAndOpen to delete).
     static func keepOriginal(_ input: URL, app: SignedApp, source: String, sha256: String?, log: ((String) -> Void)?) -> String? {
         guard OriginalIPA.keeps(source: source, bundleID: app.bundleID, originalBundleID: app.originalBundleID,
                                 own: Bundle.main.bundleIdentifier),
-              let sha = sha256?.lowercased() ?? IPAHash.of(input), OriginalIPA.keep(input, bundleID: app.bundleID) else { return nil }
-        log?("Kept the IPA for Re-sign (Caches/\(app.bundleID).ipa)")
+              let sha = sha256?.lowercased() ?? IPAHash.of(input),
+              OriginalIPA.stage(input, bundleID: app.bundleID, sha256: sha) else { return nil }
+        log?("Keeping the IPA for Re-sign once it is installed (Caches/\(app.bundleID).ipa)")
         return sha
     }
 
-    // keepOriginal undone for an install that didn't happen: the file goes unless a record of the app has that hash.
+    // keepOriginal undone for an install that didn't happen: the staged IPA goes, the one kept before stays.
     static func dropOriginal(_ bid: String, sha256: String?) {
-        guard let s = sha256, !records().contains(where: { $0.bundleID == bid && $0.sha256 == s }) else { return }
-        OriginalIPA.remove(bid)
+        if let s = sha256 { OriginalIPA.discard(bid, sha256: s) }
     }
 
     // Re-sign's input: a copy of the IPA kept for `r` when it is there and its SHA-256 is the record's; nil: download it.
@@ -1122,6 +1125,7 @@ enum Sideload {
         case .mismatch: log("The kept IPA isn't the one \(r.shownName) was signed from: it goes, and is downloaded again")
         case .missing: if r.sha256 != nil { log("The kept IPA is gone (iOS clears caches when storage runs low): downloading it again") }
         case .unknown: break // signed before IPAs were kept
+        case .unreadable: log("The kept IPA couldn't be read: downloading it again")
         }
         return nil
     }

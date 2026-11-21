@@ -507,8 +507,12 @@ test("the IPA kept for Re-sign (F343)") {
     let input = work.appendingPathComponent("kept-in.ipa")
     try Data("original".utf8).write(to: input)
     let sha = hashOf(input)!
-    check(OriginalIPA.keep(input, bundleID: "com.a", in: dir), "kept")
+    check(OriginalIPA.stage(input, bundleID: "com.a", sha256: sha, in: dir), "staged")
     check(!FileManager.default.fileExists(atPath: input.path), "moved, not copied")
+    check(!OriginalIPA.stage(input, bundleID: "com.a", sha256: "nothex", in: dir), "a hash that isn't one")
+    check(OriginalIPA.take("com.a", sha256: sha, to: work.appendingPathComponent("x.ipa"), in: dir, hash: hashOf) == .missing,
+          "not kept until the install is recorded")
+    OriginalIPA.commit("com.a", sha256: sha, in: dir)
     let out = work.appendingPathComponent("kept-out.ipa")
     check(OriginalIPA.take("com.a", sha256: sha.uppercased(), to: out, in: dir, hash: hashOf) == .file(out), "matching: taken")
     check((try? Data(contentsOf: out)) == Data("original".utf8), "the same bytes")
@@ -519,12 +523,25 @@ test("the IPA kept for Re-sign (F343)") {
     check(OriginalIPA.take("com.a", sha256: String(repeating: "0", count: 64), to: out, in: dir, hash: hashOf) == .mismatch, "another IPA")
     check(!FileManager.default.fileExists(atPath: OriginalIPA.url("com.a", in: dir)!.path), "a mismatch goes")
 
-    // replaced on upgrade
+    // replaced on upgrade, once it is recorded; a failed upgrade leaves the one kept before
+    let kept = OriginalIPA.url("com.a", in: dir)!
     try Data("v1".utf8).write(to: input)
-    OriginalIPA.keep(input, bundleID: "com.a", in: dir)
+    let v1 = hashOf(input)!
+    OriginalIPA.stage(input, bundleID: "com.a", sha256: v1, in: dir)
+    OriginalIPA.commit("com.a", sha256: v1, in: dir)
     try Data("v2".utf8).write(to: input)
-    OriginalIPA.keep(input, bundleID: "com.a", in: dir)
-    check((try? Data(contentsOf: OriginalIPA.url("com.a", in: dir)!)) == Data("v2".utf8), "the newer one replaces it")
+    let v2 = hashOf(input)!
+    OriginalIPA.stage(input, bundleID: "com.a", sha256: v2, in: dir)
+    check((try? Data(contentsOf: kept)) == Data("v1".utf8), "staged: the installed version's stays")
+    OriginalIPA.discard("com.a", sha256: v2, in: dir)
+    check((try? Data(contentsOf: kept)) == Data("v1".utf8), "the upgrade failed: still v1")
+    check(!FileManager.default.fileExists(atPath: OriginalIPA.pending("com.a", sha256: v2, in: dir)!.path), "and the staged one is gone")
+    try Data("v2".utf8).write(to: input)
+    OriginalIPA.stage(input, bundleID: "com.a", sha256: v2, in: dir)
+    OriginalIPA.commit("com.a", sha256: v2, in: dir)
+    check((try? Data(contentsOf: kept)) == Data("v2".utf8), "the upgrade recorded: v2 replaces it")
+    OriginalIPA.commit("com.a", sha256: v1, in: dir)
+    check((try? Data(contentsOf: kept)) == Data("v2".utf8), "nothing staged: commit changes nothing")
 
     // removed with the record
     func rec(_ bid: String, _ sha: String?) -> SignedRecord {

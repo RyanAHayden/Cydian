@@ -1,7 +1,9 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
   <!-- The Clear app icon (native/icon/alternates.py renders it): pre-rendered clear glass, after the concept's
        "iOS 26 Clear", so iOS 15-25 show it too. Flat and square: iOS masks the corners itself. The globe is the
-       real icon's (tools/icon.svg.in), drawn as white lines on frosted glass. The same in both builds: no LITE sash. -->
+       real icon's (tools/icon.svg.in): white lines on a smoked-glass sphere inside a frosted rim, on frosted glass.
+       The smoked sphere and the bold lines keep it a globe at 20 pt (notifications), where thin white lines on
+       light glass read as iOS's blank placeholder. The same in both builds: no LITE sash. -->
   <defs>
     <linearGradient id="glass" x1="0" y1="0" x2=".35" y2="1">
       <stop offset="0" stop-color="#f6f7f9"/><stop offset=".55" stop-color="#e4e7eb"/><stop offset="1" stop-color="#c8cdd5"/>
@@ -14,31 +16,35 @@
       <stop offset="0" stop-color="#fff" stop-opacity=".95"/><stop offset=".5" stop-color="#fff" stop-opacity=".25"/>
       <stop offset="1" stop-color="#fff" stop-opacity=".7"/>
     </linearGradient>
-    <linearGradient id="line" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#f3f5f8"/>
+    <!-- the frosted ring around the globe: lighter than the glass at the top, a shade darker at the bottom -->
+    <linearGradient id="ring" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fbfcfd"/><stop offset="1" stop-color="#d3d8df"/>
     </linearGradient>
-    <filter id="soft" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="9"/></filter>
+    <!-- the smoked-glass sphere: slate, lit from the top left like the glass -->
+    <radialGradient id="sphere" cx="36%" cy="28%" r="80%">
+      <stop offset="0" stop-color="#8e9aab"/><stop offset=".6" stop-color="#5f6c7e"/><stop offset="1" stop-color="#465263"/>
+    </radialGradient>
+    <linearGradient id="gloss" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fff" stop-opacity=".38"/><stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="soft" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="14"/></filter>
     <clipPath id="gclip"><circle cx="512" cy="512" r="236"/></clipPath>
   </defs>
   <rect width="1024" height="1024" fill="url(#glass)"/>
   <rect width="1024" height="1024" fill="url(#shine)"/>
   <!-- the glass's lit edge, just inside the corner mask iOS puts on it -->
   <rect x="7" y="7" width="1010" height="1010" rx="222" fill="none" stroke="url(#rim)" stroke-width="12"/>
-  <!-- the globe: a faint ring, then the lines, each over a soft grey shadow so white reads on the light glass -->
-  <g opacity=".34" filter="url(#soft)" transform="translate(0 10)" fill="none" stroke="#5b6472" stroke-width="26">
-    <circle cx="512" cy="512" r="236"/>
+  <!-- the globe: a soft shadow under the ring, the frosted ring with a grey edge, the smoked sphere, the lines -->
+  <circle cx="512" cy="530" r="302" fill="#4a5466" opacity=".35" filter="url(#soft)"/>
+  <circle cx="512" cy="512" r="300" fill="url(#ring)" stroke="#9aa3b0" stroke-width="8"/>
+  <circle cx="512" cy="512" r="236" fill="url(#sphere)"/>
+  <g fill="none" stroke="#fff" stroke-width="34">
     <g clip-path="url(#gclip)"><g transform="rotate(-16 512 512)" stroke-linecap="round">
       <ellipse cx="512" cy="512" rx="128" ry="240"/>
       <path d="M302 382 Q512 450 722 382"/><path d="M266 514 Q512 582 758 514"/><path d="M308 636 Q512 704 716 636"/>
     </g></g>
   </g>
-  <circle cx="512" cy="512" r="300" fill="none" stroke="#fff" stroke-opacity=".55" stroke-width="7"/>
-  <circle cx="512" cy="512" r="236" fill="#fff" fill-opacity=".14"/>
-  <g fill="none" stroke="url(#line)" stroke-width="22">
-    <g clip-path="url(#gclip)"><g transform="rotate(-16 512 512)" stroke-linecap="round">
-      <ellipse cx="512" cy="512" rx="128" ry="240"/>
-      <path d="M302 382 Q512 450 722 382"/><path d="M266 514 Q512 582 758 514"/><path d="M308 636 Q512 704 716 636"/>
-    </g></g>
-    <circle cx="512" cy="512" r="236"/>
-  </g>
+  <!-- the sphere's glassy top highlight and its dark edge -->
+  <ellipse cx="512" cy="392" rx="190" ry="112" fill="url(#gloss)" clip-path="url(#gclip)"/>
+  <circle cx="512" cy="512" r="236" fill="none" stroke="#3c4757" stroke-width="10"/>
 </svg>

@@ -21,7 +21,8 @@ white lines on frosted white glass, as icon/clear/clear.svg. The LITE sash is a 
 same in both builds, so iOS 26+ shows no sash on the Lite build's Home Screen icon (the PNG sizes iOS 26 uses for
 Settings and notifications come from the .icon too).
 
-    python3 native/icon/glass.py write DIR      DIR/<set>.icon for every set (icon/assets.sh hands them to actool)
+    python3 native/icon/glass.py write DIR      DIR/<set>.icon for every set
+    python3 native/icon/glass.py car DIR        only the CAR_SETS ones (icon/assets.sh hands them to actool)
     python3 native/icon/glass.py show <icon>    the colours one icon's layers take, as JSON
     python3 native/icon/glass.py sources        one digest of everything `write` makes (icon/assets.sources)
 
@@ -165,19 +166,28 @@ def all_sets():
     return out
 
 
-def write(dest):
+# The sets whose .icon goes into Assets.car (icon/assets.sh). Empty until the user picks which (journal
+# 2026-11-20-f324-liquid-glass-icon): actool drops a same-named .appiconset's PNGs for the .icon (iOS 15-25 then get
+# actool's flattened render, no LITE sash) and stores ~3 MB of 1024 px renders per set, so all 74 would be ~220 MB.
+CAR_SETS = ()
+
+
+def write(dest, names=None):
+    """dest/<set>.icon for the sets named (default: every set)."""
     os.makedirs(dest, exist_ok=True)
-    return [write_icon(dest, name, l, d) for name, (l, d) in all_sets().items()]
+    return [write_icon(dest, name, l, d) for name, (l, d) in all_sets().items() if names is None or name in names]
 
 
 def sources():
-    """{"glass": sha256 of every file write() makes}, for icon/assets.sources: a changed theme colour, layer or set
+    """{"glass": sha256 of the CAR_SETS documents} ({} with none), for icon/assets.sources: a changed theme colour, layer or set
     list means the .car files are stale."""
     import hashlib
     import tempfile
+    if not CAR_SETS:
+        return {}
     h = hashlib.sha256()
     with tempfile.TemporaryDirectory() as d:
-        write(d)
+        write(d, CAR_SETS)
         for base, dirs, files in sorted(os.walk(d)):
             dirs.sort()
             for name in sorted(files):
@@ -191,6 +201,9 @@ def sources():
 def main(argv):
     if len(argv) == 2 and argv[0] == "write":
         for p in write(argv[1]):
+            print(p)
+    elif len(argv) == 2 and argv[0] == "car":
+        for p in write(argv[1], CAR_SETS):
             print(p)
     elif argv == ["sources"]:
         for path, digest in sources().items():

@@ -24,10 +24,11 @@ compile() {
   mkdir -p "$1/out"
   # F324: each set's Icon Composer document (icon/glass.py), same name as its .appiconset: iOS 26+ draws the .icon
   # in Liquid Glass, iOS 15-25 the PNGs.
-  local glass=("$1"/glass/*.icon)
+  local glass=()
+  [ -d "$1/glass" ] && glass=($(cd "$1/glass" && ls -d *.icon 2>/dev/null | sed "s|^|$1/glass/|"))
   xcrun actool --compile "$1/out" --platform iphoneos --minimum-deployment-target 15.0 --target-device iphone \
     --app-icon AppIcon "${alts[@]}" --output-partial-info-plist "$1/partial.plist" \
-    --errors --warnings --output-format human-readable-text "$1/Assets.xcassets" "${glass[@]}" > "$1/actool.log" 2>&1 ||
+    --errors --warnings --output-format human-readable-text "$1/Assets.xcassets" ${glass[@]+"${glass[@]}"} > "$1/actool.log" 2>&1 ||
     { cat "$1/actool.log" >&2; exit 1; }
   # A set actool didn't take whole ("unassigned children": a dark appearance dropped) is a broken icon: stop.
   if grep -i -E "warning|error" "$1/actool.log" >&2; then echo "icon assets: actool complained (above)" >&2; exit 1; fi
@@ -40,8 +41,8 @@ work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 python3 alternates.py catalog "$work/plain" >/dev/null
 python3 alternates.py catalog "$work/lite" --lite >/dev/null
-python3 glass.py write "$work/plain/glass" >/dev/null
-python3 glass.py write "$work/lite/glass" >/dev/null
+python3 glass.py car "$work/plain/glass" >/dev/null
+python3 glass.py car "$work/lite/glass" >/dev/null
 
 if [ "$(uname)" != Darwin ]; then
   host=${1:?"icon assets: run on a Mac, or give a Mac's ssh host"}

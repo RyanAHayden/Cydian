@@ -309,6 +309,11 @@ class Glass(unittest.TestCase):
         self.assertEqual(len(set(seen.values())), len(seen), "two icons came out the same")
         self.assertEqual(glass.colours("classic")["grid"][0], "5a6473")  # tools/icon.svg.in's ink
 
+    def test_car_sets_are_sets(self):
+        """The .icon documents assets.sh compiles are named sets (each costs ~3 MB of Assets.car, journal F324)."""
+        self.assertFalse(set(glass.CAR_SETS) - set(glass.all_sets()))
+        self.assertLessEqual(len(glass.CAR_SETS), 4, "each .icon adds ~3 MB to both .car files")
+
     def test_svg_layers_are_well_formed(self):
         import xml.etree.ElementTree as ET
         for layer, text in glass.layer_svgs("nord").items():

@@ -50,7 +50,8 @@ and run 9's verdict came from that rule (same version, new folder → installed)
    and route/format changes, no interruption (`audio-session-log.txt`, from the phone log; the only "became
    inactive" in run 4, at 12:05:23, has "Source: App": KeepAlive let go itself after the install): KeepAlive's session is `.playback` with `.mixWithOthers`, and iOS lets
    another app's session start beside a mixable one without interrupting it. The background copy kept going at
-   14-17 MB/s against 17-18 in front (82-95 %), the same as Home Screen or locked (B246, R55).
+   14-17 MB/s against 17-18 in front (82-95 %) in every run without a drop, the same as Home Screen or locked
+   (B246, R55).
 2. **The one slow install (run 2) was a Tailscale path loss, not iOS stopping the app.** Timeline
    (`run2-stall-tailscale-log.txt`): 11:59:33.70 the app went to the background (Camera opening); 11:59:33.94 the
    phone's Tailscale node started a new WireGuard handshake and the app answered; from 11:59:35 remotepairingd

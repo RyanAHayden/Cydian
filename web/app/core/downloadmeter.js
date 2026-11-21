@@ -8,9 +8,10 @@
 //   rateText(rate)     -> "21.4 MB/s"
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-const MB = 1048576;
-const mb = (n) => (Number(n) / MB).toFixed(1);
-export const rateText = (rate) => `${mb(Math.max(0, Number(rate) || 0))} MB/s`;
+import { rateText } from "./signing.js"; // already loaded at startup (this module isn't: module-graph.test.js)
+export { rateText };
+
+const mb = (n) => (Number(n) / 1048576).toFixed(1);
 
 export function downloadLine({ bytes = 0, total = 0, rate = 0 } = {}) {
   if (!(total > 0)) return `Downloaded ${mb(bytes)} MB, ${rateText(rate)}`;

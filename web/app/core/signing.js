@@ -424,6 +424,9 @@ export function phaseLabel(ev) {
   return ev.phase !== "installing" && pct > 0 && pct < 100 ? `${name} ${pct}%` : name;
 }
 
+// B262: a download's speed, bytes a second -> "21.4 MB/s" (core/downloadmeter.js's lines, the row's and the labels')
+export const rateText = (rate) => `${(Math.max(0, Number(rate) || 0) / 1048576).toFixed(1)} MB/s`;
+
 // What a failed signing call leads to, by its error code (native/Sources/SignBridge.swift): an alert's
 // { title, message } and where it sends the user next ("signing": Settings > Signing's walkthrough; null: nowhere).
 export function deviceError(err, name = "") {

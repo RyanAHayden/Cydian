@@ -35,8 +35,7 @@ export async function chooseRoute({ native, alert = showAlert, storage = storage
 }
 export const forgetRoute = () => { heldRoute = null; };
 import { showBanner } from "../nav/banner.js";
-import { phaseLabel, deviceError } from "../core/signing.js";
-import { rateText } from "../core/downloadmeter.js"; // B262
+import { phaseLabel, deviceError, rateText } from "../core/signing.js"; // rateText: B262
 import { IFIZBOX_ID } from "../core/websign.js";
 import { withKeep } from "../core/keepid.js";
 import { progressHUD, RESTART_BY_HAND, RETURN_LABEL, lockSelfUpdate, WAITING_LABEL } from "../nav/progress.js";

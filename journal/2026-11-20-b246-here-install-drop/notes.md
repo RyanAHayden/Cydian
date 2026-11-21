@@ -30,8 +30,8 @@ while iOS had installed the app.
 
 ## Why the copy was slow in the background (part 2): what is known
 
-Not measured (see below). From the code: installHere holds KeepAlive's silent audio for the whole install, so the app
-should not be suspended. Candidates, in the order I'd check them on a phone:
+Measured on the 15 Pro later (tables below): no slowdown there. From the code: installHere holds KeepAlive's silent
+audio for the whole install, so the app should not be suspended. Candidates for the user's phone:
 1. the audio loop stopped (another app took audio without mixing: Instagram plays video) and iOS suspended the app;
    the tunnel then went quiet and remotepairingd dropped it (would explain the UnexpectedEof). Fixed in part: the loop
    restarts on return, and the install now resumes / rechecks instead of failing.
@@ -43,21 +43,17 @@ N s`, the page's speed summary) tell these apart on the next real install.
 
 ## Checks
 
-- `python3 -m unittest native.test_sideload`: passes, with the new B246 test.
-- `native/build.sh` (both builds) and `tools/check.sh`: see the commit (run by `done`).
+- `python3 -m unittest native.test_sideload`: passes, with the new B246 tests.
+- `node --test` on the install-route screens and core (29 tests, the new `installroute-b246.test.js` included): pass.
+- `native/build.sh` (both builds): passes; `tools/check.sh` runs in `done`.
+- Phone runs on the iPhone 15 Pro: below.
 
-## Not verified
+## First half of the session
 
-(Superseded below: the user plugged the 15 Pro in and set Tailscale up mid-session.)
-
-- **No phone run at all (first half of the session).** The iPhone 15 Pro was not on USB during this session (`lsusb` showed no Apple device,
-  usbmuxd inactive), and even plugged in it has no route for this: on 2026-11-20 it was unpaired, with neither
-  LocalDevVPN nor the Tailscale app installed (installing either needs the owner's Apple ID, and Tailscale's sign-in
-  the owner's account). So none of: a big IPA leaving the app mid-copy and mid-install, front vs background copy
-  speed, whether Browse returns `Path` on iOS 26/27, whether a reinstall of the same version gets a new bundle
-  folder, whether installd keeps installing after our installation_proxy socket drops (the user's case says it did),
-  whether `AfcRw` + seek on a PublicStaging file resumes correctly. Filed as R53 (after B246) for a person with a phone.
-- The cause of the background slowdown (part 2) is not pinned down; see the list above.
+The iPhone 15 Pro wasn't on USB at first (`lsusb` showed no Apple device), so the code above was written and
+unit-tested before any phone run, and R53 was filed for a person to check it. The user then plugged the phone in
+with Tailscale set up and asked for the reproduction and part 3 in this task: see below. The current list of what
+is still unchecked is under **Not verified** at the end.
 
 ## Part 3 (added mid-task by the user): the 15 Pro stuck on "No Answer" over Tailscale
 
@@ -129,7 +125,8 @@ With those fixes (build 90c3d03+, installed on the 15 Pro with `ui-15.sh install
 | Run | What I did | Result |
 | --- | --- | --- |
 | 5 (6.0) | VPN off 6 s into the copy (at 91 MB), on again 11 s later | `Socket(Kind(TimedOut))` 19 s later; reconnected through Tailscale 2 s after that (node restart 1.5 s, tunnel 0.19 s); "carrying on from 91.0 MB of 351.5 MB"; copy 37.9 s in all (16.9 MB/s in front, 17.1 in the background); installd took the resumed file; **installed** |
-| 6 (4.0 over 6.0) | VPN off the moment the log said installd started (copy 19.9 s: 17.9 / 16.1 MB/s); my tap to turn it on again didn't take | nothing came back from installd, so the drop showed only at the 180 s installd limit (TIMEOUT, then `BrokenPipe`); the reconnects said "Tailscale isn't back on yet" 4 times (2, 4, 8, 15 s) and the install failed, now saying "iOS may still have installed it: look on the Home Screen" |
+| 6 (4.0 over 6.0) | VPN off the moment the log said installd started (copy 19.9 s: 17.9 / 16.1 MB/s); my tap to turn it on again didn't take | nothing came back from installd, so the drop showed only at the 180 s installd limit (TIMEOUT, then `BrokenPipe`); the reconnects said "Tailscale isn't back on yet" 4 times (2, 4, 8, 15 s) and the install failed (the right end with the route gone for good). iOS had installed 4.0 anyway: run 7's `before` lists it |
+| 7 (2.0 over 4.0, the user's case) | VPN off the moment installd started (copy 20.2 s: 17.8 / 15.4 MB/s), on again 16 s later (checked by the switch's pixel) | TIMEOUT at the 180 s installd limit, reconnected through Tailscale 2 s later, "iOS lists com.ryha.b246test: 2.0 (2.0) in F3872F13… -> installed" (bundle folder changed from 033D9A67…), staged IPA removed; **installed** |
 
 Two runs in between didn't test anything: with iOS Settings in front from 3 s after Confirm (the IPA not signed yet) the
 run waited for the app to come back, and then went the Signing Server way because one of my VPN taps had left
@@ -137,4 +134,25 @@ Tailscale's VPN off (I cancelled iOS's install prompt both times). Filed: B252 (
 B251 (notice a drop during installd sooner than its 180 s limit).
 
 Run 6 also showed the log's "try 5 of 4" (counted before the give-up check) and that the failure didn't say iOS may
-have installed it anyway: both fixed.
+have installed it anyway: both fixed before run 7 ("… iOS may still have installed it: look on the Home Screen").
+
+Phone left as: paired with the app (RemotePairing), Tailscale's VPN on, the app holding the team's ad hoc signing
+identity (it had none before; useful for later Lite tests), B246 Test uninstalled and its IPAs and signed copies
+deleted from the app's container. Screenshots: `ref/15/screens/b246-*.png` (main checkout's ref/, not committed).
+
+## Not verified
+
+- **The user's own slowdown** (iOS 26+, their phone, RyukGram): not reproduced. On the 15 Pro (iOS 27.0.1) the copy
+  ran at 15-17 MB/s in the background or locked against 18 in front, with no suspension. Not tried: switching to an
+  app that takes the audio session (KeepAlive's loop would stop; the 15 Pro has no Apple ID for such apps and no
+  sound), a slower or DERP-relayed Tailscale path (here it was direct over the LAN), iOS 26. R53 asks a person to
+  repeat it on their phone with this build; its log and page lines now give front/background speeds and drops.
+- **A drop during installd is only noticed after the 180 s installd limit** (run 7): it ends right, but slowly.
+  Filed B251.
+- **Leaving the app before the copy starts** (signing, route choice) pauses the run until it is back: filed B252.
+- **Resume of a copy that dropped mid-chunk**: run 5 dropped between chunks as far as the log shows; a chunk cut
+  part-way is handled by `resumeAt` (tested on Linux only).
+- **Same-version reinstall after a drop** (the `sameAsBefore` / bundle-folder rule): every phone run changed
+  version; Browse does return `Path`, and each install got a new bundle folder (runs 6-7), which is what the rule
+  relies on.
+- **LocalDevVPN route**: not installed on the 15 Pro; only the Tailscale route was run.

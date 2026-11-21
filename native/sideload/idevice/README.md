@@ -38,7 +38,9 @@ verifies an existing pairing. LocalDevVPN must be on while installing; iOS lets 
 
 Leaving the app, a tunnel reset or Tailscale's node going quiet can drop the connection to iOS (idevice's
 `Socket(Kind(UnexpectedEof))`, or the watchdog's timeout). That is not iOS refusing the app, so `IDevice.install`
-connects again, up to 4 times with a growing pause (`../../sign/HereRecheck.swift` holds the rules):
+connects again, up to 4 times with a growing pause (`../../sign/HereRecheck.swift` holds the rules), always over the
+route the install started on (Automatic would pick LocalDevVPN while Tailscale's VPN is still coming back); a connect
+that fails while it is connecting again counts as one of the tries:
 
 - **During the copy**: it carries on from the end of iOS's file in `PublicStaging` (a whole 1 MB chunk back).
 - **After the install was sent**: installd goes on without us, so it asks installation_proxy (Browse by bundle ID:

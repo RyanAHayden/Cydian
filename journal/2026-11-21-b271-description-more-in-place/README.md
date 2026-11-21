@@ -52,6 +52,21 @@ style draws What's New, not a folded text.
 - `node tools/smoke/smoke.mjs` and `--site`: pass, including the new step (`More kept the scroll position (1112px)`,
   text and group edges off by 0.0px, `Less ... scroll 1539 -> 1018px, row 444 -> 445`). Slowed shots looked right.
 
+- iPhone 15 Pro (iOS 27), Safari: a test page in the scratchpad that imports this worktree's `web/app` modules (real
+  CSS, `installSlides`, `descriptionGroup`, the App Store card built as altstore.js does), served through
+  `tailscale serve --https=8475`, driven with `tools/ui-15.sh` taps. It logs `scrollTop` every frame for 1.5 s after
+  each tap: More `540 -> 540 (values seen: 540)`; Less `1011 -> 490` with the Less row back under the finger; App Store
+  More `672 -> 672 (values seen: 672)`. Shots: `ref/15/screens/b271-1..6.png` (main checkout's ref/). Port and
+  server stopped afterwards.
+
 ## Not verified
 
-(filled in below)
+- The motion itself on the phone (that the text and the group edge travel with the rows): go-ios screenshots take
+  longer than the .3s slide, so the phone shots show only before and after. The frame-by-frame edge checks ran in
+  Chromium (smoke step 7/7b), not WebKit. WebKit has supported unprefixed `clip-path: inset(... round ...)` and its Web
+  Animations since well before iOS 15, so I expect the same, but it wasn't seen.
+- Inside the Lite app and the jailbreak app on a phone: I didn't install a test build on the 15 (a reinstall can lose
+  its signing identity, B276) or touch the 7. Both apps run the same `web/app` in WKWebView, the engine Safari uses,
+  so the Safari run stands in for them.
+- The iOS 7 / iOS 13 styles: only the iOS 6 style ran. The code reads the table's corner radius from computed style
+  and touches nothing else that differs per style.

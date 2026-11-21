@@ -135,7 +135,12 @@ The bars' own heights (`--nav-h`, `--tab-h`) are layout that every screen depend
 
 iOS 13 and iOS 26 need three, each off in iOS 6:
 
-- large titles that collapse into the nav bar on scroll (`nav/navbar.js`), not built yet;
+- **large titles**: `<html data-nav="large">`, set by the era's JS through `nav/navbar.js` `setLargeTitles(true)`.
+  Each tab's root page draws its title as a 34px bold left `.large-title` at the top of its body, which scrolls with
+  the content; as it goes under the nav bar it fades out and the bar's `.nav-title` fades in (from half way), and
+  pulled past the top it grows to 110% from its left. Transform and opacity only, once a frame. Pushed pages and
+  pages whose title is a control keep the bar title. Hooks in `style.css`: `--large-title-h` (52px, also the
+  collapse distance) and `--large-title-pad` (3px 16px 8px); its type is look an era may restyle on `.large-title`;
 - a floating tab bar pill, Search as its own circle, content scrolling under it (`nav/tabbar.js`, `style.css`), not
   built yet;
 - **card sheets**: `<html data-sheet="card">`, set by the era's JS when it is chosen. A modal sheet (`nav/sheet.js`)
@@ -203,7 +208,7 @@ Not yet clean, each queued as its own cleanup:
   reload bar, segmented control, undo bar, pull to refresh, placeholders);
 - the other stylesheets (`packages.css`; the small ones);
 - the light palettes' segmented-control rules in `palettes.css` (they move onto tokens with that control);
-- the large-title and floating-tab-bar nav hooks above.
+- the floating-tab-bar nav hook above.
 
 The screens' inline SVG art comes from the icon map below; the overlays `nav/` draws take theirs from CSS tokens
 ([Overlays](#overlays-nav)).

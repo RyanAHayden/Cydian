@@ -25,7 +25,8 @@ An era is clean when all of these hold:
    iOS 6 page: check it with a 3x screenshot and computed-style diff against main
    (`journal/2026-11-20-c44-era-readiness/shots.mjs` then `diff.py`, both themes and every palette).
 
-An era is ready to build when the components it restyles meet 1 to 4. Today only the four below do.
+An era is ready to build when the components it restyles meet 1 to 4. [What is clean today](#what-is-clean-today)
+lists the ones that do.
 
 ### Look and layout
 
@@ -94,8 +95,9 @@ the app supports iOS 15.0, so cascade layers are out.
   every palette, light or dark, and the era's dark block needs no extra weight. The tokens it does not set would
   still come from the palette, half-painting it, so **an era offers only its own themes** (White and OLED Black):
   the theme menu must hide the palettes while an era is chosen, and the app set no `data-palette` under it (a saved
-  palette waits for iOS 6). Two palette rules still paint chrome: the App Store segmented control (`ios6.css`'s has
-  no tokens yet) and Brushed Metal's etched text; with the palettes hidden they never meet an era.
+  palette waits for iOS 6). Two palette rules still paint chrome: the App Store segmented control (`ios6.css`'s
+  reads `--seg*` tokens, but the palettes still paint it with rules) and Brushed Metal's etched text; with the
+  palettes hidden they never meet an era.
 - **Order**: link `ios<N>.css` after `palettes.css`; `wide.css` is layout and can stay last.
 
 ## Hooks
@@ -112,6 +114,17 @@ the app supports iOS 15.0, so cascade layers are out.
 | `--group-margin`, `--group-gap`, `--group-first-head` | 10px 10px 0, 23px, 10px | grouped tables: inset, space between, the first header |
 | `--group-head-margin`, `--group-foot-margin` | 0 9px 7px, 7px 9px 0 | a group's header and footer |
 | `--cell-min-h`, `--cell-pad`, `--cell-gap` | 43px, 0 10px, 8px | every table cell |
+| `--plain-cell-pad-y` | 4px | a plain table's cell, above and below |
+| `--section-head-h`, `--section-head-pad` | 23px, 0 12px | a plain table's sticky section header |
+| `--pair-h`, `--pair-gap` | 44px, 9px | two buttons in one row (the button pair) |
+| `--seg-h`, `--seg-margin` | 30px, 10px 10px 0 | the segmented control |
+| `--hud-w`, `--hud-pad` | 180px, 28px 12px 22px | the HUD |
+| `--callout-h` | 38px | the menu callout and the queue hint |
+| `--banner-pad` | 6px 12px 7px | the notification banner |
+
+No hook yet, on purpose: the switch (`nav/switch.js` moves the knob 50px from JS, so its 77x27 box can't change
+from CSS alone), the reload and undo bars' 44pt, the share sheet's grid, the pull area and the placeholders.
+`packages.css` and the other component stylesheets keep their layout in their own rules and have no hooks.
 
 The bars' own heights (`--nav-h`, `--tab-h`) are layout that every screen depends on; an era that changes them
 (large titles, a floating tab bar) does it through a nav hook, not by setting them.
@@ -129,7 +142,67 @@ The bars' own heights (`--nav-h`, `--tab-h`) are layout that every screen depend
   (`.tab[data-tab] { --glyph }`); badge `--badge`, `--badge-ring`, `--badge-shadow`; dark `--dk-tabbar`.
 - Grouped tables: `--grouped-ground` (also pull to refresh's area on a grouped page), `--table`, `--table-edge`,
   `--table-inset`, `--divider`, `--divider-hi`, `--head`, `--emboss`, `--text`, `--subtitle`, `--detail`, `--count`,
-  `--chevron`, `--select`.
+  `--chevron`, `--select`; a selected row's white chevron `--chevron-pressed`.
+- Plain tables: section header `--section-head-text`, `--section-head-emboss` (its bar is `--category`).
+- Button pair: `--pair-delete`, `--pair-delete-pressed`, `--pair-delete-text`, `--pair-delete-emboss`,
+  `--pair-delete-edge`, `--pair-delete-edge-bottom`, `--pair-delete-shadow`, `--pair-delete-shadow-dark`.
+- Switch: `--sw-edge`, `--sw-edge-on`, `--sw-track`, `--sw-on`, `--sw-on-label` ("ON"), `--sw-on-text`,
+  `--sw-on-emboss`, `--sw-off-label` ("OFF"), `--sw-off-text`, `--sw-knob`, `--sw-knob-held`, `--sw-knob-edge`,
+  `--sw-knob-edge-bottom`, `--sw-track-shadow-dark`.
+- Segmented control: `--seg`, `--seg-edge`, `--seg-shadow`, `--seg-divider`, `--seg-text`, `--seg-emboss`,
+  `--seg-pressed`, `--seg-selected`, `--seg-selected-text`, `--seg-selected-emboss`, `--seg-selected-edge`.
+- HUD: `--hud`, `--hud-text`, `--hud-emboss`, `--hud-check`; scroll indicator `--scroll-thumb`, `--scroll-thumb-ring`.
+- Menu callout: `--menu`, `--menu-drop`, `--menu-edge`, `--menu-shine`, `--menu-text`, `--menu-emboss`,
+  `--menu-divider`, `--menu-divider-hi`, `--menu-pressed`, `--menu-arrow`, `--menu-arrow-below`; queue hint
+  `--callout`, `--callout-drop`, `--callout-edge`, `--callout-text`, `--callout-emboss`, `--callout-arrow`.
+- Signing rows: `--field-caret`, `--field-ring`, `--field-active`, `--pw-right`, `--pw-wrong`.
+- Banner: `--banner`, `--banner-shadow`, `--banner-edge`, `--banner-icon-shadow`, `--banner-emboss`,
+  `--banner-title`, `--banner-text`, `--banner-timer`.
+- Share sheet: `--share-dim`, `--share-sheet`, `--share-sheet-shadow`, `--share-icon-shadow`, `--share-system`,
+  `--share-system-metal`, `--share-system-shine`, `--share-system-glyph-emboss`, `--share-glyph-copy`,
+  `--share-glyph-qr`, `--share-app-gloss`, `--share-app-shine`, `--share-letter`, `--share-letter-emboss`,
+  `--share-pressed`, `--share-label`, `--share-label-emboss`, `--share-dot`, `--share-dot-on`, `--share-cancel`,
+  `--share-cancel-edge`, `--share-cancel-shadow`, `--share-cancel-text`, `--share-cancel-emboss`,
+  `--share-cancel-stroke`, `--share-cancel-pressed`; the nav bar's Share glyph `--bar-glyph-emboss`.
+- Reload bar `--reload-bar`, `--reload-text`, `--reload-emboss`; undo bar `--undo-bar`, `--undo-text`,
+  `--undo-emboss`.
+- Pull to refresh: `--pull-arrow`, `--pull-text`, `--pull-emboss`, `--pull-emboss-dark`.
+- Placeholders `--placeholder` (dark `--dk-placeholder`); locked tab `--tab-lock` (the padlock), `--tab-locked` (the
+  dimming).
+
+The `…-dark` tokens hold the decorations `ios6.css`'s dark rules draw that are the same in every dark palette (the
+sunken switch track, the delete button's shadow, the pull text's emboss); the dark rules' colours stay `--dk-*`.
+Flat colours and corner radii are still literal in some rules (a held row's white text, the badge's): an era
+restyles those with a look rule of its own.
+
+### Look tokens (packages.css)
+
+`packages.css` opens with a `:root` of iOS 6's decorations (its own look-only stretch); each of its sections keeps
+their layout in plain rules and paint in a look-only stretch after them.
+
+- Search bar: `--search-bar`, `--search-bar-scoped`, the field `--search-field` (white plus the magnifier),
+  `--search-field-edge`, `--search-field-edge-top`, `--search-field-shadow`, `--search-text`, `--search-hint`, the
+  clear button `--search-clear`, Cancel `--search-cancel`, `--search-cancel-pressed`, `--search-cancel-edge`,
+  `--search-cancel-edge-top`, `--search-cancel-edge-bottom`, `--search-cancel-text`, `--search-cancel-emboss`,
+  `--search-cancel-shadow`.
+- Scope bar: `--search-scope`, segments `--scope-seg`, `--scope-seg-edge`, `--scope-seg-edge-top`,
+  `--scope-seg-edge-bottom`, `--scope-seg-divider`, `--scope-seg-text`, `--scope-seg-emboss`, `--scope-seg-shadow`,
+  selected `--scope-seg-selected`, `--scope-seg-selected-edge`, `--scope-seg-selected-edge-top`,
+  `--scope-seg-selected-edge-bottom`, `--scope-seg-selected-divider`; dark `--scope-seg-dark-selected-edge`,
+  `--scope-seg-dark-divider`.
+- Filter: its Done `--scope-done`, `--scope-done-pressed`, `--scope-done-edge`, `--scope-done-edge-top`; the panel
+  `--filter-ground`, `--filter-shadow`.
+- Action sheet: `--action-dim`, `--action-sheet`, `--action-title`, `--action-title-emboss`, `--action-btn`,
+  `--action-btn-text`, `--action-btn-emboss`, `--action-btn-edge`, `--action-btn-shadow`, `--action-btn-pressed`,
+  `--action-btn-pressed-text`, `--action-btn-pressed-emboss`, `--action-destructive`, `--action-destructive-text`,
+  `--action-destructive-emboss`, `--action-cancel`, `--action-cancel-pressed`, `--action-cancel-text`,
+  `--action-cancel-emboss`; dark `--dk-action-sheet`, `--dk-action-btn`, `--dk-action-cancel`.
+- Store header: `--store-head`, `--store-head-edge`, `--store-head-emboss`.
+- Sheets (`nav/sheet.js`) paint with `--plain` and their bar is a `.navbar`, so the nav bar's tokens restyle them;
+  card sheets are the [nav hook](#nav-hooks) below.
+
+The store icon's and Browse hero's reflection (`-webkit-box-reflect`) paints but is not in the test's `LOOK` list,
+so it still sits in a layout rule.
 
 ### Nav hooks
 
@@ -161,16 +234,16 @@ against these classes. The classes and states are the hooks: keep them when an o
 | Overlay | JS | Classes and states | Look today |
 |---|---|---|---|
 | Alert | `alert.js` | `.alert-scrim`, `.alert`, `.alert-title`, `.alert-message`, `.alert-field`, `.alert-field-row`, `.alert-paste`, `.alert-buttons` (`.stacked`), `.alert-button` (`.cancel`, `.green`, `.red`) | `sources.css`, literal |
-| Action sheet | `actionsheet.js` | `.action-scrim`, `.action-dim`, `.action-sheet`, `.action-title`, `.action-list`, `.action-button` (`.destructive`, `.cancel`) | `packages.css`, literal |
+| Action sheet | `actionsheet.js` | `.action-scrim`, `.action-dim`, `.action-sheet`, `.action-title`, `.action-list`, `.action-button` (`.destructive`, `.cancel`) | `packages.css`, tokens: `--action-*`; dark `--dk-action-sheet`, `--dk-action-btn`, `--dk-action-cancel` |
 | Share sheet | `sharesheet.js` | `.share-scrim`, `.share-dim`, `.share-sheet`, `.share-pages`, `.share-grid`, `.share-item`, `.share-icon` (`.system`, `.app`, `.has-image`), `.share-glyph` (`.glyph-copy`, `.glyph-qr`), `.share-letter`, `.share-image`, `.share-label`, `.share-dots` (`span.on`), `.share-cancel`; the nav bar's `.share-button` | `ios6.css`, tokens: `--share-*`, the glyphs `--share-glyph-copy`, `--share-glyph-qr`; an app's own colour comes in `--share-tint` |
 | HUD | `hud.js` | `.hud-scrim`, `.hud`, `.hud-spinner`, `.hud-label`, `.hud-check` | `ios6.css`, tokens: `--hud`, `--hud-text`, `--hud-emboss`, `--spinner-large`, `--hud-check` (the checkmark's art) |
 | Spinners | `spinner.js` | `.hud-spinner`, `.reload-spinner`, `.pull-spinner`, `.badge.spinning`, `.source-row.is-loading` | `ios6.css` tokens `--spinner-white`, `--spinner-gray`, `--spinner-large` |
-| Reload bar | `reloadbar.js` | `.reload-bar`, `.reload-spinner`, `.reload-text`, `.reload-cancel` (a `.bar-button.done`) | `ios6.css`, literal |
+| Reload bar | `reloadbar.js` | `.reload-bar`, `.reload-spinner`, `.reload-text`, `.reload-cancel` (a `.bar-button.done`) | `ios6.css`, tokens: `--reload-bar`, `--reload-text`, `--reload-emboss` |
 | Section index | `sectionindex.js` | `.section-index` (`.held`), its letters (`.section-index span`) | `packages.css`, literal |
 | Row swipe | `rowswipe.js` | `.row-swipe` (`.armed`, `.hint`, `.swiping`, `[data-kind="add"|"remove"|"cancel"]`), `.row-swipe-control` | `packages.css`, literal |
-| Banner | `banner.js` | `.banner`, `.banner-icon`, `.banner-text`, `.banner-action` (a `.bar-button.done`), `.banner-timer` | `ios6.css`, literal |
-| Undo bar | `undobar.js` | `.undo-bar` (`.shown`), `.undo-bar-text`, `.undo-bar-button` (a `.bar-button.done`) | `ios6.css`, literal |
-| Menu | `menu.js` | `.menu` (`.below`), `.menu-items`, `.menu-item` (`.is-held`), `.menu-arrow` | `ios6.css`, literal |
+| Banner | `banner.js` | `.banner`, `.banner-icon`, `.banner-text`, `.banner-action` (a `.bar-button.done`), `.banner-timer` | `ios6.css`, tokens: `--banner*` |
+| Undo bar | `undobar.js` | `.undo-bar` (`.shown`), `.undo-bar-text`, `.undo-bar-button` (a `.bar-button.done`) | `ios6.css`, tokens: `--undo-bar`, `--undo-text`, `--undo-emboss` |
+| Menu | `menu.js` | `.menu` (`.below`), `.menu-items`, `.menu-item` (`.is-held`), `.menu-arrow` | `ios6.css`, tokens: `--menu*` |
 | Placeholders | `ui.js` `placeholder()` | `.ph` (`.ph-list`, `.ph-page`), `.ph-head`, `.ph-lines`, `.ph-box` (`.ph-icon`, `.ph-icon-lg`), `.ph-bar` (`.ph-sub`, widths `.ph-w30`…`.ph-w70`) | `ios6.css`, tokens `--placeholder`, `--dk-placeholder` |
 | Built-in lock | `lock.js` | `.name-lock`, `.source-lock`, `.lock-icon` | `sources.css`, token `--lock-icon` (the padlock's art) |
 | Row icon tint | `ui.js` | `.cell-icon` | `ios6.css`, tokens `--cell-icon`, `--cell-icon-text`; a row's own colour (`icon.color`) comes in `--cell-icon-tint` |
@@ -182,8 +255,18 @@ that sheet's cleanup turns them into tokens.
 
 ## What is clean today
 
-Clean: the nav bar (bar, shadow, title, status-bar strip), bar buttons (bordered, back, red, the Share glyph), the
-tab bar (bar, tabs, glyph fills, badge) and grouped tables with their cells.
+Clean:
+
+- all of `ios6.css`: the nav bar (bar, shadow, title, status-bar strip), bar buttons (bordered, back, red, the Share
+  glyph), the tab bar (bar, tabs, glyph fills, badge) and grouped tables with their cells; and the switch, plain
+  tables and section header, button pair, HUD, menu callout, queue hint, signing rows, banner, share sheet, reload
+  bar, segmented control, undo bar, pull to refresh, placeholders and locked tab. Its layout is in `style.css`
+  (geometry an era moves through [the hooks](#geometry-stylecss-era-hooks)), its paint in look-only stretches and
+  its decorations in the [tokens](#look-tokens-ios6css);
+- `packages.css`: the search bar, scope bar, Filter, action sheet, store header and sheets, and every other section
+  (package rows, Sections, the package page, Browse, …) split into layout rules and a look-only stretch, with the
+  decorations in its [tokens](#look-tokens-packagescss). Some of its colours and glyphs (the section index, the row
+  swipe control) are still literal look rules.
 
 Split, with their layout in their own rules and their paint in look-only stretches: `sources.css`, `home.css` and
 `settings.css`. Their iOS 6 decorations are tokens an era sets:
@@ -199,10 +282,9 @@ literal look rules: an era restyles them with look rules of its own.
 
 Not yet clean, each queued as its own cleanup:
 
-- the rest of `ios6.css` (switch, plain tables and section header, button pair, HUD, menu, banner, share sheet,
-  reload bar, segmented control, undo bar, pull to refresh, placeholders);
-- the other stylesheets (`packages.css`; the small ones);
-- the light palettes' segmented-control rules in `palettes.css` (they move onto tokens with that control);
+- the other stylesheets (the small ones);
+- the light palettes' segmented-control rules in `palettes.css` (the control now reads `--seg*` tokens; the rules
+  have not moved onto them yet);
 - the large-title and floating-tab-bar nav hooks above.
 
 The screens' inline SVG art comes from the icon map below; the overlays `nav/` draws take theirs from CSS tokens

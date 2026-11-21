@@ -37,12 +37,23 @@
   paired), and the account would carry it to the website and other phones.
 - Only `tailscaled.state` is kept: tsnet regenerates the rest of its Dir; logs go to TMPDIR.
 
+## Spec review
+
+- "restoreState() writes before stateDir exists": no, `stateURL` goes through `Tailscale.stateDir`, whose getter
+  creates the directory. No change.
+- "the Keychain copy can go stale after Running": `endInstall()` now keeps the state file again after the node
+  stops (key renewals come through a sign-in, which goes through `remember()`).
+- "the saved sign-in itself may overwrite the route in the same container": checked, the account applies only TRAVELS
+  settings (screens/account.js) and never touches `installRoute` or the Tailscale calls.
+- Connect With is kept too, beside the route: it is half of "local signing over Tailscale" (Automatic vs
+  LocalDevVPN decides whether the route uses Tailscale). `app.js` gets one line to start keepRoute.
+
 ## Not verified
 
 - On the 15 Pro: pick This iPhone + Tailscale sign-in, reinstall the Lite IPA, sign in with the saved account key,
   and see the route still This iPhone, Tailscale signed in without a login page, and the tailnet admin console still
   one device. Not done in this run: it needs a reinstall of the user's Lite build on the 15 Pro and the owner's
-  tailnet admin console (memory: Tailscale login there needs the owner). Filed as a CONFIRM follow-up if the gate
-  passes.
+  tailnet admin console (memory: Tailscale login there needs the owner). Filed as R50. The sideload and jailbreak
+  builds compile (`make -C native package`), and the Python/node checks pass.
 - Whether the Keychain item survives a re-sign with a different team (a different access group): by iOS design it
   doesn't; then the old behaviour (a new node) remains. Not checked on a device.

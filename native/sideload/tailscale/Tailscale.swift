@@ -173,6 +173,7 @@ enum Tailscale {
         tunnel_set_port_map(nil)
         lock.lock(); relayHost = nil; lock.unlock()
         stop()
+        if node != nil { TailscaleKeep.keepState() } // B218: whatever tsnet wrote while it ran
         log("install connection closed; node stopped")
     }
 }

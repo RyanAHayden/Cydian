@@ -48,6 +48,10 @@ when Match Theme goes off (a theme icon) and back on (the primary):
 ## Not verified
 
 - Through Theme's own Match Theme switch on screen: the check sent the bridge messages that switch sends, not taps.
+  After the spec review I went back for the tapped version, but R54 held the iPhone 15's lock for the next 15
+  minutes, so it wasn't run.
+- Spec review: the own icon's switch after the self re-sign goes through `apply` too (app.icon -> applyShown ->
+  switchTo -> apply), so it is kept like any other switch; seen in the code, not on the phone.
 - The own-icon case from F329a (Icon-owna on screen, then the primary) and the a/b own-set pick with a kept name:
   it needs a picture added and the self re-sign + install round, which the Midnight -> primary pair covers for apply's
   check; `pick` gets the same `onScreen` reading.

@@ -134,3 +134,23 @@ test("previewSlot: built detached (all widths 0), the first dot is the dark one"
     assert.deepEqual(dots.children.map((d) => d.classList.contains("on")), [true, false, false]);
   }, layoutDocument(detached));
 });
+
+test("B195 revealSlot: the slot slides down from `by` up while its content slides the other way, clipped, in the rows' timing", async () => {
+  const { revealSlot } = await import("./altstore.js");
+  const { DURATION, EASE } = await import("../nav/motion.js");
+  const made = [];
+  const anim = (target, frames, timing) => { const a = { target, frames, timing, playState: "running" }; made.push(a); return a; };
+  const child = { animate(f, t) { return anim("child", f, t); } };
+  const slot = { style: {}, children: [child], animate(f, t) { return anim("slot", f, t); } };
+  const r = revealSlot(slot, 300);
+  assert.ok(r);
+  assert.deepEqual(made.map((a) => [a.target, a.frames[0].transform, a.frames[1].transform]),
+    [["slot", "translateY(-300px)", "none"], ["child", "translateY(300px)", "none"]]);
+  for (const a of made) assert.deepEqual(a.timing, { duration: DURATION, easing: EASE }, "nav/slide.js's timing");
+  for (const a of made) assert.deepEqual(Object.keys(a.frames[0]), ["transform"], "transform only");
+  assert.equal(slot.style.overflow, "hidden", "clipped while it opens");
+  r.box.playState = "finished";
+  r.box.onfinish();
+  assert.equal(slot.style.overflow, "", "the clip goes once it's open");
+  assert.equal(revealSlot(slot, 0), null, "nothing to reveal when it didn't grow");
+});

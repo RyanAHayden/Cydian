@@ -44,6 +44,7 @@ import { notIphonePage } from "./core/platform.js";
 import { showNotIphone } from "./screens/notiphone.js";
 import { handoffRecent } from "./handoffclock.js";
 import { navButtons, MOVED_CLASS } from "./nav/navbuttons.js";
+import { holdButton } from "./nav/menu.js"; // F346
 import { setNavigator, pageHandle } from "./nav/go.js";
 
 // F266: a Mac, PC or Android phone gets the Not-an-iPhone page first, and the app only starts once it's left (Look
@@ -117,6 +118,7 @@ function button(spec, cls) {
   b.textContent = spec.label;
   if (spec.onClick) b.addEventListener("click", spec.onClick);
   if (spec.onPress) b.addEventListener("pointerdown", spec.onPress); // touch-down (Sources' Add: Type before the Paste bubble)
+  if (spec.onHold) holdButton(b, spec.onHold); // F346: a package page's Install held opens Install Which Version?
   if (spec.ref) spec.ref(b); // F147: the screen keeps the button to change its label later (Installed's Wish List count)
   return b;
 }

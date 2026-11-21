@@ -140,6 +140,12 @@ export function longPress(el, selector, onHold, { doc = globalThis.document, hol
   el.addEventListener("contextmenu", (e) => { if (e.target.closest(selector)) e.preventDefault(); });
 }
 
+// F346: a hold on one button (the nav bar's Install): `onHold(button)` after HOLD_MS, the tap's click eaten, no
+// callout. A tap still clicks. The pressed look while the finger is down is app.js's .is-pressed, as for any tap.
+export function holdButton(button, onHold, opts = {}) {
+  longPress(button, "button", (b) => onHold(b), opts);
+}
+
 // The touch that is down now has done its job (a hold): its click, wherever it lands, is eaten. A new touch (its
 // pointerdown) or 2 s without a click ends this.
 function swallowNextClick(doc) {

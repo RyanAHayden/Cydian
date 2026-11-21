@@ -345,14 +345,17 @@ export function installWhichButtons(app, installed = "", ios = null) {
 // Sideload: the version's job is queued (Confirm); when nothing could be queued, the install rows' first one runs, as
 // Version History falls back to its rows (siteInstallVersion picks the same first row).
 export async function installWhichVersion(app, pkg, source, { installed = "", ask = showActionSheet, mode = detectMode(), ios = currentDevice().ios ?? null,
-  queueVersion = (v) => appPageAction(pkg, source, { version: v.version }), siteInstall = (v) => siteInstallVersion(pkg, v, source) } = {}) {
+  queueVersion = (v) => appPageAction(pkg, source, { version: v.version }), siteInstall = (v) => siteInstallVersion(pkg, v, source),
+  jailbreakInstall = null } = {}) {
   const { buttons, versions } = installWhichButtons(app, installed, ios);
   if (!versions.some(Boolean)) return null;
+  if (mode === "jailbreak" && !jailbreakInstall) return null; // F346: the jailbreak app's hold brings its own install
   const i = await ask({ title: INSTALL_WHICH_TITLE, buttons });
   const v = i >= 0 ? versions[i] : null;
   if (!v) return null;
   if (mode === "sideload") { if (!(await queueVersion(v))) await siteInstall(v); }
   else if (mode === "site") await siteInstall(v);
+  else if (mode === "jailbreak") await jailbreakInstall(v);
   else return null;
   return v;
 }

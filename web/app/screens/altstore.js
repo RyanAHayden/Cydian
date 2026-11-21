@@ -1321,12 +1321,23 @@ const revealing = new WeakMap(); // slot -> its running reveal (the last one cle
 export function revealSlot(slot, by) {
   if (typeof slot.animate !== "function" || !(by > 0)) return null;
   if (globalThis.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches) return null;
+  // The slot itself sliding too (something above it changed in the same step): a second transform would replace
+  // slide.js's, so it opens as before (still in step, unclipped) rather than out of step.
+  if (slot.getAnimations?.().some((a) => a.playState === "running" && !revealing.has(slot))) return null;
   const timing = { duration: DURATION, easing: EASE };
   const box = slot.animate([{ transform: `translateY(${-by}px)` }, { transform: "none" }], timing);
   const inner = [...slot.children].map((c) => c.animate?.([{ transform: `translateY(${by}px)` }, { transform: "none" }], timing));
-  slot.style.overflow = "hidden"; // not `clip`: iOS 15's WebKit lacks it; the slot is already a flow-root, so no reflow
+  // not `clip`: iOS 15's WebKit lacks it; the slot is already a flow-root, so no reflow. The empty band the box
+  // holds above the slot while it opens lets taps through to the rows there; the gallery itself stays tappable.
+  Object.assign(slot.style, { overflow: "hidden", pointerEvents: "none" });
+  for (const c of slot.children) c.style && (c.style.pointerEvents = "auto");
   revealing.set(slot, box);
-  const done = () => { if (revealing.get(slot) === box) { revealing.delete(slot); slot.style.overflow = ""; } };
+  const done = () => {
+    if (revealing.get(slot) !== box) return;
+    revealing.delete(slot);
+    Object.assign(slot.style, { overflow: "", pointerEvents: "" });
+    for (const c of slot.children) c.style && (c.style.pointerEvents = "");
+  };
   box.onfinish = done;
   box.oncancel = done;
   return { box, inner };

@@ -152,12 +152,15 @@ export function plan(prev, next, own = () => 0) {
   return { moves, enters, leaves };
 }
 
-// B195: which of plan()'s enters and leaves fade. A loading skeleton (.ph) leaves at once: a fading copy of it over
-// the content it stood for is a half-faded skeleton. A page still in its navigation push (`pushing`) fades nothing
-// and takes its content at once, so the push carries no half-faded layer over the page below.
+// B195: which of plan()'s enters and leaves fade. A loading skeleton (.ph) is swapped for its content at once, both
+// ways: a fading copy of it over the content is a half-faded skeleton, and content fading in where it went would
+// blink the place empty first. A page in a navigation slide (`pushing`: app.js marks both pages .is-moving for a push,
+// a pop and an edge swipe) fades nothing and takes its content at once, so the slide carries no half-faded layer.
 export function fadesOf({ enters, leaves }, pushing = false) {
   if (pushing) return { enters: [], leaves: [] };
-  return { enters, leaves: leaves.filter(({ box }) => !box.el?.matches?.(STAND_IN)) };
+  const standIn = ({ box }) => Boolean(box.el?.matches?.(STAND_IN));
+  if (leaves.some(standIn)) return { enters: [], leaves: leaves.filter((l) => !standIn(l)) };
+  return { enters, leaves };
 }
 
 // ---- measuring (DOM) -------------------------------------------------------------------------------------------

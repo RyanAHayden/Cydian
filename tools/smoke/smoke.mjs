@@ -310,7 +310,7 @@ try {
   })()`);
   if (check(!skeleton.error, `a skeleton swap ran${skeleton.error ? ": " + skeleton.error : ""}`)) {
     check(skeleton.rest.ghosts === 0 && skeleton.push.ghosts === 0, "a skeleton leaves no fading copy over the content");
-    check(skeleton.push.fading === 0, "mid-push the content comes in at once (no fade)");
+    check(skeleton.push.fading === 0 && skeleton.rest.fading === 0, "the content takes the skeleton's place at once (no fade, no blank blink)");
   }
 
   // the verdict

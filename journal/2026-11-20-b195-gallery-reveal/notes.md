@@ -46,6 +46,17 @@ The user's recording (frames 0.9-1.4 s at 15 fps) shows two things:
 - The smoke's edge-swipe-back step failed 2 times out of about 6 runs while other slots were busy, and passed
   alone. It's unrelated to this change (the same failure appears with or without it); filed as a follow-up.
 
+## Spec review fixes
+- Dropping only the skeleton's fading copy left the content fading in from 0, so the place blinked empty first.
+  Content that replaces a skeleton now comes in at once (`fadesOf` drops the enters too when a `.ph` leaves).
+- `revealSlot` steps aside when slide.js is already sliding the slot itself in the same change: a second transform
+  would replace slide.js's. The slot then opens as before.
+- During the reveal the slot's box hangs `by` px above the slot. It now has `pointer-events: none` there, with
+  the gallery set back to `auto`, so taps on the rows above get through.
+- `.page.is-moving` is set on both pages for a push, a pop and an edge swipe. Fading nothing during any of these is
+  intended; the comment now says so.
+- `plan/TODO.md`'s T65 line came from `run plan add`, not a hand edit.
+
 ## Not verified
 - On a real phone (iPhone 15 Pro sideload / iPhone 7 jailbreak) at 120 Hz: not run. The check was Chromium at
   60 fps (rAF sampling plus slowed screenshots). WebKit composites `overflow: hidden` plus transform the same way,

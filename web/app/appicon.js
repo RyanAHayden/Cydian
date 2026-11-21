@@ -11,7 +11,7 @@ import { settings } from "./settings-store.js";
 import { iconFor, iconState } from "./core/settings.js";
 import { nativeBridge, hasNativeCall } from "./native.js";
 import { iosFromUserAgent } from "./core/compat.js";
-import { clearOffered } from "./core/settings.js";
+import { clearOffered, isOwnIcon } from "./core/settings.js";
 
 // Whether Theme > App Icon's grid offers Clear on this phone (iOS 18+; the web view's user agent carries iOS's version).
 export const clearHere = (ua = globalThis.navigator?.userAgent) => clearOffered(iosFromUserAgent(ua));
@@ -56,6 +56,13 @@ export const RETRY_MS = [1000, 3000, 10000];
 // native/bridge.js turns "failed: <text>" into an Error with code "failed" and message <text>.
 export const retryable = (e) => e?.code === "failed" || /^failed\b/.test(String(e?.message ?? e ?? ""));
 
+// B240: Lite answers "resign_needed: …" for a picked own icon that isn't in its bundle: an update from the AltStore
+// source (or any fresh IPA) put the own sets' placeholders back, or the self re-sign's install never finished. The
+// page then offers the re-sign again or the theme's icon (screens/appicon.js offerResign).
+export const resignNeeded = (e) => e?.code === "resign_needed" || /^resign_needed\b/.test(String(e?.message ?? e ?? ""));
+let onResign = (name, s) => { import("./screens/appicon.js").then((m) => m.offerResign(name, s)).catch(() => {}); };
+export const setResignHandler = (f) => { onResign = f; };
+
 let lastSent = "";
 let sends = 0; // a reply counts only while no newer app.icon went out
 let retry = null;
@@ -71,6 +78,7 @@ export function tellIcon(onScreen, s = settings, native = nativeBridge(), attemp
   Promise.resolve(native.call(method, params)).catch((e) => {
     if (n !== sends) return; // a newer change went out after it
     lastSent = ""; // so the next change, or the retry, sends it again
+    if (resignNeeded(e) && isOwnIcon(params.onScreen)) return onResign(params.onScreen, s);
     if (!retryable(e) || attempt >= RETRY_MS.length) return;
     retry = setTimeout(() => { retry = null; if (n === sends) tellIcon(onScreen, s, native, attempt + 1); }, RETRY_MS[attempt]);
   });

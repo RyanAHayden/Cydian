@@ -34,7 +34,7 @@ html[data-style="ios13"][data-theme="light"] {
   --i13-tint: #007aff; --i13-red: #ff3b30; --i13-green: #34c759;
   --i13-bar: #f9f9f9; --i13-hairline: rgba(0,0,0,.3); --i13-label: #000;
   --i13-sw-track: #e9e9eb; --i13-knob: #fff;
-  --i13-knob-shadow: 0 3px 8px -2px rgba(0,0,0,.15), 0 3px 1px -2px rgba(0,0,0,.06), 0 0 0 -1.5px rgba(0,0,0,.04);
+  --i13-knob-shadow: 0 3px 8px rgba(0,0,0,.15), 0 3px 1px rgba(0,0,0,.06), 0 0 0 .5px rgba(0,0,0,.04);
   --i13-knob-held: #f2f2f2;
   --i13-seg-track: #e3e3e8; --i13-seg-pill: #fff; --i13-seg-text: #000; --i13-seg-divider: #c7c7cc;
   --i13-seg-pressed: #d6d6db;
@@ -121,7 +121,7 @@ html[data-style="ios13"][data-theme="dark"] {
   --i13-tint: #0a84ff; --i13-red: #ff453a; --i13-green: #30d158;
   --i13-bar: #000; --i13-hairline: #38383a; --i13-label: #fff;
   --i13-sw-track: #39393d; --i13-knob: #fff;
-  --i13-knob-shadow: 0 3px 8px -2px rgba(0,0,0,.3), 0 3px 1px -2px rgba(0,0,0,.1);
+  --i13-knob-shadow: 0 3px 8px rgba(0,0,0,.3), 0 3px 1px rgba(0,0,0,.1);
   --i13-knob-held: #e5e5e5;
   --i13-seg-track: #1c1c1e; --i13-seg-pill: #636366; --i13-seg-text: #fff; --i13-seg-divider: #3a3a3c;
   --i13-seg-pressed: #2c2c2e;
@@ -231,8 +231,8 @@ html[data-style="ios13"] .cell-inner.chevron.is-pressed::after { background-imag
 html[data-style="ios13"] .section-header { font-size: 15px; font-weight: 600; color: var(--i13-label); text-shadow: none; }
 
 /* Switch: flat, iOS 13's green with a white knob and no ON / OFF, in iOS 7's 51 x 31 box (the hooks above). The knob
-   is drawn 2pt inside its 31pt box (a transparent ring, the shadow pulled in by the same 2pt), so the track shows
-   round it as on iOS 13. */
+   is drawn 2pt inside its 31pt box: a 2pt ring in the track's own colour (green when on, the grey track when off; a
+   transparent ring would show the off track's grey beside an on knob), so the track shows round it as on iOS 13. */
 html[data-style="ios13"] .sw-track,
 html[data-style="ios13"][data-theme] .sw-track {
   border: 1.5px solid var(--i13-sw-track); border-radius: 15.5px; background: var(--i13-sw-track); box-shadow: none;
@@ -243,15 +243,23 @@ html[data-style="ios13"][data-theme] .sw-track::before { content: ""; text-shado
 html[data-style="ios13"] .sw-track::after { content: ""; }
 html[data-style="ios13"] .sw-knob,
 html[data-style="ios13"][data-theme] .sw-knob {
-  border: 2px solid transparent; background: var(--i13-knob) padding-box; box-shadow: var(--i13-knob-shadow);
+  --i13-ring: var(--i13-sw-track); border: 2px solid var(--i13-ring); box-shadow: var(--i13-knob-shadow);
+  /* the ring's colour under the knob too, so no green seam shows where the two meet */
+  background: linear-gradient(var(--i13-knob), var(--i13-knob)) padding-box, var(--i13-ring);
 }
+html[data-style="ios13"] .switch[aria-checked="true"] .sw-knob { --i13-ring: var(--i13-green); }
 html[data-style="ios13"] .switch.is-held .sw-knob,
-html[data-style="ios13"][data-theme] .switch.is-held .sw-knob { background: var(--i13-knob-held) padding-box; }
+html[data-style="ios13"][data-theme] .switch.is-held .sw-knob {
+  background: linear-gradient(var(--i13-knob-held), var(--i13-knob-held)) padding-box, var(--i13-ring);
+}
 
 /* Signature pills (packages.css .sig-pill, whose fills the tokens above make flat): semibold white text, no tracking. */
 html[data-style="ios13"] .sig-pill,
 html[data-style="ios13"] .cell[class*="sig-row-"] .cell-detail,
 html[data-style="ios13"] .pkg-row[data-change="resign"] .pkg-version { font-weight: 600; letter-spacing: 0; }
+/* a held row greys its detail (the pressed rules above); the pill keeps its white text */
+html[data-style="ios13"] .cell-inner.is-pressed .cell-detail.sig-pill,
+html[data-style="ios13"] .cell[class*="sig-row-"] .cell-inner.is-pressed .cell-detail { color: #fff; }
 
 /* The bars over the page: the banner's Upgrade is semibold tinted text centred in its 30pt box (the 44pt line-height
    of the bar buttons above pushed it down); the banner's title semibold, its icon iOS 13's rounder corner; the

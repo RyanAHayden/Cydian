@@ -4,9 +4,9 @@
 
 - **Switch** (`web/app/ios13.css`): the geometry hooks block now sets iOS 7's `--sw-w: 51px; --sw-h: 31px;
   --sw-knob-size: 31px; --sw-travel: 20px` (F331's hooks), and the track gets the 15.5px corner. iOS 13's green
-  and white knob stay. The knob is drawn 2pt inside its 31pt box (2px transparent border, `background` clipped to
-  `padding-box`) so the track shows round it as on iOS 13. Its shadows got a -2px spread, so they follow the 27pt
-  knob, not the 31pt box.
+  and white knob stay. The white knob is drawn 2pt inside its 31pt box, with a 2pt ring in the track's own colour
+  (green when on, the grey track when off; the `--i13-ring` property on the knob), so it reads as iOS 13's inset
+  knob. The ring colour is also painted under the white, so no green seam shows where the two meet.
 - **Signature pills**: `web/app/packages.css` now draws `.sig-pill` from five new tokens on `:root`
   (`--sig-pill`, `-soon`, `-expired`, `-unknown`, `--sig-pill-shadow`), set to the old gradients, so iOS 6 is
   unchanged. Both iOS 13 tones set them to flat systemGreen / systemOrange / systemRed / systemGray
@@ -32,11 +32,31 @@
 - Shots (3x, 402x874, headless Chromium, sideload mode on a fake bridge): `capture.mjs` here is B129's script plus
   a `signing.installed` fake with three apps (363 days, 3 days, expired). `mksteps.py` writes `steps.json`.
   Server: `worker/node.mjs` on 127.0.0.1:8931. Taken in iOS 13 White and OLED Black: `shots/{light,dark}-installed`,
-  `-app` (Alpha's page), `-changes` (Needs Re-sign with the Expired pill), `-settings` and `-general` (switches).
+  `-app` (Alpha's page), `-changes` (Needs Re-sign with the Expired pill), `-settings` and `-general` (switches;
+  the last one is set to off through its attribute, for the picture only). `shots/switches-zoom.png` shows on and
+  off zoomed in, in both tones.
   `shots/before-dark-installed.png` is main's glossy pills and banner, for comparison.
 - iOS 6 and iOS 7 are unchanged: packages.css's tokens hold the old values, and every other change is scoped to
   `html[data-style="ios13"]`.
 - `tools/check.sh`: run by `run done`.
+
+## Tried and dropped
+
+- A transparent 2px ring on the knob with the shadow pulled in by a -2px spread: a zoomed shot showed the off
+  track's grey as an arc beside an on knob, because the green fill ends at the knob's centre. The ring's faint
+  0 0 0 -1.5px outline also drew nothing, since an outer shadow is clipped to outside the box (the spec review
+  caught this). A `drop-shadow` filter fixed the shadow but not the arc. The track-coloured ring fixed both.
+
+## Spec review (fresh subagent, diff and brief only)
+
+- Fixed: the knob's outline shadow drew nothing (see above). A held signed-app row turned the pill's text grey,
+  because the iOS 13 pressed-row rule greys `.cell-detail`; that bug is older than this task. A rule now keeps
+  the pill's text white.
+- Kept: the banner and reload-bar type changes (the same look-only rules as ios7.css; they fix the clipped
+  Upgrade, and the sweep found these parts). The tweak pills, which are the same glossy family on Installed.
+- The review noted that the copied capture.mjs still holds the `ssh 7` path for jailbreak installs. It is not
+  used in `--mode sideload`, so I left it as copied.
+- The missing shots it listed (grey "?", amber, tweak pills, the package page) are under Not verified.
 
 ## Slips
 
@@ -53,7 +73,9 @@
 - **The open package page from Changes in sideload mode**: it did not load on the fake bridge (main shows the same
   blank page), so I used an Installed app's page as the "app page".
 - **On a phone (WebKit)**: Chromium only. These are plain colour tokens plus a transparent knob border.
-- **A held or dragged switch**: no capture held it. The held knob keeps `padding-box`, so its ring stays clear.
+- **A held or dragged switch**: no capture held or dragged one. The held knob keeps the ring. While a drag is
+  under way the ring keeps the old state's colour until release (aria-checked changes only then).
+- **A held signed-app row**: the white-text fix for the pill was not pressed in a capture.
 - **Still iOS 6 under iOS 13, left alone because none of it is gloss or emboss**: package rows' bold names
   (type), and Home's tiles (Home is not one of the swept pages; F331 tracks it). Sources' failed-row red badge
   (`.row-failed-badge`, packages.css) is still glossy under iOS 13. It is on Sources, outside this sweep, so I filed

@@ -14,7 +14,7 @@
 // The sheet's buttons (F81, user 2026-11-17): Install at the top right of its nav bar, a red Cancel at the bottom,
 // and a plain Cancel at the top left of the nav bar as well (user 2026-11-20).
 //
-// The bridge is globalThis.ifizboxNative; an older shell without signing.inspect installs straight away as before.
+// The bridge comes from native.js nativeBridge(); an older shell without signing.inspect installs straight away as before.
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { showSheet } from "./nav/sheet.js";
 import { showAlert } from "./nav/alert.js";
@@ -35,6 +35,7 @@ import { tweaksGroup } from "./screens/tweaks.js"; // F288
 import { tweakParams } from "./core/tweaks.js";
 import { toBase64 } from "./core/signing.js";
 import { loadStyle } from "./nav/motion.js";
+import { nativeBridge } from "./native.js";
 
 const ICON_SIZE = 180; // the 60pt @3x icon; the signer writes the same PNG as @2x and @3x
 
@@ -44,7 +45,7 @@ function style() { loadStyle("signsheet.css"); }
 const unknownMethod = (e) => /unknown method/i.test(String(e?.message ?? e ?? ""));
 
 export async function inspectAndInstall({ url, name = "", onInstalled = () => {} },
-  { native = globalThis.ifizboxNative, hud = liveHUD, alert = showAlert, install = installOnDevice, sheet = openSignSheet, later = setTimeout } = {}) {
+  { native = nativeBridge(), hud = liveHUD, alert = showAlert, install = installOnDevice, sheet = openSignSheet, later = setTimeout } = {}) {
   const h = hud("Downloading");
   let info;
   try {
@@ -94,7 +95,7 @@ export async function customInstall(opts, { check = null, inspect = inspectAndIn
 // was looked at, the edits, the name to show, the ID iOS will know it by) and closes. True once queued, false on
 // Cancel or an error (shown). An older shell without signing.inspect queues it plain (queue(null)), as Install would.
 export async function inspectToQueue({ url, name = "", queue },
-  { native = globalThis.ifizboxNative, hud = liveHUD, alert = showAlert, sheet = openSignSheet, now = Date.now } = {}) {
+  { native = nativeBridge(), hud = liveHUD, alert = showAlert, sheet = openSignSheet, now = Date.now } = {}) {
   const h = hud("Downloading");
   let info;
   try {
@@ -313,7 +314,7 @@ function openSignSheet(info, { onSign, onClose = () => {}, fallbackName = "" } =
     else if (!guide && guideLi.parentNode) guideLi.remove();
   }
   drawKeep();
-  originalState(globalThis.ifizboxNative, app.bundleId).then((s) => { orig = s; drawKeep(); }, () => {});
+  originalState(nativeBridge(), app.bundleId).then((s) => { orig = s; drawKeep(); }, () => {});
 
   box.append(grouped(inspectGroups(info)));
   // The missing group's rows are a warning: red, as Settings' warnings are.

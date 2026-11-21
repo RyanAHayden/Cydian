@@ -326,7 +326,7 @@ function showRoute(route) {
 // then ours finishing and calling history.back() again), landing somewhere else. So on the web our edge strip stays
 // off and a pop we didn't start isn't animated; we just show the page history lands on. The native app's WKWebView
 // has no such gesture (N1 turns it off), so it keeps ours.
-const webBack = !(globalThis.ifizboxApp || globalThis.ifizboxNative);
+const webBack = !(globalThis.ifizboxApp || nativeBridge());
 let ownBack = false; // the pop under way came from our back button or our swipe
 
 function goBack() {
@@ -403,7 +403,7 @@ const lockTabs = async () => {
   const locked = gate.browsingLocked({ mode: detectMode() });
   for (const t of BAR_TABS) tabbar.items[t].classList.toggle("tab-locked", locked && !OPEN_TABS.has(t));
 };
-if (!(globalThis.ifizboxApp || globalThis.ifizboxNative)) { lockTabs(); addEventListener("ifizbox:browse-lock", lockTabs); }
+if (!(globalThis.ifizboxApp || nativeBridge())) { lockTabs(); addEventListener("ifizbox:browse-lock", lockTabs); }
 
 document.getElementById("tabbar").addEventListener("click", (e) => {
   const a = e.target.closest("a.tab");
@@ -491,7 +491,7 @@ if (isAddPath(location.pathname)) {
 // The Home Screen web app opens outside links in a sheet over itself, address bar on top. x-safari-https://… makes
 // iOS hand them to Safari instead, and from there to their own apps (Discord, GitHub). The app's shell sends them
 // out natively already (LinkOut); a Safari tab opens them as usual.
-const standalone = !globalThis.ifizboxNative && (navigator.standalone || matchMedia?.("(display-mode: standalone)").matches);
+const standalone = !nativeBridge() && (navigator.standalone || matchMedia?.("(display-mode: standalone)").matches);
 if (standalone) {
   const outside = (u) => { try { const x = new URL(u, location.href); return /^https?:$/.test(x.protocol) && x.origin !== location.origin ? x.href : null; } catch { return null; } };
   // A site with its own app's scheme (core/applinks.js: X, YouTube) opens that app; Safari only if it didn't come up.
@@ -506,13 +506,13 @@ if (standalone) {
 }
 // The app's shell: LinkOut asks iOS for the universal link, which only reaches the app signed by its own team. A
 // re-signed sideload (Unbound for Discord, though it drops the invite, so Discord stays https) still claims the scheme, so try that first; else the https link as before.
-if (globalThis.ifizboxNative) {
+if (nativeBridge()) {
   document.addEventListener("click", (e) => {
     const a = e.target.closest?.("a[href]");
     const app = a && a.target === "_blank" && appSchemeFor(a.href);
     if (!app) return;
     e.preventDefault();
-    const out = (url) => globalThis.ifizboxNative.call("app.openURL", { url }).then((r) => r?.opened === true, () => false);
+    const out = (url) => nativeBridge().call("app.openURL", { url }).then((r) => r?.opened === true, () => false);
     out(app).then((ok) => ok || out(a.href));
   }, true);
 }
@@ -521,7 +521,7 @@ askFromInstallLink(installLink, { install: () => home.installiFizBox() }).catch(
 // F93 (as before F89): first launch of a iFizBox installed from the website: its signed copy carries the website's
 // sources and settings as web/transfer.link (signed in the browser, websign-job.js); import them once, no question.
 // Only on the very first launch (user 2026-11-17: the website is rarely used after that).
-if (globalThis.ifizboxNative) {
+if (nativeBridge()) {
   let done = null;
   try { done = localStorage.getItem("ifizbox.transferDone"); } catch { /* private */ }
   if (!done) fetch("transfer.link", { cache: "no-store" }).then((r) => (r.ok ? r.text() : null)).then(async (link) => {
@@ -607,7 +607,7 @@ addEventListener("pageshow", (e) => { if (e.persisted) homeTop.opened(); });
 
 // F75: ifizbox:// links from the website (Send Settings, Home's Open in iFizBox App) and elsewhere (incoming.js).
 // ifizbox://install (F89) is no longer sent by the website since F92/F95: only for links already out there.
-if (globalThis.ifizboxNative) import("./incoming.js").then((m) => m.startIncoming()).catch(() => {});
+if (nativeBridge()) import("./incoming.js").then((m) => m.startIncoming()).catch(() => {});
 
 // The Home Screen icon's long-press Upgrade All (native Shortcut.perform): Changes, every upgrade queued, Confirm.
 // F167: the native shell calls this on a status bar tap (App.swift scrollViewShouldScrollToTop).
@@ -620,7 +620,7 @@ globalThis.ifizboxShortcut = async (type) => {
 };
 if (globalThis.ifizboxPendingShortcut) { globalThis.ifizboxShortcut(globalThis.ifizboxPendingShortcut); globalThis.ifizboxPendingShortcut = null; }
 
-if (globalThis.ifizboxNative) {
+if (nativeBridge()) {
   // F183: every launch, Home's Reload and every return check iFizBox's own source and GitHub's latest release, with
   // no wait between checks and never a popup: a newer iFizBox is a row in Changes and its badge (essential-ui.js).
   const lookForSelf = () => lookForUpdates().catch(() => {});
@@ -664,7 +664,7 @@ if (globalThis.ifizboxNative) {
 
 // F89: Web Push went with the website's server. A browser that registered the old push service worker (sw.js,
 // F10) drops it, so iOS stops waking it for pushes that no longer come.
-if (!globalThis.ifizboxNative) {
+if (!nativeBridge()) {
   // A new build on the site: get every file again and reload (screens/home.js refreshIfNewBuild), on open and on
   // each return to the foreground (a Home Screen web app rarely cold-launches), once a minute at most.
   let lastBuildCheck = 0;

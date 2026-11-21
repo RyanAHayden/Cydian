@@ -6,6 +6,7 @@ import { NAME } from "../brand.js";
 import { browserSigning, localSigning } from "./common.js";
 import { firstInstallCheck } from "./device.js";
 import { installOnDevice } from "./route.js";
+import { nativeBridge } from "../native.js";
 // C32: the website's signer (signing/browser.js and its parts, ~650 lines) loads with import() where the site signs,
 // never at startup.
 import { isSelfIpa } from "./common.js";
@@ -67,7 +68,7 @@ const warnedIds = (storage) => {
 };
 
 export async function originalWarning({ bundleId = null, name = "" } = {},
-  { native = globalThis.ifizboxNative, alert = showAlert, storage = globalThis.localStorage, keep = storedKeep() } = {}) {
+  { native = nativeBridge(), alert = showAlert, storage = globalThis.localStorage, keep = storedKeep() } = {}) {
   if (!bundleId || !keep || bundleId === IFIZBOX_ID || typeof native?.call !== "function") return "install";
   if (warnedIds(storage).includes(bundleId)) return "install";
   const state = await originalState(native, bundleId).catch(() => ({ installed: false, ours: false }));

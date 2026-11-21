@@ -32,6 +32,18 @@ they are hooks, so the iOS 26 era (F203) sets its own if they're off.
   no circle ground), as expected: rounding and glass are the era's look.
 - `tools/smoke/smoke.mjs` (app), `--site`, and `--site` on the float copy: all passed.
 
+## Spec review
+
+- Fixed: the test's filter for skipping the `:root` block matched on `--bar-btn-h`, which was fragile. It now skips
+  by selector. The test also checks that no `.tabbar` rule sets `overflow`, which would clip the circle sitting
+  past the bar's edge (grep: no stylesheet does today).
+- Kept as decided: no `border-radius` in style.css. docs/eras.md counts radius as look, and style.css holds layout
+  only, so the circle's round shape, like the pill's, is the era's paint. The hook gives the square slot,
+  as tall as the pill. The same goes for see-through paint: the scrollers fill the screen, so the content is under
+  the pill, and an opaque iOS 6 paint just hides it.
+- Kept: `FLOAT_OWN_TAB` beside the literal selector. The test builds the selector from the constant, so the two
+  can't drift.
+
 ## Not verified
 
 - On a phone: the hook is web-only (the app's tab bar is native and `html.native` hides ours), and no era turns

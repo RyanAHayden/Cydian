@@ -159,7 +159,9 @@ test("C52: style.css floats the bar only behind html[data-tabbar=float]; iOS 6's
   assert.match(base.decl, /left: 0; right: 0; bottom: 0;/);
   assert.match(base.decl, /height: var\(--tab-h\)/);
   // every rule that reads a --tabbar-float-* hook is behind the attribute (the :root defining them aside)
-  const readers = rules.filter((r) => /var\(--tabbar-float-/.test(r.decl) && !r.decl.includes("--bar-btn-h"));
+  const readers = rules.filter((r) => /var\(--tabbar-float-/.test(r.decl) && r.sel !== ":root");
+  // and nothing hides overflow on the bar, which would clip the circle sitting past its right edge
+  for (const r of rules.filter((x) => /\.tabbar\b/.test(x.sel) && !/\.tab\b/.test(x.sel))) assert.doesNotMatch(r.decl, /overflow/, r.sel);
   assert.ok(readers.length >= 3, readers.map((r) => r.sel).join());
   for (const r of readers) assert.match(r.sel, /^html\[data-tabbar="float"\]/, `${r.sel} is drawn in iOS 6`);
   assert.equal(rules.filter((r) => /data-tabbar/.test(r.sel) && !r.sel.startsWith('html[data-tabbar="float"]')).length, 0);

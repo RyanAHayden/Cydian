@@ -43,5 +43,10 @@ Settings > Not Jailbroken hides these entries too. It signs the same way, so tho
 
 - Not checked on the iPhone 15 Pro (sideload build): the change is in pure catalog/list code covered by node tests,
   and the task asked for a node test only.
-- Tweaks never checked on this device still show in a Tweak Source's list; a tap checks them and may still show the
-  refusal once (then the row goes). Hiding them up front would need each `.deb` downloaded.
+- Tweaks not checked yet: after the spec review pointed out they could still lead to the refusal once, a sideload
+  Tweak Source's list now checks them in the background (`checkTweakRows`, two at a time, each verdict cached) and
+  drops refused rows as verdicts come (`setItems`). A row tapped before its check ends can still show the refusal
+  once; a failed download or a paid tweak stays listed. Not timed on a phone: the downloads happen once per tweak
+  version, but a big Tweak Source means many small `.deb` downloads the first time it is opened.
+- The Tweak Source's sections page counts still include refused tweaks: the counts come from the catalog worker,
+  which can't read the per-device check cache.

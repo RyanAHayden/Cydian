@@ -2,7 +2,7 @@
 // (the "for iOS itself, not an app you can sign" ones); unchecked and addable ones stay.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { addableTweakRows, INFO_KEY } from "./tweaks.js";
+import { addableTweakRows, checkTweakRows, INFO_KEY } from "./tweaks.js";
 import { sideloadListRows } from "./browse.js";
 
 function memoryStorage(map = {}) {
@@ -34,4 +34,24 @@ test("B269 sideloadListRows: only the sideload build filters a source's list", (
     assert.equal(sideloadListRows(rows, "jailbreak").length, rows.length);
     assert.equal(sideloadListRows(rows, "site").length, rows.length);
   } finally { globalThis.localStorage = saved; }
+});
+
+test("B269 checkTweakRows: only unchecked rows are checked; refusals reported as they come, failures left listed", async () => {
+  const more = [...rows, { id: "com.x.paid", version: "1.0" }, { id: "com.x.daemon", version: "1.0" }];
+  const checked = [];
+  const verdicts = { "com.x.unchecked": { ok: true }, "com.x.daemon": { ok: false, why: "daemon" } };
+  const seen = [];
+  const refused = await checkTweakRows(more, { storage, pkg: async (r) => ({ package: r.id, version: r.version }),
+    check: async (st) => { checked.push(st.package); if (st.package === "com.x.paid") throw new Error("paid"); return verdicts[st.package]; },
+    onRefused: (ids) => seen.push(ids) });
+  assert.deepEqual(checked.sort(), ["com.x.daemon", "com.x.paid", "com.x.unchecked"]);
+  assert.deepEqual(refused, ["com.x.daemon"]);
+  assert.deepEqual(seen, [["com.x.daemon"]]);
+});
+
+test("B269 checkTweakRows: stops once the page is gone", async () => {
+  let n = 0;
+  await checkTweakRows([{ id: "a" }, { id: "b" }, { id: "c" }], { storage: memoryStorage(), limit: 1, stop: () => n >= 1,
+    pkg: async (r) => ({ package: r.id }), check: async () => { n++; return { ok: false }; } });
+  assert.equal(n, 1);
 });

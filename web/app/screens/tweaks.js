@@ -318,8 +318,10 @@ function endpointOf(source, text, cache = endpoints) {
   const url = paymentEndpointUrl(source);
   if (!url) return Promise.resolve(null);
   if (!cache.has(source.key)) {
-    // B268: a fetch that failed (offline, a timeout) is asked again next time, not kept as "no seller" for the session
-    cache.set(source.key, Promise.resolve().then(() => text(url)).then(parseEndpoint, () => { cache.delete(source.key); return null; }));
+    // B268: a fetch that failed (offline, a timeout) is asked again next time, not kept as "no seller" for the session;
+    // a source that answered it has none (not_found, upstream: BigBoss's 404) is kept
+    const answered = (e) => e?.code === "not_found" || e?.code === "upstream";
+    cache.set(source.key, Promise.resolve().then(() => text(url)).then(parseEndpoint, (e) => { if (!answered(e)) cache.delete(source.key); return null; }));
   }
   return cache.get(source.key);
 }
@@ -330,18 +332,27 @@ function endpointOf(source, text, cache = endpoints) {
 // backend's list, `text(url)`: the payment_endpoint file's text.
 export async function findSeller(st, { catalog, sources, text, cache = endpoints }) {
   const hasVersion = (p) => p && (!st.version || p.stanza?.version === st.version || (p.others ?? []).some((o) => o.version === st.version));
-  const p = await catalog.package(st.package, "*").catch(() => null);
-  let keys = [p?.key, ...(p?.others ?? []).filter((o) => !st.version || o.version === st.version).map((o) => o.key)];
-  if (!keys.some(Boolean)) {
-    for (const s of sources) {
-      if (!s?.key || String(s.key).startsWith("alt:")) continue;
-      if (hasVersion(await catalog.package(st.package, s.key).catch(() => null))) keys.push(s.key);
+  const tried = new Set();
+  const sellerIn = async (keys) => {
+    for (const key of keys) {
+      if (!key || tried.has(key)) continue;
+      tried.add(key);
+      const source = sources.find((s) => s.key === key);
+      const base = source ? await endpointOf(source, text, cache) : null;
+      if (base) return { base, source };
     }
-  }
-  for (const key of new Set(keys.filter(Boolean))) {
-    const source = sources.find((s) => s.key === key);
-    const base = source ? await endpointOf(source, text, cache) : null;
-    if (base) return { base, source };
+    return null;
+  };
+  const p = await catalog.package(st.package, "*").catch(() => null);
+  const listed = [...(!st.version || p?.stanza?.version === st.version ? [p?.key] : []),
+    ...(p?.others ?? []).filter((o) => !st.version || o.version === st.version).map((o) => o.key)];
+  const found = await sellerIn(listed);
+  if (found) return found;
+  for (const s of sources) {
+    if (!s?.key || tried.has(s.key) || String(s.key).startsWith("alt:")) continue;
+    if (!hasVersion(await catalog.package(st.package, s.key).catch(() => null))) continue;
+    const got = await sellerIn([s.key]);
+    if (got) return got;
   }
   return null;
 }

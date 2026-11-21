@@ -46,7 +46,19 @@ seller; a failed endpoint fetch is retried.
   `preparedItems` turned them into three dylibs plus ElleKit for injection. The app's saved list was put back to
   empty afterwards.
 
+## Spec review
+
+Fixed: a version-mismatched All Sources key could skip the per-source search (now the search runs whenever no
+seller is found among the listed keys); a 404 (`not_found`/`upstream`) on payment_endpoint stays cached, only network
+failures are retried; added tests for a failed free download (says "couldn't be downloaded", never paid) and those
+two cases. Packix: the repo is gone (shut down), so there was no live Packages file to test against.
+"Almost every tweak": the measured share of tagged tweaks is 14-45% per repo; the tester's wording is taken as
+"most of the ones I tried", which this fix covers. No free tweak was found misreported.
+
 ## Not verified
+
+- Free Chariz and Havoc tweaks added on the phone: their free tweaks downloaded and were checked on the phone, but
+  the ones sampled are SpringBoard tweaks (refused for that reason), so the three added were all from BigBoss.
 
 - The fix in a built IPA on the phone: the phone runs the installed build, so the new code was checked inlined in
   its web view, not from a rebuilt IPA (building, signing and installing an IPA for a JS-only change was not worth

@@ -133,3 +133,27 @@ test("a payment_endpoint fetch that failed is asked again, not kept as no seller
   fail = false;
   assert.equal((await ask())?.base, REPOS.chariz.endpoint);
 });
+
+test("a free tweak whose download fails says it couldn't be downloaded, never that it's paid", async () => {
+  const st = stanza("havoc", "com.mtac.ampere");
+  const noPaid = { deb: async () => { throw new Error("asked the seller for a free tweak"); } };
+  await assert.rejects(tweakDeb({ ...st, version: `${st.version}-down` }, { paid: noPaid, fetchDeb: async () => { throw new Error("The source answered HTTP 503."); } }),
+    (e) => /couldn't be downloaded/.test(e.message) && /HTTP 503/.test(e.message) && !/paid|seller/.test(e.message));
+});
+
+test("a source that answers it has no payment_endpoint is kept, not asked on every lookup", async () => {
+  const cache = new Map();
+  let asked = 0;
+  const text = async () => { asked++; throw Object.assign(new Error("The source answered HTTP 404."), { code: "not_found" }); };
+  const st = stanza("bigboss", "org.thebigboss.2x2foldericons");
+  for (let i = 0; i < 3; i++) assert.equal(await findSeller(st, { catalog: phoneCatalog(), sources: SOURCES, text, cache }), null);
+  assert.equal(asked, 1);
+});
+
+test("All Sources listing another source's copy (other version, no seller) still finds the seller of this one", async () => {
+  const st = stanza("havoc", "jp.uzra.aerial");
+  const other = { ...st, version: "0.9" };
+  const catalog = { package: async (id, key) => (key === "*" ? { stanza: other, key: REPOS.bigboss.key, others: [{ key: REPOS.bigboss.key, version: "0.9" }] }
+    : phoneCatalog().package(id, key)) };
+  assert.equal((await findSeller(st, { catalog, sources: SOURCES, text: endpointText, cache: new Map() }))?.base, REPOS.havoc.endpoint);
+});

@@ -6,6 +6,7 @@ import { isInsecure, INSECURE_IPA_ALERT, INSTALL_ANYWAY } from "../core/insecure
 import { malwareHashes, rememberSigned } from "../core/malicious.js";
 import { APP_SERVER, normalizeServer, LEGACY_SERVER } from "../core/signing.js";
 import { GITHUB_REPO, NAME } from "../brand.js";
+import { nativeBridge } from "../native.js";
 
 // B104: a bridge call that downloads an IPA (signing.install, signing.prepare, signing.inspect, library.add), sent by
 // `send(extra)`. For an http link the shell tries the https twin first; when there is none it answers "insecure", and
@@ -66,7 +67,7 @@ export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 export const localSigning = () => detectMode() === "sideload";
 
 export const bridge = (native) => {
-  const n = native ?? globalThis.ifizboxNative;
+  const n = native ?? nativeBridge();
   if (!n?.call) throw Object.assign(new Error("This build has no signer."), { code: "internal" });
   return n;
 };

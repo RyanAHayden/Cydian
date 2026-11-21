@@ -23,6 +23,7 @@
 // Device tokens and watch lists go only to that server, never to a log.
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { NAME, BUNDLE_ID } from "../brand.js";
+import { nativeBridge } from "../native.js";
 
 export const PUSH_KEY = "ifizbox.push";
 export const WATCH_KEY = "ifizbox.push.watch"; // the last watch app-updates.js built, for enablePush
@@ -104,7 +105,7 @@ export async function serverInfo(server, fetcher = globalThis.fetch) {
   } catch { return null; }
 }
 
-const defaults = (d = {}) => ({ native: globalThis.ifizboxNative, fetcher: globalThis.fetch?.bind(globalThis),
+const defaults = (d = {}) => ({ native: nativeBridge(), fetcher: globalThis.fetch?.bind(globalThis),
   storage: globalThis.localStorage, ...d });
 
 // Push on: iOS's permission (asked once), the token, then the server. -> {ok, reason?: {code, text}}.
@@ -202,7 +203,7 @@ export async function pushInfo(deps = {}) {
 // signer renamed it installs as a second iFizBox. Said once, before the first such install:
 //   await renamedUpdateNotice({ native, alert, storage }) -> "install" | "cancel"
 export const RENAMED_WARNED_KEY = "ifizbox.push.renamedWarned";
-export async function renamedUpdateNotice({ native = globalThis.ifizboxNative, alert, storage = globalThis.localStorage } = {}) {
+export async function renamedUpdateNotice({ native = nativeBridge(), alert, storage = globalThis.localStorage } = {}) {
   let id = null;
   try { id = (await native?.call?.("push.status", {}))?.bundleId ?? null; } catch { return "install"; } // an older shell
   if (!id || id === BUNDLE_ID) return "install";

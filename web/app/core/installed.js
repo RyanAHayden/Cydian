@@ -12,6 +12,7 @@
 import { parseControl, description, compareVersions, parseRelations } from "./apt.js";
 import { sectionName, parseAuthor, compareNames, sectionGroup } from "./sections.js"; // C36: not catalog.js, which imports this file
 import { NAME } from "../brand.js";
+import { nativeBridge } from "../native.js";
 
 // Where dpkg keeps it: rootful, then rootless (Dopamine, palera1n rootless).
 export const STATUS_PATHS = ["/var/lib/dpkg/status", "/var/jb/var/lib/dpkg/status"];
@@ -203,7 +204,7 @@ export function sourceRecordFor(app, pkgs, now = Date.now()) {
 }
 
 // signing.installed through the bridge, renamed by the device's records (withSourceNames). Throws as the call does.
-export async function signedAppsNamed(native = globalThis.ifizboxNative, { store = apps } = {}) {
+export async function signedAppsNamed(native = nativeBridge(), { store = apps } = {}) {
   const [installed, records] = await Promise.all([native.call("signing.installed", {}), store().then((s) => s.all()).catch(() => [])]);
   return withSourceNames(installed, records);
 }
@@ -252,7 +253,7 @@ export const apps = () => (shared ??= openAppStore().catch(() => memoryAppStore(
 
 export const SELF_ID = "com.ryha.ifizbox";
 let selfInfo = null;
-function selfRecord(native = globalThis.ifizboxNative) {
+function selfRecord(native = nativeBridge()) {
   if (!native?.call) return Promise.resolve(null);
   selfInfo ??= Promise.resolve().then(() => native.call("app.info", {})).then((i) => (i?.mode === "jailbreak" || !i?.version ? null
     : { id: SELF_ID, name: NAME, version: String(i.version), key: null, source: null, sourceName: NAME,

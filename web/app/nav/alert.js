@@ -14,6 +14,8 @@
 // `onTap(index)` runs inside the tap's own click (before the promise resolves), for what Safari only allows from a
 // user gesture, such as opening an itms-services link.
 // A one-button (OK) alert: title, message. `alert` swaps in another showAlert (tests pass a fake).
+import { nativeBridge } from "../native.js";
+
 export const alertOK = (title, message, alert = showAlert) => alert({ title, message, buttons: ["OK"] });
 
 export function showAlert({ title = "", message = "", input = null, buttons = ["OK"], cancel = 0, stacked = false, countdown = null, colors = {}, onTap = null } = {}) {
@@ -47,8 +49,8 @@ export function showAlert({ title = "", message = "", input = null, buttons = ["
         const paste = Object.assign(document.createElement("button"), { type: "button", className: "alert-paste", textContent: "Paste" });
         paste.addEventListener("click", async () => {
           // F146: the app reads UIPasteboard through the bridge (no WebKit Paste bubble); the website asks Safari.
-          // (menu.js nativePaste, inline so alert.js keeps no imports.)
-          const native = globalThis.ifizboxNative;
+          // (menu.js nativePaste, inline so alert.js imports only native.js.)
+          const native = nativeBridge();
           let text = null;
           if (native?.call) try { text = String((await native.call("clipboard.read", {})) ?? ""); } catch { /* old shell */ }
           if (text == null) try { text = await navigator.clipboard.readText(); } catch { return; }

@@ -32,8 +32,9 @@ import { parseOtherLink, otherLinksOn } from "./core/otherlinks.js";
 import { packageIdOf } from "./websign-gate.js";
 import { NAME } from "./brand.js";
 import { markHandoff } from "./handoffclock.js";
+import { nativeBridge } from "./native.js";
 
-export function startIncoming({ native = globalThis.ifizboxNative, events = globalThis, doc = globalThis.document,
+export function startIncoming({ native = nativeBridge(), events = globalThis, doc = globalThis.document,
   runPage = defaultRunPage, alert = showAlert } = {}) {
   if (!native?.call) return;
   // B175: back in front (reopened, or a link or file brought it up) with the app run's log still up and its run over:
@@ -108,7 +109,7 @@ export function runningText(url) {
 // callbacks to the page, "error: …" where one failed) into Settings > Console Logs, one entry per take, so a report
 // of "nothing happened" shows where it stopped. Taken at start, after each link and on "ifizbox:openlog".
 //   await takeOpenLog({ native, logs }) -> the entry added, or null (no lines, an older shell)
-export async function takeOpenLog({ native = globalThis.ifizboxNative, logs = null } = {}) {
+export async function takeOpenLog({ native = nativeBridge(), logs = null } = {}) {
   let r = null;
   try { r = await native.call("app.takeOpenLog", {}); } catch { return null; } // an older shell
   const lines = Array.isArray(r?.lines) ? r.lines.map(String) : [];
@@ -145,7 +146,7 @@ export function onReceiving({ hud = liveHUD } = {}) {
   };
 }
 
-export async function handleIncoming(url, { native = globalThis.ifizboxNative, alert = showAlert, hud = showHUD,
+export async function handleIncoming(url, { native = nativeBridge(), alert = showAlert, hud = showHUD,
   review = null, add = null, shared = null, install = null, signIn = null, on = otherLinksOn, open = goHash, now = Date.now } = {}) {
   const u = String(url ?? "");
   if (/^ifizbox:\/\/install\b/i.test(u)) {

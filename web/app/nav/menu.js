@@ -5,6 +5,7 @@
 //   longPress(element, selector, (target, e) => ...)  a HOLD_MS hold that doesn't move or scroll; the click ending it is eaten
 import { haptic } from "./haptic.js";
 import { guarded } from "./tapguard.js";
+import { nativeBridge } from "../native.js";
 
 export const HOLD_MS = 550; // B48: a little longer than 500, nearer iOS's own, so a finger resting before a slow scroll doesn't hold
 export const HOLD_SLOP = 10;
@@ -93,7 +94,7 @@ export async function copyText(text) {
 // there's no text. null on the website, or a shell from before clipboard.read: those use navigator.clipboard.
 // F146: `params.auto` (Sources' Add filling its field by itself) lets the sideload build skip the read when iOS says
 // no URL was copied or the user refused Allow Paste before; without it (a tap on Paste) it always reads.
-export async function nativePaste(native = globalThis.ifizboxNative, params = {}) {
+export async function nativePaste(native = nativeBridge(), params = {}) {
   if (!native?.call) return null;
   try { return String((await native.call("clipboard.read", params)) ?? ""); } catch { return null; }
 }
@@ -101,7 +102,7 @@ export async function nativePaste(native = globalThis.ifizboxNative, params = {}
 // B171: whether the app's clipboard holds a URL, asked without reading it (Bridge.swift clipboard.peek: hasURLs and
 // detectPatterns, which never show iOS's Allow Paste). true/false, or null on the website or a shell from before
 // clipboard.peek (unknown: callers then offer Paste as before).
-export async function nativeHasUrl(native = globalThis.ifizboxNative) {
+export async function nativeHasUrl(native = nativeBridge()) {
   if (!native?.call) return null;
   try {
     const r = await native.call("clipboard.peek", {});

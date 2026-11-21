@@ -14,6 +14,7 @@
 import { detectMode } from "../core/settings.js";
 import { NAME } from "../brand.js";
 import { EASE, DURATION } from "./motion.js";
+import { nativeBridge } from "../native.js";
 
 export const AUTO_MS = 5000;
 export const ACTION_MS = 8000;
@@ -23,7 +24,7 @@ const TAP_PX = 8;
 export const MAX_WAITING = 3;  // banners queued behind the one up; more are dropped
 
 // iFizBox's own icon for where it runs: WEB on the website, LITE in the sideload app, plain in the jailbreak app.
-const ownIcon = () => (!globalThis.ifizboxNative ? "icons/icon-web-glossy-76.png"
+const ownIcon = () => (!nativeBridge() ? "icons/icon-web-glossy-76.png"
   : detectMode() === "sideload" ? "icons/icon-lite-glossy-76.png" : "icons/icon-glossy-76.png");
 
 // How long a banner stays up by itself: 0 for one that waits for iOS.

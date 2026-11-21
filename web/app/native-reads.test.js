@@ -15,27 +15,11 @@ const root = dirname(fileURLToPath(import.meta.url));
 const EXEMPT = new Set(["backend-native.js", "native.js"]);
 
 const ALLOWED = {
-  "app.js": 9,
   "app-updates.js": 1,
   "backend.js": 1,
-  "catalog.js": 2,
-  "core/installed.js": 2,
-  "core/push.js": 2,
-  "core/reviews.js": 1,
   "device.js": 1,
-  "essential-ui.js": 2,
-  "incoming.js": 3,
-  "ipa-install.js": 3,
-  "nav/alert.js": 1,
-  "nav/banner.js": 1,
-  "nav/menu.js": 2,
-  "settings.js": 4,
   "settings-store.js": 2,
   "share.js": 1,
-  "signing/common.js": 1,
-  "signing/device.js": 1,
-  "signing/install.js": 1,
-  "signing-sheet.js": 4,
 };
 
 // The shipped modules: every .js under web/app but tests, test helpers and vendor/.

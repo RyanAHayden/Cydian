@@ -157,7 +157,10 @@ test("F64 cancelApply while apt downloads stops the run before dpkg: nothing cha
   const r = await backend.apply([{ op: "install", id: "com.example.tweak", version: "0.9" }], (e) => {
     events.push(e);
     // Cancel once that sleep runs (its pid is written), not on the line before it: the window the gate hit.
-    if (e.fd === "status" && e.line.startsWith("dlstatus:") && !cancelling) cancelling = untilFile(pidFile).then(() => backend.cancelApply());
+    if (e.fd === "status" && e.line.startsWith("dlstatus:") && !cancelling) {
+      cancelling = untilFile(pidFile).then(() => backend.cancelApply());
+      cancelling.catch(() => {}); // reported by `await cancelling` below, not as an unhandled rejection meanwhile
+    }
   });
   await cancelling;
   assert.equal(r.code, 130); // 128 + SIGINT

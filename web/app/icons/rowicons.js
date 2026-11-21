@@ -293,7 +293,7 @@ const GUIDE_TILES_7 = {
 };
 
 // Home's tiles: iOS 7's flat colours (no gradients) and line glyphs, the row glyphs' 1.9-unit line. A tile with no
-// colour keeps what the row or iOS 6's rule gives it (GitHub's near-black: the dark theme's own grey still wins).
+// colour takes the row's (the green row's state glyphs).
 const home7 = (colour, parts) => ({ ...(colour ? { colour } : {}),
   svg: `${HOME_SVG}>${glyphSvg(parts).replace(/"/g, "'")}</svg>` });
 const CLYDE = "M19.3 5.4A16.6 16.6 0 0 0 15.2 4l-.5 1a15.3 15.3 0 0 0-5.4 0l-.5-1a16.5 16.5 0 0 0-4.1 1.4C2.1 9.3 1.4 13.2 1.8 17a16.7 16.7 0 0 0 5 2.5l1.1-1.7a10.8 10.8 0 0 1-1.7-.8l.4-.3a11.9 11.9 0 0 0 10.8 0l.4.3a10.8 10.8 0 0 1-1.7.8l1.1 1.7a16.6 16.6 0 0 0 5-2.5c.5-4.4-.7-8.3-2.9-11.6z";
@@ -301,7 +301,7 @@ const HOME_TILES_7 = {
   // The Why tile: iOS 7's flat orange, the line star.
   why: { colour: "#ff9500", gradient: ["#ff9500", "#ff9500"],
     svg: `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='${star()}' fill='none' stroke='#fff' stroke-width='1.6' stroke-linejoin='round'/></svg>` },
-  github: home7(null, [ln("M8 6 2 12l6 6M16 6l6 6-6 6M14 4l-4 16")]),
+  github: home7(C7.dark, [ln("M8 6 2 12l6 6M16 6l6 6-6 6M14 4l-4 16")]),
   sources: home7(C7.blue, GLYPHS_7.list),
   discord: home7(C7.indigo, [ln(CLYDE, 1.6), dot(8.5, 12.6, 1.5), dot(15.5, 12.6, 1.5)]),
   featured: home7(C7.gold, [STAR_7]),

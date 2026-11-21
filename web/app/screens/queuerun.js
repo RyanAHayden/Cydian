@@ -1,5 +1,6 @@
 // F234: the install queue's run where one failure doesn't stop the rest (the brain is core/installrun.js), on the
-// black progress page (nav/progress.js) with Packages | Log in its nav bar (user 2026-11-18, mockup in the plan):
+// black progress page (nav/progress.js) with Packages | Log under its nav bar (user 2026-11-18, mockup in the plan;
+// B224: the nav bar itself as Cydia's on the 4S, "Running" then "Complete", plain buttons):
 //
 //   Packages (the default; a run of one package opens on the Log instead): one row per package apt's plan changes, in the dpkg lane's order: its name, a grey line
 //     (Waiting / Downloading 1.2 of 4.0 MB / Waiting to install / Installing / Installed / Failed: why / Needs X,
@@ -10,11 +11,12 @@
 //   Log: the console as before, one line per step per package (Downloading X 4.0 MB, Downloaded X, apt's Unpacking /
 //     Configuring lines once each, Installed X or the error); apt's and dpkg's own output grey under its package.
 //     Percents only move the rows' bars and the bottom status.
-//   Top left: Hide while it runs (the page slides away; a strip under every tab's nav bar reopens it, and the
-//     Installed badge counts what's left), Close after a run with failures. Top right: the red Cancel while it runs
-//     (downloads stop at once, dpkg finishes the package it is on: "Stopping after X…", Cancel greyed; then Confirm
-//     again with what finished cleared from the queue and the footer "Stopped. N installed and cleared from the
-//     queue."), Retry All once it ended with failures (failed, skipped and cancelled rows), Done when clean.
+//   Top left: Cancel while it runs, as Cydia's (downloads stop at once, dpkg finishes the package it is on:
+//     "Stopping after X…", Cancel greyed; then Confirm again with what finished cleared from the queue and the
+//     footer "Stopped. N installed and cleared from the queue."), Close after a run with failures. Top right: Hide
+//     while it runs (the page slides away; a strip under every tab's nav bar reopens it, and the Installed badge
+//     counts what's left), Retry All once it ended with failures (failed, skipped and cancelled rows). A clean end has no bar
+//     buttons, as the 4S's "Complete": the finish button closes it.
 //   The bottom: the status and bar while it runs, then the finish button (core/progress.js chooseFinish over what
 //     was installed: Restart SpringBoard for a tweak, Reload Data for an app, Return to iFizBox).
 //
@@ -198,18 +200,18 @@ export async function runQueue({ jobs, plan }, deps) {
   };
 
   // ---- the bar ----
+  // B224: as Cydia's Running page on the 4S: plain black-bar buttons, Cancel at the top left; no buttons once it ends
+  // clean (the 4S's Complete has none: the finish button closes it)
   const hide = barButton("Hide");
-  const cancel = barButton("Cancel", "red");
+  const cancel = barButton("Cancel");
   const closeB = barButton("Close");
   const retryAll = barButton("Retry All");
-  const done = barButton("Done", "done");
   hide.addEventListener("click", () => { page.hide(); strip.show(); tick(); });
   cancel.addEventListener("click", () => {
     if (cancel.disabled) return;
     if (run.cancel()) { cancel.disabled = true; for (const r of rows) draw(r); tick(); }
   });
   closeB.addEventListener("click", () => page.close());
-  done.addEventListener("click", () => page.close());
   retryAll.addEventListener("click", () => { const p = run.retryAll(); if (p) drive(p); });
   const retry = (id) => { const wasRunning = run.running; const p = run.retry(id); if (p && !wasRunning) drive(p); };
 
@@ -242,7 +244,7 @@ export async function runQueue({ jobs, plan }, deps) {
     page.reopen({ title: "Running", status: runStatus(rows, names) });
     cancel.disabled = false;
     summary.hidden = true;
-    page.bar({ left: hide, right: cancel }); // a retry keeps the finish levels earlier passes asked for
+    page.bar({ left: cancel, right: hide }); // a retry keeps the finish levels earlier passes asked for
     for (const r of rows) draw(r);
     await promise;
     await asking;
@@ -277,7 +279,7 @@ export async function runQueue({ jobs, plan }, deps) {
       deps.reopenConfirm?.(`Stopped. ${installed.length} installed and cleared from the queue.`);
       return result;
     }
-    page.bar(bad.length ? { left: closeB, right: retryAll } : { right: done });
+    page.bar(bad.length ? { left: closeB, right: retryAll } : {});
     page.finish({ label: choice.label, status: text, action: () => finishAction(choice) });
     if (page.hidden) strip.update();
     return result;

@@ -109,9 +109,11 @@ test("Cancel abandons the rest and reopens Confirm with what finished cleared", 
   const done = runAppRun(s.queue.list(), { queue: s.queue, lanes: s.l, open: () => s.page, reopenConfirm: (f) => s.reopened.push(f) });
   await settle();
   await s.l.release("a");
-  const cancel = s.page.bars.at(-1).right;
+  // B224: Cydia's plain Cancel at the top left, as on the 4S
+  const cancel = s.page.bars.at(-1).left;
   assert.equal(cancel.textContent, "Cancel");
-  assert.ok(cancel.className.includes("red"));
+  assert.ok(!cancel.className.includes("red"));
+  assert.equal(s.page.bars.at(-1).right ?? null, null);
   cancel.click();
   const r = await done;
   assert.equal(r.stopped, true);
@@ -123,7 +125,7 @@ test("Cancel abandons the rest and reopens Confirm with what finished cleared", 
   assert.deepEqual(s.reopened, ["Stopped. 1 installed and cleared from the queue."]);
 }));
 
-test("a failed app ends its row only; Retry All signs it again; a clean run ends on Done; re-sign rows show the expiry", () => withDom(async () => {
+test("a failed app ends its row only; Retry All signs it again; a clean run ends with no bar buttons; re-sign rows show the expiry", () => withDom(async () => {
   const s = setup([app("a", "Alpha", "resign"), app("b", "Beta")], { bad: ["b"] });
   const done = runAppRun(s.queue.list(), { queue: s.queue, lanes: s.l, open: () => s.page });
   await settle();
@@ -140,7 +142,9 @@ test("a failed app ends its row only; Retry All signs it again; a clean run ends
   await s.l.release("b");
   await settle();
   assert.deepEqual(s.l.calls.sign, ["b"]);
-  assert.equal(s.page.bars.at(-1).right.textContent, "Done");
+  // B224: no bar buttons at a clean end, as the 4S's Complete
+  assert.equal(s.page.bars.at(-1).right ?? null, null);
+  assert.equal(s.page.bars.at(-1).left ?? null, null);
   assert.equal(s.queue.size, 0);
 }));
 

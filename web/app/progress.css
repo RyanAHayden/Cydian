@@ -128,11 +128,15 @@
 .progress-page .sheet-bar .bar-button:disabled { opacity: .5; }
 /* ==== } look-only ==== */
 
-/* ---- F234: the queue run (screens/queuerun.js): Packages | Log in the black nav bar, one row per package ---- */
+/* ---- F234: the queue run (screens/queuerun.js): Packages | Log under the black nav bar, one row per package ---- */
 /* UISegmentBarBlackButton / ...Highlighted / ...Divider (ref/4s/artwork/Shared@2x, sampled): 30px, a #1e1e1e top
    edge, #767676 -> #262626 to the middle, flat black under it, a white 30% line below; the chosen segment
    #8f8f8f -> #494848 over flat #3b3b3b; #8f8f8f -> #3c3c3c dividers over #262626. */
-.nav-title.has-seg { display: flex; justify-content: center; align-items: center; }
+/* B224: the nav bar keeps Cydia's title ("Running", then "Complete", as on the 4S); the control sits on the black page
+   just under it, and the log and the list start under the band. */
+.progress-seg-band { flex: none; display: flex; justify-content: center; align-items: center; height: 44px; margin-top: var(--nav-h); }
+.has-seg-band .progress-scroll { padding-top: 10px; }
+.has-seg-band .progress-pane { padding-top: 0; }
 .progress-seg { display: inline-flex; height: 30px; overflow: hidden; }
 .progress-seg-item { min-width: 82px; height: 30px; padding: 0 12px; cursor: pointer; touch-action: manipulation; }
 

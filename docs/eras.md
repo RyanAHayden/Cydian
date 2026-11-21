@@ -171,7 +171,7 @@ against these classes. The classes and states are the hooks: keep them when an o
 | Banner | `banner.js` | `.banner`, `.banner-icon`, `.banner-text`, `.banner-action` (a `.bar-button.done`), `.banner-timer` | `ios6.css`, literal |
 | Undo bar | `undobar.js` | `.undo-bar` (`.shown`), `.undo-bar-text`, `.undo-bar-button` (a `.bar-button.done`) | `ios6.css`, literal |
 | Menu | `menu.js` | `.menu` (`.below`), `.menu-items`, `.menu-item` (`.is-held`), `.menu-arrow` | `ios6.css`, literal |
-| Placeholders | `ui.js` `placeholder()` | `.ph` (`.ph-list`, `.ph-page`), `.ph-head`, `.ph-lines`, `.ph-box` (`.ph-icon`, `.ph-icon-lg`), `.ph-bar` (`.ph-sub`, widths `.ph-w30`…`.ph-w70`) | `ios6.css`, literal |
+| Placeholders | `ui.js` `placeholder()` | `.ph` (`.ph-list`, `.ph-page`), `.ph-head`, `.ph-lines`, `.ph-box` (`.ph-icon`, `.ph-icon-lg`), `.ph-bar` (`.ph-sub`, widths `.ph-w30`…`.ph-w70`) | `ios6.css`, tokens `--placeholder`, `--dk-placeholder` |
 | Built-in lock | `lock.js` | `.name-lock`, `.source-lock`, `.lock-icon` | `sources.css`, token `--lock-icon` (the padlock's art) |
 | Row icon tint | `ui.js` | `.cell-icon` | `ios6.css`, tokens `--cell-icon`, `--cell-icon-text`; a row's own colour (`icon.color`) comes in `--cell-icon-tint` |
 

@@ -120,11 +120,11 @@ html[data-style="ios7"][data-theme="light"] {
   /* packages.css: the action sheet, iOS 7's white rounded buttons over a dimmed page */
   --action-dim: rgba(0,0,0,.4); --action-sheet: none;
   --action-title: #8f8f8f; --action-title-emboss: none;
-  --action-btn: rgba(248,248,248,.97); --action-btn-text: #007aff; --action-btn-emboss: none;
+  --action-btn: #f3f3f3; --action-btn-text: #007aff; --action-btn-emboss: none;
   --action-btn-edge: transparent; --action-btn-shadow: none;
-  --action-btn-pressed: #e5e5e5; --action-btn-pressed-text: #007aff; --action-btn-pressed-emboss: none;
-  --action-destructive: rgba(248,248,248,.97); --action-destructive-text: #ff3b30; --action-destructive-emboss: none;
-  --action-cancel: rgba(248,248,248,.97); --action-cancel-pressed: #e5e5e5;
+  --action-btn-pressed: #dcdcdc; --action-btn-pressed-text: #007aff; --action-btn-pressed-emboss: none;
+  --action-destructive: #f3f3f3; --action-destructive-text: #ff3b30; --action-destructive-emboss: none;
+  --action-cancel: #ebebeb; --action-cancel-pressed: #d4d4d4;
   --action-cancel-text: #007aff; --action-cancel-emboss: none;
   --store-head: #f7f7f7; --store-head-edge: #c8c7cc; --store-head-emboss: none;
   /* sources.css's Done ("Button (Gloss Blue)"): iOS 7's Done is bold tinted text with no box, in the nav bar and on
@@ -233,8 +233,8 @@ html[data-style="ios7"] .tab[data-tab="settings"].active { --glyph: url("data:im
 
 /* Grouped tables: edge to edge with a hairline top and bottom, separators inset 15pt (drawn on the cell, so the
    pressed grey covers them as iOS 7 hides a selected row's lines), uppercase 13pt headers, left-aligned footers. */
-html[data-style="ios7"] .group-header { font-size: 13px; font-weight: 400; line-height: 16px; letter-spacing: 0; text-transform: uppercase; }
-html[data-style="ios7"] .group-footer { font-size: 13px; line-height: 17px; text-align: left; }
+html[data-style="ios7"] .group-header { font-size: 14px; font-weight: 400; line-height: 17px; letter-spacing: 0; text-transform: uppercase; } /* the kit's 14pt */
+html[data-style="ios7"] .group-footer { font-size: 14px; line-height: 18px; text-align: left; }
 html[data-style="ios7"] .table.grouped { border-width: .5px 0; border-radius: 0; }
 html[data-style="ios7"] .grouped .cell + .cell {
   border-top-width: 0;
@@ -330,8 +330,9 @@ html[data-style="ios7"] .search-field { border-radius: 5px; }
 html[data-style="ios7"] .search-cancel { font-size: 17px; font-weight: 400; }
 html[data-style="ios7"][data-theme="dark"] .search-cancel { background: none; }
 
-/* Action sheet: rounded white buttons, regular weight, Cancel bold. */
-html[data-style="ios7"] .action-button { font-size: 20px; font-weight: 400; border-radius: 4px; }
+/* Action sheet: rounded white buttons, regular weight, Cancel bold. The kit's "Actions Sheet": 21pt text, 3pt corners,
+   #f3f3f3 buttons and a #ebebeb Cancel (the colour tokens above). */
+html[data-style="ios7"] .action-button { font-size: 21px; font-weight: 400; border-radius: 3px; }
 html[data-style="ios7"] .action-button.cancel { font-weight: 600; }
 html[data-style="ios7"][data-theme="dark"] .action-button.destructive { background: var(--action-destructive); }
 
@@ -343,3 +344,119 @@ html[data-style="ios7"] .banner-text strong { font-weight: 600; }
 html[data-style="ios7"] .banner-icon { border-radius: 7px; }
 html[data-style="ios7"] .reload-text { font-size: 15px; font-weight: 600; }
 html[data-style="ios7"] .reload-spinner { background-image: var(--i7-reload-spinner); }
+
+/* ---- F333: controls checked against the kit (ref/teehanlax/ios7/sheet.svg) ---- */
+/* Counts (a source's packages, More Sources): plain grey text as Mail's mailbox counts, no pill. */
+html[data-style="ios7"] .cell-count { font-size: 17px; font-weight: 400; color: var(--detail); background: none; border-radius: 0; text-align: right; }
+html[data-style="ios7"] .cell-inner.is-pressed .cell-count { color: var(--detail); }
+/* A link in a group footer: tinted, no underline (the browser's default link blue and underline otherwise). */
+html[data-style="ios7"] .group-footer a { color: var(--i7-tint); text-decoration: none; }
+/* A row held for its menu: iOS 7's grey with the row's own ink, as a tapped row (iOS 6 turns it white). */
+html[data-style="ios7"] .cell.is-held > .cell-inner,
+html[data-style="ios7"] .cell.is-held > .cell-inner .cell-label { color: var(--text); }
+html[data-style="ios7"] .cell.is-held > .cell-inner .cell-subtitle { color: var(--subtitle); }
+html[data-style="ios7"] .cell.is-held > .cell-inner .cell-detail,
+html[data-style="ios7"] .cell.is-held > .cell-inner .cell-count { color: var(--detail); }
+html[data-style="ios7"] .cell.is-held > .cell-inner.chevron::after { background-image: var(--chevron); }
+/* Plain tables: the kit's .5pt #c7c7cb keyline from 15pt in ("Table View 2"), from the label on rows with an icon
+   (a source's 29pt icon, a package's 40pt art). A full-height tile whose gradient paints its bottom .5pt: a .5pt-tall
+   tile at the row's bottom is not painted by Chromium at 3x, and the package list is virtual (rows out of order in
+   the DOM), so the line can't go on the next row's top. */
+html[data-style="ios7"] {
+  --i7-keyline: linear-gradient(to top, var(--keyline) .5px, transparent .5px);
+}
+html[data-style="ios7"] .plain .cell { border-bottom-width: 0; background: var(--i7-keyline) 15px 0 / calc(100% - 15px) 100% no-repeat; }
+html[data-style="ios7"] .plain .cell:has(> .cell-inner > .cell-icon) {
+  background-position: calc(15px + 29px + var(--cell-gap)) 0;
+  background-size: calc(100% - 15px - 29px - var(--cell-gap)) 100%;
+}
+html[data-style="ios7"] .pkg-row {
+  border-bottom-width: 0;
+  background: var(--i7-keyline) 51px 0 / calc(100% - 51px) 100% no-repeat, var(--plain); /* from the name, 51pt in */
+}
+
+/* Alert ("Alert" in the kit): a white box with 7pt corners, black 17pt semibold title, 13pt message, tinted 17pt
+   buttons with no box under a .5pt rgba(0,0,0,.3) line, a .5pt line between two side by side; the default (last)
+   button semibold. The box keeps iOS 6's padding and button gaps (no hook yet), so the lines are drawn on the box
+   itself, edge to edge, from its bottom: the button row starts 54pt up (11pt padding + the 43pt button). */
+html[data-style="ios7"][data-theme="light"] {
+  --i7-alert: rgba(248,248,248,.97); --i7-alert-line: rgba(0,0,0,.3); --i7-alert-pressed: rgba(0,0,0,.08);
+  --i7-alert-dim: rgba(0,0,0,.25); --i7-alert-field: #fff; --i7-alert-field-edge: #c8c7cc; --i7-scrim: rgba(0,0,0,.4);
+}
+html[data-style="ios7"][data-theme="dark"] {
+  --i7-alert: #1c1c1e; --i7-alert-line: #38383a; --i7-alert-pressed: rgba(255,255,255,.08);
+  --i7-alert-dim: rgba(255,255,255,.3); --i7-alert-field: #000; --i7-alert-field-edge: #38383a; --i7-scrim: rgba(0,0,0,.6);
+}
+html[data-style="ios7"] .alert-scrim { background: var(--i7-scrim); }
+html[data-style="ios7"] .alert {
+  border: 0; border-radius: 7px; box-shadow: none; color: var(--i7-label); text-shadow: none;
+  background:
+    linear-gradient(var(--i7-alert-line), var(--i7-alert-line)) 0 calc(100% - 56px) / 100% .5px no-repeat,
+    linear-gradient(var(--i7-alert-line), var(--i7-alert-line)) 50% 100% / .5px 56px no-repeat,
+    var(--i7-alert);
+}
+html[data-style="ios7"] .alert:has(> .alert-buttons > .alert-button:only-child) {
+  background: linear-gradient(var(--i7-alert-line), var(--i7-alert-line)) 0 calc(100% - 56px) / 100% .5px no-repeat, var(--i7-alert);
+}
+/* stacked buttons (three or more, or two long ones): 43pt with 9pt gaps, a line across each gap and over the first */
+html[data-style="ios7"] .alert:has(> .alert-buttons.stacked > :nth-child(2):last-child) {
+  background:
+    linear-gradient(var(--i7-alert-line), var(--i7-alert-line)) 0 calc(100% - 58.5px) / 100% .5px no-repeat,
+    linear-gradient(var(--i7-alert-line), var(--i7-alert-line)) 0 calc(100% - 109px) / 100% .5px no-repeat,
+    var(--i7-alert);
+}
+html[data-style="ios7"] .alert:has(> .alert-buttons.stacked > :nth-child(3):last-child) {
+  background:
+    linear-gradient(var(--i7-alert-line), var(--i7-alert-line)) 0 calc(100% - 58.5px) / 100% .5px no-repeat,
+    linear-gradient(var(--i7-alert-line), var(--i7-alert-line)) 0 calc(100% - 110.5px) / 100% .5px no-repeat,
+    linear-gradient(var(--i7-alert-line), var(--i7-alert-line)) 0 calc(100% - 161px) / 100% .5px no-repeat,
+    var(--i7-alert);
+}
+html[data-style="ios7"] .alert:has(> .alert-buttons.stacked > :nth-child(4):last-child) {
+  background:
+    linear-gradient(var(--i7-alert-line), var(--i7-alert-line)) 0 calc(100% - 58.5px) / 100% .5px no-repeat,
+    linear-gradient(var(--i7-alert-line), var(--i7-alert-line)) 0 calc(100% - 110.5px) / 100% .5px no-repeat,
+    linear-gradient(var(--i7-alert-line), var(--i7-alert-line)) 0 calc(100% - 162.5px) / 100% .5px no-repeat,
+    linear-gradient(var(--i7-alert-line), var(--i7-alert-line)) 0 calc(100% - 213px) / 100% .5px no-repeat,
+    var(--i7-alert);
+}
+html[data-style="ios7"] .alert::before { background: none; }
+html[data-style="ios7"] .alert-title { font-size: 17px; line-height: 22px; font-weight: 600; }
+html[data-style="ios7"] .alert-message { font-size: 13px; line-height: 17px; }
+html[data-style="ios7"] .alert-field {
+  border-radius: 0; font-size: 14px; color: var(--i7-label);
+  background: var(--i7-alert-field); border: .5px solid var(--i7-alert-field-edge); box-shadow: none;
+}
+html[data-style="ios7"] .alert-paste,
+html[data-style="ios7"] .alert-paste:active {
+  border: 0; border-radius: 0; font-size: 15px; font-weight: 400; color: var(--i7-tint); text-shadow: none; background: none;
+}
+html[data-style="ios7"] .alert-paste:active { opacity: .3; }
+html[data-style="ios7"] .alert-button,
+html[data-style="ios7"] .alert-button.cancel,
+html[data-style="ios7"] .alert-button.green,
+html[data-style="ios7"] .alert-button.red,
+html[data-style="ios7"] .alert-button:disabled {
+  border: 0; border-radius: 0; box-shadow: none; text-shadow: none; background: none;
+  font-size: 17px; font-weight: 400; color: var(--i7-tint);
+}
+html[data-style="ios7"] .alert-button:last-child:not(.cancel) { font-weight: 600; }
+html[data-style="ios7"] .alert-button.red { color: var(--i7-red); }
+html[data-style="ios7"] .alert-button:disabled { color: var(--i7-alert-dim); opacity: 1; }
+html[data-style="ios7"] .alert-button:active:not(:disabled),
+html[data-style="ios7"] .alert-button.is-pressed { background: var(--i7-alert-pressed); }
+
+/* Callout menu and the queue hint ("Contextual menu"): flat #232323, 8pt corners, 36pt tall, 14pt light white items
+   split by .5pt #b9b9b9 lines, no gloss, emboss or drop shadow. */
+html[data-style="ios7"] {
+  --callout-h: 36px;
+  --menu: #232323; --menu-drop: none; --menu-edge: transparent; --menu-shine: none;
+  --menu-text: #fff; --menu-emboss: none; --menu-divider: #b9b9b9; --menu-divider-hi: none;
+  --menu-pressed: #4a4a4a; --menu-arrow: #232323; --menu-arrow-below: #232323;
+  --callout-drop: none; --callout-edge: #232323; --callout: #232323; --callout-text: #fff; --callout-emboss: none;
+  --callout-arrow: #232323;
+}
+html[data-style="ios7"] .menu-items { border-width: 0; border-radius: 8px; }
+html[data-style="ios7"] .menu-item { font-size: 14px; font-weight: 300; letter-spacing: .28px; line-height: 36px; }
+html[data-style="ios7"] .menu-item + .menu-item { border-left-width: .5px; }
+html[data-style="ios7"] .queue-hint-text { border-width: 0; border-radius: 8px; font-weight: 300; letter-spacing: .28px; }

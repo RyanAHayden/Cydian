@@ -1,0 +1,147 @@
+[
+{
+"eval": "(()=>{localStorage.clear();localStorage.setItem('ifizbox.firstVisit','later');localStorage.setItem('ifizbox.device','iphoneos-arm64');localStorage.setItem('ifizbox.style','ios7');localStorage.setItem('ifizbox.appearance','__TONE__');localStorage.setItem('ifizbox.darkTheme','oled');return 1})()"
+},
+{
+"nav": "#/home",
+"ms": 5000
+},
+{
+"shot": "__P__-home"
+},
+{
+"nav": "#/sources",
+"ms": 6000
+},
+{
+"shot": "__P__-sources"
+},
+{
+"clicktext": "BigBoss",
+"ms": 5000
+},
+{
+"shot": "__P__-source"
+},
+{
+"nav": "#/changes",
+"ms": 8000
+},
+{
+"shot": "__P__-changes"
+},
+{
+"nav": "#/installed",
+"ms": 4000
+},
+{
+"shot": "__P__-installed"
+},
+{
+"nav": "#/search",
+"ms": 4000
+},
+{
+"shot": "__P__-search"
+},
+{
+"nav": "#/home/settings",
+"ms": 3000
+},
+{
+"shot": "__P__-settings"
+},
+{
+"nav": "#/home/settings/theme",
+"ms": 3000
+},
+{
+"shot": "__P__-theme"
+},
+{
+"nav": "#/home/settings/signing",
+"ms": 3000
+},
+{
+"shot": "__P__-signing"
+},
+{
+"nav": "#/home/settings/device",
+"ms": 3000
+},
+{
+"shot": "__P__-device"
+},
+{
+"nav": "#/sources/manage",
+"ms": 4000
+},
+{
+"shot": "__P__-manage"
+},
+{
+"nav": "#/home",
+"ms": 3000
+},
+{
+"eval": "(async()=>{const a=await import('./nav/actionsheet.js');a.showActionSheet({title:'Remove this source and its packages?',buttons:['Remove Source','Refresh'],destructive:0});return 1})()"
+},
+{
+"wait": 1200
+},
+{
+"shot": "__P__-actionsheet"
+},
+{
+"nav": "#/home",
+"ms": 3000
+},
+{
+"eval": "(async()=>{const a=await import('./nav/alert.js');a.showAlert({title:'Add Source',message:'Enter the URL of the source.',input:{placeholder:'https://'},buttons:['Cancel','Add Source'],cancel:0});return 1})()"
+},
+{
+"wait": 1200
+},
+{
+"shot": "__P__-alert"
+},
+{
+"nav": "#/home",
+"ms": 3000
+},
+{
+"eval": "(async()=>{const a=await import('./nav/alert.js');a.showAlert({title:'Verify Device',message:'Pick one.',buttons:['Cancel','Keep My Old Copy','Accept the New Copy'],cancel:0});return 1})()"
+},
+{
+"wait": 1200
+},
+{
+"shot": "__P__-alert3"
+},
+{
+"nav": "#/home",
+"ms": 3000
+},
+{
+"eval": "(async()=>{const m=await import('./nav/menu.js');const c=[...document.querySelectorAll('.cell')][4];m.showMenu(c,[{label:'Copy',onClick(){}},{label:'Share',onClick(){}},{label:'Install',onClick(){}}]);return 1})()"
+},
+{
+"wait": 800
+},
+{
+"shot": "__P__-menu"
+},
+{
+"nav": "#/home",
+"ms": 3000
+},
+{
+"eval": "(async()=>{const a=await import('./nav/alert.js');a.showAlert({title:'Installed',message:'Done.',buttons:['OK']});return 1})()"
+},
+{
+"wait": 1200
+},
+{
+"shot": "__P__-alert1"
+}
+]

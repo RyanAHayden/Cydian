@@ -323,6 +323,150 @@ try {
     check(skeleton.push.fading === 0 && skeleton.rest.fading === 0, "the content takes the skeleton's place at once (no fade, no blank blink)");
   }
 
+  // 7. B271: a page's long description (screens/description.js) opened with More, tapped as a finger would: the page
+  // keeps its scroll position every frame, the rows below slide down, and the text's visible bottom (its clip) never
+  // reaches past the Less row's top. Then Less folds it and scrolls back to the description, as before.
+  const descSetup = await ev(`(async () => {
+    const body = document.querySelector(".page.is-top .page-body");
+    if (!body) return { error: "no page body" };
+    const { descriptionGroup } = await import("./screens/description.js");
+    const text = ["A long description.", "", ...Array.from({ length: 30 }, (_, i) => "Line " + i + " of a text long enough to fold behind More")].join("\\n");
+    const wrap = document.createElement("div");
+    wrap.className = "smoke-desc";
+    const spacer = document.createElement("div");
+    spacer.style.height = "600px";
+    const below = document.createElement("ul");
+    below.className = "table grouped smoke-desc-below";
+    for (const t of ["Version", "Size", "Section"]) { const li = document.createElement("li"); li.className = "cell"; li.textContent = t; below.append(li); }
+    const tail = document.createElement("div");
+    tail.style.height = "1200px";
+    wrap.append(spacer, descriptionGroup(text), below, tail);
+    body.append(wrap);
+    await new Promise((r) => setTimeout(r, 400)); // its layout check (rAF) and slide.js's first measure
+    const more = wrap.querySelector(".desc-more");
+    if (!more) return { error: "no More row" };
+    body.scrollTop = wrap.offsetTop + 450; // the description in mid-screen, scrolled to
+    await new Promise((r) => requestAnimationFrame(r));
+    const r = more.getBoundingClientRect();
+    return { x: r.x + r.width / 2, y: r.y + r.height / 2, scroll: body.scrollTop };
+  })()`);
+  if (check(!descSetup.error, `a long description drew with More${descSetup.error ? ": " + descSetup.error : ""}`)) {
+    const sampling = ev(`(async () => {
+      const body = document.querySelector(".page.is-top .page-body");
+      const wrap = body.querySelector(".smoke-desc");
+      const box = wrap.querySelector(".desc-text");
+      const frames = [];
+      const t0 = performance.now();
+      await new Promise((done) => { const tick = () => {
+        const row = wrap.querySelector(".desc-more");
+        const b = box.getBoundingClientRect();
+        const cut = (e) => +(/inset\\(\\S+ \\S+ ([\\d.]+)px/.exec(getComputedStyle(e).clipPath)?.[1] ?? 0);
+        const table = box.closest(".table");
+        frames.push({ scroll: body.scrollTop, visible: b.bottom - cut(box), next: row.getBoundingClientRect().top,
+          rowEnd: row.getBoundingClientRect().bottom, tableEnd: table.getBoundingClientRect().bottom - cut(table),
+          below: wrap.querySelector(".smoke-desc-below").getBoundingClientRect().top, open: !box.classList.contains("collapsed") });
+        if (performance.now() - t0 < ${1500 * SLOW}) requestAnimationFrame(tick); else done(); }; requestAnimationFrame(tick); });
+      return frames;
+    })()`);
+    if (SHOTS) await send("Animation.setPlaybackRate", { playbackRate: 1 / SLOW });
+    await sleep(100);
+    await mouse("mouseMoved", descSetup.x, descSetup.y, 0);
+    await mouse("mousePressed", descSetup.x, descSetup.y);
+    await sleep(60);
+    await mouse("mouseReleased", descSetup.x, descSetup.y, 0);
+    if (SHOTS) for (let n = 0; n < 12; n++) { await shot(`7-desc-${String(n).padStart(2, "0")}`); await sleep(150 * SLOW / 4); }
+    const f = (await sampling).filter((x) => x.open);
+    if (SHOTS) await send("Animation.setPlaybackRate", { playbackRate: 1 });
+    if (check(f.length > 0, "More opened the description")) {
+      const end = f.at(-1);
+      const gap = end.next - end.visible;
+      const jumped = f.filter((x) => Math.abs(x.scroll - descSetup.scroll) > 0.5);
+      check(jumped.length === 0, `More kept the scroll position (${descSetup.scroll}px${jumped.length ? `, moved to ${jumped[0].scroll}px` : ""})`);
+      const over = f.filter((x) => x.visible > x.next + 1);
+      check(over.length === 0, `the text never shows under its Less row while it opens (${over.length} of ${f.length} frames)`);
+      const moving = f.filter((x) => Math.abs(x.below - end.below) > 1);
+      check(moving.length >= 3, `the rows below slid down as it opened (${moving.length} moving frames)`);
+      const drift = Math.max(0, ...f.map((x) => Math.abs(x.next - x.visible - gap)));
+      check(drift <= 2, `the text's edge moved with its Less row (off by at most ${drift.toFixed(1)}px)`);
+      const edge = end.tableEnd - end.rowEnd;
+      const tdrift = Math.max(0, ...f.map((x) => Math.abs(x.tableEnd - x.rowEnd - edge)));
+      check(tdrift <= 2, `the group's bottom edge moved with its Less row (off by at most ${tdrift.toFixed(1)}px)`);
+    }
+    await settle();
+    const less = await ev(`(async () => { const body = document.querySelector(".page.is-top .page-body");
+      const row = document.querySelector(".smoke-desc .desc-more");
+      body.scrollTop += row.getBoundingClientRect().top - body.clientHeight / 2; // the Less row in mid-screen
+      await new Promise((r) => requestAnimationFrame(r));
+      const r = row.getBoundingClientRect();
+      return { x: r.x + r.width / 2, y: r.y + r.height / 2, scroll: body.scrollTop }; })()`);
+    await mouse("mouseMoved", less.x, less.y, 0);
+    await mouse("mousePressed", less.x, less.y);
+    await sleep(60);
+    await mouse("mouseReleased", less.x, less.y, 0);
+    await sleep(100);
+    await settle();
+    const after = await ev(`(() => { const r = document.querySelector(".smoke-desc .desc-more").getBoundingClientRect();
+      return { y: r.y + r.height / 2, scroll: document.querySelector(".page.is-top .page-body").scrollTop,
+        folded: document.querySelector(".smoke-desc .desc-text").classList.contains("collapsed") }; })()`);
+    check(after.folded && after.scroll < less.scroll && Math.abs(after.y - less.y) <= 2,
+      `Less folded it and scrolled back to the description (scroll ${less.scroll} -> ${after.scroll}px, row ${Math.round(less.y)} -> ${Math.round(after.y)})`);
+    await settle();
+    await ev(`document.querySelector(".smoke-desc")?.remove()`);
+  }
+
+  // 7b. B271: the app page's "From the App Store" card (altstore.js: its text and a More row that goes when tapped):
+  // the scroll position holds and the card's bottom edge moves with the group below it.
+  const store = await ev(`(async () => {
+    const body = document.querySelector(".page.is-top .page-body");
+    const { growOpen } = await import("./screens/description.js");
+    const { grouped } = await import("./nav/ui.js");
+    const long = Array.from({ length: 30 }, (_, i) => "Store line " + i + " of Apple's long text").join("\\n");
+    const wrap = document.createElement("div");
+    wrap.className = "smoke-store";
+    const spacer = document.createElement("div"); spacer.style.height = "600px";
+    const g = document.createElement("div"); g.className = "group";
+    const t = document.createElement("div"); t.className = "table grouped";
+    const text = document.createElement("div"); text.className = "pkg-description"; text.textContent = long.split("\\n").slice(0, 5).join("\\n");
+    const more = grouped([{ rows: [{ label: "More", onClick: () => growOpen(text, () => { text.textContent = long; more.remove(); }) }] }]).querySelector("li");
+    t.append(text, more); g.append(t);
+    const below = document.createElement("ul"); below.className = "table grouped smoke-store-below";
+    below.innerHTML = "<li class=cell>What's New</li>";
+    const tail = document.createElement("div"); tail.style.height = "1200px";
+    wrap.append(spacer, g, below, tail);
+    body.append(wrap);
+    await new Promise((r) => setTimeout(r, 400));
+    body.scrollTop = wrap.offsetTop + 450;
+    await new Promise((r) => requestAnimationFrame(r));
+    const r = more.getBoundingClientRect();
+    return { x: r.x + r.width / 2, y: r.y + r.height / 2, scroll: body.scrollTop };
+  })()`);
+  const storeRun = ev(`(async () => {
+    const body = document.querySelector(".page.is-top .page-body");
+    const t = body.querySelector(".smoke-store .table"), below = body.querySelector(".smoke-store-below");
+    const cut = (e) => +(/inset\\(\\S+ \\S+ ([\\d.]+)px/.exec(getComputedStyle(e).clipPath)?.[1] ?? 0);
+    const frames = [];
+    const t0 = performance.now();
+    await new Promise((done) => { const tick = () => {
+      frames.push({ scroll: body.scrollTop, edge: t.getBoundingClientRect().bottom - cut(t), next: below.getBoundingClientRect().top, open: !t.querySelector(".cell") });
+      if (performance.now() - t0 < 1500) requestAnimationFrame(tick); else done(); }; requestAnimationFrame(tick); });
+    return frames;
+  })()`);
+  await sleep(100);
+  await mouse("mouseMoved", store.x, store.y, 0);
+  await mouse("mousePressed", store.x, store.y);
+  await sleep(60);
+  await mouse("mouseReleased", store.x, store.y, 0);
+  const sf = (await storeRun).filter((x) => x.open);
+  if (check(sf.length > 0, "the App Store card's More opened it")) {
+    const gap = sf.at(-1).next - sf.at(-1).edge;
+    check(sf.every((x) => Math.abs(x.scroll - store.scroll) <= 0.5), `the App Store card's More kept the scroll position (${store.scroll}px)`);
+    check(sf.filter((x) => Math.abs(x.next - sf.at(-1).next) > 1).length >= 3, "the group below the App Store card slid down");
+    const sd = Math.max(0, ...sf.map((x) => Math.abs(x.next - x.edge - gap)));
+    check(sd <= 2, `the App Store card's edge moved with the group below (off by at most ${sd.toFixed(1)}px)`);
+  }
+  await settle();
+  await ev(`document.querySelector(".smoke-store")?.remove()`);
+
   // the verdict
   const anims = await ev("window.__smoke.anims");
   const bad = anims.filter((a) => a.props.some(isLayoutProperty));

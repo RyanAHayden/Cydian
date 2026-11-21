@@ -179,7 +179,6 @@ const HOME_TILES = {
   upgrades: { svg: `${HOME_SVG} fill='#fff'><path d='M12 2 3 11h6v10h6V11h6z'/></svg>` },
   failed: { svg: `${HOME_SVG} fill='#fff'><path d='M10 3h4l-.6 12h-2.8zm0 15h4v3h-4z'/></svg>` },
   current: { svg: `${HOME_SVG} fill='none' stroke='#fff' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'><path d='m4 12.5 5 5L20 6.5'/></svg>` },
-  changes: { svg: `${HOME_SVG} fill='none' stroke='#fff' stroke-width='2.6' stroke-linecap='round'><circle cx='12' cy='12' r='9'/><path d='M12 7v5l3.5 2.5'/></svg>` },
   loading: { svg: `${HOME_SVG} fill='none' stroke='#fff' stroke-width='2.6' stroke-linecap='round'><circle cx='12' cy='12' r='9'/><path d='M12 7v5l3.5 2.5'/></svg>` },
   // B266: More Sources in the state tile's slot: its row tile's blue and white plus (ROW_ICONS moreSources), which
   // home.css keeps over the green row's glyph colour
@@ -318,7 +317,6 @@ const HOME_TILES_7 = {
   upgrades: home7(null, [ln("M12 20V4.5M6 10.5l6-6 6 6")]),
   failed: home7(null, [ln("M12 4v10", 2.2), dot(12, 19, 1.4)]),
   current: home7(null, GLYPHS_7.check),
-  changes: home7(null, GLYPHS_7.clock),
   loading: home7(null, GLYPHS_7.clock),
   more: home7(C7.blue, GLYPHS_7.plus), // B266: More Sources in the state tile's slot, its row tile's blue plus
   jailbreak: home7(C7.purple, [ln("M5.5 11h13v9.5h-13z"), ln("M8.5 11V7.8a3.5 3.5 0 0 1 6.8-1.2"), ln("M12 14.5v2.5")]),

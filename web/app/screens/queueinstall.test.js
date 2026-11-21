@@ -46,9 +46,11 @@ test("Custom Install: the sheet's Install queues the app with its options and op
   const n = await runAppQueue(q.list(), { queue: q, ready: async () => true, record: async () => {},
     install: (j) => (j.options ? installCustom(j, { sc, now: 2000, follow: () => {} }) : sc.installOnDevice({ url: j.url })) });
   assert.equal(n, 3);
+  // B247: each with the source's app it is (credit), kept on the shell's signed record
+  const credit = (name) => ({ name, source: "https://s/", sourceName: null, key: "alt:k" });
   assert.deepEqual(calls.map((c) => c.params ?? null), [
-    { token: "t1", name: "Mine", bundleId: "com.me.a" },
-    { token: "t2", removeExtensions: ["PlugIns/W.appex"] },
+    { token: "t1", name: "Mine", bundleId: "com.me.a", credit: credit("COM.X.A") },
+    { token: "t2", removeExtensions: ["PlugIns/W.appex"], credit: credit("COM.X.B") },
     null,
   ]);
   assert.equal(calls[0].name, "Mine");

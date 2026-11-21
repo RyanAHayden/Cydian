@@ -40,11 +40,12 @@ test("Install a Copy queues the job with keepBundleId: false, and both runs sign
   await appPageAction(pkgOf("com.x.a"), null, opts);
   const job = q.get("com.x.a");
   assert.deepEqual(job.options, { edits: { keepBundleId: false } });
-  assert.deepEqual(prepareParams(job), { url: "https://s/com.x.a-2.ipa", keepBundleId: false });
+  const credit = { name: "App", source: "https://s/", sourceName: null, key: "alt:k" }; // B247
+  assert.deepEqual(prepareParams(job), { url: "https://s/com.x.a-2.ipa", keepBundleId: false, credit });
   let got = null;
   const sc = { isSelfIpa: () => false, installOnDevice: async (o) => { got = o; return true; } };
   await installCustom(job, { sc, follow: () => {} });
-  assert.deepEqual(got.params, { url: "https://s/com.x.a-2.ipa", keepBundleId: false });
+  assert.deepEqual(got.params, { url: "https://s/com.x.a-2.ipa", keepBundleId: false, credit });
 });
 
 test("Version History's row asks too; an installed app (a record) or a queued one isn't asked", async () => {

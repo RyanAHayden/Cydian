@@ -288,6 +288,31 @@ test("signed records") {
     check(SignedRecords.only(list, bundleID: "nope").isEmpty && SignedRecords.only(list, bundleID: "").isEmpty, "none")
 }
 
+// B247: the source's app an IPA was signed from goes on the record (Re-sign keeps it) and names it in iFizBox
+test("B247: source credit on the signed record") {
+    let o = try SignOptions(json: ["credit": ["name": " RyukGram ", "source": "https://ryuk.example/apps.json",
+                                              "sourceName": "RyukGram Repo", "key": "ryuk|com.burbn.instagram", "extra": 1]])
+    check(o.credit?.name == "RyukGram" && o.credit?.sourceName == "RyukGram Repo" && o.credit?.key == "ryuk|com.burbn.instagram", "parsed")
+    check(o.shownName("Instagram") == "RyukGram", "the log names the source's app")
+    check(try SignOptions(json: ["credit": ["source": "https://x"]]).credit == nil, "no name: no credit")
+    check(try SignOptions(json: ["credit": "RyukGram"]).credit == nil && (try SignOptions(json: [:])).credit == nil, "not an object")
+    var renamed = o
+    renamed.name = "Mine"
+    check(renamed.shownName("Mine") == "Mine", "the user's rename wins")
+    let r = SignedRecord(bundleID: "com.burbn.instagram", originalBundleID: "com.burbn.instagram", name: "Instagram", version: "454.0.0",
+                         url: "https://ryuk.example/r.ipa", signed: day("2026-11-20T00:00:00Z"), expires: nil, options: o.stored)
+    let back = SignedRecords.decode(try SignedRecords.encode([r]))
+    check(back.first?.options.credit == o.credit && SignOptions(back[0].options).credit == o.credit, "kept for Re-sign")
+    check((r.json["credit"] as? [String: Any])?["name"] as? String == "RyukGram" && r.shownName == "RyukGram", "json and shown name")
+    check(JSONSerialization.isValidJSONObject(r.json), "valid json")
+    check(r.options == SignOptions().stored, "left out of the options' ==")
+    var mine = r
+    mine.options.name = "Mine"; mine.name = "Mine"
+    check((mine.json["credit"] as? [String: Any])?["name"] as? String == "Mine", "the rename is the credit's name on signing.installed")
+    let old = SignedRecords.decode(Data(#"[{"bundleID":"a","originalBundleID":"a","name":"A","version":"1","url":"u","signed":"2026-11-17T00:00:00Z","options":{"removeExtensions":[],"fixArm64e":true}}]"#.utf8))
+    check(old.first?.options.credit == nil && old.first?.json["credit"] == nil && old.first?.shownName == "A", "older record: no credit")
+}
+
 // F75: iFizBox's own IPA with the user's certificate inside (BundledIdentity), the ifizbox:// links the shell takes,
 // and gunzip for ifizbox://import on an iOS without DecompressionStream.
 test("bundled identity: first launch imports, once") {

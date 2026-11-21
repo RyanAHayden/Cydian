@@ -17,6 +17,12 @@
 Why the record is the entitlements' App ID (`signingIds(...).entitlementsId`) plus team: iOS compares the
 `application-identifier` (TEAM.<App ID>) of an update with the installed copy's and refuses a change.
 
+Spec review: `warnings` do reach the page (signing-worker.js posts `{ ok, ...r }`, runInWorker resolves with it). The
+record is keyed by the Info.plist ID under the current Keep Bundle IDs setting, both when it's checked and when it's
+saved, so a copy made the old way (another Info.plist ID, another app to iOS) isn't compared with the kept one. That
+is intended. For an IPA whose ID only the job finds, the other-ID warning can only come after signing (still before
+the upload and iOS). A profile with no readable team skips the team comparison.
+
 ## Checks
 
 - `node --test web/app/core/keepid.test.js`: the reworded note, the record round trip, each resignNote wording, the

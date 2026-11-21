@@ -38,7 +38,10 @@ def settings_palettes():
     for key in ["lightTheme", "darkTheme"]:
         block = re.search(r'key: "%s".*?options: \[(.*?)\}\],' % key, settings, re.S).group(1)
         out += re.findall(r'value: "([a-z]+)"', block)
-    return out
+    # B231: the eras' own themes (STYLE_PALETTES), e.g. iOS 7's White, which no theme list offers
+    table = re.search(r"export const STYLE_PALETTES = \{(.*?)\};", settings, re.S).group(1)
+    out += [v for v in re.findall(r'(?:light|dark): "([a-z]+)"', table) if v not in out]
+    return sorted(set(out))
 
 
 class LaunchGrounds(unittest.TestCase):
@@ -172,6 +175,20 @@ class LaunchThemes(unittest.TestCase):
         light_nav = self.block(self.ios6, ".navbar")
         light_nav = self.token(re.search(r"background:(.*?);", light_nav, re.S).group(1))
         light_tab = self.token(re.search(r"background:(.*?);", self.block(self.ios6, ".tabbar"), re.S).group(1))
+        if key == "white":  # B231: iOS 7's flat bars, its hairlines flattened over the bar (make.py)
+            b = self.block(read("web", "app", "ios7.css"), 'html[data-style="ios7"][data-theme="light"]')
+            ground = hex6(self.var(b, "pin-dark"))
+            bar = hex6(self.var(b, "i7-bar"))
+            line = make.mix(make.hexrgb(bar), (0, 0, 0), colour(self.var(b, "i7-hairline"))[1])
+            line = "%02x%02x%02x" % line
+            for name, layer in (("nav-bar", "bottom"), ("tabbar", "top")):
+                self.assertEqual(self.var(b, name), "linear-gradient(var(--i7-hairline), var(--i7-hairline)) %s / "
+                                 "100%% .5px no-repeat, #%s" % (layer, bar), name)
+            self.assertEqual(self.var(b, "nav-shadow"), "none")
+            self.assertEqual(self.var(b, "tabbar-shadow"), "none")
+            flat = make.stops((0, bar), (1, bar))
+            return dict(pins=(ground, hex6(self.var(b, "pin-light"))), nav_line=line, nav_hi=(bar, 1), nav_gloss=flat,
+                        nav_shadow=0, tab_line=(line, 1), tab_gloss=flat, tab_base=bar, tab_shadow=0)
         if key == "classic":
             root = self.block(self.ios6, ":root")
             pins = (hex6(self.var(root, "pin-dark")), hex6(self.var(root, "pin-light")))

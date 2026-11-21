@@ -100,7 +100,8 @@ test("add: a URL that isn't a repo is 'Did Not Find Repository'", async () => {
   await assert.rejects(verifySource(b, "https://example.org/"), (e) => e instanceof SourceError &&
     e.kind === "not_repository" && e.title === "Did Not Find Repository" && /legacy Installer/.test(e.message));
   assert.deepEqual(b.calls, ["packages https://example.org/", "https://example.org/Release",
-    "https://example.org/InRelease", "https://example.org/Packages.zst", "https://example.org/Packages.lzma"]);
+    "https://example.org/InRelease", "https://example.org/Packages.zst", "https://example.org/Packages.lzma",
+    "https://example.org/dists/stable/Release", "https://example.org/dists/stable/InRelease"]); // B261's BigBoss layout
 });
 
 test("add: a bad URL never reaches the backend", async () => {

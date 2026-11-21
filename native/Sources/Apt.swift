@@ -266,6 +266,8 @@ enum Apt {
     }()
 
     static func get(_ url: URL, done: @escaping (Result<(Int, [String: String], Data), BridgeError>) -> Void) {
+        // B261: plain http (BigBoss) outside ATS, which refuses it in URLSession (Sources/PlainFetch.swift).
+        if url.scheme?.lowercased() == "http" { return PlainFetch.get(url, done: done) }
         session.dataTask(with: url) { data, resp, err in
             if let e = err as? URLError {
                 return done(.failure(BridgeError(e.code == .timedOut ? "timeout" : "network", e.localizedDescription)))

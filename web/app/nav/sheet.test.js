@@ -213,3 +213,15 @@ test("showSheet card hook: defaults when the page sets no numbers", () => withCa
   for (const a of doc.anims) a.end();
   await p;
 }));
+
+test("showSheet card hook: closed mid push-back, the page comes back from where it is, not from the end", () => withCardDom({ card: true }, async (doc) => {
+  const close = showSheet({ title: "Quick" });
+  const mid = "matrix(0.96, 0, 0, 0.96, 0, 0)";
+  globalThis.getComputedStyle = () => ({ getPropertyValue: () => "", transform: mid, opacity: "0.875" });
+  const p = close();
+  const forward = pageAnims(doc).slice(3);
+  assert.equal(forward.length, 3);
+  for (const a of forward) assert.deepEqual(a.frames[0], { transform: mid, opacity: 0.875 });
+  for (const a of doc.anims) a.end();
+  await p;
+}));

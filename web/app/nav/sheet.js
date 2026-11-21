@@ -29,7 +29,7 @@ const PAGE = ["navbar", "screens", "tabbar"];  // index.html's page, under every
 let behind = null;                            // the page's open card animations, while a card sheet is up
 let cards = 0;                                // card sheets up
 
-export const cardSheets = (doc = globalThis.document) => doc?.documentElement?.getAttribute?.("data-sheet") === "card";
+const cardSheets =(doc = globalThis.document) => doc?.documentElement?.getAttribute?.("data-sheet") === "card";
 
 // The page behind scales about the viewport's centre: each fixed piece gets the translate that, with its own centre
 // as the origin, lands it where scaling about the screen's centre would.
@@ -51,9 +51,12 @@ function pushBack(doc) {
   return anims;
 }
 
+// Back from wherever the page is now (a sheet closed mid push-back must not jump to the end first).
 function bringForward(anims) {
   for (const { el, to, a } of anims) {
-    const back = el.animate([to, { transform: "none", opacity: 1 }], { duration: DURATION, easing: EASE, fill: "forwards" });
+    const cs = globalThis.getComputedStyle?.(el);
+    const now = cs?.transform ? { transform: cs.transform, opacity: Number(cs.opacity) } : to;
+    const back = el.animate([now, { transform: "none", opacity: 1 }], { duration: DURATION, easing: EASE, fill: "forwards" });
     const end = () => { a.cancel?.(); back.cancel?.(); };
     if (back?.finished) back.finished.then(end, end); else end();
   }

@@ -119,8 +119,8 @@ export function attachLargeTitle(body, item, doc = globalThis.document) {
   };
 }
 
-// The era turns the hook on or off. On, every tab's root page (the first .page of each #screens .tab-stack) gets
-// its large title, and root pages made later get theirs as they are added; off takes them all away again and leaves
+// The era turns the hook on or off. On, every tab's root page (the first .page of each #screens .tab-stack) but
+// Home's gets its large title (Home keeps its plain bar title, user 2026-11-21), and root pages made later get theirs as they are added; off takes them all away again and leaves
 // the bar titles as iOS 6 draws them.
 let largeState = null; // { doc, stackWatch, pages: Map(body -> attached) } while on
 
@@ -141,6 +141,7 @@ export function setLargeTitles(on, doc = globalThis.document) {
   largeState = state;
   const scan = () => {
     for (const stack of doc.querySelectorAll(".tab-stack")) {
+      if (stack.dataset?.tab === "home") continue;
       const page = stack.firstElementChild;
       const body = page?.querySelector(":scope > .page-body");
       if (!body || state.pages.has(body)) continue;

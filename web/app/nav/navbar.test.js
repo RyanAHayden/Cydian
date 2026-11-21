@@ -137,6 +137,23 @@ test("off by default; on draws root pages only; off again takes them away", () =
   assert.equal(root.h1.style.opacity, "");
 });
 
+test("Home's root page gets no large title", () => {
+  const doc = fakeDocument();
+  const stack = doc.createElement("div");
+  stack.className = "tab-stack";
+  stack.dataset.tab = "home";
+  doc.body.append(stack);
+  const root = page(doc, "Home");
+  const section = doc.createElement("section");
+  section.className = "page";
+  section.append(root.body);
+  stack.append(section);
+  setLargeTitles(true, doc);
+  assert.equal(root.body.children.length, 0);
+  assert.deepEqual(Object.keys(root.h1.style), []);
+  setLargeTitles(false, doc);
+});
+
 test("style.css draws the large title only behind the hook, 34px bold on the left", () => {
   const css = readFileSync(new URL("../style.css", import.meta.url), "utf8");
   assert.match(css, /\.large-title \{ display: none; \}/);

@@ -47,6 +47,13 @@ iOS's install prompt.
      below: `websign-job.js putTweaks` writes their files into the folder and the weak load commands into the
      executable), then zsign on the folder (`-b` only when the app is signed the old way). zsign's own last error is
      what the alert shows.
+     Before it signs, when the app's ID is known, a Signed Before Under Another ID alert (Cancel, Sign Anyway) comes
+     up if this browser signed that app before under another team or App ID (`core/keepid.js siteSigned`,
+     `resignNote`; team and App ID kept per bundle ID in localStorage `ifizbox.siteSigned` once the upload is done):
+     iOS refuses an update whose `application-identifier` differs, and deleting the app first loses its data. After
+     signing, a Before You Install alert (Cancel, Install) shows the job's `warnings` (a group folder the app used
+     that this profile lacks), and the same other-ID warning for an IPA whose ID only the job found; Cancel uploads
+     nothing.
   3. *Uploading*: the signed IPA to `POST /sign/upload` in 20 MB parts (KV holds 25 MB a value), kept 10 minutes
      (`TTL`), served at `/sign/up/<token>/manifest.plist` and `app.ipa` (Range too).
   4. iOS's install prompt (`itms-services`), with a banner saying to press Install.
@@ -606,7 +613,8 @@ Notifications:
   renamedUpdateNotice`), and the old copy is deleted by hand.
 - Warnings (`core/keepid.js profileNotes`, under the switch and in Custom Install): a wildcard profile (Apple gives
   it no Push), a development one (sandbox push only), an App ID without Push, and an explicit App ID's shared
-  keychain (apps signed with one App ID share their keychain; their notifications are not affected). Custom Install also warns when the original (same ID, not signed by iFizBox:
+  App Groups (each app keeps its own keychain group first, but apps signed with one App ID share the profile's App
+  Groups folders; their notifications are not affected). Custom Install also warns when the original (same ID, not signed by iFizBox:
   `apps.isInstalled`, `signing.installed`) is on the phone: iOS refuses to put a signed app over the App Store copy,
   which must be deleted first. None of these falls back to the old way: every profile kind installs with the ID kept.
   A plain Install (`signAndInstall`, when the app's bundle ID is known) asks the same before it signs

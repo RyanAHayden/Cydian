@@ -15,8 +15,9 @@
 // The .p12, password and profile go only into the Web Worker (this browser), and with bring into iFizBox's signed
 // IPA, which waits on the Worker for those 10 minutes as the old server signer's copy did.
 import { IPA_MAX, overSiteLimit, overMemoryLimit, memoryLimit, IFIZBOX_ID, noteSigned, isOutOfMemory,
-  noteOutOfMemory } from "../core/websign.js";
-import { withKeep } from "../core/keepid.js";
+  noteOutOfMemory, profileInfo, signingIds } from "../core/websign.js";
+import { withKeep, siteSigned, rememberSiteSigned, resignNote, RESIGN_TITLE, RESIGN_BUTTONS, installWarningText,
+  INSTALL_WARNING_TITLE, INSTALL_WARNING_BUTTONS } from "../core/keepid.js";
 import { progressHUD } from "../nav/progress.js";
 import { showAlert } from "../nav/alert.js";
 import { KNOWN_MALWARE, failed, keepIpaHash, refusing, storageOf, untilCancel } from "./common.js";
@@ -141,6 +142,17 @@ export async function uploadSigned(bytes, { bundleId, name, version }, { base = 
   return call(`/sign/upload/${up.token}/done`, { method: "POST" });
 }
 
+// F334: the team and App ID (entitlements' ID) this profile signs `own` with, and the Info.plist ID iOS knows the app
+// by; null when the profile can't be read or the app's ID isn't known yet.
+export function signingTarget(profile, own, keep = withKeep({}).keepBundleId !== false) {
+  if (!profile || !own) return null;
+  try {
+    const p = profileInfo(profile instanceof Uint8Array ? profile : new Uint8Array(profile));
+    const { bundleId, entitlementsId } = signingIds(p.appId || "*", own, { keep });
+    return { bundleId, team: p.teamId ?? null, appId: entitlementsId };
+  } catch { return null; }
+}
+
 export async function signInBrowser({ url, name = "", onInstalled = () => {}, bring = false, bundleId = null, version = "", bytes = null, size = null, iconUrl = null, anyway = false },
   { hud = progressHUD, alert = showAlert, open = (u) => { location.href = u; }, go = openRoute,
     identity = loadIdentity, fetcher = globalThis.fetch, worker = runInWorker, transfer = websiteTransfer, base = "",
@@ -218,12 +230,25 @@ export async function signInBrowser({ url, name = "", onInstalled = () => {}, br
       log: (t) => h.page?.raw?.(t) })) : null;
     // F288: the tweaks kept for this app (screens/tweaks.js, Inject Tweaks on its IPA page), unpacked and prepared here
     const tweaks = !self && bundleId ? await guard((await import("../screens/tweaks.js")).preparedFor(bundleId)) : null;
-    const signed = await guard(worker({ ipa: buffer(ipa), p12: buffer(id.p12), profile: buffer(made ?? id.profile), password: id.password ?? "", bring: carry,
+    // F334: signed here before under another team or App ID: iOS refuses that update, so ask before signing
+    const signProfile = made ?? id.profile;
+    const ask = async (title, message, buttons) => (await alert({ title, message, buttons, cancel: 0 }))?.index === 1;
+    const stop = () => { drop(); h.hide(); return false; };
+    const target = signingTarget(signProfile, bundleId || (isSelfIpa(url) ? IFIZBOX_ID : null));
+    const before = target ? resignNote(siteSigned(storage, target.bundleId), target, name) : null;
+    if (before && !(await ask(RESIGN_TITLE, before, RESIGN_BUTTONS))) return stop();
+    const signed = await guard(worker({ ipa: buffer(ipa), p12: buffer(id.p12), profile: buffer(signProfile), password: id.password ?? "", bring: carry,
         appBundleId: bundleId || (isSelfIpa(url) ? IFIZBOX_ID : null), ...withKeep({}), ...(tweaks ? { tweaks } : {}),
         ...refusing() },
       { onProgress: (t) => h.set(t), ...(signal ? { signal } : {}) }));
     noteSigned(storage, ipaSize); // F261
     keepIpaHash(storage, signed, { bundleId, version }); // F292: Report as Malicious sends it
+    // F334: the job's warnings (B227: a group folder this profile lost), and the other-ID warning for an app whose ID
+    // only the IPA knew, before anything goes to iOS
+    const after = target ?? signingTarget(signProfile, signed.originalId || signed.bundleId);
+    const late = !target && after ? resignNote(siteSigned(storage, signed.bundleId || after.bundleId), after, name || signed.name) : null;
+    const warning = installWarningText([...(late ? [late] : []), ...(signed.warnings ?? [])]);
+    if (warning && !(await ask(INSTALL_WARNING_TITLE, warning, INSTALL_WARNING_BUTTONS))) return stop();
     h.set("Uploading");
     const ipaBytes = signed.ipa instanceof Uint8Array ? signed.ipa : new Uint8Array(signed.ipa);
     // the early link takes this app only if it came out with the reserved bundle ID (iOS already has its manifest)
@@ -233,6 +258,7 @@ export async function signInBrowser({ url, name = "", onInstalled = () => {}, br
       ...(signal ? { signal } : {}) }));
     ios?.stop(); // uploaded: watchInstall follows iOS from here
     if (h.cancelled) return false;
+    if (after) rememberSiteSigned(storage, signed.bundleId || after.bundleId, after); // F334
     onInstalled({ ...body, bundleId: signed.bundleId, name: signed.name, version: signed.version });
     const app = name || signed.name || "The app";
     if (intoEarly && clock() - early.at < EARLY_WINDOW) {

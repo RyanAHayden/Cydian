@@ -4,7 +4,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { keepPlan, profileFacts, profileNotes, originalNote, sheetNotes, originalState, withKeep, storedKeep, keepOn,
-  OLD_WAY_ALERT, GUIDE_ID, GUIDE_ROUTE } from "./keepid.js";
+  OLD_WAY_ALERT, GUIDE_ID, GUIDE_ROUTE, siteSigned, rememberSiteSigned, resignNote, installWarningText, SITE_SIGNED_KEY,
+  RESIGN_TITLE, RESIGN_BUTTONS, INSTALL_WARNING_TITLE, INSTALL_WARNING_BUTTONS } from "./keepid.js";
 import { signingIds, profileInfo, plistXml } from "./websign.js";
 import { installParams, installedId, signsAsFor, parseProfile } from "./signing.js";
 import { libraryJob } from "./appqueue.js";
@@ -48,7 +49,7 @@ test("profileNotes per profile kind: what it can't do with the ID kept, and the 
   assert.equal(profileNotes(ADHOC_PUSH)[0].guide, false);
   // one explicit App ID with Push covers every app; an ID per app only keeps keychains and App Groups apart
   const oneApp = profileNotes(ADHOC_PUSH)[0].text;
-  assert.match(oneApp, /com\.you\.youtube.*covers every app's notifications.*keychain and App Groups.*App ID per app only/);
+  assert.match(oneApp, /com\.you\.youtube.*covers every app's notifications.*own keychain.*App Groups folders.*App ID per app only/);
   assert.doesNotMatch(oneApp, /use it for one app/);
   // off: one plain warning, whatever the profile
   const off = profileNotes(ADHOC_PUSH, { keep: false, name: "YouTube", as: "com.you.youtube" });
@@ -176,4 +177,103 @@ test("website signing the old way (keepBundleId false); iFizBox's own IPA keeps 
   ({ create, seen } = fakeZsign("com.ryha.ifizbox"));
   r = await runSignJob(create, job({ keepBundleId: false }));
   assert.equal(r.bundleId, "com.you.youtube", "Keep Bundle IDs off: the old way, iFizBox too");
+});
+
+// F334: the one-app note no longer says apps under one App ID share a keychain (B227: each app's own group first)
+test("F334: the one-app note: each app keeps its own keychain; only the profile's App Groups folders are shared", () => {
+  const text = profileNotes(ADHOC_PUSH).find((n) => n.id === "one-app").text;
+  assert.doesNotMatch(text, /share a keychain/);
+  assert.match(text, /Each app keeps its own keychain/);
+  assert.match(text, /share the profile's App Groups folders/);
+});
+
+function memoryStorage() {
+  const m = new Map();
+  return { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)), m };
+}
+
+test("F334: the website remembers team + App ID per bundle ID; resignNote names what changed", () => {
+  const s = memoryStorage();
+  assert.equal(siteSigned(s, "com.google.ios.youtube"), null);
+  rememberSiteSigned(s, "com.google.ios.youtube", { team: "TEAM", appId: "com.you.youtube" });
+  rememberSiteSigned(s, "io.dev.delta", { team: "TEAM", appId: "io.dev.delta" });
+  const before = siteSigned(s, "com.google.ios.youtube");
+  assert.deepEqual(before, { team: "TEAM", appId: "com.you.youtube" });
+  assert.equal(JSON.parse(s.m.get(SITE_SIGNED_KEY))["io.dev.delta"].appId, "io.dev.delta");
+  // same team and App ID: an update iOS takes, no warning
+  assert.equal(resignNote(before, { team: "TEAM", appId: "com.you.youtube" }, "YouTube"), null);
+  assert.equal(resignNote(null, { team: "OTHER", appId: "x" }, "YouTube"), null, "never signed here: nothing to say");
+  assert.equal(resignNote(before, { team: "OTHER", appId: "com.you.youtube" }, "YouTube"),
+    "YouTube was signed here before under another team (TEAM). If that copy is still on your iPhone, iOS won't update it with this one, and deleting it first loses its data.");
+  assert.match(resignNote(before, { team: "TEAM", appId: "com.you.yt2" }, "YouTube"), /under another App ID \(com\.you\.youtube\)\./);
+  assert.match(resignNote(before, { team: "B", appId: "com.b.yt" }, ""), /^The app was signed here before under another team \(TEAM\) and App ID \(com\.you\.youtube\)/);
+  // unreadable storage: nothing remembered, nothing thrown
+  assert.equal(siteSigned({ getItem: () => "{oops" }, "a"), null);
+  assert.doesNotThrow(() => rememberSiteSigned({ getItem: () => null, setItem: () => { throw new Error("full"); } }, "a", { team: "T" }));
+});
+
+test("F334: the sign job's warnings as one alert message", () => {
+  assert.equal(installWarningText(undefined), "");
+  assert.equal(installWarningText(["", null]), "");
+  assert.equal(installWarningText(["One.", " Two. "]), "One.\n\nTwo.");
+  assert.equal(INSTALL_WARNING_TITLE, "Before You Install");
+  assert.deepEqual(INSTALL_WARNING_BUTTONS, ["Cancel", "Install"]);
+  assert.deepEqual(RESIGN_BUTTONS, ["Cancel", "Sign Anyway"]);
+});
+
+// F334 on the website's Install (signing/browser.js signInBrowser): the warnings come before the upload and Install
+const site = await import("../signing-client.js");
+function siteDeps(storage, { warnings = null, answer = 1, bundleId = "com.google.ios.youtube" } = {}) {
+  const log = { alerts: [], uploads: 0 };
+  const fetcher = async (url, init = {}) => {
+    const u = new URL(url, "https://ifizbox.example");
+    const j = (b) => new Response(JSON.stringify(b), { headers: { "Content-Type": "application/json" } });
+    if (u.pathname === "/api/fetch") return new Response(new Uint8Array([0x50, 0x4b, 3, 4]), { headers: { "Content-Length": "4" } });
+    if (u.pathname === "/sign/upload") { log.uploads++; return j({ token: "t", partSize: 64, parts: 1 }); }
+    if (u.pathname === "/sign/upload/t/done") return j({ itms: "itms-services://x" });
+    return j({ ok: true, method: init.method });
+  };
+  const d = {
+    storage, fetcher, open: () => {}, go: () => {}, transfer: async () => null, phone: () => null, now: () => null,
+    hud: () => ({ set: () => {}, hide: () => {} }),
+    identity: async () => ({ p12: new Uint8Array([0x30]), profile: explicit, password: "" }),
+    alert: async (a) => { log.alerts.push(a); const index = a.title === "Ready to Install" ? 1 : answer; a.onTap?.(index); return { index }; },
+    worker: async () => ({ ipa: new Uint8Array([0x50, 0x4b, 1]), bundleId, originalId: bundleId, name: "YouTube", version: "1",
+      ...(warnings ? { warnings } : {}) }),
+  };
+  return { d, log };
+}
+
+test("F334: website Install shows the job's warnings before Install; Cancel uploads nothing", async () => {
+  const lost = ["This profile has no group.com.google.ios.youtube, where YouTube kept its shared data until now: iOS keeps that folder from it."];
+  let { d, log } = siteDeps(memoryStorage(), { warnings: lost, answer: 0 });
+  assert.equal(await site.signInBrowser({ url: "https://a.example/yt.ipa", name: "YouTube" }, d), false);
+  assert.deepEqual(log.alerts.map((a) => [a.title, a.message, a.buttons]), [["Before You Install", lost[0], ["Cancel", "Install"]]]);
+  assert.equal(log.uploads, 0);
+  ({ d, log } = siteDeps(memoryStorage(), { warnings: lost, answer: 1 }));
+  assert.equal(await site.signInBrowser({ url: "https://a.example/yt.ipa", name: "YouTube" }, d), true);
+  assert.deepEqual(log.alerts.map((a) => a.title), ["Before You Install", "Ready to Install"]);
+});
+
+test("F334: website Install remembers team + App ID and warns before signing under another one", async () => {
+  const s = memoryStorage();
+  let { d, log } = siteDeps(s);
+  assert.equal(await site.signInBrowser({ url: "https://a.example/yt.ipa", name: "YouTube", bundleId: "com.google.ios.youtube" }, d), true);
+  assert.deepEqual(siteSigned(s, "com.google.ios.youtube"), { team: "TEAM", appId: "com.you.youtube" });
+  assert.deepEqual(log.alerts.map((a) => a.title), ["Ready to Install"], "the same profile again: no warning");
+  // another team signed it before: asked before signing; Cancel stops there
+  rememberSiteSigned(s, "com.google.ios.youtube", { team: "OLDTEAM", appId: "com.you.youtube" });
+  let signedJobs = 0;
+  ({ d, log } = siteDeps(s, { answer: 0 }));
+  const w = d.worker; d.worker = async (...a) => { signedJobs++; return w(...a); };
+  assert.equal(await site.signInBrowser({ url: "https://a.example/yt.ipa", name: "YouTube", bundleId: "com.google.ios.youtube" }, d), false);
+  assert.equal(signedJobs, 0, "nothing signed after Cancel");
+  assert.equal(log.alerts[0].title, RESIGN_TITLE);
+  assert.match(log.alerts[0].message, /another team \(OLDTEAM\)/);
+  // an IPA whose ID only the job knows: the same warning comes after signing, before the upload
+  ({ d, log } = siteDeps(s, { answer: 0 }));
+  assert.equal(await site.signInBrowser({ url: "https://a.example/yt.ipa", name: "YouTube" }, d), false);
+  assert.equal(log.alerts[0].title, "Before You Install");
+  assert.match(log.alerts[0].message, /another team \(OLDTEAM\)/);
+  assert.equal(log.uploads, 0);
 });

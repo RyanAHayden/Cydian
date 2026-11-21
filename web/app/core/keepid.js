@@ -14,6 +14,8 @@
 //   profileNotes(profile, { keep, name })    what the profile can't do the new way, or the old way's warning
 //   originalNote(name, { installed, ours })  the original (same ID) is on the phone and would be replaced
 //   OLD_WAY_ALERT                            the alert that turning Keep Bundle IDs off shows first
+//   siteSigned / rememberSiteSigned / resignNote / installWarningText   the website's warnings before it signs and
+//                                            installs an app (F334, signing/browser.js)
 // A note: { id, text, guide } (guide: link to the guide, GUIDE_ROUTE).
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { targetBundleId } from "./websign.js";
@@ -84,8 +86,9 @@ export function profileNotes(profile, { keep = true, name = "", as = "" } = {}) 
     notes.push({ id: "no-push", guide: true,
       text: `Your profile's App ID (${f.appId}) doesn't have Push Notifications: ${who} keeps its ID but won't get notifications.` });
   }
+  // B227: each app gets a keychain group of its own first (TEAM.<its ID>); only the profile's App Groups folders are shared
   notes.push({ id: "one-app", guide: false,
-    text: `Your profile's App ID (${f.appId}) covers every app's notifications, but apps signed with it share a keychain and App Groups, so their sign-ins can mix. Make an App ID per app only to keep those apart.` });
+    text: `Your profile's App ID (${f.appId}) covers every app's notifications. Each app keeps its own keychain, but apps signed with it share the profile's App Groups folders, so data they keep there can mix. Make an App ID per app only to keep those apart.` });
   return notes;
 }
 
@@ -96,6 +99,53 @@ export function originalNote(name, { installed = false, ours = false } = {}) {
   return { id: "original", guide: false,
     text: `${appName(name)} is already on this iPhone under its own ID, and this replaces it. iOS won't put a signed app over the App Store copy: delete that one first (its data goes with it).` };
 }
+
+// F334: the team and App ID (the entitlements' ID) the website last signed each app with, by its Info.plist ID, in
+// this browser's localStorage. iOS refuses an update whose application-identifier (TEAM.<App ID>) differs from the
+// installed copy's, and deleting the app to get past that loses its data: so the website warns before signing it.
+//   siteSigned(storage, bundleId)                      { team, appId } or null
+//   rememberSiteSigned(storage, bundleId, { team, appId })
+//   resignNote(before, { team, appId }, name)          the warning when team or App ID changed, else null
+//   installWarningText(warnings)                       the sign job's warnings (websign-job.js result.warnings) as one message
+export const SITE_SIGNED_KEY = "ifizbox.siteSigned";
+
+const siteSignedAll = (storage) => {
+  try {
+    const all = JSON.parse(storage?.getItem?.(SITE_SIGNED_KEY) ?? "null");
+    return all && typeof all === "object" && !Array.isArray(all) ? all : {};
+  } catch { return {}; }
+};
+
+export function siteSigned(storage, bundleId) {
+  const r = bundleId ? siteSignedAll(storage)[bundleId] : null;
+  return r && typeof r === "object" && (r.team || r.appId) ? { team: r.team ?? null, appId: r.appId ?? null } : null;
+}
+
+export function rememberSiteSigned(storage, bundleId, { team = null, appId = null } = {}) {
+  if (!bundleId || (!team && !appId)) return;
+  const all = siteSignedAll(storage);
+  all[bundleId] = { team, appId };
+  try { storage?.setItem?.(SITE_SIGNED_KEY, JSON.stringify(all)); } catch { /* full or blocked: no warning next time */ }
+}
+
+export const RESIGN_TITLE = "Signed Before Under Another ID";
+export const RESIGN_BUTTONS = ["Cancel", "Sign Anyway"];
+
+export function resignNote(before, { team = null, appId = null } = {}, name = "") {
+  if (!before) return null;
+  const teamChanged = Boolean(before.team && team && before.team !== team);
+  const idChanged = Boolean(before.appId && appId && before.appId !== appId);
+  if (!teamChanged && !idChanged) return null;
+  const what = teamChanged && idChanged ? `another team (${before.team}) and App ID (${before.appId})`
+    : teamChanged ? `another team (${before.team})` : `another App ID (${before.appId})`;
+  const who = appName(name);
+  return `${who} was signed here before under ${what}. If that copy is still on your iPhone, iOS won't update it with this one, and deleting it first loses its data.`;
+}
+
+export const INSTALL_WARNING_TITLE = "Before You Install";
+export const INSTALL_WARNING_BUTTONS = ["Cancel", "Install"];
+export const installWarningText = (warnings) => (Array.isArray(warnings) ? warnings : [])
+  .map((w) => String(w ?? "").trim()).filter(Boolean).join("\n\n");
 
 // Custom Install's Keep Bundle ID group (signing-sheet.js) for a signing.inspect answer: { notes, guide } with the
 // original-app note while the ID is kept (the old way installs a copy beside it, replacing nothing).

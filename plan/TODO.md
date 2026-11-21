@@ -44,7 +44,6 @@ parsed). Finish with `agent-runner done <ID> "msg"`.
 - [ ] **F335** (follow-up, low) iOS 7 style: the undo bar after a row's swipe (nav/undobar.js) keeps the iOS 6 semi-transparent black bar and embossed white text; give it the flat iOS 7 toolbar look B230 gave the reload bar (--undo-bar / --undo-text / --undo-emboss in ios7.css). Its Undo button is already text-only since B230. | files: web/app/ios7.css
 - [ ] **F336** (follow-up, low) iOS 7 Settings > Theme's Mode at iOS 7's own 29pt segmented-control height (13px type, 4px corners) instead of the 44pt row: a --settings-seg-h hook in style.css read by settings.css, value in ios7.css | files: web/app/ios7.css, web/app/settings.css, web/app/style.css
 - [ ] **T65** (follow-up, low) tools/smoke edge-swipe-back step flaky under load: 'swipe back pops' fails ~1 in 3 runs while other slots run (the route stays on the pushed page; DIV.edge-swipe at the edge), passes alone. Make the drag robust (wait for the push to be fully at rest / the edge strip to be live before touchStart) instead of timing | files: tools/smoke/smoke.mjs
-- [ ] **B239** (follow-up, low) Live Theme > Style switch keeps the start-up style's icons until reload where a screen computes them at import: home.js SETTINGS_ICON (rowIcon at module load) and why.js WHY_CSS (homeTileCss at load); read them at render time so iOS 6 <-> iOS 7 swaps the tiles at once | files: web/app/screens/home.js, web/app/screens/why.js, web/app/screens/homefeatured.test.js
 
 ### Parked
 

@@ -6,9 +6,14 @@
 // Keychain, so deleting and reinstalling the app comes back with its certificate. docs/signing.md, "On the phone (I6)".
 // SPDX-License-Identifier: GPL-3.0-or-later
 import Foundation
+import os
 import Security
 
 enum SignStore {
+    // B286: iOS 27's syslog shows an NSLog line only as <private>; os_log with %{public}@ keeps it readable.
+    private static let osLog = OSLog(subsystem: "ifizbox.signing", category: "keychain")
+    private static func say(_ s: String) { os_log("%{public}@", log: osLog, type: .default, s) }
+
     static let dir: URL = {
         let d = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("Signing", isDirectory: true)
@@ -148,7 +153,7 @@ enum SignStore {
             writeKept(keepCertAccount, Data(want.utf8))
         } else if let kept = readKept(keepCertAccount).flatMap({ String(data: $0, encoding: .utf8) }) ?? p12CertSHA256() {
             defaults.set(kept, forKey: certKey)
-            NSLog("\(Brand.name): signing certificate restored from the keychain")
+            say("\(Brand.name): signing certificate restored from the keychain")
         }
         guard defaults.string(forKey: certKey) != nil else { return }
         if let file = try? Data(contentsOf: profileURL) {
@@ -156,8 +161,8 @@ enum SignStore {
         } else if let kept = readKept(keepProfileAccount), (try? Profile(kept)) != nil {
             do {
                 try kept.write(to: profileURL, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
-                NSLog("\(Brand.name): signing profile restored from the keychain")
-            } catch { NSLog("\(Brand.name): signing profile not restored: \(error)") }
+                say("\(Brand.name): signing profile restored from the keychain")
+            } catch { say("\(Brand.name): signing profile not restored: \(error)") }
         }
     }()
 

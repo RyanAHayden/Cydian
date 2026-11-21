@@ -8,9 +8,14 @@
 //   device.udid.set {udid} -> as device.udid: the UDID the website's Profile Service visit found, kept as a paired one
 // SPDX-License-Identifier: GPL-3.0-or-later
 import Foundation
+import os
 import Security
 
 enum PhoneID {
+    // B286: iOS 27's syslog shows an NSLog line only as <private>; os_log with %{public}@ keeps it readable.
+    private static let osLog = OSLog(subsystem: "ifizbox.phone", category: "keychain")
+    private static func say(_ s: String) { os_log("%{public}@", log: osLog, type: .default, s) }
+
     private static let lock = NSLock()
     private static var known: DeviceCheck.Phone??
 
@@ -88,7 +93,7 @@ enum PhoneID {
         if let u = UserDefaults.standard.string(forKey: udidKey) { keepUDID(u); return .udid(u) }
         if let u = keptUDID() {
             UserDefaults.standard.set(u, forKey: udidKey)
-            NSLog("\(Brand.name): phone UDID restored from the keychain")
+            say("\(Brand.name): phone UDID restored from the keychain")
             return .udid(u)
         }
         let embedded = Bundle.main.url(forResource: "embedded", withExtension: "mobileprovision").flatMap { try? Data(contentsOf: $0) }

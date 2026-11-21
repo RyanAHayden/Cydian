@@ -347,10 +347,10 @@ class Plists(unittest.TestCase):
             self.assertTrue(adds, name)
             for a in adds:
                 self.assertTrue(a.startswith("add as") or a.startswith("OwnKeychain.scoped("), f"{name}: SecItemAdd({a}")
-            for m in re.finditer(r"var add = (.*)\n", text):
-                self.assertTrue(m.group(1).startswith("OwnKeychain.scoped("), f"{name}: var add = {m.group(1)}")
-            for m in re.finditer(r"let add = (.*)\n", text):
-                self.assertTrue(m.group(1).startswith("OwnKeychain.scoped("), f"{name}: let add = {m.group(1)}")
+            assigns = re.findall(r"(?:var|let) add\b[^=\n]*=\s*(.*)\n", text)
+            self.assertTrue(assigns or all(a.startswith("OwnKeychain.scoped(") for a in adds), name)
+            for a in assigns:
+                self.assertTrue(a.startswith("OwnKeychain.scoped("), f"{name}: add = {a}")
         with open(os.path.join(src, "OwnKeychain.swift")) as f:
             own = f.read()
         body = own[own.index("static func moveAll()"):own.index("static func entitlement(")]

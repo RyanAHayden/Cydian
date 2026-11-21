@@ -20,15 +20,40 @@ app signed with that profile has.
   `scoped`. Reads and deletes keep no group, so they find items in either group.
 - Payment secrets (Paid.swift `Keychain`) are behind Face ID when the phone has a passcode, so they don't move at
   launch (a `SecItemUpdate` of an access-controlled item might ask); `Keychain.get` returns the attributes with the
-  value and writes it again into our group when it was elsewhere.
+  value and, when it was in another group, adds it to ours and deletes the old copy only once that add worked
+  (`moveIn`; the review caught a first version that deleted first).
+- "Once": `moveAll` runs every launch instead of once behind a flag. Moving is a no-op when nothing is elsewhere, and
+  a sign without our group in between (SideDrop's signer) would put new items in the shared group again.
+- Reads still name no group (decided, not changed after the review suggested scoping them): an item whose move failed
+  stays readable. Another app under the same App ID could plant an item in the shared group that we'd then read or
+  move in, as it could before this task; only when ours exists does ours win.
 - `native/test_native.py test_own_keychain_group`: every add in those files is scoped, moveAll names every store.
 - `ASC.query` lost its `private` (moveAll reads it). SignBridge.swift is outside the task's file list: its
   `confirmImport` add and the launch call are one line each.
 
 ## Device check (iPhone 15 Pro)
 
-(see below)
+1. Baseline: `tools/resignprobe/run.sh B233 check baseline` (the probe B227 left, signed with SideDrop's profile,
+   groups `S8NFX3A2LT.com.ryha.ifizbox.probe`, `S8NFX3A2LT.com.ryha.sideload`) listed
+   `com.ryha.ifizbox.reviews` and `com.ryha.ifizbox.signing.p12` in `S8NFX3A2LT.com.ryha.sideload`.
+2. This branch's Lite IPA signed with SideDrop's identity (A) by the native signer (`signbench-linux`, as
+   `run.sh native` does, no group fix): `keychain-access-groups` starts with `S8NFX3A2LT.com.ryha.ifizbox`.
+   Installed over B227's copy (`ui-15.sh install --as-is`), launched.
+3. Probe again (`check after-b233`): visible lists only its own four `probe.*` items. iFizBox's are gone from it.
+4. iFizBox still has them (web inspector, `ifizboxNative.call`): `reviews.token.get` -> a 43-character token,
+   `signing.status` -> the SideDrop identity, `signing.export` -> the .p12 (4192 bytes base64). No account key or
+   ASC key was set on this phone.
+
+## Failed on the way
+
+- First Paid move deleted the secret before adding the copy (spec review); now add first, delete after.
+- The first edits went through a Python heredoc; the rest with the editing tool.
 
 ## Not verified
 
-(see below)
+- **The identity's certificate and key moved**: the probe lists generic passwords only; `signing.status` reading the
+  identity after the move shows it's still reachable, not which group holds it.
+- **ASC key, account key, payment secrets**: none were saved on the 15 Pro, so their move wasn't seen; the same
+  `move` as the p12/review token (ASC, account) and `moveIn` (payment, on read) cover them. The payment path with a
+  passcode and Face ID can't be shown on the 15 Pro (no passcode).
+- **Jailbreak build**: `group` is nil there by construction (`com.ryha.ifizbox` has no team prefix); not run on the 7.

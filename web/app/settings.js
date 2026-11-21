@@ -1,6 +1,6 @@
 // F65: the jailbreak app's side of N5's upgrade daemon (native/daemon/), wired up by app.js.
 //
-//   const up = createUpgradeNotices({ settings, native: globalThis.ifizboxNative, current: () => router.current() });
+//   const up = createUpgradeNotices({ settings, native: nativeBridge(), current: () => router.current() });
 //   up.badge("changes", n);   // beside the tab badge: 0 while the Changes tab is on screen clears the icon badge
 //   up.start();               // once at launch: Upgrade Notifications off reaches the daemon again
 //
@@ -12,8 +12,9 @@
 // Elsewhere (the site, the sideload build) both do nothing.
 import { detectMode, DAEMON_KEYS, DAEMON_LISTS } from "./core/settings.js";
 import { parse } from "./router.js";
+import { nativeBridge } from "./native.js";
 
-export function createUpgradeNotices({ settings, native = globalThis.ifizboxNative, current, win = globalThis.window } = {}) {
+export function createUpgradeNotices({ settings, native = nativeBridge(), current, win = globalThis.window } = {}) {
   // Both app builds: the jailbreak app's daemon counts in the background too, the sideload app counts here.
   const mode = native ? detectMode({ ifizboxNative: native }) : "site";
   const on = Boolean(native && typeof native.call === "function") && ["jailbreak", "sideload"].includes(mode);
@@ -91,12 +92,12 @@ export function createUpgradeNotices({ settings, native = globalThis.ifizboxNati
 // shell's prefs.set {values: {"ifizbox.<key>": value | null}} (Bridge.swift Prefs; null removes the key): all of
 // them once at launch, then each one as it changes.
 //
-//   createPrefsMirror({ settings, native: globalThis.ifizboxNative }).start();
+//   createPrefsMirror({ settings, native: nativeBridge() }).start();
 //
 // Jailbreak app only; elsewhere start() does nothing and returns false. A failed call is dropped: the next change
 // or launch writes the values again.
 
-export function createPrefsMirror({ settings, native = globalThis.ifizboxNative } = {}) {
+export function createPrefsMirror({ settings, native = nativeBridge() } = {}) {
   const on = Boolean(native && typeof native.call === "function") && detectMode({ ifizboxNative: native }) === "jailbreak";
   const send = (values) => Promise.resolve().then(() => native.call("prefs.set", { values })).catch(() => {});
   const watched = new Set([...DAEMON_KEYS, ...DAEMON_LISTS]);

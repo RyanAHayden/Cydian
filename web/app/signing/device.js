@@ -9,7 +9,7 @@
 //                                      Set Up Signing alert ("cancel" when the user didn't), or null
 //   await installOnDevice({ url, name, onInstalled })  signing.install with the progress page following its phases (F151)
 //
-// Each takes `native` (the bridge, globalThis.ifizboxNative by default) so tests can pass a fake.
+// Each takes `native` (the bridge, native.js nativeBridge() by default) so tests can pass a fake.
 import { toBase64 } from "../core/signing.js";
 import { format, settingsRoute } from "../router.js";
 import { showAlert } from "../nav/alert.js";

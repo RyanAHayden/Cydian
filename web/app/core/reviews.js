@@ -19,6 +19,7 @@
 // Our reviews carry { ours: true, id } so the tab can offer Report on them; a depiction's carry what
 // core/previews.js sileoRatings gave. Text is always plain: the tab draws ours with textContent.
 import { ACCOUNT_BASE } from "./account.js";
+import { nativeBridge } from "../native.js";
 
 export const LIMITS = { title: 80, name: 30, text: 2000, version: 64 };
 export const TOKEN_KEY = "ifizbox.reviewToken";
@@ -39,7 +40,7 @@ export function checkDraft({ stars, title = "", name = "", text = "", version = 
 
 const b64url = (bytes) => btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 
-export async function deviceToken({ storage = globalThis.localStorage, native = globalThis.ifizboxNative,
+export async function deviceToken({ storage = globalThis.localStorage, native = nativeBridge(),
   rand = (n) => globalThis.crypto.getRandomValues(new Uint8Array(n)) } = {}) {
   const valid = (t) => (typeof t === "string" && TOKEN.test(t) ? t : null);
   let kept = null;

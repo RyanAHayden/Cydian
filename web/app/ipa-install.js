@@ -11,6 +11,7 @@
 import { detectMode } from "./core/settings.js";
 import { ipaStatus, ipaError } from "./core/ipainstall.js";
 import { INSECURE_IPA_ALERT, INSTALL_ANYWAY, isInsecure } from "./core/insecureipa.js";
+import { nativeBridge } from "./native.js";
 
 // B113: an http:// IPA link (ifizbox://install, Settings > Install IPA, an app page from an http source). The shell
 // (Apt.swift IPAInstall.fetchHTTP) downloads its https twin; when there is none, ipa.install answers code "insecure"
@@ -24,9 +25,9 @@ export async function askInsecureIpa({ alert } = {}) {
 }
 export function forgetAllowedHttp() { allowedHttp.clear(); } // tests
 
-export const ipaInstallAvailable = (mode = detectMode()) => mode === "jailbreak" && Boolean(globalThis.ifizboxNative?.call);
+export const ipaInstallAvailable = (mode = detectMode()) => mode === "jailbreak" && Boolean(nativeBridge()?.call);
 
-export async function installIpa(url, onEvent = null, { native = globalThis.ifizboxNative, insecure = false } = {}) {
+export async function installIpa(url, onEvent = null, { native = nativeBridge(), insecure = false } = {}) {
   if (!native?.call) throw Object.assign(new Error("sideload: no native bridge"), { code: "sideload" });
   try {
     return await native.call("ipa.install", { url, stream: Boolean(onEvent), ...(insecure ? { insecure: true } : {}) }, onEvent ?? undefined);
@@ -47,7 +48,7 @@ export async function installIpa(url, onEvent = null, { native = globalThis.ifiz
 // screens/ipa-install.js stopIpaInstall).
 // B113: `ask` puts up This Download Is Not Secure for an http link with no https twin (askInsecureIpa); its Cancel
 // resolves { ok: false, cancelled: true, declined: true } (the page closes, as for its own Cancel).
-export async function runIpaInstall({ url, name = "" }, view, { native = globalThis.ifizboxNative, signal = null,
+export async function runIpaInstall({ url, name = "" }, view, { native = nativeBridge(), signal = null,
   ask = askInsecureIpa } = {}) {
   const log = [];
   const line = (type, text) => {

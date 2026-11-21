@@ -30,6 +30,7 @@ import { hiddenAltApps } from "./core/appoffer.js";
 import { detectMode } from "./core/settings.js";
 import { splitIgnoredVersions } from "./core/appupdates.js";
 import { isGithubSource, githubSourceText } from "./core/github.js"; // F304
+import { nativeBridge } from "./native.js";
 
 export { ALL };
 
@@ -289,10 +290,10 @@ function setIpaInfo(map) {
 const STATUS_KEY = "dpkg:status";
 let statusSent = null; // Promise of the worker's installed count (-1: no status file), once sent
 
-export const statusSource = () => (typeof globalThis.ifizboxNative?.dpkgStatus === "function" ? "native" : "upload");
+export const statusSource = () => (typeof nativeBridge()?.dpkgStatus === "function" ? "native" : "upload");
 
 async function statusText() {
-  if (statusSource() === "native") return (await globalThis.ifizboxNative.dpkgStatus()) ?? null;
+  if (statusSource() === "native") return (await nativeBridge().dpkgStatus()) ?? null;
   const db = await indexCache();
   return (db && (await db.get(STATUS_KEY))?.value) ?? null;
 }

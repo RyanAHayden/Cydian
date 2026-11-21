@@ -1,5 +1,8 @@
-// F329: your own app icon (Settings > Theme > App Icon > Light / Dark, the grid's "Your Icons" group). The jailbreak
-// app only for now: the Lite build, whose signed bundle can't gain icons, is its own task.
+// F329: your own app icon (Settings > Theme > App Icon > Light / Dark, the grid's "Your Icons" group), in both apps.
+// F329a: the Lite app's signed bundle can't change, so picking a picture that isn't in it yet (app.icon.ready) asks
+// first: Lite re-signs itself with the picture and installs that as its own update (signing.install {selfIcon},
+// signing/route.js installOnDevice, as its own update's flow), then switches to it once it is open again. Its
+// pictures carry the LITE sash unless Move and Scale's switch leaves it off.
 //
 //   Add            a file input (iOS offers Photo Library, Take Photo and Choose File: PNG, JPEG, HEIC), then
 //                  iOS 6's Move and Scale: the picture behind black bars, the icon's rounded mask, a small Home Screen
@@ -10,15 +13,18 @@
 //
 // Shell calls (native/Sources/AppIcon.swift OwnIcons):
 //   app.icon.list                     -> {icons: [{name, label}]}
-//   app.icon.add {data, crop, label}  -> {name, icons}   data: the picture's bytes (base64); crop: {x, y, size,
-//                                                        width, height} in its px (cropRect, and its size)
+//   app.icon.add {data, crop, label, sash} -> {name, icons}  data: the picture's bytes (base64); crop: {x, y, size,
+//                                                        width, height} in its px (cropRect, and its size); sash:
+//                                                        Lite draws its LITE sash over it
+//   app.icon.ready {name}             -> {ready, canResign}  F329a: whether Lite has the picture in its bundle
 //   app.icon.remove {name}            -> {icons}
 //   app.icon.decode {data}            -> {jpeg}          a picture the web view can't draw (HEIC on iOS 15), as JPEG
 // A pick is applied like any icon: settings lightIcon / darkIcon take the name (core/settings.js isOwnIcon) and
 // appicon.js tellIcon sends it in app.icon; the shell shows it as appicon/<name>.png.
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { nativeBridge, hasNativeCall } from "../native.js";
-import { isOwnIcon } from "../core/settings.js";
+import { isOwnIcon, detectMode } from "../core/settings.js";
+import { createSwitch } from "../nav/switch.js";
 import { swipeDecide } from "../nav/rowswipe.js";
 import { NAME } from "../brand.js";
 
@@ -86,8 +92,40 @@ export function dropMissing(store, list) {
   for (const k of missingPicks(list, (x) => store.get(x))) store.set(k, "theme");
 }
 
-// Where Add is offered: the jailbreak app with a bridge. (The Lite build can't apply one yet.)
-export const ownIconsOffered = (mode, native = nativeBridge()) => mode === "jailbreak" && hasNativeCall(native);
+// Where Add is offered: either app with a bridge (Lite re-signs itself to apply one: pickOwn).
+export const ownIconsOffered = (mode, native = nativeBridge()) => (mode === "jailbreak" || mode === "sideload") && hasNativeCall(native);
+
+// F329a: what Lite says before it re-signs itself with your icon.
+export const RESIGN_TITLE = "Use This Icon?";
+export const resignMessage = (name = NAME) =>
+  `${name} puts your icon in by re-signing itself and installing that as an update. It takes about as long as an ` +
+  `update: ${name} closes, iOS installs it, and when you open ${name} again it switches to your icon.`;
+
+// F329a: picks own icon `name` for `key`. The jailbreak app, or Lite with the picture in its bundle already
+// (app.icon.ready): the setting changes and tellIcon applies it. Otherwise Lite asks (RESIGN_TITLE) and on Install
+// re-signs itself with it (`install`: signing/route.js installOnDevice); the pick goes back if that fails.
+// -> "same" | "set" | "cancelled" | "installing" | "failed" | "old"
+export async function pickOwn(key, name, store, { native = nativeBridge(), mode = detectMode(), alert = null, install = null } = {}) {
+  const before = store.get(key);
+  if (before === name) return "same";
+  if (mode !== "sideload") { store.set(key, name); return "set"; }
+  let r = null;
+  try { r = await call("app.icon.ready", { name }, native); } catch { r = null; }
+  if (!r || r.ready) { store.set(key, name); return "set"; } // a shell without the question applies it itself
+  const ask = alert ?? (await import("../nav/alert.js")).showAlert;
+  if (!r.canResign) {
+    await ask({ title: "Can't Use This Icon", message: `This copy of ${NAME} has no room for your own icon. Update ${NAME}, then try again.`, buttons: ["OK"] });
+    return "old";
+  }
+  const { index } = await ask({ title: RESIGN_TITLE, message: resignMessage(), buttons: ["Cancel", "Install"], cancel: 0 });
+  if (index !== 1) return "cancelled";
+  store.set(key, name); // kept through the update: the reopened app's tellIcon switches to it
+  const run = install ?? (await import("../signing/route.js")).installOnDevice;
+  let ok = false;
+  try { ok = await run({ params: { selfIcon: name }, name: NAME, host: true }); } catch { ok = false; }
+  if (!ok) { store.set(key, before); return "failed"; }
+  return "installing";
+}
 
 // ---- Shell calls ----------------------------------------------------------------------------------------------
 let cache = []; // the last list, so a redraw (a pick) draws Your Icons at once
@@ -102,8 +140,8 @@ export async function loadIcons(native) {
   cache = readList(await call("app.icon.list", {}, native));
   return cache;
 }
-async function addIcon(data, crop, label) {
-  const r = await call("app.icon.add", { data, crop, label });
+async function addIcon(data, crop, label, sash) {
+  const r = await call("app.icon.add", { data, crop, label, ...(sash === undefined ? {} : { sash }) });
   cache = readList(r);
   return r?.name;
 }
@@ -153,12 +191,12 @@ export function ownIconsGroup({ key, now, store }) {
           else b.classList.remove("is-deleting");
           return;
         }
-        if (store.get(key) !== i.name) store.set(key, i.name);
+        if (store.get(key) !== i.name) pickOwn(key, i.name, store).catch(() => {});
       });
       swipeToDelete(b, grid);
       return b;
     });
-    grid.replaceChildren(...cells, addTile(key, store));
+    grid.replaceChildren(...cells, addTile(key, store, () => { if (grid.isConnected) draw(cache); }));
   };
 
   async function remove(name, cell) {
@@ -215,7 +253,7 @@ function swipeToDelete(cell, grid) {
   }, { passive: true });
 }
 
-function addTile(key, store) {
+function addTile(key, store, added) {
   const tile = make("label", "icon-cell own-icon-add");
   const box = make("span", "own-icon-plus");
   box.setAttribute("aria-hidden", "true");
@@ -226,7 +264,7 @@ function addTile(key, store) {
   input.addEventListener("change", () => {
     const file = input.files?.[0];
     input.value = "";
-    if (file) openCrop(file, { key, store });
+    if (file) openCrop(file, { key, store, added });
   });
   tile.append(input, box, make("span", "icon-cell-label", "Add"));
   return tile;
@@ -265,7 +303,7 @@ async function pictureOf(file) {
   }
 }
 
-export async function openCrop(file, { key, store }) {
+export async function openCrop(file, { key, store, added = null }) {
   let img, data;
   try {
     ({ img, data } = await pictureOf(file));
@@ -299,6 +337,20 @@ export async function openCrop(file, { key, store }) {
   prev.append(box, make("span", "crop-preview-label", NAME));
   bar.append(cancel, prev, choose);
   screen.append(stage, mask, title, bar);
+  // F329a: Lite's LITE sash, on by default; the switch leaves it off (shown over the square and the preview)
+  const lite = detectMode() === "sideload";
+  let sash = lite;
+  if (lite) {
+    const over = (cls) => Object.assign(make("img", cls), { src: "icons/sash-lite.png", alt: "" });
+    const big = over("crop-sash-over"), small = over("crop-sash-over");
+    mask.classList.add("has-sash");
+    mask.append(big);
+    box.append(small);
+    const row = make("div", "crop-sash");
+    const sw = createSwitch({ label: "LITE Sash", checked: true, onToggle: (on) => { sash = on; big.hidden = small.hidden = !on; } });
+    row.append(make("span", "crop-sash-label", "LITE Sash"), sw);
+    screen.append(row);
+  }
   document.body.append(screen);
 
   // left/top: the square's corner in the screen's own coordinates (the screen may be mid-slide when measured)
@@ -374,9 +426,10 @@ export async function openCrop(file, { key, store }) {
     choose.disabled = cancel.disabled = true;
     const { sx, sy, size } = cropRect(c);
     try {
-      const name = await addIcon(data, { x: sx, y: sy, size, width: c.w, height: c.h }, label);
-      if (isOwnIcon(name)) store.set(key, name);
+      const name = await addIcon(data, { x: sx, y: sy, size, width: c.w, height: c.h }, label, lite ? sash : undefined);
       close();
+      added?.(); // Your Icons shows it even when Lite's pick is cancelled
+      if (isOwnIcon(name)) pickOwn(key, name, store).catch(() => {});
     } catch {
       choose.disabled = cancel.disabled = false;
       const { showAlert } = await import("../nav/alert.js");

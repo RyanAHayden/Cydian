@@ -118,8 +118,15 @@ enum AppIcon {
 //   app.icon.decode {data}       -> {jpeg}           a picture the web view can't draw (HEIC on iOS 15), as JPEG
 // Applying one (app.icon with an own name): the jailbreak build draws it at every icon size into AppIcons/Apply/, the
 // helper copies them over one of Info.plist's two own sets (helper/ownicon.h, icon/alternates.py OWN_SLOTS), the
-// one not on screen, and the shell switches to it quietly. The sideload build can't (its signed bundle can't gain
-// icons): the page doesn't offer Add there, and app.icon answers lite_unsupported.
+// one not on screen, and the shell switches to it quietly.
+// F329a: the sideload build's signed bundle can't change, so it re-signs itself with the picture in that set
+// (selfSource: an IPA of the running bundle, SignOptions.ownIconFiles) and installs it as its own update
+// (signing.install {selfIcon}, the hosted or This iPhone route); once it reopens, app.icon finds the picture in the
+// set and switches to it with the public call (iOS's alert). Until then app.icon answers resign_needed.
+//   app.icon.ready {name}        -> {ready, canResign}  ready: the picture is in an own set already (always true in
+//                                the jailbreak build); canResign: this build has the own sets to re-sign into
+// Lite pictures carry the LITE sash unless Move and Scale's switch left it off (app.icon.add's sash, drawn into the
+// kept picture from web/icons/sash-lite.png, tools/icons.sh sash_only).
 enum OwnIcons {
     static func isOwn(_ s: String) -> Bool { s.range(of: "^own[a-z0-9]{1,16}$", options: .regularExpression) != nil }
 
@@ -178,8 +185,8 @@ enum OwnIcons {
         }
     }
 
-    static func add(_ data: Data, crop: [String: Double], label: String) throws -> String {
-        guard let out = cropped(data, crop: crop, px: 1024) else {
+    static func add(_ data: Data, crop: [String: Double], label: String, sash: Bool = false) throws -> String {
+        guard let plain = cropped(data, crop: crop, px: 1024), let out = sash ? sashed(plain) : plain else {
             throw BridgeError("bad_image", "The picture couldn't be read.")
         }
         lock.lock(); defer { lock.unlock() }
@@ -198,6 +205,23 @@ enum OwnIcons {
         lock.lock(); defer { lock.unlock() }
         try save(list().filter { $0["name"] != name })
         try? FileManager.default.removeItem(at: file(name))
+    }
+
+    // F329a: a 1024 px picture with the LITE sash over it (the bundle's web/icons/sash-lite.png); nil when either
+    // can't be read.
+    static let sashFile = Bundle.main.bundlePath + "/web/icons/sash-lite.png"
+    static func sashed(_ png: Data) -> Data? {
+        guard let image = UIImage(data: png), let sash = UIImage(contentsOfFile: sashFile) else { return nil }
+        let f = UIGraphicsImageRendererFormat()
+        f.scale = 1
+        f.opaque = true
+        let size = CGSize(width: 1024, height: 1024)
+        return UIGraphicsImageRenderer(size: size, format: f).pngData { ctx in
+            UIColor.black.setFill()
+            ctx.fill(CGRect(origin: .zero, size: size))
+            image.draw(in: CGRect(origin: .zero, size: size))
+            sash.draw(in: CGRect(origin: .zero, size: size))
+        }
     }
 
     // A picture the web view can't draw, as JPEG (at most 4096 px on its long side).
@@ -221,7 +245,8 @@ enum OwnIcons {
                     throw BridgeError("bad_params", "data is a base64 picture, crop its square")
                 }
                 let crop = raw.compactMapValues { ($0 as? NSNumber)?.doubleValue }
-                let name = try add(d, crop: crop, label: c.params["label"] as? String ?? "")
+                let name = try add(d, crop: crop, label: c.params["label"] as? String ?? "",
+                                   sash: AppMode.current == .sideload && c.params["sash"] as? Bool == true)
                 return ["name": name, "icons": list()]
             }
         }
@@ -230,6 +255,25 @@ enum OwnIcons {
                 guard let n = c.params["name"] as? String, isOwn(n) else { throw BridgeError("bad_params", "name is an own icon") }
                 try remove(n)
                 return ["icons": list()]
+            }
+        }
+        // F329a: whether picking `name` needs the Lite app's re-sign first
+        b.on("app.icon.ready") { c in
+            guard let n = c.params["name"] as? String, isOwn(n) else { return c.reply(nil, "bad_params: name is an own icon") }
+            if AppMode.current == .jailbreak { return c.reply(["ready": true, "canResign": false], nil) }
+            DispatchQueue.main.async {
+                let current = UIApplication.shared.alternateIconName
+                DispatchQueue.global(qos: .userInitiated).async {
+                    lock.lock(); defer { lock.unlock() }
+                    do {
+                        let p = try plan(n, current: current)
+                        Apt.reply(c, ["ready": !p.write && ready(p.slot), "canResign": ready(p.slot)], nil)
+                    } catch let e as BridgeError {
+                        Apt.reply(c, nil, e.text)
+                    } catch {
+                        Apt.reply(c, nil, "failed: \(error.localizedDescription)")
+                    }
+                }
             }
         }
         b.on("app.icon.decode") { c in
@@ -310,6 +354,31 @@ enum OwnIcons {
         }
     }
 
+    // The slot `name` goes in given the set on screen, and its PNGs (render, pick). Under `lock`, off the main queue.
+    static func plan(_ name: String, current: String?) throws -> (slot: String, write: Bool, pngs: [Data]) {
+        let pngs = try render(name)
+        let p = pick(current: current) { holds($0, pngs) }
+        return (p.slot, p.write, pngs)
+    }
+
+    // F329a: the Lite app's re-sign of itself with `name`: an IPA of the running bundle (deleted by the signer's
+    // caller) and the own-set files to put in it (SignOptions.ownIconFiles). `current`: the set on screen (main queue's
+    // alternateIconName). Off the main queue.
+    static func selfSource(_ name: String, current: String?, stop: () -> Bool = { false }) throws -> (ipa: URL, files: [String: Data]) {
+        lock.lock(); defer { lock.unlock() }
+        let p: (slot: String, write: Bool, pngs: [Data])
+        do { p = try plan(name, current: current) } catch let e as BridgeError { throw SignError(e.code, e.message) }
+        guard ready(p.slot) else { throw SignError("old_build", "This build has no own icon sets.") }
+        var files = [String: Data]()
+        for (size, png) in zip(sizes, p.pngs) { files["IconOwn\(p.slot.uppercased())\(size.file).png"] = png }
+        let out = SignBridge.work.appendingPathComponent("\(SignBridge.token())-self.ipa")
+        do { try SelfIPA.make(app: Bundle.main.bundleURL, to: out, stop: stop) } catch {
+            try? FileManager.default.removeItem(at: out)
+            throw error
+        }
+        return (out, files)
+    }
+
     // Copies AppIcons/Apply/ (render) into `slot` through the helper. Off the main queue.
     static func write(slot: String) throws {
         let out = try Helper.run(["own-icon", slot, dir.appendingPathComponent("Apply").path], emit: nil)
@@ -333,18 +402,18 @@ enum OwnIcons {
         guard isOwn(shown) else {
             return finish(AppIcon.setName(light: shown, dark: shown, onScreen: shown, variants: AppIcon.variants, sets: AppIcon.sets))
         }
-        guard AppMode.current == .jailbreak else {
-            return c.reply(nil, "lite_unsupported: the sideload build can't add icons to itself yet")
-        }
         guard FileManager.default.fileExists(atPath: file(shown).path) else { return c.reply(nil, "missing: that icon isn't kept any more") }
         DispatchQueue.main.async {
             let current = UIApplication.shared.alternateIconName
             DispatchQueue.global(qos: .userInitiated).async {
                 lock.lock(); defer { lock.unlock() }
                 do {
-                    let pngs = try render(shown)
-                    let p = pick(current: current) { holds($0, pngs) }
+                    let p = try plan(shown, current: current)
                     guard ready(p.slot) else { return Apt.reply(c, nil, "old_build: this build has no own icon sets") }
+                    // F329a: the sideload build gets the picture by re-signing itself (selfSource), not here
+                    if p.write, AppMode.current != .jailbreak {
+                        return Apt.reply(c, nil, "resign_needed: \(Brand.name) puts your icon in by re-signing itself first")
+                    }
                     if p.write { try write(slot: p.slot); refreshLater() }
                     finish(setName(p.slot))
                 } catch let e as BridgeError {

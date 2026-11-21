@@ -87,6 +87,9 @@ sashed() {
 </svg>
 SVG
 }
+# sash_only <text> <light colour> <dark colour>: the sash and its shadow alone, on a transparent square (the Lite
+# app draws it over your own icon's picture: native/Sources/AppIcon.swift OwnIcons, screens/appicon.js's preview).
+sash_only() { sashed "$@" | perl -0pe 's/(<svg[^>]*>\n).*?(  <defs>\n    <linearGradient id="sash")/$1$2/s'; }
 web=$(mktemp --suffix=.svg) lite=$(mktemp --suffix=.svg)
 trap 'rm -f "$bg" "$web" "$lite"' EXIT
 sashed WEB '#4f8dff' '#0f47e8' > "$web"
@@ -112,6 +115,10 @@ trap 'rm -f "$bg" "$web" "$lite" "$webg" "$liteg"' EXIT
   echo '</g></svg>'
 } > "$liteg"
 for n in 76 152 228; do png "$liteg" "$n" "$dir/icon-lite-glossy-$n.png"; done
+liteSash=$(mktemp --suffix=.svg)
+trap 'rm -f "$bg" "$web" "$lite" "$webg" "$liteg" "$liteSash"' EXIT
+sash_only LITE '#ffa53b' '#e8660a' > "$liteSash"
+png "$liteSash" 1024 web/app/icons/sash-lite.png
 png "$lite" 120 native/icon/AppIconLite60x60@2x.png
 png "$lite" 180 native/icon/AppIconLite60x60@3x.png
 

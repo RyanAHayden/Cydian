@@ -897,5 +897,59 @@ test("B211: group fix") {
     check(own.injected.isEmpty, "iFizBox's own IPA: \(own.injected)")
 }
 
+// F329a: the Lite app re-signs itself with your own icon: an IPA made from the installed bundle (SelfIPA), the own-icon
+// sets' files replaced (SignOptions.ownIconFiles), Info.plist and its CFBundleAlternateIcons as they were.
+test("F329a: an IPA of the running bundle, own-icon files replaced, alternate icons kept") {
+    let app = work.appendingPathComponent("selfapp/Fixture.app")
+    try? FileManager.default.removeItem(at: app.deletingLastPathComponent())
+    let z = try ZipReader(url: fixtures.appendingPathComponent("rich.ipa"))
+    let a = "Payload/Fixture.app/"
+    for e in z.entries where e.name.hasPrefix(a) && !e.isDirectory {
+        let u = app.appendingPathComponent(String(e.name.dropFirst(a.count)))
+        try FileManager.default.createDirectory(at: u.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try z.data(e).write(to: u)
+        try FileManager.default.setAttributes([.posixPermissions: NSNumber(value: Int(e.unixMode & 0o777))], ofItemAtPath: u.path)
+    }
+    // Info.plist's own-icon set, as icon/alternates.py writes it, and its placeholder PNG
+    let infoURL = app.appendingPathComponent("Info.plist")
+    var info = try PropertyListSerialization.propertyList(from: try Data(contentsOf: infoURL), format: nil) as! [String: Any]
+    let alternates: [String: Any] = ["Icon-owna": ["CFBundleIconFiles": ["IconOwnA60x60"]],
+                                     "Icon-classic": ["CFBundleIconName": "Icon-classic"]]
+    info["CFBundleIcons"] = ["CFBundlePrimaryIcon": ["CFBundleIconName": "AppIcon"], "CFBundleAlternateIcons": alternates]
+    try PropertyListSerialization.data(fromPropertyList: info, format: .binary, options: 0).write(to: infoURL)
+    let png = Data([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A])
+    try (png + Data("placeholder".utf8)).write(to: app.appendingPathComponent("IconOwnA60x60@2x.png"))
+    try FileManager.default.createSymbolicLink(atPath: app.appendingPathComponent("Link.png").path, withDestinationPath: "IconOwnA60x60@2x.png")
+
+    let src = work.appendingPathComponent("self-src.ipa")
+    try SelfIPA.make(app: app, to: src)
+    let made = try ZipReader(url: src)
+    check(made.entries.contains { $0.name == a + "Info.plist" }, "Info.plist in Payload/Fixture.app/")
+    check(made.entries.first { $0.name == a + "Fixture" }.map { $0.unixMode & 0o111 != 0 } == true, "the executable keeps its x bit")
+    check(made.entries.first { $0.name == a + "Link.png" }?.isSymlink == true, "a symlink stays one")
+    do { try SelfIPA.make(app: app.deletingLastPathComponent(), to: work.appendingPathComponent("x.ipa")); check(false, "a folder that isn't an app") }
+    catch let e as SignError { check(e.code == "bad_app", "\(e)") }
+
+    let picture = png + Data("your own icon".utf8)
+    let signer = IPASigner(profile: try Profile(try fixture("profile.mobileprovision")), identity: identity)
+    signer.options.ownIconFiles = ["IconOwnA60x60@2x.png": picture, "IconOwnA60x60@3x.png": picture,
+                                   "Info.plist": picture, "IconOwnB20x20@2x.png": Data("not a png".utf8)]
+    check(signer.options.ownIconFiles.keys.sorted() == ["IconOwnA60x60@2x.png", "IconOwnA60x60@3x.png"],
+          "only own-set PNGs: \(signer.options.ownIconFiles.keys.sorted())")
+    let out = work.appendingPathComponent("self-signed.ipa")
+    _ = try signer.sign(src, to: out)
+    let f = try entries(out)
+    check(f[a + "IconOwnA60x60@2x.png"] == picture && f[a + "IconOwnA60x60@3x.png"] == picture, "the picture replaced the placeholder")
+    let signedInfo = try PropertyListSerialization.propertyList(from: f[a + "Info.plist"]!, format: nil) as? [String: Any]
+    let icons = signedInfo?["CFBundleIcons"] as? [String: Any]
+    check((icons?["CFBundleAlternateIcons"] as? NSDictionary)?.isEqual(to: alternates) == true, "alternate icons kept: \(String(describing: icons))")
+    let res = try PropertyListSerialization.propertyList(from: f[a + "_CodeSignature/CodeResources"]!, format: nil) as? [String: Any]
+    let sealed = (res?["files2"] as? [String: Any])?["IconOwnA60x60@3x.png"] as? [String: Any]
+    check(sealed?["hash2"] as? Data == sha256(picture), "CodeResources seals the new picture")
+    try verifySigned(f[a + "Fixture"]!, name: "Fixture-self", expectIdent: "dev.ifizbox.fixture", team: team,
+                     info: f[a + "Info.plist"], resources: f[a + "_CodeSignature/CodeResources"], ents: true)
+    check(SignOptions(SignOptions().stored).ownIconFiles.isEmpty, "not stored")
+}
+
 print(failures == 0 ? "all passed" : "\(failures) failure(s)")
 exit(failures == 0 ? 0 : 1)

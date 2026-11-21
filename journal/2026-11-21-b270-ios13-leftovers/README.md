@@ -46,6 +46,18 @@ Look-only changes in `web/app/ios13.css` and `web/app/ios7.css` (iOS 6 untouched
 - `node --test web/app/ios13-leftovers.test.js web/app/ios6-css.test.js web/app/ios13-flat.test.js
   web/app/palettes.test.js`: pass (the era sheets still set no layout).
 
+## Spec review
+
+A fresh reviewer read the diff and the brief. Kept, as judgment calls:
+- Manage's toolbar going flat, and the picked row going grey: part of items 3 and 4 (a flat Delete on iOS 6's blue
+  toolbar, or iOS 13's circle on iOS 6's pale-blue pick, would still be the iOS 6 look the user reported).
+- `--home-inset: 16px` moves every Home tile, not only the Discord and Theme rows: that misalignment *was* what made
+  the Theme row look wrong.
+- "GitHub link has no outline" read as the pair's missing card (see 2). If the user meant the glyph tile itself
+  (dark grey on #1c1c1e in OLED Black), that is still open.
+- Delete as red text, not a filled red button: iOS 7 and 13 toolbars draw destructive items as red text.
+- No tile has an outline in iOS 13 now: iOS 13's inset grouped cards have none.
+
 ## Not verified
 
 - **On a phone**: Chromium renders only. `backdrop-filter` blur behind the iOS 13 alert is drawn by Chromium here;

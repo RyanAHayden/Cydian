@@ -323,7 +323,7 @@ export async function verifySource(backend, input, { arch = DEFAULT_ARCH, count 
       if (!missing(e)) throw verificationError(e);
     }
   }
-  if (!found) throw new SourceError("not_repository");
+  if (!found) return stableDistSource(backend, uri, { arch, count });
   if (release?.origin) source.origin = release.origin;
   if (release) source.depiction = release.fields.depiction || null;
   if (release?.fields[MIN_FIELD]) source.minimumVersion = release.fields[MIN_FIELD]; // F72: iFizBox's own repo
@@ -339,6 +339,20 @@ export async function verifySource(backend, input, { arch = DEFAULT_ARCH, count 
 }
 
 const isFlatDist = (dist) => !dist || String(dist).endsWith("/");
+
+// B261: a typed URL with nothing flat at it but a Release under dists/stable/ (BigBoss,
+// http://apt.thebigboss.org/repofiles/cydia/, and the other old Cydia repos laid out as `deb <uri> stable main`) is
+// added as that dist source, its components from the Release. Nothing there either: not_repository, as before.
+async function stableDistSource(backend, uri, opts) {
+  let release;
+  try {
+    release = await releaseOf(backend, `${uri}dists/stable/`); // null when the repo answered without one
+  } catch (e) {
+    throw verificationError(e); // refused, timeout, network: said as such, not as Did Not Find Repository
+  }
+  if (!release) throw new SourceError("not_repository");
+  return verifyDistSource(backend, { uri, dist: "stable" }, opts);
+}
 
 // A suite as apt takes it on a `deb` line: a relative path, no spaces, no `..` (it goes into URI/dists/<dist>/).
 const DIST_RE = /^[A-Za-z0-9._~+-]+(\/[A-Za-z0-9._~+-]+)*$/;

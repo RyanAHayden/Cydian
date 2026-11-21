@@ -372,7 +372,11 @@ function warnFooters(sections) {
   return frag;
 }
 
-async function tailscaleSignIn(native, alert, redraw, done = `${NAME} is on your tailnet. Tap Test Connection to check it reaches this iPhone.`, from = null) {
+// B219: a finished sign-in says nothing and waits for no tap: Settings checks the connection by itself
+// (connectAfterSignIn) and only a failure gets an alert; This iPhone's setup page (`from`, its visit) has no pairing
+// to test yet: its poll starts pairing once the Tailscale VPN is on, and its rows say what it waits for.
+// `hud`: the page has no Test Connection row to spin (Settings' main page), so the check shows the HUD.
+async function tailscaleSignIn(native, alert, redraw, from = null, { hud = false } = {}) {
   if (signingIn) return;
   signingIn = "Starting…";
   signInVisit = from;
@@ -387,14 +391,52 @@ async function tailscaleSignIn(native, alert, redraw, done = `${NAME} is on your
     signingIn = null;
     signInVisit = null;
     redraw();
-    await alert({ title: "Signed In", message: done, buttons: ["OK"] });
-    await recheckPairing(native, alert, redraw);
+    if (from) return;
+    await connectAfterSignIn(native, alert, redraw, { hud });
   } catch (e) {
     signingIn = null;
     signInVisit = null;
     redraw();
     if (!/^cancel+ed/.test(e?.message || "") && e?.code !== "canceled") alert({ title: "Couldn't Sign In", message: e?.message || "No answer.", buttons: ["OK"] });
   }
+}
+
+// B219: right after a sign-in the tailnet is still coming up (the node's map without this iPhone yet, the Tailscale
+// app's VPN reconnecting), so tailscale.test is tried again every `gapMs` while a failure may pass by itself, until
+// `budgetMs` is spent; a failure only the user can fix (approve the device, sign in again, refused, ...) ends it at
+// once. Answers { ok, code, ... } as tailscale.test does (not_responding when it didn't answer in TIMEOUTS.test).
+export const AFTER_SIGN_IN = { budgetMs: 30000, gapMs: 2500 };
+// "error": tailscale.test itself failed (not signed in, the bridge refused it): trying again changes nothing.
+const FINAL_CODES = new Set(["needs_approval", "expired", "needs_login", "refused", "error"]);
+export async function testUntilConnected(native, now = () => Date.now()) {
+  const t0 = now();
+  for (;;) {
+    let r;
+    try { r = await within(call(native, "tailscale.test"), TIMEOUTS.test); } catch (e) { r = isLate(e) ? { ok: false, code: "not_responding" } : { ok: false, code: "error", detail: e?.message }; }
+    if (r?.ok || FINAL_CODES.has(r?.code) || now() - t0 + AFTER_SIGN_IN.gapMs >= AFTER_SIGN_IN.budgetMs) return r ?? { ok: false };
+    await new Promise((res) => setTimeout(res, AFTER_SIGN_IN.gapMs));
+  }
+}
+
+// B219: Settings' check after a sign-in: Test Connection's spinner (or the HUD) while testUntilConnected runs, then
+// the page redrawn on its connected state with no alert. A connection made, or refused, goes on to B220's check of the
+// kept pairing (recheckPairing forgets a refused one and starts pairing again, with its own alert). Any other failure
+// shows Test Connection's alert for it. Answers "ok", "repair" or the failing code.
+export async function connectAfterSignIn(native, alert, redraw, { hud = false } = {}) {
+  let r;
+  if (hud) r = await busy("Checking Connection", () => testUntilConnected(native));
+  else {
+    testing = true;
+    redraw();
+    try { r = await testUntilConnected(native); } finally { testing = false; redraw(); }
+  }
+  if (r?.ok || r?.code === "refused") {
+    const how = await recheckPairing(native, alert, redraw);
+    if (r.ok) return "ok";
+    if (how === "repair" || how === "ok") return how; // ok: the pairing answered after all
+  }
+  await testAlert(alert, r);
+  return r?.code ?? "error";
 }
 
 // B220: setting Tailscale up again with a pairing kept used to skip the pairing, and every connect was then refused.
@@ -432,6 +474,11 @@ async function tailscaleTest(native, alert, ended = () => {}) {
   let r;
   try { r = await within(call(native, "tailscale.test"), TIMEOUTS.test); } catch (e) { r = isLate(e) ? { ok: false, code: "not_responding" } : { ok: false, code: "error", detail: e?.message }; }
   ended();
+  return testAlert(alert, r);
+}
+
+// tailscale.test's answer `r` as an alert (core tailscaleTestResult; Copy Rule when the tailnet's rules block it).
+async function testAlert(alert, r) {
   const why = r?.code === "not_responding"
     ? { title: NOT_RESPONDING, message: `Tailscale didn't answer in ${TIMEOUTS.test / 1000} seconds. Check that the Tailscale app's VPN is on, then test again.` }
     : tailscaleTestResult(r);
@@ -561,7 +608,7 @@ export function mainPage({ store, native = globalThis.ifizboxNative, alert = sho
     if (a === "checkServer") return checkServer();
     if (a === "openVPN") return openVPN(native, alert).then(refresh);
     if (a === "pair") return goTo("pair");
-    if (a === "signIn") return tailscaleSignIn(native, alert, refresh);
+    if (a === "signIn") return tailscaleSignIn(native, alert, refresh, null, { hud: true });
     if (a === "openTailscale") return openApp(native, alert, TAILSCALE_URL, "Tailscale");
     if (a === "useTailscale") { await busy("Switching", () => call(native, "tailscale.setConnect", { value: "auto" }).catch(() => {})); return refresh(); }
   };
@@ -874,7 +921,7 @@ async function drawPair(box, { store, native, alert, redraw }) {
     vpn,
     busy: signingIn,
     choose: async (value) => { await busy("Switching", () => call(native, "tailscale.setConnect", { value }).catch(() => {})); recheck(); },
-    signIn: async () => { await useTailscale(); tailscaleSignIn(native, alert, () => { if (visit === v) redraw(); }, `${NAME} is on your tailnet. Turn on the Tailscale app's VPN to pair.`, v); }, // B143: once left, an ending sign-in mustn't draw the page (a new visit and its poll)
+    signIn: async () => { await useTailscale(); tailscaleSignIn(native, alert, () => { if (visit === v) redraw(); }, v); }, // B143: once left, an ending sign-in mustn't draw the page (a new visit and its poll)
     openTailscale: async () => { await useTailscale(); openApp(native, alert, TAILSCALE_URL, "Tailscale"); },
     install: () => openApp(native, alert, LOCALDEVVPN_STORE, "App Store"),
     installTailscale: () => openApp(native, alert, TAILSCALE_STORE, "App Store"),

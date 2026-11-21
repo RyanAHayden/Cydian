@@ -289,8 +289,13 @@ profiles" above).
    CA keys and files at launch (`SignStore.removeOldInstallCA`); its profile stays in iOS Settings until the user
    deletes it.
 
-Remove Certificate (`signing.remove`) deletes the identity and the kept `.p12` from the Keychain, and the profile
-file.
+The identity outlives the app: the Keychain keeps it when the app is deleted, as long as the next install is
+signed by the same team. What picks it out (its certificate's SHA-256) and the profile are kept beside it, as
+generic-password items (service `com.ryha.ifizbox.signing.setup`, `...ThisDeviceOnly`; neither is a secret), so a
+reinstall comes back with its certificate and profile (`SignStore.restored`, once per launch).
+
+Remove Certificate (`signing.remove`) deletes the identity, the kept `.p12` and those two items from the Keychain,
+and the profile file.
 
 ### What leaves the phone, and when
 

@@ -2,7 +2,8 @@
 // synced or backed up) and is used there. F73: the imported .p12 file and its password are also kept, as one Keychain
 // generic-password item (this device only), so signing.export can hand them to iFizBox Account's certificate sync
 // (screens/account.js); signing.remove deletes it with the identity. The profile is a plain file in
-// Application Support (it holds no secret). docs/signing.md, "On the phone (I6)".
+// Application Support (it holds no secret). B276: the certificate's SHA-256 and the profile are also kept in the
+// Keychain, so deleting and reinstalling the app comes back with its certificate. docs/signing.md, "On the phone (I6)".
 // SPDX-License-Identifier: GPL-3.0-or-later
 import Foundation
 import Security
@@ -47,10 +48,12 @@ enum SignStore {
         try keepP12(p12, password: password, certSHA256: sha256(der).base64EncodedString()) // F73
         try profileData.write(to: profileURL, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
         UserDefaults.standard.set(sha256(der).base64EncodedString(), forKey: certKey)
+        keepSetup(certSHA256: sha256(der).base64EncodedString(), profile: profileData)
         return profile
     }
 
     static func identity() -> SecIdentity? {
+        _ = restored
         guard let want = UserDefaults.standard.string(forKey: certKey) else { return nil }
         let q: [String: Any] = [kSecClass as String: kSecClassIdentity, kSecMatchLimit as String: kSecMatchLimitAll,
                                 kSecReturnRef as String: true]
@@ -77,8 +80,86 @@ enum SignStore {
     }
 
     static func profile() -> Profile? {
-        (try? Data(contentsOf: profileURL)).flatMap { try? Profile($0) }
+        _ = restored
+        return (try? Data(contentsOf: profileURL)).flatMap { try? Profile($0) }
     }
+
+    // ---- B276: what finds the identity, kept in the Keychain so a reinstall comes back with its certificate
+
+    // The identity itself is in the Keychain, which outlives the app's container while the signing team stays the
+    // same; the certificate's SHA-256 (certKey, which picks it out) and the profile file don't. Both are kept as
+    // generic-password items too (no secret: the SHA-256 of a public certificate and a profile), this device only,
+    // as the Tailscale node (TailscaleKeep). Remove Certificate deletes them.
+    static let keepService = "com.ryha.ifizbox.signing.setup"
+    static let keepCertAccount = "cert", keepProfileAccount = "profile"
+
+    static func keepQuery(_ account: String) -> [String: Any] {
+        [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: keepService,
+         kSecAttrAccount as String: account]
+    }
+
+    static func readKept(_ account: String) -> Data? {
+        var q = keepQuery(account)
+        q[kSecReturnData as String] = true
+        q[kSecMatchLimit as String] = kSecMatchLimitOne
+        var out: CFTypeRef?
+        guard SecItemCopyMatching(q as CFDictionary, &out) == errSecSuccess else { return nil }
+        return out as? Data
+    }
+
+    // nil deletes it. A refusal is logged, never thrown: the container's copy still works until the next reinstall.
+    static func writeKept(_ account: String, _ data: Data?) {
+        let q = keepQuery(account)
+        guard let data = data else { SecItemDelete(q as CFDictionary); return }
+        if readKept(account) == data { return }
+        var st = SecItemUpdate(q as CFDictionary, [kSecValueData as String: data] as CFDictionary)
+        if st == errSecItemNotFound {
+            var add = OwnKeychain.scoped(q)
+            add[kSecValueData as String] = data
+            add[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+            add[kSecAttrLabel as String] = "\(Brand.name) signing setup"
+            st = SecItemAdd(add as CFDictionary, nil)
+        }
+        if st != errSecSuccess { NSLog("\(Brand.name) keychain refused the signing \(account) (\(st))") }
+    }
+
+    static func keepSetup(certSHA256: String, profile: Data) {
+        writeKept(keepCertAccount, Data(certSHA256.utf8))
+        writeKept(keepProfileAccount, profile)
+    }
+
+    // The certificate's SHA-256 the F73 .p12 item names, for a phone whose setup was imported before B276.
+    static func p12CertSHA256() -> String? {
+        var q = p12Query
+        q[kSecReturnData as String] = true
+        q[kSecMatchLimit as String] = kSecMatchLimitOne
+        var out: CFTypeRef?
+        guard SecItemCopyMatching(q as CFDictionary, &out) == errSecSuccess, let blob = out as? Data,
+              let d = try? PropertyListSerialization.propertyList(from: blob, format: nil) as? [String: Any] else { return nil }
+        return d["cert"] as? String
+    }
+
+    // Once per launch, before the identity or the profile is first looked up. A fresh container (deleted and
+    // reinstalled) gets certKey and the profile file back from the Keychain; a container that has them while the
+    // Keychain doesn't (imported before B276) puts them there, so the next reinstall keeps them.
+    static let restored: Void = {
+        let defaults = UserDefaults.standard
+        if let want = defaults.string(forKey: certKey) {
+            writeKept(keepCertAccount, Data(want.utf8))
+        } else if let kept = readKept(keepCertAccount).flatMap({ String(data: $0, encoding: .utf8) }) ?? p12CertSHA256() {
+            defaults.set(kept, forKey: certKey)
+            NSLog("\(Brand.name): signing certificate restored from the keychain")
+        }
+        guard defaults.string(forKey: certKey) != nil else { return }
+        if let file = try? Data(contentsOf: profileURL) {
+            writeKept(keepProfileAccount, file)
+        } else if let kept = readKept(keepProfileAccount), (try? Profile(kept)) != nil {
+            do {
+                try kept.write(to: profileURL, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+                NSLog("\(Brand.name): signing profile restored from the keychain")
+            } catch { NSLog("\(Brand.name): signing profile not restored: \(error)") }
+        }
+    }()
 
     static func removeIdentity() {
         if let id = identity() {
@@ -92,6 +173,8 @@ enum SignStore {
             }
         }
         deleteP12() // F73
+        writeKept(keepCertAccount, nil) // B276
+        writeKept(keepProfileAccount, nil)
         UserDefaults.standard.removeObject(forKey: certKey)
         try? FileManager.default.removeItem(at: profileURL)
     }
@@ -122,6 +205,7 @@ enum SignStore {
     // The kept .p12 and password, when they belong to the identity in use; nil when there is none (no certificate,
     // or one imported before F73: the user imports it again for iFizBox to update itself through the Signing Server).
     static func exportP12() -> (p12: Data, password: String)? {
+        _ = restored
         guard let want = UserDefaults.standard.string(forKey: certKey) else { return nil }
         var q = p12Query
         q[kSecReturnData as String] = true

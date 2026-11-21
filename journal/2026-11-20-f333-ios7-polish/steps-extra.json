@@ -1,0 +1,6 @@
+[{"eval": "(()=>{localStorage.clear();localStorage.setItem('ifizbox.firstVisit','later');localStorage.setItem('ifizbox.device','iphoneos-arm64');localStorage.setItem('ifizbox.style','ios7');localStorage.setItem('ifizbox.appearance','__TONE__');localStorage.setItem('ifizbox.darkTheme','oled');return 1})()"},
+ {"nav": "#/changes/package%3Acom.mariopartyrd.partyboard", "ms": 8000}, {"shot": "__P__-package"},
+ {"nav":"#/home","ms":3000},
+ {"eval":"(async()=>{const m=await import('./nav/menu.js');const c=[...document.querySelectorAll('.cell')][4];m.showMenu(c,[{label:'Copy',onClick(){}},{label:'Share',onClick(){}},{label:'Install',onClick(){}}]);return 1})()"},
+ {"wait":800},{"shot":"__P__-menu"}
+]

@@ -9,7 +9,7 @@ Nothing else changed.
 
 | Control | Before | Kit | Now |
 |---|---|---|---|
-| **Alert** (`nav/alert.js`) | still iOS 6: navy glossy box, glossy buttons. ios7.css had no alert rules at all | "Alert": white box with 6.5pt corners, 17.5pt medium title, tinted 17.5pt buttons with no box, a .5pt rgba(0,0,0,.3) line over the buttons and between them, the default button bolder | white box (#1c1c1e in OLED), 7px corners, no border, shadow or gloss; title 17px semibold, message 13px; buttons are flat tinted 17px text, the last non-Cancel button semibold, red buttons `--i7-red`, a countdown dims the text; the field is flat with a .5pt edge; Paste is tinted text; scrim rgba(0,0,0,.4) |
+| **Alert** (`nav/alert.js`) | still iOS 6: navy glossy box, glossy buttons. ios7.css had no alert rules at all | "Alert": white box with 6.5pt corners, 17.5pt medium title, tinted 17.5pt buttons with no box, a .5pt rgba(0,0,0,.3) line over the buttons and between them, the default button bolder | rgba(248,248,248,.97), the translucent off-white the action sheet had (#1c1c1e in OLED), 7px corners, no border, shadow or gloss; title 17px semibold, message 13px; buttons are flat tinted 17px text, the last non-Cancel button semibold, red buttons `--i7-red`, a countdown dims the text; the field is flat with a .5pt edge; Paste is tinted text; scrim rgba(0,0,0,.4) |
 | **Callout menu** (`nav/menu.js`) and the **queue hint** | iOS 6: glossy black, bold, embossed, 38pt | "Contextual menu": flat #232323, 8pt corners, 36pt tall, 14pt light white text, .5pt #b9b9b9 dividers | those values. `--callout-h: 36px` (an existing hook), no drop shadow |
 | **Row held for its menu** | white text on iOS 7's grey (iOS 6's held row) | (iOS 7 keeps the row's ink) | label, subtitle, detail and chevron keep their own colours |
 | **Counts** (a source's packages, More Sources) | grey iOS 6 pill | Mail's counts: plain grey 17.5pt text | plain 17px `--detail` text, right-aligned |
@@ -44,6 +44,15 @@ The brief sends geometry that needs a hook to F331, but F331 has already landed,
 - I appended the first block of rules with a shell heredoc instead of the edit tool. The result is the same, but the
   run's rules ask for the edit tool. Every later edit used it.
 
+## Spec review
+
+The fresh-agent review found three things, now fixed. The plain keyline used the `background` shorthand, which would
+reset a row's own background colour, so it now uses longhands. The alert comment said 54pt where the code uses 56px;
+the comment now explains the 2pt. The journal called the alert "white". The review also asked for the package page
+and a before shot of the menu: both are now shot (`steps-extra.json`, `*-package.png`, `before/*-menu.png`). On the
+package page only the 14pt group headers changed. Its other points are listed under Not verified, or are the F341
+geometry.
+
 ## Checks
 
 - `node --test web/app/ios6-css.test.js` passes, including the new F333 test (the alert, action sheet, menu, counts,
@@ -70,7 +79,10 @@ The brief sends geometry that needs a hook to F331, but F331 has already landed,
   gaps in sources.css, and only two and three buttons were looked at.
 - **Every page of Settings and every sheet**: I shot Home, Sources, a source page, Changes, Installed, Search,
   Settings, Theme, Signing, Device and Manage, plus the action sheet, alerts and menu. Sheets (`nav/sheet.js`) paint
-  with the nav bar's and table's tokens, so they were not shot one by one. The package page was not reached (the
-  click step opened a source, not a package).
+  with the nav bar's and table's tokens, so they were not shot one by one. The package page was shot after the
+  review (Party Board, from Changes).
+- **Bar buttons, segmented controls, plain buttons**: I judged them against the kit from the shots I already had
+  (nav bars and Theme's Mode in `before/`). None was changed, and no zoomed shot was kept for them.
+- `tools/check.sh` is run by `run done`, as the test gate. It was not run separately before that.
 - **iOS 15.0–15.3**: the keyline inset on icon rows uses `:has()` (15.4+). On older versions those rows keep the
   15pt inset.

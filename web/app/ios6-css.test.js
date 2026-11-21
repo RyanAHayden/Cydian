@@ -339,6 +339,6 @@ test("F333: ios7.css draws the kit's alert, action sheet, menu, counts and keyli
   assert.match(rule('html[data-style="ios7"] .cell-count'), /background: none/);
   assert.match(rule('html[data-style="ios7"] .group-header'), /font-size: 14px/);
   assert.match(ios7, /--i7-keyline: linear-gradient\(to top, var\(--keyline\) \.5px, transparent \.5px\);/);
-  assert.match(rule('html[data-style="ios7"] .plain .cell'), /border-bottom-width: 0; background: var\(--i7-keyline\) 15px 0 \/ calc\(100% - 15px\) 100% no-repeat/);
+  assert.match(rule('html[data-style="ios7"] .plain .cell'), /background-image: var\(--i7-keyline\); background-position: 15px 0; background-size: calc\(100% - 15px\) 100%; background-repeat: no-repeat;/);
   assert.match(rule('html[data-style="ios7"] .pkg-row'), /var\(--i7-keyline\) 51px 0/);
 });

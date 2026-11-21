@@ -249,11 +249,14 @@ select { font: inherit; color: var(--ink); background: var(--panel); border: 1px
   function paintBars() {
     var d = deviceOf(), site = state.mode === "site", dark = tone() === "dark";
     $("strip").style.background = stripColor;
-    var darkText = site && lum(stripColor) > 0.6;
+    // in every mode the glyphs sit on the theme's bar colour (Safari's strip, or the app's nav bar through the
+    // status bar): dark glyphs on a light one (iOS 7 White's #f7f7f7, Brushed Metal)
+    var darkText = lum(stripColor) > 0.6;
     $("sb").classList.toggle("dark-text", darkText);
     $("safari").classList.toggle("dark", dark);
-    // over the app's black tab bar the bar is light; over Safari's light bar, dark
-    $("homebar").classList.toggle("dark", site && !dark);
+    // over Safari's light bar the home bar is dark; in the apps it sits on the tab bar, black in every theme but
+    // iOS 7 White's near-white one (Brushed Metal's grey nav bar keeps the black tab bar, hence not 0.6)
+    $("homebar").classList.toggle("dark", site ? !dark : lum(stripColor) > 0.9);
     if (d) $("sb").style.height = "";
   }
   function fit() {

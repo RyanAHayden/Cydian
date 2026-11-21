@@ -46,6 +46,8 @@ Before = main's signers (B211), after = this branch. Every row is a re-sign inst
 | relaunch, lock + unlock, reboot (after) | kept | kept | kept | kept | kept | kept | kept |
 | iFizBox on the phone (this branch's Lite build, SideDrop's identity): Install IPAs > Sign > Install over the web-signed probe | kept | kept | kept | kept | kept | kept | kept |
 | the same app's Re-sign (Installed > Probe > Re-sign; new bundle path, so really reinstalled) | kept | kept | kept | kept | kept | kept | kept |
+| checked again 13 min later (after) | kept | kept | kept | kept | kept | kept | kept |
+| a fresh install of another app with `legacy` set (final dylib) | NEW (own) | NEW | NEW: the shared group's marker not copied in | NEW | NEW | NEW | NEW |
 
 Findings:
 

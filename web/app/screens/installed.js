@@ -1263,9 +1263,10 @@ export function attachRowHold(ul, { view = latest.apps, ...opts } = {}) {
 // The installed-app page (#installed/app:<id>): what iFizBox knows of an app no source lists any more, or one it
 // signed but doesn't remember: version (browse.js installedAppSection, with I4's note in the jailbreak app), bundle ID,
 // source, install date and the signature's days left; then the sheet's actions as rows.
-async function renderAppPage(body, route, ctx) {
+async function renderAppPage(body, route, ctx, { quiet = false } = {}) {
   const id = appIdOf(route.path.at(-1));
-  body.append(placeholder("page"));
+  appPages.open(body, { route, ctx }); // B281: drawn again by reloadSigned
+  if (!quiet) body.append(placeholder("page"));
   let rec = null;
   let signed = null;
   try {
@@ -1280,6 +1281,28 @@ async function renderAppPage(body, route, ctx) {
   const ipa = detectMode() === "sideload" ? await keptIpa(r) : null;
   body.replaceChildren(grouped(appPageSections(r, { ipa, onAction: (label) => runAppAction(label, r, { ipa, after: navBack }) })));
 }
+
+// ---- B281: an install that records nothing itself ended ----------------------------------------------------------
+// An ifizbox://install link's Install (incoming.js) and another sideloader's IPA link sign from a URL and write no
+// Installed record, so nothing told the lists: Installed's row and the app's page kept the signed record from before
+// (a My IPAs install's) until they were opened again. When that run ends, every live apps list and app page loads
+// the signed records again.
+//   reloadSigned({ load, draw })   -> the number of app pages drawn again (load, draw: stand-ins for tests)
+const appPages = pageViews(() => ({ kind: "app", route: null, ctx: null }));
+
+export function reloadSigned({ load = loadAllApps, draw = renderAppPage } = {}) {
+  load();
+  let n = 0;
+  for (const p of appPages.all()) {
+    if (!p.route || p.body?.isConnected === false) continue;
+    draw(p.body, p.route, p.ctx, { quiet: true });
+    n++;
+  }
+  return n;
+}
+
+// Registers `body` as an app page, as renderAppPage does (tests).
+export const openAppPage = (body, route, ctx = null) => appPages.open(body, { route, ctx });
 
 // The page's sections for a row `r` (with `signed`), testable without a page.
 export function appPageSections(r, { ipa = null, mode = detectMode(), now = new Date(), window, onAction = () => {} } = {}) {

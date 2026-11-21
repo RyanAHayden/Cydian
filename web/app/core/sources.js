@@ -13,6 +13,8 @@ import { repoLayout, parseRelease, parseControl, matchesArch, DEFAULT_ARCH } fro
 import { isAltKey, neverLoaded } from "./altstore.js";
 import { releaseTime, fingerprint, healthFields, withTimeout, pool, REFRESH_TIMEOUT, REFRESH_CONCURRENCY } from "./health.js";
 import { githubApiRepo, isGithubSource, refreshGithubSource } from "./github.js"; // F304
+import { githubTweakUri } from "./github.js"; // F344a
+import { indexQuery } from "./tweakindex.js"; // F344a
 
 // F72: iFizBox's own repo names the oldest iFizBox that may run without upgrading first (core/essential.js).
 const MIN_FIELD = "x-ifizbox-minimum-version";
@@ -99,9 +101,33 @@ async function loadDefaultList(file, from, { remote = null, bundled = readBundle
 // opts: { remote: (url) => Promise<text>, bundled: (file) => Promise<text>, timeout: ms }.
 export const loadTweakSources = (opts) => loadDefaultList(TWEAK_SOURCES_FILE, tweakSourcesFrom, opts);
 
-// F302: the Tweak Sources the sideload build starts with: tweak-sources.json's entries marked "inject": true (repos
-// carrying tweaks that go into an app: Havoc, Chariz, BigBoss), as tweakSourcesFrom records.
-export const injectSourcesFrom = (list) => tweakSourcesFrom(Array.isArray(list) ? list.filter((s) => s?.inject === true) : []);
+// F302: the Tweak Sources the sideload build starts with: tweak-sources.json's entries marked "inject": true, as
+// tweakSourcesFrom records. F344a: only app-tweak sources real users trust, which today are GitHub repos whose releases
+// carry the tweak's .deb ({ name, github: "<owner>/<repo>", inject: true }, core/github.js reads them; the research is
+// in journal/2026-11-21-f344a-tweak-sources-lite/). tweakSourcesFrom (the jailbroken defaults, the Worker's cron) skips
+// them: they have no uri.
+export const injectSourcesFrom = (list) => {
+  const picked = Array.isArray(list) ? list.filter((s) => s?.inject === true) : [];
+  const out = [...tweakSourcesFrom(picked), ...githubDefaultsFrom(picked)];
+  return out.filter((s, i) => out.findIndex((o) => o.key === s.key) === i);
+};
+
+// F344a: tweak-sources.json's { github: "<owner>/<repo>" } entries as GitHub Tweak Source records (the shape
+// core/github.js githubTweakRecord saves, before its first refresh fills the count).
+const GITHUB_DEFAULT = /^([A-Za-z0-9](?:[A-Za-z0-9-]{0,38}))\/([A-Za-z0-9._-]{1,100})$/;
+export function githubDefaultsFrom(list) {
+  const out = [];
+  for (const s of Array.isArray(list) ? list : []) {
+    const m = typeof s?.github === "string" ? GITHUB_DEFAULT.exec(s.github.trim()) : null;
+    if (!m || m[2] === "." || m[2] === "..") continue;
+    const gh = { user: m[1], repo: m[2] };
+    const uri = githubTweakUri(gh);
+    const key = sourceKey({ uri, dist: "./" });
+    if (out.some((o) => o.key === key)) continue;
+    out.push({ key, uri, dist: "./", components: [], github: gh, name: typeof s.name === "string" && s.name ? s.name : gh.repo });
+  }
+  return out;
+}
 export const loadInjectSources = (opts) => loadDefaultList(TWEAK_SOURCES_FILE, injectSourcesFrom, opts);
 export const loadAppSources = (opts) => loadDefaultList(APP_SOURCES_FILE, appSourcesFrom, opts);
 
@@ -736,3 +762,46 @@ export function httpsInput(input) {
   const uri = sourceUri(input).replace(/^http:/i, "https:");
   return typeof input === "string" ? uri : { ...input, uri };
 }
+
+// ---- F344a: the sideload app shows only Tweak Sources with something for the user's apps ------------------------
+//
+//   tweakSourceVerdict(answer, appIds)  -> true (a tweak works in one of these apps, or in any app), false (the Tweak
+//                                          Index has checked every tweak of the source and none does), null (not
+//                                          known yet: no index, the source still being read, a failed read)
+//   askTweakIndex(source, { get, base }) -> the index's answer for a source (GET /api/tweaks, every tweak), or null;
+//                                          never asked for a GitHub Tweak Source (one tweak, no Packages to index)
+//   shownTweakSources(list, hidden)     -> the Tweak Sources the list shows: those not in `hidden` (keys)
+// A source is hidden only on a false verdict, so a missing or unfinished index hides nothing.
+export function tweakIndexDone(a) {
+  return Boolean(a?.enabled && a.known && a.refreshed && !a.pending && !a.error && Array.isArray(a.tweaks));
+}
+
+export function usableTweak(e, appIds) {
+  if (!e?.ok || e.systemOnly) return false;
+  if (e.anyApp && !e.unverified) return true;
+  return (Array.isArray(e.bundles) ? e.bundles : []).some((b) => appIds.has(String(b).toLowerCase()));
+}
+
+export function tweakSourceVerdict(answer, appIds = []) {
+  if (!tweakIndexDone(answer)) return null;
+  const ids = new Set([...appIds].map((id) => String(id).toLowerCase()));
+  return answer.tweaks.some((e) => usableTweak(e, ids));
+}
+
+export async function askTweakIndex(source, { get = (u, o) => globalThis.fetch(u, o), base, timeout = 6000 } = {}) {
+  if (!source || isGithubSource(source)) return null;
+  const q = indexQuery(source);
+  if (!q || !base) return null;
+  const ac = typeof AbortController === "function" ? new AbortController() : null;
+  const timer = setTimeout(() => ac?.abort(), timeout);
+  try {
+    const r = await get(`${base}?${q}`, ac ? { signal: ac.signal } : {});
+    return r?.ok ? await r.json() : null;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+export const shownTweakSources = (list, hidden) => (hidden?.size ? list.filter((s) => !hidden.has(s.key)) : list);

@@ -10,6 +10,10 @@ sideload app reads APT repos as Tweak Sources and lists only the tweaks it can i
 A tweak's page says which apps it works in and has Add to App; Sign Options' Inject Tweaks also takes a tweak from a
 source or your own `.deb`, `.dylib` or zipped `.framework`. ElleKit is bundled for tweaks that link CydiaSubstrate,
 and an app's tweaks are kept for its re-signs. How it's done: docs/signing.md "Tweak injection".
+A new install starts with app-tweak sources only: GitHub repos whose releases carry the tweak's `.deb` (YTLite,
+YTMusicUltimate, SCInsta; `web/app/tweak-sources.json` entries with `github` and `"inject": true`). The Sources tab
+leaves out a Tweak Source the Tweak Index has fully checked with no tweak for the user's apps (or for any app);
+searching and Manage still list it.
 
 The notes on the other projects come from their source, not from runs on a phone. Sources, at these commits:
 

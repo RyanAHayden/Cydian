@@ -47,6 +47,22 @@
 - The iOS file picker once failed with "Internal error / The requested app extension could not be found" right after a
   .deb reinstall; the file input then didn't open again until the app was relaunched. System behaviour, not ours.
 
+## Spec review (fresh subagent, diff + brief only)
+
+- Fixed: the own sets now carry every iPhone size (20, 29, 40, 60 pt at @2x/@3x, as the primary), so the helper
+  writes "every icon size" (checked on the iPhone 7: 8 files per set written, icon applied). A pick whose picture the
+  shell no longer keeps goes back to the theme's icon (`dropMissing`, tested).
+- Kept, on purpose: uicache runs only when a set the app wrote again needs it, and only once the app is in the
+  background. Running it on every apply would close the app on every pick (`uicache -p` closes it).
+- Kept: the Lite half and its LITE sash are split out as F329a (needs a source IPA of the running app, a signer
+  option that keeps CFBundleAlternateIcons, and a sideload phone check).
+- Kept: files outside the brief's list (core/settings.js `accepts`, alternates.py OWN_SLOTS, Info.plist, build.sh,
+  carfile.py, test_icons.py) are what the two-set design needs. The wheel zoom and file-name labels are small parts
+  of Move and Scale and Your Icons.
+- PNG output is byte-identical across renders (seen on the phone: the same sizes and no rewrite on a re-pick), so the
+  slot byte compare holds.
+- Filed B226: Theme > App Icon's Light/Dark rows show stale values after Match Theme is turned off (F323 behaviour).
+
 ## Tried and dropped
 
 - Patching Info.plist in the helper + uicache per apply: closes the app every time.

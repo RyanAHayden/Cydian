@@ -1,6 +1,7 @@
 """F329: ifizbox-helper own-icon <a|b> <dir> (ownicon.h): copies the app's picture over one own-icon set's two PNGs,
 only those files, only PNGs, and refuses bad slots and folders, symlinks, missing files and other callers."""
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -17,6 +18,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(HERE), "icon"))
 import alternates  # noqa: E402
 
 PNG = b"\x89PNG\r\n\x1a\n"
+SIZES = ["%dx%d%s" % (pt, pt, s) for pt in alternates.OWN_SIZES for s in ("@2x", "@3x")]
 
 
 class Names(unittest.TestCase):
@@ -24,8 +26,11 @@ class Names(unittest.TestCase):
         with open(os.path.join(HERE, "ownicon.h")) as f:
             c = f.read()
         self.assertEqual(alternates.OWN_SLOTS, ("a", "b"))
-        self.assertIn('"%s/IconOwn%c60x60%s.png"', c)
-        self.assertEqual(alternates.own_stem("a"), "IconOwnA60x60")
+        self.assertIn('"%s/IconOwn%c%s.png"', c)
+        files = re.search(r"helper_own_files\[HELPER_OWN_N\] = \{(.*?)\};", c, re.S).group(1)
+        self.assertEqual(re.findall(r'"([^"]+)"', files), SIZES)
+        self.assertEqual([alternates.own_stem("a", pt) for pt in alternates.OWN_SIZES],
+                         ["IconOwnA%dx%d" % (pt, pt) for pt in (20, 29, 40, 60)])
         self.assertEqual(alternates.own_set("b"), "Icon-ownb")
 
 
@@ -49,10 +54,10 @@ class OwnIcon(unittest.TestCase):
         shutil.rmtree(self.src, True)
         os.makedirs(self.src)
         for slot in "AB":
-            for s in ("@2x", "@3x"):
-                self.write(os.path.join(self.app, "IconOwn%s60x60%s.png" % (slot, s)), PNG + b"primary")
-        for s in ("@2x", "@3x"):
-            self.write(os.path.join(self.src, "IconOwn60x60%s.png" % s), PNG + b"mine " + s.encode())
+            for s in SIZES:
+                self.write(os.path.join(self.app, "IconOwn%s%s.png" % (slot, s)), PNG + b"primary")
+        for s in SIZES:
+            self.write(os.path.join(self.src, "IconOwn%s.png" % s), PNG + b"mine " + s.encode())
 
     def write(self, path, data):
         with open(path, "wb") as f:
@@ -70,10 +75,10 @@ class OwnIcon(unittest.TestCase):
     def test_copies_into_the_slot(self):
         out = self.spawn("own-icon", "b", self.src)
         self.assertEqual(out[-1], "exit: 0", out)
-        for s in ("@2x", "@3x"):
-            self.assertEqual(self.get("IconOwnB60x60%s.png" % s), PNG + b"mine " + s.encode())
-            self.assertEqual(self.get("IconOwnA60x60%s.png" % s), PNG + b"primary")  # the other slot stays
-            self.assertEqual(os.stat(os.path.join(self.app, "IconOwnB60x60%s.png" % s)).st_mode & 0o777, 0o644)
+        for s in SIZES:
+            self.assertEqual(self.get("IconOwnB%s.png" % s), PNG + b"mine " + s.encode())
+            self.assertEqual(self.get("IconOwnA%s.png" % s), PNG + b"primary")  # the other slot stays
+            self.assertEqual(os.stat(os.path.join(self.app, "IconOwnB%s.png" % s)).st_mode & 0o777, 0o644)
         self.assertFalse([f for f in os.listdir(self.app) if f.endswith(".launch-theme")])  # no temp files left
 
     def test_not_a_png_changes_nothing(self):

@@ -116,7 +116,7 @@ enum AppIcon {
 //                                square the page showed, drawn at 1024 px
 //   app.icon.remove {name}       -> {icons}
 //   app.icon.decode {data}       -> {jpeg}           a picture the web view can't draw (HEIC on iOS 15), as JPEG
-// Applying one (app.icon with an own name): the jailbreak build draws it at 120 and 180 px into AppIcons/Apply/, the
+// Applying one (app.icon with an own name): the jailbreak build draws it at every icon size into AppIcons/Apply/, the
 // helper copies them over one of Info.plist's two own sets (helper/ownicon.h, icon/alternates.py OWN_SLOTS), the
 // one not on screen, and the shell switches to it quietly. The sideload build can't (its signed bundle can't gain
 // icons): the page doesn't offer Add there, and app.icon answers lite_unsupported.
@@ -246,7 +246,11 @@ enum OwnIcons {
     // ---- Applying (jailbreak build)
 
     static func setName(_ slot: String) -> String { "Icon-own\(slot)" }
-    static func stem(_ slot: String) -> String { "IconOwn\(slot.uppercased())60x60" }
+    // Every size the set has (icon/alternates.py OWN_SIZES, helper/ownicon.h): "<pt>x<pt>@<s>x" and its px
+    static let sizes: [(file: String, px: Int)] = [20, 29, 40, 60].flatMap { pt in [2, 3].map { ("\(pt)x\(pt)@\($0)x", pt * $0) } }
+    static func bundleFile(_ slot: String, _ size: String) -> String {
+        Bundle.main.bundlePath + "/IconOwn\(slot.uppercased())\(size).png"
+    }
 
     // The slot to show the picture in, given the set on screen: the one on screen if its files are the picture
     // already, else the other one (so the switch is a change of name and SpringBoard draws the new picture).
@@ -259,32 +263,28 @@ enum OwnIcons {
         return (target, !holds(target))
     }
 
-    // The picture at 120 and 180 px in AppIcons/Apply/ (what the helper copies), as [@2x, @3x].
+    // The picture at every size in AppIcons/Apply/IconOwn<size>.png (what the helper copies), in `sizes` order.
     static func render(_ name: String) throws -> [Data] {
         guard let d = try? Data(contentsOf: file(name)), let image = UIImage(data: d) else {
             throw BridgeError("missing", "That icon isn't kept any more.")
         }
         let apply = dir.appendingPathComponent("Apply")
         try FileManager.default.createDirectory(at: apply, withIntermediateDirectories: true)
-        return try [(120, "@2x"), (180, "@3x")].map { px, s in
-            guard let p = png(image, px: px) else { throw BridgeError("bad_image", "The picture couldn't be drawn.") }
-            try p.write(to: apply.appendingPathComponent("IconOwn60x60\(s).png"), options: .atomic)
+        return try sizes.map { size in
+            guard let p = png(image, px: size.px) else { throw BridgeError("bad_image", "The picture couldn't be drawn.") }
+            try p.write(to: apply.appendingPathComponent("IconOwn\(size.file).png"), options: .atomic)
             return p
         }
     }
 
     static func holds(_ slot: String, _ pngs: [Data]) -> Bool {
-        zip(["@2x", "@3x"], pngs).allSatisfy { s, p in
-            FileManager.default.contents(atPath: Bundle.main.bundlePath + "/" + stem(slot) + s + ".png") == p
-        }
+        zip(sizes, pngs).allSatisfy { size, p in FileManager.default.contents(atPath: bundleFile(slot, size.file)) == p }
     }
 
     // A slot's files in the bundle are the app's to switch to: Info.plist lists the set (a build since F329) and
-    // both PNGs are there.
+    // every size's PNG is there.
     static func ready(_ slot: String) -> Bool {
-        AppIcon.sets.contains(setName(slot)) && ["@2x", "@3x"].allSatisfy {
-            FileManager.default.fileExists(atPath: Bundle.main.bundlePath + "/" + stem(slot) + $0 + ".png")
-        }
+        AppIcon.sets.contains(setName(slot)) && sizes.allSatisfy { FileManager.default.fileExists(atPath: bundleFile(slot, $0.file)) }
     }
 
     // SpringBoard keeps the picture it last drew for a set: a slot written again shows its old picture until the app

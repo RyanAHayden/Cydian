@@ -611,7 +611,7 @@ function appIconGroups() {
   const [group, pickGroup] = frag.querySelectorAll(".group");
   // F329: a pick of your own icon is named from the shell's list, which may not be read yet
   if (ownOffered()) {
-    loadOwnIcons().then((m) => m.loadIcons()).then(() => picks.rows.forEach((r, i) => {
+    loadOwnIcons().then((m) => m.loadIcons().then((list) => m.dropMissing(settings, list))).then(() => picks.rows.forEach((r, i) => {
       const detail = pickGroup.querySelectorAll(".cell-detail")[i];
       if (detail && isOwnIcon(r.icon)) detail.textContent = iconLabel(iconOf(defOf(r.key).iconTone));
     })).catch(() => {});

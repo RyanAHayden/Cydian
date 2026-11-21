@@ -79,6 +79,13 @@ export function labelFor(fileName, list = []) {
 // The icon settings that pick `name`: deleting it puts them back on their theme's icon.
 export const picksOf = (name, get) => ["lightIcon", "darkIcon"].filter((k) => get(k) === name);
 
+// The icon settings picking an own icon the shell no longer keeps (its list): they go back to the theme's icon.
+export const missingPicks = (list, get) =>
+  ["lightIcon", "darkIcon"].filter((k) => isOwnIcon(get(k)) && !list.some((i) => i.name === get(k)));
+export function dropMissing(store, list) {
+  for (const k of missingPicks(list, (x) => store.get(x))) store.set(k, "theme");
+}
+
 // Where Add is offered: the jailbreak app with a bridge. (The Lite build can't apply one yet.)
 export const ownIconsOffered = (mode, native = nativeBridge()) => mode === "jailbreak" && hasNativeCall(native);
 
@@ -169,7 +176,10 @@ export function ownIconsGroup({ key, now, store }) {
   }
 
   draw(cache);
-  loadIcons().then((list) => { if (grid.isConnected) draw(list); }).catch(() => {});
+  loadIcons().then((list) => {
+    dropMissing(store, list);
+    if (grid.isConnected) draw(list);
+  }).catch(() => {});
   return group;
 }
 

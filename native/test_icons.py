@@ -31,8 +31,9 @@ def bundle(lite):
              for pt, scales in carfile.ICON_SIZES.items() for s in scales}
     files[APP + "Assets.car"] = read("AssetsLite.car" if lite else "Assets.car")
     for slot in "AB":  # F329: your own icon's sets, the primary icon until the helper writes one
-        for s in (2, 3):
-            files[APP + "IconOwn%s60x60@%dx.png" % (slot, s)] = read("%s60x60@%dx.png" % (src, s))
+        for pt in (20, 29, 40, 60):
+            for s in (2, 3):
+                files[APP + "IconOwn%s%dx%d@%dx.png" % (slot, pt, pt, s)] = read("%s%dx%d@%dx.png" % (src, pt, pt, s))
     return files
 
 
@@ -204,7 +205,7 @@ class Alternates(unittest.TestCase):
         self.assertEqual(list(alts), list(alternates.sets()) + own)
         for name, d in alts.items():
             if name in own:
-                self.assertEqual(d, {"CFBundleIconFiles": [alternates.own_stem(name[-1])]})
+                self.assertEqual(d, {"CFBundleIconFiles": [alternates.own_stem(name[-1], pt) for pt in alternates.OWN_SIZES]})
             else:
                 self.assertEqual(d, {"CFBundleIconName": name})
         with open(os.path.join(HERE, "Info.plist")) as f:

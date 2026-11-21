@@ -154,15 +154,16 @@ END = "<!-- end of icon/alternates.py's block -->"
 # (helper/ownicon.h). Listed from the start, so applying one changes no Info.plist and needs no uicache (which closes
 # the running app); two, so a new picture goes into the set not on screen and the switch is a real change of name.
 OWN_SLOTS = ("a", "b")
+OWN_SIZES = (20, 29, 40, 60)  # every iPhone size the primary has: notifications, Settings, Spotlight, Home Screen
 
 
 def own_set(slot):
     return "Icon-own%s" % slot
 
 
-def own_stem(slot):
-    """The set's file stem: <stem>@2x.png and @3x.png in the app (60pt, as the themes' alternates)."""
-    return "IconOwn%s60x60" % slot.upper()
+def own_stem(slot, pt=60):
+    """A size's file stem: <stem>@2x.png and @3x.png in the app."""
+    return "IconOwn%s%dx%d" % (slot.upper(), pt, pt)
 
 
 def plist_block(indent="\t\t"):
@@ -170,8 +171,9 @@ def plist_block(indent="\t\t"):
     for name in sets():
         lines.append(indent + "\t<key>%s</key><dict><key>CFBundleIconName</key><string>%s</string></dict>" % (name, name))
     for slot in OWN_SLOTS:
-        lines.append(indent + "\t<key>%s</key><dict><key>CFBundleIconFiles</key><array><string>%s</string></array></dict>"
-                     % (own_set(slot), own_stem(slot)))
+        stems = "".join("<string>%s</string>" % own_stem(slot, pt) for pt in OWN_SIZES)
+        lines.append(indent + "\t<key>%s</key><dict><key>CFBundleIconFiles</key><array>%s</array></dict>"
+                     % (own_set(slot), stems))
     lines += [indent + "</dict>", indent + END]
     return "\n".join(lines)
 

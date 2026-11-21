@@ -1,7 +1,7 @@
 // F329: your own app icon: Move and Scale's crop maths and the stored list (screens/appicon.js).
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { cropStart, clampCrop, panCrop, zoomCrop, cropRect, readList, labelFor, picksOf, ownIconsOffered, OUT, ZOOM } from "./appicon.js";
+import { cropStart, clampCrop, panCrop, zoomCrop, cropRect, readList, labelFor, picksOf, missingPicks, dropMissing, ownIconsOffered, OUT, ZOOM } from "./appicon.js";
 import { createSettings, iconFor, isOwnIcon } from "../core/settings.js";
 
 const near = (a, b, msg) => assert.ok(Math.abs(a - b) < 1e-9, `${msg ?? ""} ${a} != ${b}`);
@@ -104,6 +104,13 @@ test("Light and Dark take an own icon; iconFor gives it; deleting it puts the pi
   assert.deepEqual(picksOf("ownabc", (k) => s.get(k)), ["darkIcon"]);
   s.set("lightIcon", "ownabc");
   assert.deepEqual(picksOf("ownabc", (k) => s.get(k)), ["lightIcon", "darkIcon"]);
+  // a pick the shell no longer keeps goes back to the theme's icon; kept ones stay
+  assert.deepEqual(missingPicks([{ name: "ownabc", label: "x" }], (k) => s.get(k)), []);
+  s.set("darkIcon", "owngone");
+  assert.deepEqual(missingPicks([{ name: "ownabc", label: "x" }], (k) => s.get(k)), ["darkIcon"]);
+  dropMissing(s, [{ name: "ownabc", label: "x" }]);
+  assert.equal(s.get("darkIcon"), "theme");
+  assert.equal(s.get("lightIcon"), "ownabc");
 });
 
 test("Add is offered in the jailbreak app only (Lite can't apply one yet), and never without a bridge", () => {

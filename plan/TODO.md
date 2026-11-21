@@ -44,7 +44,6 @@ parsed). Finish with `agent-runner done <ID> "msg"`.
 - [ ] **C56** (follow-up, low) Light palettes' App Store segmented control on tokens: palettes.css's .store-segmented / .store-segment rules (the four light palettes' block) become --seg* token values in the shared html[data-theme=light] block, as C49 did for the bar buttons and scope bar; no visible change in any palette (C49's probe.mjs + shots), palettes.test.js extended to forbid the rule; docs/eras.md drops it from 'Not yet clean'. | files: web/app/palettes.css, web/app/palettes.test.js, docs/eras.md
 - [ ] **F335** (follow-up, low) iOS 7 style: the undo bar after a row's swipe (nav/undobar.js) keeps the iOS 6 semi-transparent black bar and embossed white text; give it the flat iOS 7 toolbar look B230 gave the reload bar (--undo-bar / --undo-text / --undo-emboss in ios7.css). Its Undo button is already text-only since B230. | files: web/app/ios7.css
 - [ ] **F336** (follow-up, low) iOS 7 Settings > Theme's Mode at iOS 7's own 29pt segmented-control height (13px type, 4px corners) instead of the 44pt row: a --settings-seg-h hook in style.css read by settings.css, value in ios7.css | files: web/app/ios7.css, web/app/settings.css, web/app/style.css
-- [ ] **C59** (follow-up, low) Remove native/fake/fake-indexeddb.mjs: since T50b no test imports it (they use fakes.test-helper.js's fakeIndexedDB); check git grep finds no other user first | files: native/fake/fake-indexeddb.mjs
 
 ### Parked
 

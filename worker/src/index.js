@@ -63,6 +63,7 @@ import { NAME, GITHUB_REPO, DOMAIN } from "../../web/app/brand.js";
 import { githubApi, githubApiTarget } from "./github.js"; // F304
 import { blockedHost, REFUSED_CODE } from "./ssrf.js"; // B190
 import { limited } from "./limits.js"; // F312
+import { tweakIndex, isTweakIndexPath, scheduled as tweakIndexScheduled } from "./tweakindex.js"; // F344
 
 const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type" };
@@ -844,7 +845,11 @@ const token = () => [...crypto.getRandomValues(new Uint8Array(24))].map((b) => b
 
 export default {
   // F280: the Cron Trigger (wrangler.toml [triggers]): the push check (src/push.js), off without an APNs key.
-  async scheduled(event, env, ctx) { await pushScheduled(event, env, ctx); },
+  // F344: and the tweak index (src/tweakindex.js), off without the TWEAKS binding.
+  async scheduled(event, env, ctx) {
+    await pushScheduled(event, env, ctx);
+    await tweakIndexScheduled(event, env, ctx).catch((e) => console.log(`tweak index: ${e?.message ?? e}`));
+  },
   async fetch(req, env, ctx) {
     const u = new URL(req.url);
     const ttl = Math.max(60, Number(env.TTL) || 600);
@@ -854,6 +859,7 @@ export default {
     if (isUdidPath(u.pathname)) return udid(req, env); // F253: this iPhone's UDID via a profile (src/udid.js)
     if (isApplePath(u.pathname)) return appleRelay(req, env); // F251: Apple sign-in relay (src/apple-relay.js)
     if (isPushPath(u.pathname)) return push(req, env); // F280: push notifications (src/push.js)
+    if (isTweakIndexPath(u.pathname)) return tweakIndex(req, env, ctx); // F344: the tweak index (src/tweakindex.js)
     if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
     const over = await limited(req, u.pathname, env, { headers: SAFE }); // F312: /api/fetch, /sign/host, /sign/upload (src/limits.js)
     if (over) return over;

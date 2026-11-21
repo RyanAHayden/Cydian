@@ -12,7 +12,8 @@ server for two things, and this Worker is that server:
 
 Beside those it stores only what you send it for other features: iFizBox Account's encrypted blobs (KV, ciphertext
 only), package reviews (the `REVIEWS` D1 database, tokens and addresses hashed) and push devices with the sources
-they follow (the `PUSH` D1 database). It logs no request bodies. iFizBox uses `https://sign.ifizbox.com` unless you set your own.
+they follow (the `PUSH` D1 database). The tweak index (the `TWEAKS` D1 database) keeps only public facts about public
+Tweak Sources' packages, nothing about who asked. It logs no request bodies. iFizBox uses `https://sign.ifizbox.com` unless you set your own.
 
 ## Host your own (free, about a minute)
 
@@ -113,6 +114,7 @@ Then put that `https://` address in **Settings > Installation & Signing > Signin
 | `GET /apple/status` | `{"on":true}` with `APPLE_RELAY` on, else a 404 |
 | `/apple/<host>/<path>` | the Apple relay above: the free Apple ID hosts with `APPLE_RELAY` on, App Store Connect always |
 | `GET /repo/<file>` | iFizBox's own APT repo (`Release`, `Packages`, `Packages.gz`, `*.deb`): the latest GitHub release's asset, fetched here so clients get no redirect (Zebra can't take GitHub's). `IFIZBOX_REPO` (owner/name) for another repo's releases |
+| `GET /api/tweaks?source=<uri>&dist=<dist>[&components=a,b][&bundle=<id>]` | the tweak index (`src/tweakindex.js`): which app each tweak of that Tweak Source is for (`{enabled, source, pending, tweaks: [{package, version, ok, why, bundles, executables, anyApp, systemOnly, dylibs, needs}]}`), from each free tweak's .deb, downloaded once per version; `bundle` keeps that app's tweaks and the every-app ones. A source not seen before is added and read after the answer; the Cron Trigger reads the rest, `TWEAK_INDEX_PER_RUN` .debs a run (20). Kept in the `TWEAKS` D1 database (made on the first deploy); without it `{enabled: false}` and the app checks tweaks on the phone. `node.mjs` has none |
 
 `node test.mjs` checks them against an in-memory KV. ifizbox.com's own deploy: `npx wrangler deploy -c wrangler.ifizbox.toml`, run on release tags only by `tools/deploy.sh vX.Y.Z` (which `tools/publish.sh` runs after tagging; a push to main deploys nothing).
 

@@ -25,6 +25,8 @@ import { detectMode } from "../core/settings.js"; // F302
 import { debOf, tweakTitle, withTweaksText, tweakSteps, madeFor, tweakUpdates, ipaEncrypted, ENCRYPTED_ALERT, HOW_TO_GET_ONE,
   HOW_TO_TEXT, tweakParams } from "../core/tweaks.js"; // F302a
 import { BUNDLE_ID } from "../brand.js"; // F302a
+import { INDEX_PATH, INDEX_URL, indexSource, indexQuery, entryInfo, paidEntry, paidHint, liteTweaks, worksInLine } from "../core/tweakindex.js"; // F344
+import { appNameOf } from "../core/tweaks.js"; // F344
 import { loadStyle } from "../nav/motion.js";
 import { tweakListRow } from "./tweakrow.js"; // B267
 import { isCommercial, paymentEndpointUrl, parseEndpoint, createPaymentClient, createCredentialStore, isFreePrice,
@@ -212,6 +214,7 @@ const debKey = (st) => `${st?.package ?? ""}@${st?.version ?? ""}`;
 export const isDylibTweak = (st) => String(st?.["x-github-asset"] ?? "").trim().toLowerCase() === "dylib";
 const debName = (st) => `${st.package}_${st.version ?? "0"}.${isDylibTweak(st) ? "dylib" : "deb"}`;
 const debs = new Map(); // debKey -> Uint8Array, this session only (a few at most)
+const indexed = new Map(); // F344: debKey -> the shared index's verdict (entryInfo), this session only
 
 function infoStore(storage = globalThis.localStorage) {
   let map = {};
@@ -228,7 +231,12 @@ function infoStore(storage = globalThis.localStorage) {
   };
 }
 
-export function cachedTweakInfo(st, { storage } = {}) { return st?.package ? infoStore(storage).get(debKey(st)) : null; }
+// F344: the device's own check first, then the shared index's verdict (loadTweakIndex) for the same package and version.
+export function cachedTweakInfo(st, { storage } = {}) {
+  if (!st?.package) return null;
+  const k = debKey(st);
+  return infoStore(storage).get(k) ?? indexed.get(k) ?? null;
+}
 
 // B269: a Tweak Source's list rows without the tweaks whose .deb was checked on this device and can't go into an app
 // (for iOS itself, a library, a daemon…), so no row leads to that refusal again. Unchecked rows stay.
@@ -241,9 +249,22 @@ export function addableTweakRows(rows, { storage } = {}) {
 // id refused so far, so the list drops those rows; a failed download or a paid tweak counts as nothing (asked again
 // later). `stop()` -> true ends it (the page went away). -> the ids refused.
 export async function checkTweakRows(rows, { pkg = async (r) => (await (await import("../catalog.js")).catalog.package(r.id, r.key))?.stanza,
-  check = (st) => tweakInfo(st), onRefused = () => {}, stop = () => false, limit = 2, storage } = {}) {
-  const todo = (rows ?? []).filter((r) => r?.id && !cachedTweakInfo({ package: r.id, version: r.version }, { storage }));
+  check = (st) => tweakInfo(st), onRefused = () => {}, stop = () => false, limit = 2, storage, onChecked = () => {}, max = Infinity,
+  index = null } = {}) {
+  // F344: `index(rows)` first (loadRowsIndex: the shared index's verdicts), and the rows it refused dropped at once;
+  // onChecked(row, info) after every verdict; `max` rows at most (the rest wait for the next look)
   const refused = [];
+  if (index) {
+    await Promise.resolve().then(() => index(rows)).catch(() => 0);
+    const dev = infoStore(storage);
+    for (const r of rows ?? []) {
+      const k = debKey({ package: r?.id, version: r?.version });
+      const known = r?.id && !dev.get(k) ? indexed.get(k) : null;
+      if (known && !known.ok && !known.unverified) refused.push(r.id);
+    }
+    if (refused.length && !stop()) onRefused([...refused]);
+  }
+  const todo = (rows ?? []).filter((r) => r?.id && !cachedTweakInfo({ package: r.id, version: r.version }, { storage })).slice(0, max);
   let i = 0;
   const worker = async () => {
     while (i < todo.length && !stop()) {
@@ -253,6 +274,7 @@ export async function checkTweakRows(rows, { pkg = async (r) => (await (await im
         if (!st || stop()) continue;
         const info = await check(st);
         if (info && info.ok === false) { refused.push(r.id); onRefused([...refused]); }
+        if (info) onChecked(r, info);
       } catch { /* not downloaded or paid: left listed */ }
     }
   };
@@ -449,6 +471,9 @@ export async function tweakInfo(st, { fetchDeb = defaultFetchDeb, storage, paid 
   const store = infoStore(storage);
   const hit = store.get(debKey(st));
   if (hit) return hit;
+  // F344: the shared index already read this .deb and refused it: no download. A paid tweak's guess is never a verdict.
+  const known = indexed.get(debKey(st));
+  if (known && !known.ok && !known.unverified) return known;
   let info;
   // F304: a bare .dylib has no filter .plist to say which app it is for: it loads into whichever app it is put in.
   if (isDylibTweak(st)) info = { ok: true, why: null, bundles: [], anyApp: true };
@@ -458,8 +483,10 @@ export async function tweakInfo(st, { fetchDeb = defaultFetchDeb, storage, paid 
     else throw e; // a failed download is asked again next time
   }
   const kept = { v: INFO_V, ok: info.ok, why: info.why ?? null, bundles: info.bundles ?? [], anyApp: Boolean(info.anyApp),
-    ...(info.library ? { library: true } : {}) };
-  store.set(debKey(st), kept);
+    ...(info.library ? { library: true } : {}), ...(info.systemOnly ? { systemOnly: true } : {}) };
+  // F344: read again after the download: checks running side by side (checkTweakRows, checkForApp) would otherwise
+  // each write back the cache as it was when they started, and drop each other's verdicts
+  infoStore(storage).set(debKey(st), kept);
   return kept;
 }
 
@@ -621,17 +648,30 @@ export async function sourceTweakRows({ catalogMod = null } = {}) {
 }
 
 export function pickSourceTweak({ bundleId, onPick, rows = sourceTweakRows, pkg = async (r) => (await (await import("../catalog.js")).catalog.package(r.id, r.key))?.stanza,
-  alert = showAlert, storage, paid = null } = {}) {
+  alert = showAlert, storage, paid = null, lister = (o) => appTweakRows(bundleId, o), check = rows === sourceTweakRows ? checkForApp : null } = {}) {
   // B267: its own scroller under the fixed bar (sheet-scroll page-body, as Add Tweaks), Cydia's list rows (tweakrow.js)
   const body = el("div", "sheet-scroll page-body grouped tweak-pick tw-browse");
   const loading = el("div", "loading");
   loading.append(el("span", "loading-spinner"), el("span", null, "Loading Tweaks"));
   body.append(loading);
-  let close = () => {};
-  import("../nav/sheet.js").then(({ showSheet }) => { close = showSheet({ title: "Tweak Sources", body }); });
-  rows().then((list) => {
+  let close = () => {}, checking = null, closed = false;
+  import("../nav/sheet.js").then(({ showSheet }) => {
+    close = showSheet({ title: "Tweak Sources", body, onClose: () => { closed = true; checking?.stop(); } });
+  });
+  // F344: for an app, only the tweaks that work in it (its own, then every-app ones), from the shared index and the
+  // phone's checks; the unchecked ones are checked in the background and join as they pass. With no app, as before.
+  const listed = bundleId ? lister({ rows, storage }) : rows().then((list) => ({ rows: list }));
+  listed.then((l) => {
+    const render = () => draw(l.rows, bundleId ? liteTweaks(l.rows, bundleId, l.infoOf) : null, l.infoOf);
+    render();
+    if (bundleId && check && !closed) {
+      checking = check(l.rows, bundleId, { storage, onChecked: (r, info) => { if (info?.ok && !closed) render(); } });
+    }
+  }, (e) => { body.replaceChildren(el("p", "group-footer", String(e?.message ?? e))); });
+  function draw(list, lite, infoOf) {
     const made = [], rest = [];
-    for (const r of list) {
+    if (lite) { made.push(...lite.made); rest.push(...lite.any); }
+    else for (const r of list) {
       const info = cachedTweakInfo({ package: r.id, version: r.version }, { storage });
       if (info && !info.ok) continue;
       (info && targetsApp(info, bundleId) ? made : rest).push(r);
@@ -640,6 +680,7 @@ export function pickSourceTweak({ bundleId, onPick, rows = sourceTweakRows, pkg 
       const u = el("ul", "table grouped");
       for (const r of items) {
         const li = tweakListRow(r, { onClick: () => pick() });
+        if (lite && infoOf) worksSubtitle(li, infoOf(r)); // F344
         const b = li.firstChild;
         const pick = async () => {
           const st = await pkg(r).catch(() => null);
@@ -669,11 +710,14 @@ export function pickSourceTweak({ bundleId, onPick, rows = sourceTweakRows, pkg 
     };
     const groups = [];
     if (made.length) { const g = el("div", "group"); g.append(el("h2", "group-header", "Made for This App"), ul(made)); groups.push(g); }
-    if (rest.length) { const g = el("div", "group"); g.append(el("h2", "group-header", made.length ? "Other Tweaks" : "Tweaks"), ul(rest)); groups.push(g); }
-    const foot = el("p", "group-footer", list.length ? "Checked when you tap one: a tweak whose filter names this app goes in as it is."
-      : "No tweaks yet. Add a source under Tweak Sources (Sources tab), then Refresh.");
+    const restHead = lite ? "Works in Any App" : made.length ? "Other Tweaks" : "Tweaks";
+    if (rest.length) { const g = el("div", "group"); g.append(el("h2", "group-header", restHead), ul(rest)); groups.push(g); }
+    const foot = el("p", "group-footer", !list.length ? "No tweaks yet. Add a source under Tweak Sources (Sources tab), then Refresh."
+      : lite ? (made.length || rest.length ? "Only tweaks that work in this app are listed. More join once checked."
+        : "None of your sources' checked tweaks works in this app yet. More join once checked.")
+        : "Checked when you tap one: a tweak whose filter names this app goes in as it is.");
     body.replaceChildren(...groups, foot);
-  }, (e) => { body.replaceChildren(el("p", "group-footer", String(e?.message ?? e))); });
+  }
   return { close: () => close() };
 }
 
@@ -795,11 +839,133 @@ export async function keptTweakParams(params, job, { log = () => {}, store = twe
   return { ...params, tweaks: t };
 }
 
-// The source tweaks made for an app, from the checks cached on this device (a tweak never opened isn't counted).
-export async function madeForRows(bundleId, { rows = sourceTweakRows, storage } = {}) {
+// The source tweaks whose filter names an app, from the checks known on this device: its own and (F344) the shared
+// index's, once loaded. Every-app tweaks aren't counted here: they'd be "for" every app (appTweakRows lists them).
+export async function madeForRows(bundleId, { rows = sourceTweakRows, storage, index = rows === sourceTweakRows ? loadRowsIndex : null } = {}) {
   if (!bundleId) return [];
   const list = await rows().catch(() => []);
-  return madeFor(list, bundleId, (r) => cachedTweakInfo({ package: r.id, version: r.version }, { storage }));
+  if (index) await index(list).catch(() => 0);
+  // a paid tweak's guessed app (unverified) isn't counted: whether its source names a seller isn't asked here
+  const infoOf = (r) => { const i = cachedTweakInfo({ package: r.id, version: r.version }, { storage }); return i?.unverified ? null : i; };
+  return liteTweaks(list, bundleId, infoOf).made;
+}
+
+// ---- F344: the shared tweak index (worker/src/tweakindex.js, GET /api/tweaks) --------------------------------------
+//
+//   await loadTweakIndex(sources, { fetch })    each Tweak Source's verdicts from the index, kept for this session
+//                                               beside the device's own checks (cachedTweakInfo reads both); a source
+//                                               the index hasn't read yet gives nothing (the phone checks it). -> n
+//   await loadRowsIndex(rows)                   the same for the sources these catalog rows come from
+//   await sellerKeys(rows)                      the keys of the sources (among these rows') that name a seller
+//                                               (payment_endpoint): their paid tweaks may be listed
+//   rowInfo(row, { storage, sellers })          the verdict for a row: cached or indexed, else for a paid row of a
+//                                               selling source the guess from its name and description (unverified)
+//   await appTweakRows(bundleId, { … })         Add Tweaks for an app: { made, any, rows }: core/tweakindex.js
+//                                               liteTweaks over the Tweak Sources' rows; nothing unchecked, nothing for
+//                                               iOS itself or another app
+//   checkForApp(rows, bundleId, { onChecked })  the phone's own check of the rows nobody has checked yet, in the
+//                                               background, CHECK_MAX at most, the ones whose name or description
+//                                               names the app first; -> { done, stop() }
+//   worksSubtitle(li, info, known)              a list row's subtitle led by "Works in: <app>"
+const INDEX_FRESH_MS = 10 * 60 * 1000, INDEX_TIMEOUT_MS = 6000;
+export const CHECK_MAX = 24;
+const indexLoads = new Map(); // index source key -> { at, p }
+
+export function indexBase() {
+  const loc = globalThis.location;
+  // the site asks its own server (ifizbox.com or a self-hosted one); the app, ifizbox.com
+  if (!hasNativeCall() && loc && /^https?:$/.test(loc.protocol ?? "")) return new URL(INDEX_PATH, loc.href).href;
+  return INDEX_URL;
+}
+
+export async function loadTweakIndex(sources, { fetch: get = (u, o) => globalThis.fetch(u, o), base = null, timeout = INDEX_TIMEOUT_MS } = {}) {
+  let n = 0;
+  await Promise.all((sources ?? []).map(async (s) => {
+    const src = indexSource(s, s?.arch);
+    const q = src && indexQuery(src);
+    if (!q) return;
+    const had = indexLoads.get(src.key);
+    if (had && Date.now() - had.at < INDEX_FRESH_MS) { n += await had.p; return; }
+    const p = (async () => {
+      const ac = typeof AbortController === "function" ? new AbortController() : null;
+      const timer = setTimeout(() => ac?.abort(), timeout);
+      try {
+        const r = await get(`${base ?? indexBase()}?${q}`, ac ? { signal: ac.signal } : {});
+        if (!r?.ok) return 0;
+        const j = await r.json();
+        if (!j?.enabled || !Array.isArray(j.tweaks)) return 0;
+        let k = 0;
+        for (const e of j.tweaks) {
+          if (!e?.package) continue;
+          indexed.set(`${e.package}@${e.version ?? ""}`, { v: INFO_V, ...entryInfo(e) });
+          k++;
+        }
+        return k;
+      } catch { return 0; } finally { clearTimeout(timer); }
+    })();
+    indexLoads.set(src.key, { at: Date.now(), p });
+    p.then((k) => { if (!k) indexLoads.delete(src.key); }); // nothing yet: asked again next time
+    n += await p;
+  }));
+  return n;
+}
+
+async function rowSources(rows) {
+  const keys = new Set((rows ?? []).map((r) => r?.key).filter(Boolean));
+  if (!keys.size) return [];
+  const { getBackend } = await import("../backend.js");
+  return (await getBackend().sources()).filter((s) => keys.has(s.key));
+}
+
+export async function loadRowsIndex(rows, opts) { return loadTweakIndex(await rowSources(rows), opts); }
+
+export async function sellerKeys(rows, { sources = rowSources, text = null } = {}) {
+  const paidKeys = new Set((rows ?? []).filter((r) => r?.paid).map((r) => r.key).filter(Boolean));
+  if (!paidKeys.size) return new Set();
+  const list = (await sources(rows.filter((r) => r?.paid)).catch(() => [])).filter((s) => paidKeys.has(s.key));
+  const read = text ?? (async (u) => (await import("../backend.js")).getBackend().text(u));
+  const out = new Set();
+  await Promise.all(list.map(async (s) => { if (await endpointOf(s, read).catch(() => null)) out.add(s.key); }));
+  return out;
+}
+
+export function rowInfo(r, { storage, sellers = new Set() } = {}) {
+  const info = cachedTweakInfo({ package: r?.id, version: r?.version }, { storage });
+  const paid = Boolean(r?.paid) || Boolean(info?.paid);
+  if (paid && !sellers.has(r?.key)) return info?.unverified ? null : info; // no seller named: not offered
+  if (info) return info;
+  if (paid) return entryInfo(paidEntry({ package: r.id, version: r.version, name: r.name, description: r.short }));
+  return null;
+}
+
+export async function appTweakRows(bundleId, { rows = sourceTweakRows, storage, index = rows === sourceTweakRows ? loadRowsIndex : null,
+  sellers = rows === sourceTweakRows ? sellerKeys : async () => new Set() } = {}) {
+  const list = await rows().catch(() => []);
+  if (index) await index(list).catch(() => 0);
+  const sell = await sellers(list).catch(() => new Set());
+  const infoOf = (r) => rowInfo(r, { storage, sellers: sell });
+  return { ...liteTweaks(list, bundleId, infoOf), rows: list, infoOf };
+}
+
+export function checkForApp(rows, bundleId, { onChecked = () => {}, storage, max = CHECK_MAX, check, pkg, name = "" } = {}) {
+  let stopped = false;
+  const want = String(bundleId ?? "").toLowerCase();
+  const known = name ? { [bundleId]: name } : {}; // the app's own name too, for apps KNOWN_APPS doesn't list
+  const mentions = (r) => Boolean(want) && paidHint({ name: r.name, description: r.short }, known).some((id) => id.toLowerCase() === want);
+  const todo = (rows ?? []).filter((r) => r?.id && !r.paid && !cachedTweakInfo({ package: r.id, version: r.version }, { storage }));
+  todo.sort((a, b) => Number(Boolean(mentions(b))) - Number(Boolean(mentions(a))));
+  const done = checkTweakRows(todo, { storage, max, onChecked, stop: () => stopped, ...(check ? { check } : {}), ...(pkg ? { pkg } : {}) });
+  return { done, stop: () => { stopped = true; } };
+}
+
+export function worksSubtitle(li, info, known = {}) {
+  const line = worksInLine(info, known, appNameOf);
+  if (!line) return li;
+  const t = li.querySelector?.(".cell-text") ?? li.firstChild?.lastChild ?? null;
+  let sub = li.querySelector?.(".cell-subtitle") ?? null;
+  if (!sub && t) { sub = el("span", "cell-subtitle"); t.append(sub); }
+  if (sub) sub.textContent = [line, sub.textContent].filter(Boolean).join(" · ");
+  return li;
 }
 
 const keptHas = (kept, pkgId) => kept.some((x) => debOf(x.name)?.package === pkgId);
@@ -902,7 +1068,8 @@ export function showPushedPage({ title = "", back = "", body = null, onClose = (
 // The Add Tweaks sheet. `pkg(row)` -> the package's stanza (the catalog's).
 export function openAddTweaks({ bundleId, name = "", rows = sourceTweakRows, store = tweakStore, storage, fetchDeb, alert = showAlert,
   sheet = showActionSheet, show = null, pkg = async (r) => (await (await import("../catalog.js")).catalog.package(r.id, r.key))?.stanza,
-  browse = pickSourceTweak, onChange = () => {}, searchAll = openSearchAllRepos, paid = null } = {}) {
+  browse = pickSourceTweak, onChange = () => {}, searchAll = openSearchAllRepos, paid = null,
+  lister = (o) => appTweakRows(bundleId, o), check = rows === sourceTweakRows ? checkForApp : null } = {}) {
   style();
   return new Promise((resolve) => {
     // B186: the page's own scroller with the grouped pinstripes (page-body grouped, as Settings), so From Files scrolls
@@ -912,8 +1079,10 @@ export function openAddTweaks({ bundleId, name = "", rows = sourceTweakRows, sto
     loading.append(el("span", "loading-spinner"), el("span", null, "Loading Tweaks"));
     body.append(loading);
     const opened = show ?? showPushedPage;
-    opened({ title: "Add Tweaks", back: name, body, onClose: () => resolve() });
-    let made = [];
+    let checking = null, closed = false; // F344: the phone's own check of tweaks nobody has checked yet
+    opened({ title: "Add Tweaks", back: name, body, onClose: () => { closed = true; checking?.stop(); resolve(); } });
+    // F344: tweaks whose filter names this app, then the ones for every app; nothing else
+    let made = [], any = [], infoOf = () => null, listed = [];
     const input = Object.assign(el("input", "visually-hidden"), { type: "file", accept: TWEAK_ACCEPT, multiple: true });
     input.id = "tw" + Math.random().toString(36).slice(2);
     input.addEventListener("change", async () => {
@@ -993,11 +1162,13 @@ export function openAddTweaks({ bundleId, name = "", rows = sourceTweakRows, sto
     async function draw() {
       const kept = await savedTweaks(bundleId, { store });
       const groups = [];
-      if (made.length) {
-        // B267: Cydia's list rows (tweakrow.js: 29pt icon, version · author), the ADD button at the end
-        groups.push(group(`Made for ${name || "This App"}`, made.map((r) => tweakListRow(r, { right: addButton(r, keptHas(kept, r.id)) }))));
-      }
-      const others = kept.filter((x) => !made.some((r) => debOf(x.name)?.package === r.id));
+      // B267: Cydia's list rows (tweakrow.js: 29pt icon, version · author), the ADD button at the end; F344: led by
+      // "Works in: <app>"
+      const rowOf = (r) => worksSubtitle(tweakListRow(r, { right: addButton(r, keptHas(kept, r.id)) }), infoOf(r), { [bundleId]: name });
+      if (made.length) groups.push(group(`Made for ${name || "This App"}`, made.map(rowOf)));
+      if (any.length) groups.push(group("Works in Any App", any.map(rowOf)));
+      listed = [...made, ...any];
+      const others = kept.filter((x) => !listed.some((r) => debOf(x.name)?.package === r.id));
       if (others.length) {
         groups.push(group("Added", others.map((x) => cell(tweakTitle(x), tweakKind(x.name), null, async () => {
           const i = await sheet({ title: tweakTitle(x), buttons: ["Remove"], destructive: 0 });
@@ -1015,11 +1186,21 @@ export function openAddTweaks({ bundleId, name = "", rows = sourceTweakRows, sto
       const files = Object.assign(el("label", "cell-inner chevron ss-tweak-add"), { htmlFor: input.id });
       files.append(el("span", "cell-label", "From Files…"));
       filesLi.append(files, input);
-      groups.push(group(made.length || others.length ? "More Tweaks" : "Tweaks", [browseLi, searchLi, filesLi],
-        `Only tweaks that work without a jailbreak are listed. ${ELLEKIT.name} goes in for the ones that need it. They go into ${name || "the app"} the next time it's signed. ${searchAllFooter(name)}`));
+      groups.push(group(listed.length || others.length ? "More Tweaks" : "Tweaks", [browseLi, searchLi, filesLi],
+        `Only tweaks that work in ${name || "this app"} without a jailbreak are listed. ${ELLEKIT.name} goes in for the ones that need it. They go into ${name || "the app"} the next time it's signed. ${searchAllFooter(name)}`));
       body.replaceChildren(...groups);
     }
-    madeForRows(bundleId, { rows, storage }).then((m) => { made = m; }, () => {}).finally(() => draw());
+    lister({ rows, storage }).then((l) => {
+      ({ made, any, infoOf } = l);
+      // F344: the tweaks no index or earlier look has checked: checked here in the background, listed as they pass
+      if (check && !closed) {
+        checking = check(l.rows, bundleId, { storage, name, onChecked: (r, info) => {
+          if (!info?.ok) return;
+          const next = liteTweaks(l.rows, bundleId, infoOf);
+          if (next.made.length !== made.length || next.any.length !== any.length) { ({ made, any } = next); draw(); }
+        } });
+      }
+    }, () => {}).finally(() => draw());
   });
 }
 

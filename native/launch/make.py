@@ -60,6 +60,8 @@ def stops(*pairs):
 #   tab_line:   the tab bar's 1 pt top line as the storyboard can draw it: a colour view on the bar's second point
 #               (rrggbb, alpha), so a theme whose line is opaque has it 1 pt lower than the page (see the journal)
 #   tab_gloss:  the bar's 48 pt from 1 pt down; tab_base: the bar's colour under it and on its first point
+#   tab_shadow: the alpha the tab bar's 2.5 pt shadow starts at, when not 0.18 (White has none)
+# Besides Settings' palettes, the eras' own (core/settings.js STYLE_PALETTES): white (OLED Black is oled's set).
 CLASSIC_TAB = dict(tab_line=("ffffff", 0.1), tab_gloss=stops((0, "2f2f2f"), (0.495, "151515"), (0.495, "000000"),
                                                             (1, "000000")), tab_base="000000")
 THEMES = {
@@ -103,6 +105,12 @@ THEMES = {
                      nav_gloss=stops((0, "8a5530"), (1, "5a3218")), nav_shadow=0.18, **CLASSIC_TAB),
     "metal": dict(pins=("c6cbd2", "cbd0d6"), nav_line="6d737c", nav_hi=("ffffff", 1),
                   nav_gloss=stops((0, "eef0f3"), (1, "b9bec6")), nav_shadow=0.18, **CLASSIC_TAB),
+    # B231: iOS 7's White (web/app/ios7.css), the light theme of the iOS 7 and iOS 13 styles: a flat #efeff4 ground,
+    # flat #f7f7f7 bars with no highlight, gloss or shadows. Their .5 pt hairline (black at 30 %) is drawn as the
+    # storyboard's 1 pt line views, flattened over the bar: #adadad.
+    "white": dict(pins=("efeff4", "efeff4"), nav_line="adadad", nav_hi=("f7f7f7", 1),
+                  nav_gloss=stops((0, "f7f7f7"), (1, "f7f7f7")), nav_shadow=0, tab_line=("adadad", 1),
+                  tab_gloss=stops((0, "f7f7f7"), (1, "f7f7f7")), tab_base="f7f7f7", tab_shadow=0),
 }
 
 
@@ -182,7 +190,7 @@ def images(theme="classic"):
         out["LaunchNavBottom" + x] = nav_half(False, th["nav_gloss"])
         out["LaunchTabGloss" + x] = tab_gloss(s, th["tab_gloss"])
         out["LaunchNavShadow" + x] = shadow(s, True, th["nav_shadow"])
-        out["LaunchTabShadow" + x] = shadow(s, False)
+        out["LaunchTabShadow" + x] = shadow(s, False, th.get("tab_shadow", 0.18))
     return {k + ".png": v for k, v in out.items()}
 
 

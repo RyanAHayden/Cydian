@@ -826,7 +826,9 @@ export function applyTheme(doc = document, win = window) {
   // A preview pins the shell to the tone on screen (its status bar and keyboard follow the page) until it ends.
   // B221: the era's own light theme (iOS 7: White), not the iOS 6 pick, and dark status-bar text on a light bar.
   const lightPalette = themeState({ style, appearance: "light", lightTheme, darkTheme: darkPalette }, false).palette;
-  tellShell(preview ? theme : appearance, theme, win, darkPalette, lightPalette, DARK_TEXT_BARS.has(palette));
+  // B231: the dark one likewise (iOS 7: OLED Black, not the iOS 6 pick's ground).
+  const eraDark = themeState({ style, appearance: "dark", lightTheme, darkTheme: darkPalette }, true).palette;
+  tellShell(preview ? theme : appearance, theme, win, eraDark, lightPalette, DARK_TEXT_BARS.has(palette));
   // F323: the Home Screen icon follows, once the theme lists are left (a tap through them would switch it each time,
   // with iOS's alert in the sideload build); the icons the page shows follow at once.
   if (!preview) tellIcon(theme);

@@ -44,14 +44,17 @@ test("applyTheme posts app.theme to the bridge once per change", () => {
   assert.deepEqual(sent.at(-1).params, { style: "auto", theme: "dark", darkPalette: "gunmetal", lightPalette: "solarized" });
   settings.set("lightTheme", "classic");
   // B221: iOS 7 sends its White for the light launch ground, and dark status-bar text on White's bar
+  // B231: and its OLED Black for the dark one, whatever the iOS 6 dark pick (Gunmetal here)
   settings.set("style", "ios7");
   settings.set("appearance", "light");
   applyTheme(doc, win);
-  assert.deepEqual(sent.at(-1).params, { style: "light", theme: "light", darkPalette: "gunmetal", lightPalette: "white", statusBar: "dark" });
+  assert.deepEqual(sent.at(-1).params, { style: "light", theme: "light", darkPalette: "oled", lightPalette: "white", statusBar: "dark" });
   settings.set("appearance", "dark");
   applyTheme(doc, win);
-  assert.deepEqual(sent.at(-1).params, { style: "dark", theme: "dark", darkPalette: "gunmetal", lightPalette: "white" });
+  assert.deepEqual(sent.at(-1).params, { style: "dark", theme: "dark", darkPalette: "oled", lightPalette: "white" });
   settings.set("style", "ios6");
+  applyTheme(doc, win); // back in iOS 6, the pick again
+  assert.deepEqual(sent.at(-1).params, { style: "dark", theme: "dark", darkPalette: "gunmetal", lightPalette: "classic" });
   settings.set("appearance", "auto");
   // the site: no handler, no throw
   applyTheme(doc, { matchMedia: () => ({ matches: false }) });

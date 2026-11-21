@@ -32,6 +32,224 @@
   };
   try { Object.defineProperty(window, "localStorage", { value: store, configurable: true }); } catch (e) { /* kept */ }
 
+  // ---- IndexedDB: the browser's own where it opens. In an opaque origin (a sandboxed frame without
+  // allow-same-origin, iPhone Safari's data: tab) open() throws ("IDBFactory.open() called in an invalid security
+  // context" in Safari, SecurityError in Chromium), and the app's stores (sources, caches) never open: Sources
+  // empty, Home's tile Add a Source. From the first refusal on, an in-memory stand-in answers instead. It covers what
+  // web/app asks of IndexedDB (open with upgrades, object stores with an inline or out-of-line key, get, getAll,
+  // getAllKeys, put, add, delete, clear, count, transactions that complete or abort), and starts empty with each app
+  // load (a theme, device or mode change, Restart): the stores seed their defaults again.
+  function memoryIndexedDB() {
+    var dbs = new Map();
+    var later = function (f) { setTimeout(f, 0); };
+    var clone = function (v) { return v === undefined || typeof structuredClone !== "function" ? v : structuredClone(v); };
+    function domError(name, msg) { try { return new DOMException(msg, name); } catch (e) { var x = new Error(msg); x.name = name; return x; } }
+    function thrownLater(e) { setTimeout(function () { throw e; }, 0); } // an app handler's exception: reported, the run goes on
+    // calls target.on<type>(event); true when the handler called preventDefault()
+    function fire(target, type, extra) {
+      var prevented = false;
+      var ev = Object.assign({ type: type, target: target, currentTarget: target,
+        preventDefault: function () { prevented = true; }, stopPropagation: function () {} }, extra || {});
+      var f = target["on" + type];
+      if (typeof f === "function") { try { f.call(target, ev); } catch (e) { thrownLater(e); } }
+      return prevented;
+    }
+    function nameList(keys) {
+      var list = Array.from(keys).sort();
+      list.contains = function (n) { return list.indexOf(String(n)) >= 0; };
+      list.item = function (i) { return list[i] ?? null; };
+      return list;
+    }
+    // IndexedDB's key order: numbers, then dates, then strings (the keys web/app uses)
+    function rank(k) { return typeof k === "number" ? 1 : k instanceof Date ? 2 : 3; }
+    function cmp(a, b) {
+      var ra = rank(a), rb = rank(b);
+      if (ra !== rb) return ra - rb;
+      if (ra === 2) { a = a.getTime(); b = b.getTime(); }
+      return a < b ? -1 : a > b ? 1 : 0;
+    }
+    function validKey(k) { return (typeof k === "number" && !isNaN(k)) || typeof k === "string" || (k instanceof Date && !isNaN(k.getTime())); }
+    function sortedKeys(rows) { return Array.from(rows.keys()).sort(cmp); }
+    function inRange(k, q) { return q === undefined || q === null || cmp(k, q) === 0; }
+
+    function makeTx(rec, db, scope, mode) {
+      var tx = { mode: mode, db: db, error: null, oncomplete: null, onerror: null, onabort: null,
+        get objectStoreNames() { return nameList(scope || rec.stores.keys()); } };
+      var pending = 0, done = false, after = [];
+      // a readwrite transaction undoes its writes when it aborts
+      var saved = mode === "readonly" ? null : new Map();
+      function save(name) { if (saved && !saved.has(name)) saved.set(name, new Map(rec.stores.get(name).rows)); }
+      function end(type) {
+        if (done) return;
+        done = true;
+        if (type === "abort" && saved) saved.forEach(function (rows, name) { var s = rec.stores.get(name); if (s) s.rows = rows; });
+        fire(tx, type);
+        after.forEach(function (f) { f(type); });
+      }
+      function settle() { later(function () { if (!pending) end("complete"); }); }
+      tx._after = function (f) { after.push(f); };
+      tx.abort = function () { if (done) throw domError("InvalidStateError", "The transaction has finished."); end("abort"); };
+      function request(f, write, storeName) {
+        if (done) throw domError("TransactionInactiveError", "The transaction has finished.");
+        if (write && mode === "readonly") throw domError("ReadOnlyError", "The transaction is read-only.");
+        var r = { result: undefined, error: null, readyState: "pending", transaction: tx, onsuccess: null, onerror: null };
+        pending++;
+        later(function () {
+          if (done) return;
+          try {
+            if (write) save(storeName);
+            r.result = f();
+            r.readyState = "done";
+            fire(r, "success");
+          } catch (e) {
+            r.error = e;
+            r.readyState = "done";
+            if (!fire(r, "error")) { tx.error = e; fire(tx, "error"); end("abort"); }
+          }
+          pending--;
+          settle();
+        });
+        return r;
+      }
+      tx.objectStore = function (name) {
+        if (done) throw domError("InvalidStateError", "The transaction has finished.");
+        name = String(name);
+        var s = rec.stores.get(name);
+        if (!s || (scope && scope.indexOf(name) < 0)) throw domError("NotFoundError", "No object store named " + name + ".");
+        var keyFor = function (value, key) {
+          var k = s.keyPath ? (value == null ? undefined : value[s.keyPath]) : key;
+          if (s.keyPath && key !== undefined) throw domError("DataError", "The store has a key path: no key argument.");
+          if (!validKey(k)) throw domError("DataError", "No valid key for " + name + ".");
+          return k;
+        };
+        var write = function (value, key, isAdd) {
+          var k = keyFor(value, key), v = clone(value); // checked and cloned at the call, as IndexedDB does
+          return request(function () {
+            if (isAdd && s.rows.has(k)) throw domError("ConstraintError", "A record with this key exists in " + name + ".");
+            s.rows.set(k, v);
+            return k;
+          }, true, name);
+        };
+        var limit = function (list, count) { return count > 0 ? list.slice(0, count) : list; };
+        return {
+          name: name, keyPath: s.keyPath, transaction: tx, autoIncrement: false, indexNames: nameList([]),
+          get: function (k) { return request(function () { return clone(s.rows.get(k)); }); },
+          getAll: function (q, count) {
+            return request(function () { return limit(sortedKeys(s.rows).filter(function (k) { return inRange(k, q); }), count).map(function (k) { return clone(s.rows.get(k)); }); });
+          },
+          getAllKeys: function (q, count) {
+            return request(function () { return limit(sortedKeys(s.rows).filter(function (k) { return inRange(k, q); }), count); });
+          },
+          count: function (q) { return request(function () { return sortedKeys(s.rows).filter(function (k) { return inRange(k, q); }).length; }); },
+          put: function (value, key) { return write(value, key, false); },
+          add: function (value, key) { return write(value, key, true); },
+          delete: function (k) { return request(function () { s.rows.delete(k); return undefined; }, true, name); },
+          clear: function () { return request(function () { s.rows.clear(); return undefined; }, true, name); },
+        };
+      };
+      settle(); // a transaction nobody asks anything of still completes
+      return tx;
+    }
+
+    function makeDb(rec) {
+      var db = { name: rec.name, onversionchange: null, onclose: null, onabort: null, onerror: null,
+        get version() { return rec.version; },
+        get objectStoreNames() { return nameList(rec.stores.keys()); } };
+      db.createObjectStore = function (name, opts) {
+        if (!rec.upgrade) throw domError("InvalidStateError", "Object stores are made only in onupgradeneeded.");
+        name = String(name);
+        if (rec.stores.has(name)) throw domError("ConstraintError", "An object store named " + name + " exists.");
+        rec.stores.set(name, { keyPath: (opts && opts.keyPath) || null, rows: new Map() });
+        return rec.upgrade.objectStore(name);
+      };
+      db.deleteObjectStore = function (name) {
+        if (!rec.upgrade) throw domError("InvalidStateError", "Object stores are removed only in onupgradeneeded.");
+        if (!rec.stores.delete(String(name))) throw domError("NotFoundError", "No object store named " + name + ".");
+      };
+      db.transaction = function (names, mode) {
+        if (db._closed) throw domError("InvalidStateError", "The database connection is closed.");
+        var scope = [].concat(names).map(String);
+        if (!scope.length) throw domError("InvalidAccessError", "A transaction needs an object store.");
+        scope.forEach(function (n) { if (!rec.stores.has(n)) throw domError("NotFoundError", "No object store named " + n + "."); });
+        return makeTx(rec, db, scope, mode === "readwrite" ? "readwrite" : "readonly");
+      };
+      db.close = function () { db._closed = true; };
+      db.addEventListener = db.removeEventListener = function () {};
+      return db;
+    }
+
+    return {
+      open: function (name, version) {
+        if (version !== undefined && !(Number.isInteger(version) && version >= 1)) throw new TypeError("The version must be a whole number from 1.");
+        name = String(name);
+        var req = { result: undefined, error: null, readyState: "pending", transaction: null, source: null,
+          onsuccess: null, onerror: null, onupgradeneeded: null, onblocked: null };
+        later(function () {
+          var rec = dbs.get(name), old = rec ? rec.version : 0;
+          var v = version === undefined ? (old || 1) : version;
+          if (v < old) {
+            req.readyState = "done";
+            req.error = domError("VersionError", "The database " + name + " is at version " + old + ".");
+            fire(req, "error");
+            return;
+          }
+          if (!rec) { rec = { name: name, version: 0, stores: new Map(), upgrade: null }; dbs.set(name, rec); }
+          var db = makeDb(rec);
+          req.result = db;
+          var succeed = function () { req.readyState = "done"; req.transaction = null; fire(req, "success"); };
+          if (v === old) { succeed(); return; }
+          var stores = new Map(rec.stores);
+          rec.version = v;
+          rec.upgrade = makeTx(rec, db, null, "versionchange");
+          req.transaction = rec.upgrade;
+          rec.upgrade._after(function (type) {
+            rec.upgrade = null;
+            if (type === "complete") { succeed(); return; }
+            rec.version = old; // an aborted upgrade leaves the database as it was
+            rec.stores = stores;
+            if (!old) dbs.delete(name);
+            req.readyState = "done";
+            req.error = domError("AbortError", "The upgrade was aborted.");
+            req.result = undefined;
+            fire(req, "error");
+          });
+          fire(req, "upgradeneeded", { oldVersion: old, newVersion: v });
+        });
+        return req;
+      },
+      deleteDatabase: function (name) {
+        var req = { result: undefined, error: null, readyState: "pending", onsuccess: null, onerror: null, onblocked: null };
+        later(function () { dbs.delete(String(name)); req.readyState = "done"; fire(req, "success", { oldVersion: 0, newVersion: null }); });
+        return req;
+      },
+      databases: function () { return Promise.resolve(Array.from(dbs.values()).map(function (r) { return { name: r.name, version: r.version }; })); },
+      cmp: function (a, b) { var c = cmp(a, b); return c < 0 ? -1 : c > 0 ? 1 : 0; },
+      memory: true,
+    };
+  } // end memoryIndexedDB (tools/concept/idb.test.mjs runs it on its own under web/app's stores)
+  (function () {
+    var real = null;
+    try { real = window.indexedDB || null; } catch (e) { /* refused outright: the stand-in from the start */ }
+    var memory = null;
+    var stand = function () { return (memory = memory || memoryIndexedDB()); };
+    var refused = function (e) { return e && (e.name === "SecurityError" || /security context/i.test(String(e.message))); };
+    // the real factory until it refuses; then the stand-in for every call after
+    var use = function (method, args) {
+      if (!memory && real) {
+        try { return real[method].apply(real, args); } catch (e) { if (!refused(e)) throw e; }
+      }
+      return stand()[method].apply(stand(), args);
+    };
+    var factory = {
+      open: function () { return use("open", arguments); },
+      deleteDatabase: function () { return use("deleteDatabase", arguments); },
+      databases: function () { return memory || !real || !real.databases ? stand().databases() : real.databases(); },
+      cmp: function (a, b) { return real ? real.cmp(a, b) : stand().cmp(a, b); },
+      get memory() { return Boolean(memory); }, // for tools/concept/check.mjs: true once the stand-in answers
+    };
+    try { Object.defineProperty(window, "indexedDB", { value: factory, configurable: true }); } catch (e) { /* kept */ }
+  })();
+
   // ---- the device: an iPhone (or iPad) user agent, touch, safe areas
   var ua = C.device.ipad
     ? "Mozilla/5.0 (iPad; CPU OS 18_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Mobile/15E148 Safari/604.1"
@@ -41,6 +259,10 @@
     try { Object.defineProperty(navigator, k, { get: function () { return nav[k]; }, configurable: true }); } catch (e) { /* kept */ }
   });
   try { Object.defineProperty(window, "Worker", { value: undefined, configurable: true, writable: true }); } catch (e) { /* kept */ }
+  // an opaque origin throws SecurityError on reading navigator.serviceWorker (app.js reads it): none there instead
+  try { void navigator.serviceWorker; } catch (e) {
+    try { Object.defineProperty(navigator, "serviceWorker", { value: undefined, configurable: true }); } catch (e2) { /* kept */ }
+  }
   function setSafeArea(sa) {
     var s = document.documentElement.style;
     ["top", "right", "bottom", "left"].forEach(function (k) { s.setProperty("--sa-" + k, (sa[k] || 0) + "px"); });

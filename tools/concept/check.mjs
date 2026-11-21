@@ -16,6 +16,9 @@
 // top rubber-bands and springs back; a drag from the left edge goes back; on Sources a left drag shows a row's
 // Delete, a tap puts it away and a hold shows the row's menu. Then the device changes to another size and back with the app running, and
 // window error events count as errors too, in the page and in the phone (ResizeObserver's loop warning is one).
+// Last, the page is served once more sandboxed (an opaque origin, where IndexedDB's open() throws) and each mode
+// checks that the phone came up on the shell's in-memory IndexedDB, Sources lists its sources and Home's tile isn't
+// Add a Source.
 //
 // Exit 0: every run clean; 1: an error or a failed check (listed); 2: Chromium didn't start.
 import { spawn } from "node:child_process";
@@ -46,10 +49,14 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const CSP = ["default-src 'none'", "script-src 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com https://cdn.tailwindcss.com https://code.jquery.com",
   "style-src 'unsafe-inline' https://fonts.googleapis.com", "font-src https://fonts.gstatic.com data:", "img-src data: blob:", "media-src data: blob:",
   "connect-src 'none'", "frame-src 'self' blob: data:", "worker-src blob:"].join("; ");
+// /sandboxed: the same page in an opaque origin (CSP sandbox without allow-same-origin), as iPhone Safari's data: tab
+// and any sandboxed viewer frame give it: IndexedDB's open() throws there (shell.js stands in for it).
+const SANDBOX_CSP = CSP + "; sandbox allow-scripts allow-forms allow-popups allow-modals";
 const page = await readFile(PAGE);
 const stray = [];
 const server = createServer((req, res) => {
   if (req.url === "/" || req.url.startsWith("/?")) { res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Content-Security-Policy": CSP }).end(page); return; }
+  if (req.url === "/sandboxed") { res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Content-Security-Policy": SANDBOX_CSP }).end(page); return; }
   stray.push(req.url);
   res.writeHead(404).end();
 });
@@ -82,7 +89,25 @@ const ev = async (expr) => {
   if (r.result?.exceptionDetails) throw new Error("eval: " + (r.result.exceptionDetails.exception?.description ?? r.result.exceptionDetails.text));
   return r.result?.result?.value;
 };
-const inApp = (body) => ev(`(() => { const d = document.getElementById("app").contentDocument; const w = document.getElementById("app").contentWindow; ${body} })()`);
+// In an opaque origin (the /sandboxed pass) the phone's frame is cross-origin to the page (no contentDocument), so
+// its body runs in the frame's own execution context: the newest default one that isn't the top frame's.
+const contexts = [];
+let topFrame = null, sandboxed = false;
+ws.addEventListener("message", (e) => {
+  const m = JSON.parse(e.data);
+  if (m.method === "Runtime.executionContextCreated" && m.params.context.auxData?.isDefault) contexts.push(m.params.context);
+  if (m.method === "Runtime.executionContextDestroyed") { const i = contexts.findIndex((c) => c.id === m.params.executionContextId); if (i >= 0) contexts.splice(i, 1); }
+  if (m.method === "Runtime.executionContextsCleared") contexts.length = 0;
+});
+const inFrame = async (body) => {
+  const c = contexts.filter((x) => x.auxData.frameId !== topFrame).at(-1);
+  if (!c) throw new Error("no frame context");
+  const r = await send("Runtime.evaluate", { expression: `(() => { const d = document, w = window; ${body} })()`, contextId: c.id, awaitPromise: true, returnByValue: true });
+  if (r.result?.exceptionDetails) throw new Error("eval: " + (r.result.exceptionDetails.exception?.description ?? r.result.exceptionDetails.text));
+  return r.result?.result?.value;
+};
+const inApp = (body) => sandboxed ? inFrame(body) :
+  ev(`(() => { const d = document.getElementById("app").contentDocument; const w = document.getElementById("app").contentWindow; ${body} })()`);
 const until = async (expr, ms) => { const end = Date.now() + ms; while (Date.now() < end) { try { if (await inApp(expr)) return true; } catch {} await sleep(150); } return false; };
 
 await send("Page.enable"); await send("Runtime.enable"); await send("Log.enable");
@@ -317,6 +342,43 @@ for (const mode of MODES) {
       check(!stray.length, `${name}: no requests besides the page` + (stray.length ? ": " + stray.slice(0, 5).join(" ") : ""));
     }
   }
+}
+// Once more in an opaque origin (/sandboxed), one run per mode at the first device and the default theme: the app
+// still keeps its sources (IndexedDB refused there: B210 saw "IDBFactory.open() called in an invalid security
+// context" on Sources and Add a Source on Home's tile).
+topFrame = (await send("Page.getFrameTree")).result.frameTree.frame.id;
+sandboxed = true;
+await send("Page.navigate", { url: base + "sandboxed" });
+await sleep(800);
+for (const mode of MODES) {
+  errors = [];
+  stray.length = 0;
+  const name = `sandboxed-${mode}-${DEVICES[0]}`;
+  await ev(`document.getElementById("mode-${mode}").click()`);
+  await set("device", DEVICES[0]);
+  await ev(`document.getElementById("startpage").click()`);
+  await sleep(300);
+  if (!check(await until(`return d.querySelector(".page") && !d.getElementById("boot")`, 15000), `${name}: the app came up`)) continue;
+  const origin = await inApp("return w.origin");
+  check(origin === "null", `${name}: the phone runs in an opaque origin (${origin})`);
+  const memory = await inApp("return w.indexedDB.memory");
+  check(memory === true, `${name}: the shell's in-memory IndexedDB answers (${memory})`);
+  await sleep(1200);
+  await inApp(`w.location.hash = "#/sources"`);
+  const rows = await until(`return d.querySelectorAll(".page.is-top .source-row[data-url]").length`, 10000);
+  const seen = await inApp(`const t = d.querySelector(".page.is-top")?.textContent ?? ""; return { rows: d.querySelectorAll(".page.is-top .source-row[data-url]").length,
+    refused: /security context|IndexedDB|IDBFactory/i.test(t) }`);
+  check(rows && !seen.refused, `${name}: Sources lists its sources (${seen.rows} rows${seen.refused ? "; shows an IndexedDB refusal" : ""})`);
+  await inApp(`w.location.hash = "#/home"`);
+  await sleep(1500);
+  const tile = await inApp(`return [...d.querySelectorAll(".page.is-top .home a, .page.is-top .home button")].map((e) => e.textContent.trim()).find((t) => /^Add a Source$/.test(t)) ?? null`);
+  check(!tile, `${name}: Home's tile isn't Add a Source`);
+  for (const m of (await ev("window.__conceptErrors.splice(0)")) ?? []) errors.push("page: " + m);
+  for (const m of (await inApp("return (w.__conceptErrors || []).splice(0)")) ?? []) errors.push("phone: " + m);
+  const own = await ev(`document.getElementById("errors").textContent`);
+  if (own) errors.push("shell: " + own);
+  check(!errors.length, `${name}: no errors` + (errors.length ? "\n      " + [...new Set(errors)].slice(0, 8).join("\n      ") : ""));
+  check(!stray.length, `${name}: no requests besides the page` + (stray.length ? ": " + stray.slice(0, 5).join(" ") : ""));
 }
 await cleanup();
 console.log(failures.length ? `concept check: ${failures.length} failed` : "concept check: all clean");

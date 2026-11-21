@@ -442,6 +442,7 @@ html[data-style="ios7"] .alert-button,
 html[data-style="ios7"] .alert-button.cancel,
 html[data-style="ios7"] .alert-button.green,
 html[data-style="ios7"] .alert-button.red,
+html[data-style="ios7"] .alert-button.blue,
 html[data-style="ios7"] .alert-button:disabled {
   border: 0; border-radius: 0; box-shadow: inset 0 .5px 0 var(--i7-alert-line); text-shadow: none; background: none;
   font-size: 17px; font-weight: 400; color: var(--i7-tint);

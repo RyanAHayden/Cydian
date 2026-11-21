@@ -329,6 +329,12 @@ test("F333: ios7.css draws the kit's alert, action sheet, menu, counts and keyli
   assert.match(alert, /box-shadow: none/);
   assert.match(rule('html[data-style="ios7"] .alert-button'), /background: none[\s\S]*font-size: 17px; font-weight: 400; color: var\(--i7-tint\)/);
   assert.match(rule('html[data-style="ios7"] .alert-button:last-child:not(.cancel)'), /font-weight: 600/);
+  // the Too Big alert's Download IPA (altstore.css .alert-button.blue, iOS 6's gloss) is flat tinted text too, in
+  // both tones (the rule's colours are tone tokens), and pressed takes the same highlight as the others
+  for (const kind of ["cancel", "green", "red", "blue"]) {
+    assert.match(rule(`html[data-style="ios7"] .alert-button.${kind}`), /border: 0;[\s\S]*background: none[\s\S]*color: var\(--i7-tint\)/, kind);
+  }
+  assert.match(rule('html[data-style="ios7"] .alert-button.is-pressed'), /background: var\(--i7-alert-pressed\)/);
   assert.match(rule('html[data-style="ios7"] .action-button'), /font-size: 21px; font-weight: 400; border-radius: 3px/);
   assert.match(ios7, /--action-btn: #f3f3f3;/);
   assert.match(ios7, /--action-cancel: #ebebeb;/);

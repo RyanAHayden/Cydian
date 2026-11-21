@@ -396,7 +396,8 @@ html[data-style="ios7"] .plain .cell { /* longhands: a row's own background colo
   border-bottom-width: 0;
   background-image: var(--i7-keyline); background-position: 15px 0; background-size: calc(100% - 15px) 100%; background-repeat: no-repeat;
 }
-html[data-style="ios7"] .plain .cell:has(> .cell-inner > .cell-icon) {
+html[data-style="ios7"] .plain .cell:has(> .cell-inner > .cell-icon),
+html[data-style="ios7"] .sources-list .all-sources-row { /* the Sources tab's folder, 29pt like a source's icon */
   background-position: calc(15px + 29px + var(--cell-gap)) 0;
   background-size: calc(100% - 15px - 29px - var(--cell-gap)) 100%;
 }

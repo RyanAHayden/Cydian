@@ -1,12 +1,14 @@
 // F236: this iPhone, for "This iPhone is in the profile" (native/sign/DeviceCheck.swift). No configuration profile:
 //   jailbreak build   `ifizbox-helper udid` (MobileGestalt's UniqueDeviceID, as root; Paid.udid in the app if it fails)
 //   sideload build    the app's own embedded.mobileprovision: one device is this phone's UDID, several a set it is in
-// Read once and kept: neither changes while the app runs.
+// Read once and kept: neither changes while the app runs. A UDID lockdown or the website gave is kept in UserDefaults
+// and the Keychain (B284), so a delete + reinstall still knows it.
 //
-//   device.udid   -> {udid | null, candidates: [udid], source: "helper" | "profile" | null}   (every build)
+//   device.udid   -> {udid | null, candidates: [udid], source: "helper" | "lockdown" | "profile" | null}   (every build)
 //   device.udid.set {udid} -> as device.udid: the UDID the website's Profile Service visit found, kept as a paired one
 // SPDX-License-Identifier: GPL-3.0-or-later
 import Foundation
+import Security
 
 enum PhoneID {
     private static let lock = NSLock()
@@ -27,7 +29,40 @@ enum PhoneID {
         let u = udid.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
         guard !u.isEmpty else { return }
         UserDefaults.standard.set(u, forKey: udidKey)
+        keepUDID(u)
         lock.lock(); known = .some(.udid(u)); lock.unlock()
+    }
+
+    // B284: the paired UDID also goes in the Keychain (beside B276's signing items), as UserDefaults goes with the
+    // container: after a delete + reinstall, This iPhone reads it back at launch without using the pairing first.
+    // Not a secret; this device only, in iFizBox's own group.
+    static let keepService = "com.ryha.ifizbox.phone", keepAccount = "udid"
+    static var keepQuery: [String: Any] {
+        [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: keepService,
+         kSecAttrAccount as String: keepAccount]
+    }
+    static func keptUDID() -> String? {
+        var q = keepQuery
+        q[kSecReturnData as String] = true
+        q[kSecMatchLimit as String] = kSecMatchLimitOne
+        var out: CFTypeRef?
+        guard SecItemCopyMatching(q as CFDictionary, &out) == errSecSuccess, let d = out as? Data,
+              let u = String(data: d, encoding: .utf8), !u.isEmpty else { return nil }
+        return u
+    }
+    // A refusal is logged, never thrown: the UserDefaults copy still works until the next reinstall.
+    static func keepUDID(_ u: String) {
+        if keptUDID() == u { return }
+        let data = Data(u.utf8)
+        var st = SecItemUpdate(keepQuery as CFDictionary, [kSecValueData as String: data] as CFDictionary)
+        if st == errSecItemNotFound {
+            var add = OwnKeychain.scoped(keepQuery)
+            add[kSecValueData as String] = data
+            add[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+            add[kSecAttrLabel as String] = "\(Brand.name) phone UDID"
+            st = SecItemAdd(add as CFDictionary, nil)
+        }
+        if st != errSecSuccess { NSLog("\(Brand.name) keychain refused the phone UDID (\(st))") }
     }
     static var udid: String? { if case .udid(let u)? = current() { return u }; return nil }
 
@@ -48,7 +83,14 @@ enum PhoneID {
             }
             return .udid(line)
         }
-        if let u = UserDefaults.standard.string(forKey: udidKey) { return .udid(u) }
+        // B284: a container that has it while the Keychain doesn't (paired before B284) puts it there; a fresh
+        // container (deleted and reinstalled) gets it back from there.
+        if let u = UserDefaults.standard.string(forKey: udidKey) { keepUDID(u); return .udid(u) }
+        if let u = keptUDID() {
+            UserDefaults.standard.set(u, forKey: udidKey)
+            NSLog("\(Brand.name): phone UDID restored from the keychain")
+            return .udid(u)
+        }
         let embedded = Bundle.main.url(forResource: "embedded", withExtension: "mobileprovision").flatMap { try? Data(contentsOf: $0) }
         return DeviceCheck.phone(fromEmbedded: embedded)
     }

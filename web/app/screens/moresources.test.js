@@ -20,6 +20,7 @@ const { format } = await import("../router.js");
 const { rowIcon } = await import("../icons/rowicons.js");
 const { RECOMMENDED_SOURCES, recommendedGroups, shortWhy, recGroupOf } = await import("../core/recommended.js");
 const { sourceWarning } = await import("../core/warnings.js");
+const { APP_SOURCE_DIRECTORY } = await import("../core/appsources.js");
 
 const labels = (el) => el.querySelectorAll(".cell-label").map((n) => n.textContent);
 const headers = (el) => el.querySelectorAll(".group-header").map((n) => n.textContent);
@@ -94,13 +95,19 @@ test("F327: Not Jailbroken: no Find Tweak Sources and no Tweak Sources group, on
   assert.deepEqual(more.findRows({ tweaks: false }).map((r) => r.label), ["Find App Sources"]);
 });
 
-test("F327: Find App Sources lists the recommended app sources not added yet, in From the Developer / Modded Apps", async () => {
+test("B272: Find App Sources lists Recommended's app sources and the directory's, in From the Developer / Modded Apps", async () => {
   const { body, bar } = await draw({ tab: "sources", path: ["more", "apps"] });
   assert.equal(bar.title, "App Sources");
   const names = body.querySelectorAll(".rec-more-row .cell-label").map((n) => n.textContent);
-  const apps = RECOMMENDED_SOURCES.filter((r) => !r.jailbreak).map((r) => r.name);
+  const apps = [...RECOMMENDED_SOURCES.filter((r) => !r.jailbreak), ...APP_SOURCE_DIRECTORY].map((r) => r.name);
   assert.ok(names.length > 0 && names.every((n) => apps.includes(n)), names.join(", "));
-  assert.ok(body.querySelectorAll(".rec-more-row .price-btn").every((b) => b.textContent === "ADD"), "none added yet");
+  for (const r of [...RECOMMENDED_SOURCES.filter((x) => !x.jailbreak), ...APP_SOURCE_DIRECTORY]) assert.ok(names.includes(r.name), r.name);
+  // added ones stay, with ADDED (this file's other tests add some); the rest say ADD (findappsources.test.js checks
+  // which is which)
+  const btns = body.querySelectorAll(".rec-more-row .price-btn").map((b) => b.textContent);
+  assert.equal(btns.length, names.length);
+  assert.ok(btns.every((t) => t === "ADD" || t === "ADDED"), btns.join(", "));
+  assert.ok(btns.includes("ADD"));
   assert.deepEqual(headers(body), ["From the Developer", "Modded Apps"]);
 });
 

@@ -3,7 +3,8 @@
 // tab's Tweak Sources group (the sideload app; Individual Sources where the device is jailbroken) and from Manage.
 //
 //   #/sources/manage/find          search bar (Search Repos), Popular on Canister (tiers 1 and 2, most packages first)
-//                                  or the search's results, a round Add on each; Other Directories: ios-repo-updates.com
+//                                  or the search's results, ADD / ADDED on each (More Sources' price button), Add All
+//                                  in the nav bar (B272: addAllListed); Other Directories: ios-repo-updates.com
 //                                  (opens in the browser, "Not checked by <name>"); footer crediting Canister
 //   #/sources/manage/find/<slug>   one repo: Trust (Label, Why, HTTPS, Signed Releases), Packages (Tweaks for
 //                                  Sideloaded Apps in the sideload app, All Packages), Add in the nav bar
@@ -20,6 +21,8 @@
 import { el, plain, grouped, note, placeholder } from "../nav/ui.js";
 import { searchBar, pinned } from "../nav/searchbar.js";
 import { showAlert } from "../nav/alert.js";
+import { showActionSheet } from "../nav/actionsheet.js";
+import { liveHUD } from "../nav/hud.js";
 import { format } from "../router.js";
 import { getBackend } from "../backend.js";
 import { NAME } from "../brand.js";
@@ -63,7 +66,7 @@ export const repoHref = (repo) => here(remember(repo)?.slug ?? "");
 
 export function nav(route, ctx) {
   const slug = route.path[2];
-  if (!slug) return { title: "Find More" };
+  if (!slug) return { title: "Find More", right: { label: "Add All", onClick: () => addAllListed(ctx) } }; // B272
   const r = stash.get(slug);
   return { title: r?.name || "Repo", right: { label: r?.added ? "Added" : "Add", onClick: (e) => addFromPage(slug, ctx, e?.currentTarget) } };
 }
@@ -157,17 +160,19 @@ export async function addRepo(r, ctx, { button = null, backend = getBackend(), a
   return true;
 }
 
+// B272: ADD / ADDED is More Sources' button (moresources.js addButton: the App Store price button, flat in the iOS 7
+// and 13 styles); while the repo is added it holds the small spinner in place of its label.
 function setButton(b, st) {
   if (!b) return;
   b.classList.toggle("added", st === "added");
   b.classList.toggle("adding", st === "adding");
   b.disabled = st !== "add";
-  b.textContent = st === "add" ? "Add" : "Added";
-  if (st === "adding") b.prepend(el("span", "loading-spinner find-spinner"));
+  b.textContent = st === "add" ? "ADD" : st === "added" ? "ADDED" : "";
+  if (st === "adding") b.append(el("span", "loading-spinner find-spinner"));
 }
 
-function addButton(r, ctx) {
-  const b = el("button", "rec-get find-add" + (r.added ? " added" : ""), r.added ? "Added" : "Add");
+export function addButton(r, ctx) {
+  const b = el("button", "price-btn rec-add find-add" + (r.added ? " added" : ""), r.added ? "ADDED" : "ADD");
   b.type = "button";
   b.disabled = Boolean(r.added);
   b.setAttribute("aria-label", (r.added ? "Added: " : "Add ") + r.name);
@@ -187,6 +192,49 @@ async function addFromPage(slug, ctx, button) {
     const body = document.querySelector(".page.is-top .find-repo")?.closest(".page-body");
     if (body) renderRepo(body, slug, ctx);
   }
+}
+
+// ---- Add All (B272) ----------------------------------------------------------------------------------------------
+
+// The rows the Find More page shows now (Popular on Canister or a search's results) and how to draw them again.
+let listed = { rows: [], redraw: () => {} };
+
+// Add All in the nav bar: every listed repo not added yet, after one action sheet, then each in turn under a HUD that
+// counts them, as Import adds its picks. No Unknown Source question per repo: the sheet is the one confirm, and an
+// Unknown repo comes in as Unknown, as an imported one does. Failures are named in one alert at the end.
+// `rows`, `backend`, `sheet`, `alert`, `hud` and `changed` are seams for the tests. Resolves how many were added.
+export async function addAllListed(ctx, { rows = listed.rows, backend = getBackend(), sheet = showActionSheet, alert = showAlert,
+  hud = liveHUD, changed = null, redraw = listed.redraw } = {}) {
+  const todo = rows.filter((r) => !r.added && !blocked(r.uri));
+  if (!todo.length) {
+    await alert({ title: "Find More", message: rows.length ? "Every repo listed here is in your sources." : "No repos are listed.",
+      buttons: ["OK"] });
+    return 0;
+  }
+  const what = todo.length === 1 ? "the 1 repo" : `the ${todo.length} repos`;
+  const i = await sheet({ title: `Add ${what} listed here that aren't in your sources yet?`, buttons: ["Add All"] });
+  if (i !== 0) return 0;
+  const failed = [];
+  const h = hud(`Adding 1 of ${todo.length}`);
+  try {
+    for (const [n, r] of todo.entries()) {
+      h.set(`Adding ${n + 1} of ${todo.length}`);
+      try {
+        await backend.addSource(inputOf(r));
+        r.added = true;
+        remember(r);
+      } catch (e) { failed.push(`${r.name}: ${e.message}`); }
+    }
+  } finally {
+    h.hide();
+  }
+  const ok = todo.length - failed.length;
+  if (ok) (changed ?? (await import("./manage.js")).sourcesChanged)(ctx);
+  if (failed.length) {
+    await alert({ title: "Some Sources Failed", message: [`Added ${ok} of ${todo.length}.`, ...failed].join("\n\n"), buttons: ["OK"] });
+  }
+  redraw();
+  return ok;
 }
 
 // ---- the Find More page ------------------------------------------------------------------------------------------
@@ -225,7 +273,10 @@ export function renderFind(body, ctx, { api = canisterApi(), sources = haveSourc
     const trusted = trustedNow();
     rows.forEach((r, i) => decorate(cells[i], r, ctx, trusted));
     const dir = cells[rows.length];
-    dir?.querySelector(".cell-inner")?.append(el("span", "find-external", "↗"));
+    // B272: the "opens outside" mark is drawn (sources.css .find-external), not the ↗ character, which iOS draws as
+    // a colour emoji.
+    dir?.querySelector(".cell-inner")?.append(el("span", "find-external"));
+    listed = { rows, redraw: () => draw(query) };
     const parts = [ul];
     if (error) parts.push(note(`Canister didn't answer: ${error.message}`));
     else if (!rows.length && searching) parts.push(note("No repos found. Canister searches whole words: a name or a host."));

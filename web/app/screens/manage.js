@@ -35,6 +35,7 @@ import { sourceWarning, warningAlert } from "../core/warnings.js";
 import {
   RECOMMENDED_SOURCES, detectJailbreak, jailbreakFromMarkers, recommendedFor, savedJailbreak,
 } from "../core/recommended.js";
+import { findAppSources } from "../core/appsources.js"; // B272: Find App Sources' directory
 import { copyText, nativePaste } from "../nav/menu.js";
 import { builtinFirst, isBuiltin, exportable } from "../core/essential.js";
 import { lockMark } from "../nav/lock.js";
@@ -85,7 +86,7 @@ export function nav(route, ctx) {
     case "io": return { title: "Import & Export" };
     case "hidden": return { title: "Hidden" };
     case "review": return { title: "Import", right: { label: "Add", onClick: () => addPicked(ctx) } };
-    case "preview": return { title: RECOMMENDED_SOURCES.find((r) => recommendedSeed(r).key === route.path[2])?.name || "Source",
+    case "preview": return { title: [...RECOMMENDED_SOURCES, ...appSourceEntries()].find((r) => recommendedSeed(r).key === route.path[2])?.name || "Source",
       right: { label: "Add", onClick: () => addFromPreview(route, ctx) } };
     default: return { title: "Not Found" };
   }
@@ -604,16 +605,31 @@ export const recRows = async () => {
   return recommendedRows(recs, sources, { jailbroken, previews });
 };
 
+// B272: Find App Sources' rows (core/appsources.js findAppSources): Recommended's AltStore sources and the directory's,
+// added ones included, as recRows draws them, so the same ADD, preview and icon code serves both pages.
+const appSourceEntries = () => findAppSources(RECOMMENDED_SOURCES, { blocked: (u) => Boolean(sourceWarning(u)) });
+export const appSourceRows = async () => {
+  const sources = await getBackend().sources().catch(() => []);
+  return recommendedRows(appSourceEntries(), sources, { jailbroken: false, previews });
+};
+
 // An AltStore source's JSON, read once per visit, so its row gets a name, icon and count and its preview its apps.
 export async function loadPreview(row) {
   if (row.rec.jailbreak) return null;
   if (previews.has(row.key)) return previews.get(row.key);
-  const text = await getBackend().text(row.record.uri);
-  const parsed = parseSource("altstore", text);
-  const p = { ...altRecord(row.record.uri, parsed), updated: null, apps: parsed.apps };
-  previews.set(row.key, p);
-  return p;
+  // B272: one read per source at a time (Find App Sources' row icon and its "did any answer" check ask together).
+  if (!reading.has(row.key)) {
+    reading.set(row.key, (async () => {
+      const text = await getBackend().text(row.record.uri);
+      const parsed = parseSource("altstore", text);
+      const p = { ...altRecord(row.record.uri, parsed), updated: null, apps: parsed.apps };
+      previews.set(row.key, p);
+      return p;
+    })().finally(() => reading.delete(row.key)));
+  }
+  return reading.get(row.key);
 }
+const reading = new Map(); // key -> the read in flight
 
 // Search's "Recommended Sources" group: the AltStore sources Recommended lists that aren't added yet, each with its
 // apps (read once per visit, as above). A source that doesn't answer is left out.
@@ -651,7 +667,7 @@ export const recHref = (row) => (row.added ? format({ tab: "sources", path: [row
 // its real page.
 async function previewRow(route) {
   const key = route.path[2];
-  return (await recRows()).find((r) => r.key === key) ?? null;
+  return (await recRows()).find((r) => r.key === key) ?? (await appSourceRows()).find((r) => r.key === key) ?? null; // B272
 }
 
 async function addFromPreview(route, ctx) {

@@ -9,7 +9,8 @@
 //                                    (jailbroken only, with the Jailbreak row), From the Developer and Modded Apps
 //                                    (core/recommended.js recommendedGroups); each row its source icon, name, two
 //                                    lines of why and ADD / ADDED (the App Store price button)
-//   #/sources/more/apps            Find App Sources: the recommended app sources not added yet, same groups and rows
+//   #/sources/more/apps            Find App Sources: B272's directory (core/appsources.js), Recommended's app sources
+//                                  and more checked ones, added ones with ADDED; same groups and rows
 //
 //   moreRow()            the Sources tab's and Home's row (icons/rowicons.js moreSources: a white plus, no badge)
 //   notAddedCount()      -> how many recommended sources aren't in the list yet (the Sources row's badge)
@@ -28,7 +29,7 @@ import { rowIcon } from "../icons/rowicons.js";
 import {
   JAILBREAKS, jailbreakName, saveJailbreak, markRecommendedSeen, recommendedGroups, shortWhy,
 } from "../core/recommended.js";
-import { recRows, loadPreview, addRecommended, recHref, currentJailbreak, sourcesChanged } from "./manage.js";
+import { recRows, appSourceRows, loadPreview, addRecommended, recHref, currentJailbreak, sourcesChanged } from "./manage.js";
 import { findMoreOn, findHref } from "./findmore.js";
 
 export const MORE = "more";
@@ -221,14 +222,25 @@ export function renderApps(body, ctx) {
   return drawApps(box, ctx);
 }
 
-async function drawApps(box, ctx) {
-  const rows = (await recRows()).filter((r) => !r.rec.jailbreak && !r.added);
+// B272: every source in the directory (manage.js appSourceRows: Recommended's app sources and the checked extras of
+// core/appsources.js), added ones kept with ADDED, so the page is never empty. Each source not added yet is read for
+// its icon (decorate: loadPreview); only when none of them answers does a note say so, under the footer, where it
+// pushes nothing down. `rows` and `preview` are seams for the tests. Resolves once that check has ended.
+export async function drawApps(box, ctx, { rows: load = appSourceRows, preview = loadPreview } = {}) {
+  const rows = await load();
   const redraw = () => drawApps(box, ctx);
   if (!rows.length) {
-    box.replaceChildren(grouped([{ footer: "Every app source on the list is in yours already. Add any other with Add "
-      + "on the Sources tab." }]));
+    box.replaceChildren(note("No app sources to show."));
     return;
   }
   box.replaceChildren(recGroups(rows, ctx, redraw),
-    el("p", "group-footer rec-foot", "App sources you haven't added. Tap one to see its apps before adding."));
+    el("p", "group-footer rec-foot", "App sources from their developers and from mod makers. Tap one to see its apps "
+      + "before adding. Piracy sources are never listed."));
+  const fresh = rows.filter((r) => !r.added);
+  if (!fresh.length) return;
+  const read = await Promise.allSettled(fresh.map((r) => preview(r)));
+  if (read.every((x) => x.status === "rejected" || !x.value) && box.isConnected !== false) {
+    const why = read.find((x) => x.status === "rejected")?.reason?.message;
+    box.append(note(`None of these sources answered${why ? `: ${why}` : ""}. Check the connection and open this page again.`));
+  }
 }

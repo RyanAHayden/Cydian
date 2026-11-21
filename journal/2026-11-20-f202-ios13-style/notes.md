@@ -45,6 +45,16 @@ Changes, a package page (openMX), Settings, Settings > Theme and Search. Taken w
 ios13.css adds no transition, animation, backdrop-filter or will-change (a test holds it); held bar buttons change
 `opacity` only. The large title collapse is the C54 hook's opacity-only, once-a-frame code. Not measured on a phone.
 
+## Spec review (fresh subagent, diff + brief only)
+
+- Fixed: removing the static navbar.js import had glued `import { showAlert, alertOK }` onto a comment line in
+  screens/settings.js, so every alert path on Settings would throw a ReferenceError (no test drew one). Fixed, and the
+  F202 test now fails on an import glued to a comment. A ios13.css comment that misstated the section header size.
+- Kept: theme-boot.js and screens/settings.js changes outside the brief's files (the only way to set data-style
+  before first paint and to turn the nav hooks on). Large titles arrive a tick after first paint under iOS 13 (the
+  dynamic import), by choice, to keep iOS 6's startup set unchanged.
+- tools/check.sh: run by `run done`, which refuses to tick unless it passes.
+
 ## Not verified
 
 - **On a phone (WebKit) and frame rate**: Chromium only; the task did not give phone access and 120 Hz is argued

@@ -208,7 +208,7 @@ html[data-style="ios13"] .cell-inner.is-pressed .cell-subtitle { color: var(--su
 html[data-style="ios13"] .cell-inner.is-pressed .cell-detail { color: var(--detail); }
 html[data-style="ios13"] .cell-inner.chevron.is-pressed::after { background-image: var(--chevron); }
 
-/* Plain tables: the flat grey section bar, 13pt semibold uppercase-free label as iOS 13's plain header. */
+/* Plain tables: the flat grey section bar with a 15pt semibold label. */
 html[data-style="ios13"] .section-header { font-size: 15px; font-weight: 600; color: var(--i13-label); text-shadow: none; }
 
 /* Switch: flat, iOS 13's green with a white knob and no ON / OFF (iOS 6's 77 x 27 box: its size is not a hook yet). */

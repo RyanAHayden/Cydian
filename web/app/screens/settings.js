@@ -20,7 +20,8 @@ import { format, parse, settingsRoute } from "../router.js";
 import { settings } from "../settings-store.js";
 import { createSwitch } from "../nav/switch.js";
 import { detectMode, themeState, paletteFor, DARK_THEME_KEY, SETTINGS, SIGNING_GROUPS } from "../core/settings.js";
-import { hooksOf } from "../core/settings.js"; // F202import { showAlert, alertOK } from "../nav/alert.js";
+import { hooksOf } from "../core/settings.js"; // F202
+import { showAlert, alertOK } from "../nav/alert.js";
 import { showHUD } from "../nav/hud.js";
 import { parseProfile, checkP12Password, deviceSummary, deviceError, summary, profileKind, deviceCheck, deviceCheckText } from "../core/signing.js";
 import { sortCertFiles, resolvePassword } from "../core/certfiles.js";

@@ -457,6 +457,9 @@ test("F201: Theme > Style picks iOS 7, which hides the Themes rows and sets data
 // F202: iOS 13 is the third Style: its own White / OLED Black like iOS 7, plus its two nav hooks, card sheets
 // (<html data-sheet="card">) and large titles (<html data-nav="large">, nav/navbar.js), both gone again in iOS 6.
 test("F202: Theme > Style picks iOS 13: data-style, its two themes, card sheets and large titles", async () => {
+  // an import glued onto a comment line drops its names silently (showAlert once did)
+  const src = await (await import("node:fs/promises")).readFile(new URL("./settings.js", import.meta.url), "utf8");
+  assert.doesNotMatch(src, /\/\/[^\n]*\bimport \{[^\n]*\} from "/);
   const { render, settings, applyTheme } = await import("./settings.js");
   const was = [settings.get("style"), settings.get("appearance")];
   const attrs = {};

@@ -1222,12 +1222,26 @@ enum Workspace {
     }
 
     static func isInstalled(_ id: String) -> Bool? {
+        guard seesInstalls else { return nil }
+        return rawIsInstalled(id)
+    }
+
+    private static func rawIsInstalled(_ id: String) -> Bool? {
         let sel = NSSelectorFromString("applicationIsInstalled:")
         guard let ws = shared, let m = class_getInstanceMethod(type(of: ws), sel) else { return nil }
         typealias F = @convention(c) (NSObject, Selector, NSString) -> Bool
         let f = unsafeBitCast(method_getImplementation(m), to: F.self)
         return f(ws, sel, id as NSString)
     }
+
+    // B229: on iOS 27 a sideloaded app's applicationIsInstalled: answers false for every app, iFizBox itself and
+    // Safari included (seen on the iPhone 15 Pro, 27.0.1), so its false means "can't tell", not "not installed".
+    // Asked once per launch with iFizBox's own ID: when even that is false, isInstalled answers nil (callers then
+    // go by their records, as when the call is missing).
+    static let seesInstalls: Bool = {
+        guard let me = Bundle.main.bundleIdentifier, !me.isEmpty else { return true }
+        return rawIsInstalled(me) != false
+    }()
 
     static func open(_ id: String) -> Bool {
         let sel = NSSelectorFromString("openApplicationWithBundleID:")

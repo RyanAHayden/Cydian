@@ -2,7 +2,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createSettings, iconFor, iconState, iconGroups, clearOffered, APP_ICONS, LIGHT_PALETTES, DARK_PALETTES } from "./core/settings.js";
-import { iconMessage, tellIcon, resetTold, iconSrc, clearHere, readIcons, retryable } from "./appicon.js";
+import { iconMessage, tellIcon, resetTold, iconSrc, clearHere, readIcons, retryable, resignNeeded, setResignHandler } from "./appicon.js";
 
 function memStorage() {
   const m = new Map();
@@ -180,6 +180,38 @@ test("turning Match Theme back on after a Clear pick switches back, and a refuse
     assert.equal(tellIcon("light", s, native), true);
   } finally {
     resetTold();
+    delete globalThis.ifizboxNative;
+  }
+});
+
+// B240: Lite answers resign_needed for a picked own icon its bundle no longer holds (an update put the placeholders
+// back): tellIcon hands it to the offer (screens/appicon.js offerResign), once per answer, and doesn't retry it.
+test("a resign_needed answer for an own icon goes to the re-sign offer, not the retry", async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const flush = () => new Promise((r) => setImmediate(r));
+  const s = store("sideload");
+  const calls = [], offers = [];
+  const native = { call: (m, p) => {
+    calls.push(p);
+    return Promise.reject(Object.assign(new Error("the app puts your icon in by re-signing itself first"), { code: "resign_needed" }));
+  } };
+  setResignHandler((name, st) => offers.push([name, st]));
+  globalThis.ifizboxNative = native;
+  try {
+    resetTold();
+    s.set("iconMatch", false);
+    s.set("lightIcon", "owna1");
+    assert.equal(tellIcon("light", s, native), true);
+    await flush();
+    assert.deepEqual(offers, [["owna1", s]]);
+    t.mock.timers.tick(20000);
+    await flush();
+    assert.equal(calls.length, 1, "not retried");
+    assert.equal(resignNeeded(new Error("resign_needed: from a mock")), true);
+    assert.equal(resignNeeded(Object.assign(new Error("x"), { code: "failed" })), false);
+  } finally {
+    resetTold();
+    setResignHandler(() => {});
     delete globalThis.ifizboxNative;
   }
 });

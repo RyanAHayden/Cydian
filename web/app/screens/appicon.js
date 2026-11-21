@@ -127,6 +127,35 @@ export async function pickOwn(key, name, store, { native = nativeBridge(), mode 
   return "installing";
 }
 
+// B240: a picked own icon Lite's bundle no longer holds (appicon.js tellIcon got resign_needed): an update from the
+// AltStore source, or any fresh IPA, put the own sets' placeholders back, so the Home Screen shows the app's own
+// icon while Settings still shows the pick; a self re-sign whose install iOS failed or the user cancelled leaves the
+// same. Asked once per picture per launch: Re-sign installs the update with the picture again (as pickOwn's
+// Install), Theme Icon (or a re-sign that fails to start) puts the picks of it back on their theme's icon, and
+// applyTheme's tellIcon switches the Home Screen to that.
+export const LOST_TITLE = "Use Your Icon Again?";
+export const lostMessage = (name = NAME) =>
+  `This copy of ${name} was installed without your icon, so the Home Screen shows ${name}'s own. Re-sign ${name} ` +
+  `to put your icon back (it takes about as long as an update), or use the theme's icon.`;
+const asked = new Set();
+export const resetAsked = () => asked.clear();
+// -> "asked" (already, this launch) | "theme" | "installing" | "failed" | "none" (nothing picks it)
+export async function offerResign(name, store, { alert = null, install = null } = {}) {
+  const keys = picksOf(name, (k) => store.get(k));
+  if (!keys.length) return "none";
+  if (asked.has(name)) return "asked";
+  asked.add(name);
+  const ask = alert ?? (await import("../nav/alert.js")).showAlert;
+  const back = () => { for (const k of picksOf(name, (x) => store.get(x))) store.set(k, "theme"); };
+  const { index } = await ask({ title: LOST_TITLE, message: lostMessage(), buttons: ["Theme Icon", "Re-sign"], cancel: 0 });
+  if (index !== 1) { back(); return "theme"; }
+  const run = install ?? (await import("../signing/route.js")).installOnDevice;
+  let ok = false;
+  try { ok = await run({ params: { selfIcon: name }, name: NAME, host: true }); } catch { ok = false; }
+  if (!ok) { back(); return "failed"; }
+  return "installing";
+}
+
 // ---- Shell calls ----------------------------------------------------------------------------------------------
 let cache = []; // the last list, so a redraw (a pick) draws Your Icons at once
 export const cachedIcons = () => cache;

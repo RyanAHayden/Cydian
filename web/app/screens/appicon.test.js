@@ -1,7 +1,7 @@
 // F329: your own app icon: Move and Scale's crop maths and the stored list (screens/appicon.js).
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { cropStart, clampCrop, panCrop, zoomCrop, cropRect, readList, labelFor, picksOf, missingPicks, dropMissing, ownIconsOffered, pickOwn, resignMessage, RESIGN_TITLE, OUT, ZOOM } from "./appicon.js";
+import { cropStart, clampCrop, panCrop, zoomCrop, cropRect, readList, labelFor, picksOf, missingPicks, dropMissing, ownIconsOffered, pickOwn, resignMessage, RESIGN_TITLE, OUT, ZOOM, offerResign, resetAsked, lostMessage, LOST_TITLE } from "./appicon.js";
 import { createSettings, iconFor, isOwnIcon } from "../core/settings.js";
 
 const near = (a, b, msg) => assert.ok(Math.abs(a - b) < 1e-9, `${msg ?? ""} ${a} != ${b}`);
@@ -175,4 +175,43 @@ test("Lite's Cancel changes nothing; a failed re-sign puts the pick back; an old
 test("the re-sign message names the app and says it switches once opened again", () => {
   assert.match(resignMessage("Box"), /^Box puts your icon in by re-signing itself/);
   assert.match(resignMessage("Box"), /when you open Box again it switches to your icon\.$/);
+});
+
+// B240: the picked own icon is gone from Lite's bundle (an update put the placeholders back): asked once per launch,
+// Re-sign installs it again, Theme Icon (or a re-sign that fails to start) puts the picks back on the theme's icon.
+test("a lost own icon offers the re-sign again or the theme's icon, once", async () => {
+  resetAsked();
+  const f = fakes({ tap: 1 });
+  f.values.lightIcon = "owna1";
+  f.values.darkIcon = "owna1";
+  assert.equal(await offerResign("owna1", f.store, { alert: f.alert, install: f.install }), "installing");
+  assert.equal(f.alerts[0].title, LOST_TITLE);
+  assert.deepEqual(f.alerts[0].buttons, ["Theme Icon", "Re-sign"]);
+  assert.deepEqual(f.installs[0].params, { selfIcon: "owna1" });
+  assert.equal(f.installs[0].host, true);
+  assert.equal(f.values.lightIcon, "owna1", "kept for the reopened app");
+  assert.equal(await offerResign("owna1", f.store, { alert: f.alert, install: f.install }), "asked");
+  assert.equal(f.alerts.length, 1, "not asked twice in one launch");
+
+  const no = fakes({ tap: 0 });
+  no.values.lightIcon = "ownb2";
+  no.values.darkIcon = "classic";
+  assert.equal(await offerResign("ownb2", no.store, { alert: no.alert, install: no.install }), "theme");
+  assert.equal(no.values.lightIcon, "theme");
+  assert.equal(no.values.darkIcon, "classic", "other picks stay");
+  assert.equal(no.installs.length, 0);
+
+  const bad = fakes({ tap: 1, ok: false });
+  bad.values.lightIcon = "ownc3";
+  assert.equal(await offerResign("ownc3", bad.store, { alert: bad.alert, install: bad.install }), "failed");
+  assert.equal(bad.values.lightIcon, "theme");
+
+  const gone = fakes();
+  assert.equal(await offerResign("ownd4", gone.store, { alert: gone.alert, install: gone.install }), "none");
+  assert.equal(gone.alerts.length, 0);
+});
+
+test("the lost-icon message names the app", () => {
+  assert.match(lostMessage("Box"), /^This copy of Box was installed without your icon/);
+  assert.match(lostMessage("Box"), /use the theme's icon\.$/);
 });

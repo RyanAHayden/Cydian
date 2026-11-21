@@ -18,8 +18,7 @@
   `:root` (read off the file, matching C46's journal), how sheets paint, and the `-webkit-box-reflect` note (T61).
 - Geometry hooks table: C45's 11 new style.css hooks with their values (read off style.css lines 108-114), and the
   components with no hook on purpose (the switch's `TRAVEL = 50` in nav/switch.js, checked).
-- Definition of clean: one more bullet for C45's ios6-css.test.js checks (no layout in ios6.css, no decoration
-  written into a rule). "Today only the four below do" now points at the clean list.
+- "Today only the four below do" now points at the clean list (it was false once the list grew).
 - Overlays table: action sheet, reload bar, banner, undo bar and menu now say "tokens" instead of "literal".
 - Palettes paragraph: the App Store segmented control has tokens now; the palettes still paint it with rules.
 
@@ -28,6 +27,17 @@
 D22 (open, same file) asks for the small stylesheets (C48), sources/home/settings (C47), palettes on tokens (C49)
 and the lazily-loaded-sheets note. I left "the small ones" and the palettes line under "Not yet clean" for it, so
 the two tasks don't do the same edit twice; noted on D22.
+
+## Spec review
+
+A fresh subagent saw only the diff and the brief. It found no wrong names or values.
+- Reverted: an added Definition of clean bullet on C45's test checks, which the task didn't ask for. Filed as D23.
+- Kept, though outside "What is clean today": the overlay rows (literal -> tokens), the palettes paragraph and
+  "Today only the four". With packages.css and ios6.css listed as clean, each of them would have been false.
+- C52/C54 not landed: they will edit the "Not yet clean" nav-hooks line when they land, as part of their own work.
+  This list's cleanups are all in.
+- Section index and row swipe stay "literal" in the overlays table: their colours are still literal look rules
+  inside packages.css's stretches. The Clean bullet says so.
 
 ## Tried and failed
 

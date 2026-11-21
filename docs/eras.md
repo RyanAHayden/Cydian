@@ -20,9 +20,7 @@ An era is clean when all of these hold:
      properties;
    - every look-only stretch in any `web/app/*.css` (below) contains only look properties;
    - the nav bar, bar button, tab bar and grouped table selectors have no rule in `ios6.css` outside a look-only
-     stretch, with or without an `html[…]` qualifier in front;
-   - `ios6.css` sets no layout at all: every rule outside its stretches is a token block (or `body`), and no rule
-     writes a gradient, `url()` art, emboss, filter or border-image itself, only through a custom property.
+     stretch, with or without an `html[…]` qualifier in front.
 4. **No visible change in iOS 6.** Splitting a component for eras keeps every pixel and every computed style of the
    iOS 6 page: check it with a 3x screenshot and computed-style diff against main
    (`journal/2026-11-20-c44-era-readiness/shots.mjs` then `diff.py`, both themes and every palette).
@@ -98,7 +96,8 @@ the app supports iOS 15.0, so cascade layers are out.
   still come from the palette, half-painting it, so **an era offers only its own themes** (White and OLED Black):
   the theme menu must hide the palettes while an era is chosen, and the app set no `data-palette` under it (a saved
   palette waits for iOS 6). Two palette rules still paint chrome: the App Store segmented control (`ios6.css`'s
-  reads `--seg*` tokens, but the palettes still paint it with rules) and Brushed Metal's etched text; with the palettes hidden they never meet an era.
+  reads `--seg*` tokens, but the palettes still paint it with rules) and Brushed Metal's etched text; with the
+  palettes hidden they never meet an era.
 - **Order**: link `ios<N>.css` after `palettes.css`; `wide.css` is layout and can stay last.
 
 ## Hooks

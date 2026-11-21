@@ -380,11 +380,11 @@ test("F205: Settings root, General and Theme rows carry iOS 6 tiles where iOS 6 
   assert.equal(at("Compatibility Marks"), at("Works on My Phone") + 1);
   for (const r of general) assert.equal(r[1], "cell-icon row-icon", r[0]);
   // F199: Theme is Mode (a segmented control, no rows) and Themes' two push rows, bare like iOS 6's.
-  // F201: Style's two choice rows come first.
+  // F201: Style's choice rows come first (F202: iOS 13 the third).
   const theme = rows(["theme"]);
-  assert.deepEqual(theme.map((r) => r[0]), ["iOS 6", "iOS 7", "Light", "Dark"]);
+  assert.deepEqual(theme.map((r) => r[0]), ["iOS 6", "iOS 7", "iOS 13", "Light", "Dark"]);
   for (const r of theme) assert.equal(r[1], null, r[0]);
-  assert.deepEqual(rows(["display"]).map((r) => r[0]), ["iOS 6", "iOS 7", "Light", "Dark"]); // the old route
+  assert.deepEqual(rows(["display"]).map((r) => r[0]), ["iOS 6", "iOS 7", "iOS 13", "Light", "Dark"]); // the old route
   // each theme list: a checked row per theme, each with its swatch
   // (then the preview's sample rows, which start at Sources)
   const list = (k) => { const r = rows(["theme", k]); return r.slice(0, r.findIndex((x) => x[0] === "Sources")).map((x) => [x[0], x[1]]); };
@@ -452,6 +452,47 @@ test("F201: Theme > Style picks iOS 7, which hides the Themes rows and sets data
     applyTheme(doc, { matchMedia: () => ({ matches: false }), location: { hash: "" } });
     assert.equal(html.dataset.style, "ios6");
   } finally { settings.set("style", was[0]); settings.set("appearance", was[1]); }
+});
+
+// F202: iOS 13 is the third Style: its own White / OLED Black like iOS 7, plus its two nav hooks, card sheets
+// (<html data-sheet="card">) and large titles (<html data-nav="large">, nav/navbar.js), both gone again in iOS 6.
+test("F202: Theme > Style picks iOS 13: data-style, its two themes, card sheets and large titles", async () => {
+  const { render, settings, applyTheme } = await import("./settings.js");
+  const was = [settings.get("style"), settings.get("appearance")];
+  const attrs = {};
+  const html = { dataset: {}, getAttribute: (k) => attrs[k] ?? null,
+    setAttribute: (k, v) => { attrs[k] = String(v); }, removeAttribute: (k) => { delete attrs[k]; } };
+  const doc = { documentElement: html, querySelectorAll: () => [], getElementById: () => null };
+  const win = { matchMedia: () => ({ matches: false }), location: { hash: "" } };
+  try {
+    settings.set("style", "ios13");
+    const root = fakeElement("div");
+    render(root, { tab: "home", path: ["theme"] });
+    const labels = [];
+    const walk = (n) => { for (const c of n.children ?? []) { if (c.className === "cell-label") labels.push(c.textContent); walk(c); } };
+    walk(root);
+    assert.deepEqual(labels.slice(0, 3), ["iOS 6", "iOS 7", "iOS 13"]);
+    assert.equal(labels.includes("Light"), false); // iOS 6's Themes rows hide, as under iOS 7
+    settings.set("appearance", "light");
+    applyTheme(doc, win);
+    assert.deepEqual([html.dataset.style, html.dataset.theme, html.dataset.palette], ["ios13", "light", "white"]);
+    assert.equal(attrs["data-sheet"], "card");
+    const { applyStyleHooks } = await import("./settings.js");
+    await applyStyleHooks("ios13", doc);
+    assert.equal(attrs["data-nav"], "large");
+    settings.set("appearance", "dark");
+    applyTheme(doc, win);
+    assert.deepEqual([html.dataset.style, html.dataset.theme, html.dataset.palette], ["ios13", "dark", "oled"]);
+    settings.set("style", "ios6");
+    applyTheme(doc, win);
+    await applyStyleHooks("ios6", doc);
+    assert.equal(html.dataset.style, "ios6");
+    assert.equal(attrs["data-sheet"], undefined);
+    assert.equal(attrs["data-nav"], undefined);
+  } finally {
+    settings.set("style", was[0]); settings.set("appearance", was[1]);
+    (await import("../nav/navbar.js")).setLargeTitles(false, doc);
+  }
 });
 
 test("F199: the theme lists preview their tone; other routes don't", async () => {

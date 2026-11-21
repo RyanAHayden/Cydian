@@ -1,0 +1,291 @@
+/* iOS 13 (F202): the third era, drawn over ios6.css when <html data-style="ios13"> (Theme > Style; theme-boot.js sets
+   it before first paint). Inset grouped: rounded 10pt white tables floating 16pt in from the sides on #f2f2f7,
+   uppercase 13pt #6d6d72 group headers, separators inset 16pt; #f9f9f9 bars with a hairline, text-only #007aff bar
+   buttons and a chevron back button; filled tab glyphs (ios6.css's own, flat-tinted); the system font; iOS 13's
+   segmented control (a white pill on a grey track) and flat green switch. The era turns on two nav hooks
+   (core/settings.js STYLE_HOOKS, docs/eras.md "Nav hooks"): large titles (34pt bold left, collapsing into the bar on
+   scroll; nav/navbar.js) and card sheets (nav/sheet.js). Two themes of its own: White (data-palette "white":
+   ios6.css's light tokens, then these) and OLED Black (data-palette "oled": ios6.css's dark block, then these).
+   Colours after UIKit's iOS 13 system colours (systemGroupedBackground #f2f2f7, opaqueSeparator #c6c6c8, systemBlue
+   #007aff / #0a84ff, systemGreen #34c759 / #30d158, secondarySystemGroupedBackground #1c1c1e in dark).
+
+   Clean as docs/eras.md defines it, the way ios7.css is: geometry only through style.css's hooks, colours and
+   decorations through ios6.css's and packages.css's tokens, and look-only rules for what no token carries.
+   ios6-css.test.js fails if a rule here sets layout. Hooks go on html[data-style="ios13"] (both tones); colours on
+   [data-theme="light"] / [data-theme="dark"]. Linked after ios7.css (index.html). */
+
+/* ---- Geometry hooks (style.css "Era hooks"): the same in both tones ---- */
+html[data-style="ios13"] {
+  --bar-btn-h: 44px; --bar-btn-min-w: 0px; --bar-btn-pad: 0 8px;
+  --bar-back-h: 44px; --bar-back-pad: 0 8px 0 3px;
+  --tab-item-h: 49px; --tab-item-margin: 0; --tab-item-pad-top: 6px; --tab-icon-size: 25px; --tab-label-gap: 3px;
+  --group-margin: 20px 16px 0; --group-gap: 35px; --group-first-head: 0px; /* inset grouped: 16pt from the sides */
+  --group-head-margin: 0 16px 6px; --group-foot-margin: 6px 16px 0;
+  --cell-min-h: 44px; --cell-pad: 0 16px; --cell-gap: 12px;
+  --seg-h: 32px; --seg-margin: 10px 16px 0;
+  --large-title-pad: 3px 16px 8px;
+}
+
+/* ---- White ---- */
+html[data-style="ios13"][data-theme="light"] {
+  color-scheme: light;
+  /* era colours the look-only rules below read */
+  --i13-tint: #007aff; --i13-red: #ff3b30; --i13-green: #34c759;
+  --i13-bar: #f9f9f9; --i13-hairline: rgba(0,0,0,.3); --i13-label: #000;
+  --i13-sw-track: #e9e9eb; --i13-knob: #fff;
+  --i13-knob-shadow: 0 3px 8px rgba(0,0,0,.15), 0 3px 1px rgba(0,0,0,.06), 0 0 0 .5px rgba(0,0,0,.04);
+  --i13-knob-held: #f2f2f2;
+  --i13-seg-track: #e3e3e8; --i13-seg-pill: #fff; --i13-seg-text: #000; --i13-seg-divider: #c7c7cc;
+  --i13-seg-pressed: #d6d6db;
+  --i13-seg-pill-shadow: 0 3px 8px rgba(0,0,0,.12), 0 3px 1px rgba(0,0,0,.04);
+  /* ios6.css's shared tokens */
+  --pin-dark: #f2f2f7; --pin-light: #f2f2f7; /* every pinstripe ground goes flat */
+  --head: #6d6d72; --emboss: none; --detail: #8a8a8e; --subtitle: #8a8a8e;
+  --text: #000; --field-text: #000; --field-hint: #c4c4c6;
+  --table: #fff; --table-edge: transparent; --table-inset: transparent;
+  --divider: #c6c6c8; --divider-hi: transparent;
+  --select: #d1d1d6; --count: #8e8e93; --plain: #fff; --keyline: #c6c6c8;
+  --category: #f2f2f7;
+  --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 9 13'%3E%3Cpath d='M1.6 1.3 6.8 6.5 1.6 11.7' fill='none' stroke='%23c4c4c6' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  /* nav bar */
+  --nav-bar: linear-gradient(var(--i13-hairline), var(--i13-hairline)) bottom / 100% .5px no-repeat, #f9f9f9;
+  --nav-shadow: none; --nav-title: #000; --nav-title-emboss: none; --site-strip: #f9f9f9;
+  /* bar buttons: text only */
+  --bar-btn-text: #007aff; --bar-btn-emboss: none;
+  --bar-btn-edge: transparent; --bar-btn-edge-top: transparent; --bar-btn: none; --bar-btn-shadow: none;
+  --bar-btn-pressed: none; --bar-btn-pressed-edge: transparent; --bar-btn-pressed-edge-top: transparent;
+  --lt-red-edge: transparent; --lt-red-edge-top: transparent; --lt-red: none;
+  --lt-red-pressed-edge: transparent; --lt-red-pressed-edge-top: transparent; --lt-red-pressed: none;
+  /* the back chevron, in the 13px slot ios6.css's border-image gives the arrow (pre-squashed like ios7.css's: on
+     screen a 10 x 21pt chevron with round ends, iOS 13's chevron.left) */
+  --bar-back: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='42' height='60'%3E%3Cpath d='M22 17 6 30l16 13' fill='none' stroke='%23007aff' stroke-width='5.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  --bar-back-pressed: var(--bar-back); /* held: the whole button dims (the opacity rule below) */
+  /* tab bar */
+  --tabbar: linear-gradient(var(--i13-hairline), var(--i13-hairline)) top / 100% .5px no-repeat, #f9f9f9;
+  --tabbar-shadow: none;
+  --tab-text: #999; --tab-text-active: #007aff; --tab-active: none; --tab-active-edge: none;
+  --tab-icon: currentColor; --tab-icon-active: currentColor; --tab-icon-emboss: none; --tab-icon-emboss-active: none;
+  --badge-ring: 0 solid transparent; --badge: #ff3b30; --badge-shadow: none;
+  /* grouped tables */
+  --grouped-ground: #f2f2f7;
+  /* the done bar button (settings.css and the sheets) */
+  --done-btn: none; --done-btn-edge: transparent; --done-btn-edge-top: transparent; --done-btn-pressed: none;
+  /* packages.css: search bar and scope bar */
+  --search-bar: #f9f9f9;
+  --search-bar-scoped: #f9f9f9;
+  --search-field: #e9e9eb url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='6.5' cy='6.5' r='5.2' fill='none' stroke='%238e8e93' stroke-width='1.8'/%3E%3Cpath d='m10.4 10.4 4.2 4.2' stroke='%238e8e93' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E") 9px 50% / 14px 14px no-repeat;
+  --search-field-edge: transparent; --search-field-edge-top: transparent; --search-field-shadow: none;
+  --search-text: #000; --search-hint: #8e8e93;
+  --search-clear: #8e8e93 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpath d='M2.5 2.5l5 5M7.5 2.5l-5 5' stroke='%23fff' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E") center / 9px 9px no-repeat;
+  --search-cancel: none; --search-cancel-pressed: none;
+  --search-cancel-edge: transparent; --search-cancel-edge-top: transparent; --search-cancel-edge-bottom: transparent;
+  --search-cancel-text: #007aff; --search-cancel-emboss: none; --search-cancel-shadow: none;
+  --search-scope: linear-gradient(var(--i13-hairline), var(--i13-hairline)) bottom / 100% .5px no-repeat, #f9f9f9;
+  --scope-seg: #e3e3e8; --scope-seg-edge: #e3e3e8; --scope-seg-edge-top: #e3e3e8; --scope-seg-edge-bottom: #e3e3e8;
+  --scope-seg-divider: #c7c7cc; --scope-seg-text: #000; --scope-seg-emboss: none; --scope-seg-shadow: none;
+  --scope-seg-selected: #fff; --scope-seg-selected-edge: #e3e3e8; --scope-seg-selected-edge-top: #e3e3e8;
+  --scope-seg-selected-edge-bottom: #e3e3e8; --scope-seg-selected-divider: #e3e3e8;
+  --scope-done: none; --scope-done-pressed: none; --scope-done-edge: transparent; --scope-done-edge-top: transparent;
+  --filter-shadow: none;
+  /* ios6.css's segmented control (App Store tabs, Theme's Mode) */
+  --seg: #e3e3e8; --seg-edge: #e3e3e8; --seg-shadow: none; --seg-divider: #c7c7cc;
+  --seg-text: #000; --seg-emboss: none; --seg-pressed: #d6d6db;
+  --seg-selected: #fff; --seg-selected-text: #000; --seg-selected-emboss: none; --seg-selected-edge: #e3e3e8;
+  /* packages.css: the action sheet, iOS 13's rounded grouped buttons over a dimmed page */
+  --action-dim: rgba(0,0,0,.4); --action-sheet: none;
+  --action-title: #8a8a8e; --action-title-emboss: none;
+  --action-btn: rgba(255,255,255,.96); --action-btn-text: #007aff; --action-btn-emboss: none;
+  --action-btn-edge: transparent; --action-btn-shadow: none;
+  --action-btn-pressed: #e5e5ea; --action-btn-pressed-text: #007aff; --action-btn-pressed-emboss: none;
+  --action-destructive: rgba(255,255,255,.96); --action-destructive-text: #ff3b30; --action-destructive-emboss: none;
+  --action-cancel: #fff; --action-cancel-pressed: #e5e5ea;
+  --action-cancel-text: #007aff; --action-cancel-emboss: none;
+  --store-head: #fff; --store-head-edge: #c6c6c8; --store-head-emboss: none;
+}
+
+/* ---- OLED Black: the same shapes, white on black; ios6.css's dark rules read the --dk-* tokens ---- */
+html[data-style="ios13"][data-theme="dark"] {
+  color-scheme: dark;
+  --i13-tint: #0a84ff; --i13-red: #ff453a; --i13-green: #30d158;
+  --i13-bar: #000; --i13-hairline: #38383a; --i13-label: #fff;
+  --i13-sw-track: #39393d; --i13-knob: #fff;
+  --i13-knob-shadow: 0 3px 8px rgba(0,0,0,.3), 0 3px 1px rgba(0,0,0,.1);
+  --i13-knob-held: #e5e5e5;
+  --i13-seg-track: #1c1c1e; --i13-seg-pill: #636366; --i13-seg-text: #fff; --i13-seg-divider: #3a3a3c;
+  --i13-seg-pressed: #2c2c2e;
+  --i13-seg-pill-shadow: 0 3px 8px rgba(0,0,0,.12), 0 3px 1px rgba(0,0,0,.04);
+  --pin-dark: #000; --pin-light: #000;
+  --head: #8d8d93; --emboss: none; --detail: #8d8d93; --subtitle: #8d8d93;
+  --text: #fff; --field-text: #fff; --field-hint: #5a5a5f;
+  --table: #1c1c1e; --table-edge: transparent; --table-inset: transparent;
+  --divider: #38383a; --divider-hi: transparent;
+  --select: #3a3a3c; --count: #48484e; --plain: #000; --keyline: #38383a;
+  --category: #1c1c1e;
+  --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 9 13'%3E%3Cpath d='M1.6 1.3 6.8 6.5 1.6 11.7' fill='none' stroke='%235a5a5f' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  --nav-title: #fff; --nav-title-emboss: none; --site-strip: #000;
+  --dk-ground: #000;
+  --dk-nav-bar: linear-gradient(var(--i13-hairline), var(--i13-hairline)) bottom / 100% .5px no-repeat, #000;
+  --dk-nav-shadow: none;
+  --dk-tabbar: linear-gradient(var(--i13-hairline), var(--i13-hairline)) top / 100% .5px no-repeat, #000;
+  --bar-btn-text: #0a84ff; --bar-btn-emboss: none; --bar-btn-shadow: none;
+  --bar-btn-edge: transparent; --bar-btn-edge-top: transparent; --bar-btn-pressed: none;
+  --bar-btn-pressed-edge: transparent; --bar-btn-pressed-edge-top: transparent;
+  --dk-btn-edge: transparent; --dk-btn: none; --dk-btn-pressed: none;
+  --dk-red-edge: transparent; --dk-red-edge-top: transparent; --dk-red: none;
+  --dk-red-pressed-edge: transparent; --dk-red-pressed-edge-top: transparent; --dk-red-pressed: none;
+  --dk-back: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='42' height='60'%3E%3Cpath d='M22 17 6 30l16 13' fill='none' stroke='%230a84ff' stroke-width='5.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  --dk-ctl-hi: transparent; --dk-seg: #1c1c1e; --dk-seg-pressed: #2c2c2e;
+  --done-btn: none; --done-btn-edge: transparent; --done-btn-edge-top: transparent; --done-btn-pressed: none;
+  /* tokens both tones' rules read, which ios6.css / packages.css define only on :root */
+  --tabbar-shadow: none; --filter-shadow: none; --dk-store-head: #000;
+  --scope-done: none; --scope-done-pressed: none; --scope-done-edge: transparent; --scope-done-edge-top: transparent;
+  --tab-text: #8d8d93; --tab-text-active: #0a84ff; --tab-active: none; --tab-active-edge: none;
+  --tab-icon: currentColor; --tab-icon-active: currentColor; --tab-icon-emboss: none; --tab-icon-emboss-active: none;
+  --badge-ring: 0 solid transparent; --badge: #ff453a; --badge-shadow: none;
+  --grouped-ground: #000;
+  --dk-search-line: #000; --dk-search-bar: #000; --dk-search-fill: #000;
+  --dk-field: #1c1c1e; --dk-field-edge: transparent; --dk-clear: #8d8d93;
+  --search-cancel-text: #0a84ff; --search-cancel-emboss: none; --search-cancel-shadow: none;
+  --search-field-shadow: none;
+  --search-field: #1c1c1e url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='6.5' cy='6.5' r='5.2' fill='none' stroke='%238d8d93' stroke-width='1.8'/%3E%3Cpath d='m10.4 10.4 4.2 4.2' stroke='%238d8d93' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E") 9px 50% / 14px 14px no-repeat;
+  --scope-seg-text: #fff; --scope-seg-emboss: none; --scope-seg-shadow: none;
+  --seg-text: #fff; --seg-emboss: none; --seg-shadow: none;
+  --seg-selected: #636366; --seg-selected-text: #fff; --seg-selected-emboss: none; --seg-selected-edge: #1c1c1e;
+  --dk-action-sheet: none; --dk-action-btn: #1c1c1e; --dk-action-cancel: #2c2c2e;
+  --action-dim: rgba(0,0,0,.6); --action-title: #8d8d93; --action-title-emboss: none;
+  --action-btn-text: #0a84ff; --action-btn-emboss: none; --action-btn-edge: transparent; --action-btn-shadow: none;
+  --action-btn-pressed: #2c2c2e; --action-btn-pressed-text: #0a84ff; --action-btn-pressed-emboss: none;
+  --action-destructive: #1c1c1e; --action-destructive-text: #ff453a; --action-destructive-emboss: none;
+  --action-cancel-text: #0a84ff; --action-cancel-emboss: none; --action-cancel-pressed: #3a3a3c;
+}
+
+/* ---- Look-only rules: type, and the shapes no token carries ---- */
+/* The system font (SF on an iPhone), in place of iOS 6's Helvetica Neue. */
+html[data-style="ios13"] body,
+html[data-style="ios13"] .store-segment,
+html[data-style="ios13"] .sign-pw-txt { font-family: -apple-system, system-ui, "Helvetica Neue", Helvetica, Arial, sans-serif; }
+
+/* Large title (the nav hook draws it; style.css sets its 34pt bold type): the label colour, on the page's ground. */
+html[data-style="ios13"] .large-title { color: var(--i13-label); letter-spacing: .01em; }
+
+/* Nav bar: a 17pt semibold title; bar buttons are tinted text that dims while held. */
+html[data-style="ios13"] .nav-title { font-size: 17px; font-weight: 600; letter-spacing: -.02em; }
+html[data-style="ios13"] .bar-button { font-size: 17px; font-weight: 400; line-height: 44px; letter-spacing: -.02em; border-radius: 0; }
+html[data-style="ios13"] .bar-button.done { font-weight: 600; }
+html[data-style="ios13"] .bar-button:active, html[data-style="ios13"] .bar-button.is-pressed { opacity: .3; }
+html[data-style="ios13"] .bar-button.back:active, html[data-style="ios13"] .bar-button.back.is-pressed { opacity: .3; filter: none; }
+html[data-style="ios13"] .bar-button.red:not(.back):not(.done) { color: var(--i13-red); }
+html[data-style="ios13"] .bar-button.share-button::before {
+  filter: none;
+  background-color: var(--i13-tint);
+  background-image: none;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 26'%3E%3Cpath d='M7 9H3.5a1 1 0 0 0-1 1v13.5a1 1 0 0 0 1 1h13a1 1 0 0 0 1-1V10a1 1 0 0 0-1-1H13' fill='none' stroke='%23000' stroke-width='1.6' stroke-linecap='round'/%3E%3Cpath d='M10 16.5V1.8M5.8 5.8 10 1.6l4.2 4.2' fill='none' stroke='%23000' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 17px 22px no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 26'%3E%3Cpath d='M7 9H3.5a1 1 0 0 0-1 1v13.5a1 1 0 0 0 1 1h13a1 1 0 0 0 1-1V10a1 1 0 0 0-1-1H13' fill='none' stroke='%23000' stroke-width='1.6' stroke-linecap='round'/%3E%3Cpath d='M10 16.5V1.8M5.8 5.8 10 1.6l4.2 4.2' fill='none' stroke='%23000' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 17px 22px no-repeat;
+}
+
+/* Tab bar: 10pt medium labels under filled glyphs (ios6.css's own set, the map's iOS 6 tabs), grey or tinted. */
+html[data-style="ios13"] .tab { font-weight: 500; letter-spacing: .01em; border-radius: 0; }
+html[data-style="ios13"] .badge { font-size: 14px; font-weight: 400; line-height: 20px; letter-spacing: 0; }
+
+/* Inset grouped tables: no outline, 10pt corners, separators inset 16pt (drawn on the cell, so the pressed grey
+   covers them as iOS hides a selected row's lines), uppercase 13pt headers, left-aligned 13pt footers. */
+html[data-style="ios13"] .group-header { font-size: 13px; font-weight: 400; line-height: 16px; letter-spacing: 0; text-transform: uppercase; }
+html[data-style="ios13"] .group-footer { font-size: 13px; line-height: 17px; text-align: left; }
+html[data-style="ios13"] .table.grouped { border-width: 0; border-radius: 10px; box-shadow: none; }
+html[data-style="ios13"] .grouped .cell + .cell {
+  border-top-width: 0;
+  background: linear-gradient(var(--divider), var(--divider)) 16px 0 / calc(100% - 16px) .5px no-repeat;
+}
+html[data-style="ios13"] .grouped .cell + .cell > .cell-inner { box-shadow: none; }
+html[data-style="ios13"] .cell-label { font-size: 17px; font-weight: 400; letter-spacing: -.02em; }
+html[data-style="ios13"] .cell-subtitle { font-size: 13px; }
+html[data-style="ios13"] .cell-detail { letter-spacing: -.02em; }
+html[data-style="ios13"] .cell-count { font-weight: 400; }
+html[data-style="ios13"] .cell-check::after { font-weight: 600; color: var(--i13-tint); }
+html[data-style="ios13"] .cell-inner.is-pressed { color: var(--text); }
+html[data-style="ios13"] .cell-inner.is-pressed * { color: inherit; }
+html[data-style="ios13"] .cell-inner.is-pressed .cell-subtitle { color: var(--subtitle); }
+html[data-style="ios13"] .cell-inner.is-pressed .cell-detail { color: var(--detail); }
+html[data-style="ios13"] .cell-inner.chevron.is-pressed::after { background-image: var(--chevron); }
+
+/* Plain tables: the flat grey section bar, 13pt semibold uppercase-free label as iOS 13's plain header. */
+html[data-style="ios13"] .section-header { font-size: 15px; font-weight: 600; color: var(--i13-label); text-shadow: none; }
+
+/* Switch: flat, iOS 13's green with a white knob and no ON / OFF (iOS 6's 77 x 27 box: its size is not a hook yet). */
+html[data-style="ios13"] .sw-track,
+html[data-style="ios13"][data-theme] .sw-track {
+  border: 1.5px solid var(--i13-sw-track); background: var(--i13-sw-track); box-shadow: none;
+}
+html[data-style="ios13"] .switch[aria-checked="true"] .sw-track { border-color: var(--i13-green); }
+html[data-style="ios13"] .sw-track::before,
+html[data-style="ios13"][data-theme] .sw-track::before { content: ""; text-shadow: none; background: var(--i13-green); }
+html[data-style="ios13"] .sw-track::after { content: ""; }
+html[data-style="ios13"] .sw-knob,
+html[data-style="ios13"][data-theme] .sw-knob {
+  border: 0; background: var(--i13-knob); box-shadow: var(--i13-knob-shadow);
+}
+html[data-style="ios13"] .switch.is-held .sw-knob,
+html[data-style="ios13"][data-theme] .switch.is-held .sw-knob { background: var(--i13-knob-held); }
+
+/* Segmented control: iOS 13's grey track with the chosen segment a white pill (the track's colour as a 1pt ring
+   inside it, so the pill sits 2pt in from the track's edge), black 13pt text, semibold when chosen. The
+   [data-theme] copies tie with ios6.css's dark rules and win by order. */
+html[data-style="ios13"] .store-segmented,
+html[data-style="ios13"][data-theme] .store-segmented,
+html[data-style="ios13"] .store-segmented:has(.store-segment.selected) {
+  border-color: var(--i13-seg-track); border-radius: 9px; box-shadow: none; background: var(--i13-seg-track);
+}
+html[data-style="ios13"] .store-segment,
+html[data-style="ios13"] .store-segment:not(.selected),
+html[data-style="ios13"][data-theme] .store-segment:not(.selected) {
+  font-size: 13px; font-weight: 400; color: var(--i13-seg-text); text-shadow: none; background: var(--i13-seg-track);
+}
+html[data-style="ios13"] .store-segment + .store-segment,
+html[data-style="ios13"][data-theme] .store-segment + .store-segment { border-left-color: var(--i13-seg-divider); }
+html[data-style="ios13"] .store-segment.selected + .store-segment,
+html[data-style="ios13"] .store-segment + .store-segment.selected,
+html[data-style="ios13"][data-theme] .store-segment.selected + .store-segment,
+html[data-style="ios13"][data-theme] .store-segment + .store-segment.selected { border-left-color: var(--i13-seg-track); }
+html[data-style="ios13"] .store-segment:active:not(.selected),
+html[data-style="ios13"][data-theme] .store-segment:active:not(.selected) { background: var(--i13-seg-pressed); }
+html[data-style="ios13"] .store-segment.selected,
+html[data-style="ios13"][data-theme] .store-segment.selected {
+  font-weight: 600; color: var(--i13-seg-text); background: var(--i13-seg-pill); border-radius: 8px;
+  box-shadow: inset 0 0 0 1px var(--i13-seg-track), var(--i13-seg-pill-shadow);
+}
+
+/* Scope bar (Changes' All / Installed, Installed's title, Search's scopes): the same grey track and white pill. */
+html[data-style="ios13"] .scope-segments,
+html[data-style="ios13"][data-theme] .scope-segments { border-radius: 9px; box-shadow: none; background: var(--i13-seg-track); }
+html[data-style="ios13"] .scope-segment, html[data-style="ios13"] .scope-filter,
+html[data-style="ios13"][data-theme] .scope-segment, html[data-style="ios13"][data-theme] .scope-filter {
+  font-size: 13px; font-weight: 400; color: var(--i13-seg-text); text-shadow: none;
+  border-color: var(--i13-seg-track); background: var(--i13-seg-track);
+}
+html[data-style="ios13"] .scope-segment:first-child { border-radius: 9px 0 0 9px; }
+html[data-style="ios13"] .scope-segment:last-child { border-radius: 0 9px 9px 0; }
+html[data-style="ios13"] .scope-filter { border-radius: 9px; }
+html[data-style="ios13"] .scope-segment + .scope-segment,
+html[data-style="ios13"][data-theme] .scope-segment + .scope-segment { border-left-color: var(--i13-seg-divider); }
+html[data-style="ios13"][data-theme] .scope-segment.selected + .scope-segment,
+html[data-style="ios13"][data-theme] .scope-segment + .scope-segment.selected { border-left-color: var(--i13-seg-track); }
+html[data-style="ios13"] .scope-segment:active, html[data-style="ios13"] .scope-filter:active,
+html[data-style="ios13"][data-theme] .scope-segment:active, html[data-style="ios13"][data-theme] .scope-filter:active {
+  border-color: var(--i13-seg-track); background: var(--i13-seg-pressed);
+}
+html[data-style="ios13"] .scope-segment.selected, html[data-style="ios13"] .scope-filter.selected,
+html[data-style="ios13"][data-theme] .scope-segment.selected, html[data-style="ios13"][data-theme] .scope-filter.selected {
+  font-weight: 600; color: var(--i13-seg-text); border-color: var(--i13-seg-track); background: var(--i13-seg-pill);
+  border-radius: 8px; box-shadow: inset 0 0 0 1px var(--i13-seg-track), var(--i13-seg-pill-shadow);
+}
+html[data-style="ios13"] .nav-segments .scope-segments { box-shadow: none; }
+
+/* Search bar: the field is a 10pt rounded grey box; Cancel is tinted text. */
+html[data-style="ios13"] .search-field { border-radius: 10px; }
+html[data-style="ios13"] .search-cancel { font-size: 17px; font-weight: 400; }
+html[data-style="ios13"][data-theme="dark"] .search-cancel { background: none; }
+
+/* Action sheet: 13pt rounded buttons, regular weight, Cancel semibold. */
+html[data-style="ios13"] .action-button { font-size: 20px; font-weight: 400; border-radius: 13px; }
+html[data-style="ios13"] .action-button.cancel { font-weight: 600; }
+html[data-style="ios13"][data-theme="dark"] .action-button.destructive { background: var(--action-destructive); }

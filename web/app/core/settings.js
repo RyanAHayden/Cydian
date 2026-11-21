@@ -97,8 +97,9 @@ export const SETTINGS = [
     // own two themes (STYLE_PALETTES), so the Themes rows (`style: "ios6"`) hide while it is on.
     key: "style", section: "style", kind: "choice", feature: "appearance", modes: ALL, default: "ios6",
     label: "Style",
-    options: [{ value: "ios6", label: "iOS 6" }, { value: "ios7", label: "iOS 7" }],
-    footer: "iOS 7 has two themes of its own: White, and OLED Black in Dark mode.",
+    // F202: iOS 13 (ios13.css), inset grouped with large titles and card sheets (STYLE_HOOKS)
+    options: [{ value: "ios6", label: "iOS 6" }, { value: "ios7", label: "iOS 7" }, { value: "ios13", label: "iOS 13" }],
+    footer: "iOS 7 and iOS 13 have two themes of their own: White, and OLED Black in Dark mode.",
   },
   {
     // F199: Theme's Mode, drawn as an iOS 6 segmented control. Kept under its old key (ifizbox.appearance) so a
@@ -909,7 +910,13 @@ export function themeState({ style = "ios6", appearance, lightTheme, darkTheme, 
 export const STYLES = byKey.get("style").options.map((o) => o.value);
 export const STYLE_DEFAULT = byKey.get("style").default;
 export const STYLE_KEY = "ifizbox.style";
-export const STYLE_PALETTES = { ios7: { light: "white", dark: "oled" } };
+export const STYLE_PALETTES = { ios7: { light: "white", dark: "oled" }, ios13: { light: "white", dark: "oled" } };
+
+// F202: the nav hooks an era turns on (docs/eras.md, "Nav hooks"): `nav: "large"` puts <html data-nav="large"> (large
+// titles, nav/navbar.js setLargeTitles), `sheet: "card"` puts <html data-sheet="card"> (card sheets, nav/sheet.js).
+// iOS 6 and iOS 7 turn none on. screens/settings.js applyTheme sets them with the style.
+export const STYLE_HOOKS = { ios13: { nav: "large", sheet: "card" } };
+export const hooksOf = (style) => ({ nav: null, sheet: null, ...STYLE_HOOKS[style] });
 
 // F323: the app icon a tone ("light" or "dark") gets: with Match Theme on, that tone's theme's icon; off, the tone's
 // pick (lightIcon, darkIcon), its theme's own while that is "theme". `get` reads a setting (settings.get).

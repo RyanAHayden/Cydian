@@ -20,7 +20,7 @@ import { format, parse, settingsRoute } from "../router.js";
 import { settings } from "../settings-store.js";
 import { createSwitch } from "../nav/switch.js";
 import { detectMode, themeState, paletteFor, DARK_THEME_KEY, SETTINGS, SIGNING_GROUPS } from "../core/settings.js";
-import { showAlert, alertOK } from "../nav/alert.js";
+import { hooksOf } from "../core/settings.js"; // F202import { showAlert, alertOK } from "../nav/alert.js";
 import { showHUD } from "../nav/hud.js";
 import { parseProfile, checkP12Password, deviceSummary, deviceError, summary, profileKind, deviceCheck, deviceCheckText } from "../core/signing.js";
 import { sortCertFiles, resolvePassword } from "../core/certfiles.js";
@@ -781,6 +781,24 @@ function currentPreview(win) {
   try { return previewOf(parse(win.location?.hash)); } catch { return null; }
 }
 
+// F202: the nav hooks the era turns on (core/settings.js STYLE_HOOKS): large titles through nav/navbar.js (it draws
+// and removes the titles itself), card sheets as <html data-sheet="card"> (nav/sheet.js reads it when a sheet opens).
+// navbar.js loads only when an era turns large titles on (or off again), so iOS 6's startup is unchanged
+// (module-graph.test.js). Returns a promise of the hook being set, for the tests.
+export function applyStyleHooks(style, doc = document) {
+  const { nav, sheet } = hooksOf(style);
+  const on = nav === "large";
+  const root = doc.documentElement;
+  let done = Promise.resolve();
+  if (on || root.getAttribute?.("data-nav") === "large") {
+    done = import("../nav/navbar.js").then((m) => m.setLargeTitles(hooksOf(root.dataset?.style).nav === "large", doc)) // the style by then
+      .catch(() => {}); // offline with the module not cached: iOS 13 keeps the bar titles
+  }
+  if (sheet) root.setAttribute?.("data-sheet", sheet);
+  else root.removeAttribute?.("data-sheet");
+  return done;
+}
+
 export function applyTheme(doc = document, win = window) {
   const dark = win.matchMedia?.("(prefers-color-scheme: dark)").matches ?? false;
   const appearance = settings.get("appearance");
@@ -789,6 +807,7 @@ export function applyTheme(doc = document, win = window) {
   const preview = currentPreview(win);
   const { theme, palette, style } = themeState({ style: settings.get("style"), appearance, lightTheme, darkTheme: darkPalette, preview }, dark);
   doc.documentElement.dataset.style = style; // F201: the era, ios6.css alone or ios7.css over it
+  applyStyleHooks(style, doc); // F202: iOS 13's large titles and card sheets
   doc.documentElement.dataset.theme = theme;
   doc.documentElement.dataset.palette = palette; // F198/F199: Mode's tone in its chosen theme
   // A meta with a media query (light or dark) is painted for its own scheme while Mode is Automatic; a fixed

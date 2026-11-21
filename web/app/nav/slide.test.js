@@ -127,3 +127,64 @@ test("without the watcher installed (node, a test DOM) nothing is watched and sl
   slideChange({}, () => { ran = true; });
   assert.ok(ran);
 });
+
+// B213: a viewport resize (iPad rotation, Split View, a desktop window) reports boxes to the ResizeObserver, and the
+// watcher measures again in that report. A box it finds then is observed on the next frame, never inside the report:
+// observed there, its first report lands shallower in the same broadcast and Chromium raises "ResizeObserver loop
+// completed with undelivered notifications". Runs last: it installs the watcher for the rest of this file.
+test("a resize report observes the boxes it finds on the next frame, not in the report", async () => {
+  const { installSlides } = await import("./slide.js");
+  const observed = [];
+  let roCallback = null, moCallback = null;
+  const frames = [];
+  const el = (cls, top, height, parent) => {
+    const e = {
+      tagName: "DIV", offsetTop: top, offsetLeft: 0, offsetWidth: 320, offsetHeight: height, offsetParent: parent,
+      children: [], textContent: cls, isConnected: true, nodeType: 1, clientWidth: 320,
+      getAttribute: (k) => (k === "class" ? cls : null),
+      matches: (sel) => sel.split(",").some((s) => s.trim() === `.${cls}`),
+      closest: (sel) => (sel.split(",").some((s) => s.trim() === `.${cls}`) ? e : parent?.closest?.(sel) ?? null),
+      hasAttribute: () => false, getAnimations: () => [], animate: () => ({}),
+    };
+    return e;
+  };
+  const root = el("page-body", 0, 600, null);
+  const a = el("home", 0, 100, root), b = el("cell", 100, 44, root);
+  root.children = [a, b];
+  Object.assign(globalThis, {
+    document: { body: {} },
+    Element: class { animate() {} },
+    MutationObserver: class { constructor(f) { moCallback = f; } observe() {} },
+    ResizeObserver: class { constructor(f) { roCallback = f; } observe(x) { observed.push(x); } unobserve() {} },
+    requestAnimationFrame: (f) => frames.push(f),
+    getComputedStyle: () => ({ display: "block", position: "static", transform: "none" }),
+  });
+  try {
+    assert.equal(installSlides(), true);
+    moCallback([{ type: "attributes", target: root, addedNodes: [], removedNodes: [] }]); // a `hidden` flip
+    assert.deepEqual(observed, [a, b]); // outside a report: observed at once
+    roCallback([{ target: a }, { target: b }]); // their first reports: skipped
+
+    // The window narrows: the top box grows and a new box shows below.
+    root.clientWidth = 280;
+    a.offsetHeight = 140; b.offsetTop = 140;
+    const c = el("home-version", 184, 20, root);
+    root.children = [a, b, c];
+    roCallback([{ target: a, borderBoxSize: [{ blockSize: 140 }] }]);
+    assert.deepEqual(observed, [a, b], "nothing observed inside the report");
+    assert.equal(frames.length, 1);
+    frames.shift()();
+    assert.deepEqual(observed, [a, b, c], "observed on the next frame");
+
+    // Its first report: skipped when it kept its size, a change when it grew in the frame it waited.
+    let measured = 0;
+    const kids = root.children;
+    Object.defineProperty(root, "children", { get: () => { measured++; return kids; } });
+    roCallback([{ target: c, borderBoxSize: [{ blockSize: 20 }] }]);
+    assert.equal(measured, 0);
+    roCallback([{ target: c, borderBoxSize: [{ blockSize: 40 }] }]);
+    assert.equal(measured, 1);
+  } finally {
+    for (const k of ["document", "Element", "MutationObserver", "ResizeObserver", "requestAnimationFrame", "getComputedStyle"]) delete globalThis[k];
+  }
+});

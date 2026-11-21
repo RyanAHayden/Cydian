@@ -288,6 +288,8 @@ function flushPending() {
 
 function unwatch(el) {
   pending.delete(el);
+  rootOf.delete(el); // so it is observed again if it comes back
+  firstSeen.delete(el);
   ro.unobserve(el);
 }
 

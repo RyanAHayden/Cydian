@@ -12,7 +12,13 @@
   now keeps the measured height: the first report is skipped only when `borderBoxSize` matches it (within 1 px), or
   when the browser gives no `borderBoxSize` (older Safari: the old behaviour). A box that grew in the wait counts as a
   change and its root is measured and slid.
-- Unobserving a box (it left the measure, or its root went) also drops it from `pending`.
+- Unobserving a box (it left the measure, or its root went) also drops it from `pending` and `rootOf`, so a box that
+  leaves and comes back (now likelier within the frame a deferred observe waits) is observed again; before, its
+  `rootOf` entry stayed and it was never observed again.
+- Spec review: it flagged the `firstSeen` height check as not asked for. I kept it because the deferral needs it: a
+  box observed a frame late could otherwise miss a size change. `b.height` is `offsetHeight` (the border box, rounded),
+  the same box as `borderBoxSize`, and the 1 px tolerance absorbs the rounding. It also flagged the missing
+  real-browser proof; see Not verified.
 - `web/app/nav/slide.test.js`: a test installs the watcher with fake observers and checks that a resize report
   observes nothing inside the report, observes the new box on the next frame, and that the late box's first report is
   skipped at the same size and re-measures when it grew. It fails on the old slide.js (checked against a copy of HEAD's

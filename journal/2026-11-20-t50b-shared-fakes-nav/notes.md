@@ -22,7 +22,7 @@ event target only), pullrefresh's B209 stand-ins and slide/statusbar's layout tr
 **fake-indexeddb.mjs**: the 8 tests that imported `native/fake/fake-indexeddb.mjs` (app-updates,
 backend-native-appversions/-linked/-live/-queue/-queuerun/-rollback, core/keepawake) import `fakeIndexedDB` from
 `fakes.test-helper.js`. None of them needed anything only the .mjs had. Nothing imports the .mjs any more; it is
-outside this task's files, so its removal is filed as a follow-up.
+outside this task's files, so its removal is filed as C59.
 
 **fakeNative variants**: of the 13 local `fakeNative`s, 6 have the shared shape (an answer per method) and now use
 `fakeNative(answers)` from `fakes.test-helper.js`: self-update-lock (identical), signing-client-original,
@@ -50,6 +50,14 @@ the sorted `ok` names diff empty.
   `fakeEl(tag)`; it uses `doc.createElement` now.
 - I made two of the edits (searchbar's helper block, reloadbar's import line) with a short python / sed command
   before going back to the file-edit tool; both were read back and tested.
+
+## Spec review
+
+A fresh subagent found nothing missing or broken. Under "not asked" it listed core/push and screens/b136-swipe,
+which fall outside the brief's file globs. I kept them because they are two of the 13 `fakeNative` variants the
+brief names. It also listed the queuehint tabs becoming `<a>`, which the shared `closest("a.tab")` needs. It
+pointed out two behaviour changes that break nothing: the shared `call` is async, and an unlisted method answers
+null instead of `{}`. Both are described above.
 
 ## Not verified
 

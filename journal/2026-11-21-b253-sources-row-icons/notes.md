@@ -12,7 +12,11 @@
   its 32pt folder (Cydia's), Home and Manage keep More Sources' Settings placement.
 - Reference geometry is the source rows', as the task asked (docs/cydia.md says folder.png is 32x32 on Sections;
   on the Sources tab it now matches the 29pt source icons instead).
-- `web/app/sources-row-icons.test.js` pins it (sizes against style.css's `.cell-icon`, the margin, the class).
+- Cydia's own Sources page on the 4S (`ref/4s/screens/cy-sources.png`) agrees: the All Sources folder and the source
+  icons (unknown.png's "?", BigBoss) are one size at one left edge, the titles in one column. Sections' 32pt folder
+  is a different page.
+- `web/app/sources-row-icons.test.js` pins it (a CSS-text test like centre-text.test.js; the gate has no browser,
+  so the measured line-up is the render below) (sizes against style.css's `.cell-icon`, the margin, the class).
 
 ## Rendered check (headless Chromium, 402x874 at 3x, `srcshot.mjs` here)
 Icon box [x, y-in-row, w, h, centre offset] and title x per row:
@@ -35,4 +39,5 @@ Height wasn't part of the ask, so I left it as it is.
 - On the iPhone 15 Pro itself: the render is Chromium at the 15 Pro's 3x and the same CSS, not the phone's WebKit.
   The geometry here is plain flex/box sizing with no WebKit-specific rule, so I didn't drive the phone for it.
 - iOS 7 keyline under All Sources: ios7.css starts a plain row's keyline at the title only for rows with a
-  `.cell-icon`, so the folder row's keyline still starts at 15pt. ios7.css isn't in this task's files.
+  `.cell-icon`, so the folder row's keyline still starts at 15pt (it did before too). ios7.css isn't in this
+  task's files: filed B255.

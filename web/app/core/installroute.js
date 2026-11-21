@@ -366,3 +366,23 @@ export function leaveQuestion(step) {
   if (!message) return null;
   return { title: "Stop Setting Up?", message, buttons: ["Cancel", "Leave"], cancel: 0 };
 }
+
+// B218: Install Apps With kept in the shell's Keychain beside the Tailscale node (Tailscale.swift tailscale.keepRoute /
+// tailscale.keptRoute), so a reinstall or a re-sign (a fresh container: localStorage gone), and an account sign-in
+// after one, comes back on the route it had. At launch, with nothing stored here, the kept route is taken; otherwise
+// what is stored is kept (a build from before this kept nothing); then every change is kept. Sideload app only (the
+// setting shows nowhere else). Returns true when it started.
+//   keepRoute({ settings, native: nativeBridge(), storage: globalThis.localStorage })   (native.js; none: no start)
+export function keepRoute({ settings, native = null, storage = globalThis.localStorage } = {}) {
+  if (!settings || typeof native?.call !== "function" || !settings.isShown?.(ROUTE_KEY)) return false;
+  const call = (name, params) => Promise.resolve().then(() => native.call(name, params));
+  const stored = () => { try { return storage?.getItem(STORAGE_KEY) ?? null; } catch { return null; } };
+  const keep = (value) => call("tailscale.keepRoute", { value }).catch(() => {});
+  settings.onChange((key, value) => { if (key === ROUTE_KEY) keep(value); });
+  if (stored() !== null) { keep(settings.get(ROUTE_KEY)); return true; }
+  call("tailscale.keptRoute").then((v) => {
+    // a pick made while the shell answered stands
+    if ((v === "iphone" || v === "server") && stored() === null) settings.set(ROUTE_KEY, v);
+  }).catch(() => {});
+  return true;
+}

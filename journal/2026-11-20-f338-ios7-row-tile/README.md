@@ -8,6 +8,8 @@ What I did
 - ios7.css: the separator on a row-tile row starts at 15 + in + 29 + after + gap = 59pt, at the label. Rows with
   another `.cell-icon` (no row tile) keep the old 52pt rule. The theme swatch rule is unchanged.
 - docs/eras.md hook table row; ios6-css.test.js F338 test.
+- icons/rowicons.test.js (not on the task's file list) checked the literal `margin: 0 3px 0 -3px` and failed the
+  first gate run; it now checks the hook rule and iOS 6's `-3px` / `3px` values.
 
 Checked
 - `node --test web/app/ios6-css.test.js`: 18 pass.

@@ -123,3 +123,18 @@ Run 4 found two bugs in the first reconnect version, fixed after it:
 - that connect failed with `connect_failed: InternalError("connect: Operation Timeout") (16)`, which isn't a drop
   code, so the install ended. Now, once it is already connecting again, a `connect_failed` is tried again too
   (`HereRecheck.shouldReconnect`), within the same 4 tries (pauses 2, 4, 8, 15 s).
+
+With those fixes (build 90c3d03+, installed on the 15 Pro with `ui-15.sh install`):
+
+| Run | What I did | Result |
+| --- | --- | --- |
+| 5 (6.0) | VPN off 6 s into the copy (at 91 MB), on again 11 s later | `Socket(Kind(TimedOut))` 19 s later; reconnected through Tailscale 2 s after that (node restart 1.5 s, tunnel 0.19 s); "carrying on from 91.0 MB of 351.5 MB"; copy 37.9 s in all (16.9 MB/s in front, 17.1 in the background); installd took the resumed file; **installed** |
+| 6 (4.0 over 6.0) | VPN off the moment the log said installd started (copy 19.9 s: 17.9 / 16.1 MB/s); my tap to turn it on again didn't take | nothing came back from installd, so the drop showed only at the 180 s installd limit (TIMEOUT, then `BrokenPipe`); the reconnects said "Tailscale isn't back on yet" 4 times (2, 4, 8, 15 s) and the install failed, now saying "iOS may still have installed it: look on the Home Screen" |
+
+Two runs in between didn't test anything: with iOS Settings in front from 3 s after Confirm (the IPA not signed yet) the
+run waited for the app to come back, and then went the Signing Server way because one of my VPN taps had left
+Tailscale's VPN off (I cancelled iOS's install prompt both times). Filed: B252 (hold KeepAlive from Confirm on) and
+B251 (notice a drop during installd sooner than its 180 s limit).
+
+Run 6 also showed the log's "try 5 of 4" (counted before the give-up check) and that the failure didn't say iOS may
+have installed it anyway: both fixed.

@@ -882,11 +882,14 @@ enum IDevice {
                 attempt += 1
                 if firstDrop == nil { firstDrop = f }
                 let stage = run.installSent ? "while iOS was installing it" : run.copied ? "after the copy" : "during the copy (\(mb(run.sent)) of \(mb(size)))"
-                ilog("dropped \(stage): \(f.errorDescription ?? f.text) (try \(attempt) of \(HereRecheck.reconnects))")
                 guard attempt <= HereRecheck.reconnects else {
+                    ilog("gave up \(stage) after \(HereRecheck.reconnects) tries: \(f.errorDescription ?? f.text)")
                     let first = firstDrop ?? f
-                    throw Failure(code: first.code, text: "lost the connection to iOS \(stage) and couldn't get it back (\(first.text))", lib: first.lib)
+                    // installd goes on without us: the app may be on the Home Screen anyway
+                    let maybe = run.installSent ? ". iOS may still have installed it: look on the Home Screen" : ""
+                    throw Failure(code: first.code, text: "lost the connection to iOS \(stage) and couldn't get it back (\(first.text))\(maybe)", lib: first.lib)
                 }
+                ilog("dropped \(stage): \(f.errorDescription ?? f.text) (try \(attempt) of \(HereRecheck.reconnects))")
                 note("Lost the connection to iOS \(stage): \(f.text). Connecting again (\(attempt) of \(HereRecheck.reconnects))")
                 Thread.sleep(forTimeInterval: HereRecheck.pause(attempt))
             }

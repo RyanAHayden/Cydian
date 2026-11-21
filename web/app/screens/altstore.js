@@ -59,6 +59,7 @@ import { installedOnPhone } from "../core/appqueue.js"; // B136
 import { whereFromGroup, reportBanner, reports, reportMalicious } from "./safety.js"; // F291
 import { addTweaksGroup, installTweaksChoice } from "./tweaks.js"; // F302a
 import { EASE, DURATION } from "../nav/motion.js";
+import { nativeBridge } from "../native.js";
 
 function img(url, cls) {
   const src = mediaUrl(url);
@@ -258,7 +259,7 @@ export async function renderAltSource(body, route, key, ctx = null) {
 
 // F91: iFizBox's signing.installed record of this app (by installed or original bundle ID), in the sideload app; null
 // anywhere else, for an app iFizBox didn't sign, or when the call fails.
-export async function signedRecordOf(id, { mode = detectMode(), native = globalThis.ifizboxNative } = {}) {
+export async function signedRecordOf(id, { mode = detectMode(), native = nativeBridge() } = {}) {
   if (mode !== "sideload" || !id || typeof native?.call !== "function") return null;
   try { return signedIndex(await native.call("signing.installed", {})).get(id) ?? null; } catch { return null; }
 }
@@ -1332,7 +1333,7 @@ export async function rowAppJob(pkg, source, { store = apps, mode = detectMode()
 
 // B136: whether iOS has the app now (the shell's apps.isInstalled, not backend-native's session cache: an install
 // can land or fail within a session). null where it can't be asked (the website, an older shell).
-export async function appOnPhone(bundleId, native = globalThis.ifizboxNative) {
+export async function appOnPhone(bundleId, native = nativeBridge()) {
   if (!native?.call || !bundleId) return null;
   const v = (await native.call("apps.isInstalled", { bundleIds: [bundleId] }))?.installed?.[bundleId];
   return typeof v === "boolean" ? v : null;

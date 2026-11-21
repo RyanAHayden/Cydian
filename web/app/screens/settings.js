@@ -70,7 +70,7 @@ import { onPageShow, patchDetails, cellsOf } from "../nav/pagestate.js";
 import { refreshInstallation } from "./installroute.js";
 import { loadStyle, EASE, DURATION } from "../nav/motion.js";
 import { APP_ICONS, iconGroups, isOwnIcon } from "../core/settings.js";
-import { hasNativeCall } from "../native.js";
+import { nativeBridge, hasNativeCall } from "../native.js";
 import { nativeIcons, iconSrc, iconOf, iconImage, refreshIcons, tellIcon, clearHere, readIcons } from "../appicon.js";
 
 // F284: Installation & Signing's own sub-pages under signing/ (the main page's Signing rows), sideload build only.
@@ -927,7 +927,7 @@ export function init() {
 // F68: Re-sign Reminder to the shell (signing.remind {days}, F14), sideload build only.
 function remindNow() {
   if (!localSigning() || !settings.isShown("resignReminder")) return;
-  const n = globalThis.ifizboxNative;
+  const n = nativeBridge();
   syncReminder((k) => settings.get(k), n?.call ? (m, p) => n.call(m, p) : null);
 }
 
@@ -1496,7 +1496,7 @@ function drawMain(el) {
         return { certificate: failure ? { text: "Unknown" } : certificateDetail(kept, { staged: Boolean(id?.p12 || id?.profile) }) };
       },
       apps: async () => {
-        const n = globalThis.ifizboxNative;
+        const n = nativeBridge();
         try { return String(signedAppRows(await n.call("signing.installed", {})).length); } catch { return ""; }
       },
       checkServer: () => checkServer(),
@@ -1828,7 +1828,7 @@ function checkRows(st, now, { pushOn = false } = {}) {
 }
 function notifySection() {
   const box = document.createElement("div");
-  const n = globalThis.ifizboxNative;
+  const n = nativeBridge();
   if (detectMode() !== "sideload" || !n?.call) return box;
   const push = pushActions({ native: n });
   const redraw = () => box.replaceWith(notifySection());

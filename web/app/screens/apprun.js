@@ -41,6 +41,7 @@ import { appRows, createAppRun, rowStatus, summaryLine, runStatus, runPercent, e
 import { recordWhen } from "../core/apprun.js"; // B136
 import { apps as appStore, undoRecord } from "../core/installed.js"; // B170
 import { SELF_UPDATE_LINES, SELF_UPDATE_FAILED, HERE_CLOSING_LINE, DOWNLOAD_HINT, DOWNLOAD_BY_HAND } from "../signing/selfupdate.js";
+import { nativeBridge, hasNativeCall } from "../native.js";
 
 // The phone's side of a run, from signing-client.js (prepareOnDevice, openPrepared, discardPrepared). Each attempt of a
 // row gets its own tag, so signing.cancel {tag} stops that try only.
@@ -49,7 +50,7 @@ import { SELF_UPDATE_LINES, SELF_UPDATE_FAILED, HERE_CLOSING_LINE, DOWNLOAD_HINT
 // earlier run's Stop or Cancel had cancelled, and that app ended "Failed: Cancelled" though nobody cancelled it.
 // F287: the backend's keepAwake (backend-native.js: the shell's idle timer; backend-http.js: Screen Wake Lock), loaded
 // only where there is a screen to keep on (the app's bridge, or a browser with navigator.wakeLock): never in node.
-const screenAwake = (on) => (globalThis.ifizboxNative?.call || globalThis.navigator?.wakeLock
+const screenAwake = (on) => (hasNativeCall() || globalThis.navigator?.wakeLock
   ? import("../backend.js").then((m) => m.getBackend().keepAwake?.(on)) : undefined);
 
 // B175: the app run's page that is up, or null: { busy (the run works, or iFizBox's own update waits locked for iOS),
@@ -78,12 +79,12 @@ export function phoneLanes(sc, { native, run = laneRunId() } = {}) {
     reprompt: (r) => sc.repromptPrepared?.(r, native) ?? false,
     // B111: a This iPhone install's Open <app> (iOS has it the moment the row ends)
     open: (r) => {
-      const n = native ?? globalThis.ifizboxNative;
+      const n = native ?? nativeBridge();
       try { Promise.resolve(n?.call?.("signing.openApp", { bundleId: r.bundleId })).catch(() => {}); } catch { /* no bridge */ }
     },
     // B76: which of these apps iOS has now ({ bundleId: true | false | null }); apps.isInstalled works in both builds
     isInstalled: async (bundleIds) => {
-      const n = native ?? globalThis.ifizboxNative;
+      const n = native ?? nativeBridge();
       if (!n?.call) return {};
       try { return (await n.call("apps.isInstalled", { bundleIds }))?.installed ?? {}; } catch { return {}; }
     },

@@ -36,6 +36,7 @@ import {
   loadInjectable, normalRepo, POPULAR_RANKS, CANISTER_SAFE_LABEL,
 } from "../core/canister.js";
 import { canisterApi, offerTweak } from "./extras.js";
+import { nativeBridge } from "../native.js";
 
 export const FIND = "find";
 export const DIRECTORY_URL = "https://ios-repo-updates.com/";
@@ -261,7 +262,7 @@ function footer() {
 }
 
 async function openOutside(url) {
-  try { const r = await globalThis.ifizboxNative?.call?.("app.openURL", { url }); if (r?.opened) return; } catch { /* an older shell */ }
+  try { const r = await nativeBridge()?.call?.("app.openURL", { url }); if (r?.opened) return; } catch { /* an older shell */ }
   globalThis.open?.(url, "_blank", "noopener");
 }
 

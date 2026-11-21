@@ -29,29 +29,6 @@ const ALLOWED = {
   "nav/alert.js": 1,
   "nav/banner.js": 1,
   "nav/menu.js": 2,
-  "screens/account.js": 3,
-  "screens/altstore.js": 2,
-  "screens/apprun.js": 3,
-  "screens/changes.js": 1,
-  "screens/devaccount.js": 1,
-  "screens/extras.js": 2,
-  "screens/findmore.js": 1,
-  "screens/home.js": 5,
-  "screens/importlink.js": 1,
-  "screens/installroute.js": 4,
-  "screens/ipa-install.js": 1,
-  "screens/manage.js": 2,
-  "screens/myipas.js": 5,
-  "screens/push-settings.js": 1,
-  "screens/queue.js": 2,
-  "screens/safety.js": 1,
-  "screens/settings.js": 3,
-  "screens/sharedeb.js": 1,
-  "screens/signed-apps.js": 1,
-  "screens/signing.js": 2,
-  "screens/sources.js": 2,
-  "screens/tweaks.js": 3,
-  "screens/version-foot.js": 1,
   "settings.js": 4,
   "settings-store.js": 2,
   "share.js": 1,
@@ -102,6 +79,12 @@ test("screens/installed.js reads the bridge only through native.js", () => {
   assert.equal(directReads()["screens/installed.js"] ?? 0, 0);
   const src = readFileSync(join(root, "screens/installed.js"), "utf8");
   assert.match(src, /from "\.\.\/native\.js"/);
+});
+
+test("no screen reads the bridge off globalThis: screens/ go through native.js or getBackend()", () => {
+  const screens = Object.keys(directReads()).filter((f) => f.startsWith("screens/"));
+  assert.deepEqual(screens, []);
+  assert.ok(!Object.keys(ALLOWED).some((f) => f.startsWith("screens/")), "screens/ has no allowlist lines");
 });
 
 test("nativeBridge() and hasNativeCall() read the global at call time", async () => {

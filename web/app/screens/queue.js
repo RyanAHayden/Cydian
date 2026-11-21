@@ -47,6 +47,7 @@ import { rowIcon } from "../icons/rowicons.js";
 import { runQueue, markNeededBy } from "./queuerun.js";
 import { createQueueHint } from "../nav/queuehint.js";
 import { showSheet } from "../nav/sheet.js";
+import { nativeBridge } from "../native.js";
 
 let ctxRef = null;
 let confirm = null;   // the open Confirm sheet: { refresh(), close() }
@@ -537,7 +538,7 @@ export function siteInstallArgs(job) {
 // F84: a Custom Install job: signing.install with its own options (core/appqueue.js customParams: the look's token
 // while fresh, else the url, and the edits), then iOS's progress on the HUD as the sheet did (signing-sheet.js
 // followInstall). The token is spent by the try, so a failed run that keeps the job queued downloads it again next time.
-export async function installCustom(job, { sc, follow = null, now = Date.now(), native = globalThis.ifizboxNative } = {}) {
+export async function installCustom(job, { sc, follow = null, now = Date.now(), native = nativeBridge() } = {}) {
   const params = customParams(job, now);
   if (params.token) job.options.token = null;
   const after = follow ?? (async (result, h) => (await import("../signing-sheet.js")).followInstall(native, result?.bundleId || job.options.signsAs || "", h));
@@ -551,7 +552,7 @@ export async function installCustom(job, { sc, follow = null, now = Date.now(), 
 // F221: a marked app's re-sign (core/appqueue.js markedResignJob) has no record on the phone to sign from: its url,
 // the installed version on the source, is downloaded, signed and installed over the app as an Install is
 // (`deps`: installOnDevice's, for tests). signing.install records it, so it is a signed app with a pill from then on.
-export async function resignApp(job, { sc, native = globalThis.ifizboxNative, hud = null, alert = showAlert, deps, stallOpts = null } = {}) {
+export async function resignApp(job, { sc, native = nativeBridge(), hud = null, alert = showAlert, deps, stallOpts = null } = {}) {
   sc ??= await import("../signing-client.js");
   if (job.url) {
     if (sc.localSigning() && !sc.isSelfIpa(job.url)) return sc.installOnDevice({ url: job.url, name: job.name || "" }, deps);

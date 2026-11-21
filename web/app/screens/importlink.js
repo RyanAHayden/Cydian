@@ -24,6 +24,7 @@ import { loadIdentity, saveIdentity } from "../signing/identity.js";
 import { settings } from "../settings-store.js";
 import { NAME } from "../brand.js";
 import { rowIcon } from "../icons/rowicons.js";
+import { nativeBridge } from "../native.js";
 
 export function openInAppSection() {
   const box = document.createElement("div");
@@ -82,7 +83,7 @@ export function reviewText(r) {
   return lines.join("\n");
 }
 
-export async function reviewAndImport(url, { native = globalThis.ifizboxNative, backend = getBackend(), store = settings,
+export async function reviewAndImport(url, { native = nativeBridge(), backend = getBackend(), store = settings,
   alert = showAlert, hud = showHUD, banner = showBanner,
   // B141: manage.js's onSourcesChanged listeners (loaded here, not imported: settings.js -> this -> manage.js ->
   // settings.js would be a cycle at start-up). screens/sources.js loads the new sources under the reload bar and

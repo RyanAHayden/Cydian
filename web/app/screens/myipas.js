@@ -64,6 +64,7 @@ import { queueApp } from "./queue.js";
 import { storedKeep, originalState, originalNote, OLD_WAY_ALERT, OLD_WAY_TEXT } from "../core/keepid.js";
 import { loadStyle } from "../nav/motion.js";
 import { go as navGo, back, handleOf } from "../nav/go.js";
+import { nativeBridge } from "../native.js";
 
 export { MYIPAS };
 
@@ -214,7 +215,7 @@ async function recheck() {
 // B229: in the sideload app such an id also counts when the shell's own record of signing it says so
 // (signing.installed: kept from when iOS was handed the IPA): on iOS 27 apps.isInstalled can't tell (null for every
 // app), and a row's install through the IPA queue writes Installed's record only once iOS confirms, which it never does.
-export async function installedOf(list, { mode = listMode(), native = globalThis.ifizboxNative, records = async () => (await apps()).all(),
+export async function installedOf(list, { mode = listMode(), native = nativeBridge(), records = async () => (await apps()).all(),
   signed = async () => (await native.call("signing.installed", {}))?.apps ?? [] } = {}) {
   const ids = [...new Set((list ?? []).filter((e) => e && !e.error).map(installedIdOf).filter(Boolean))];
   const out = {};
@@ -719,7 +720,7 @@ async function onPrice(r) {
   if (act === "install") return install(r.file, r); // the IPA page's Install: Confirm in the sideload app (user 2026-11-19)
 }
 
-async function openApp(r, { native = globalThis.ifizboxNative, alert = showAlert } = {}) {
+async function openApp(r, { native = nativeBridge(), alert = showAlert } = {}) {
   const name = r.options?.name || r.name || r.title;
   if (!site() && !jailbreak() && typeof native?.call === "function") {
     try { if ((await native.call("signing.openApp", { bundleId: installedIdOf(r) }))?.opened) return true; } catch { /* below */ }
@@ -1231,11 +1232,11 @@ export async function queueLibraryInstall(entry, { reachable = serverReachable, 
 // F212: the jailbreak app's Install for a library file: Install IPA's console (screens/ipa-install.js, as a URL's or a
 // shared file's), whose ipa.install call goes to library.helperInstall {file} instead (MyIPAs.swift: the file staged
 // where ifizbox-helper takes IPAs, then install-ipa), as share.js does for share.ipaInstall.
-export function helperBridge(file, native = globalThis.ifizboxNative) {
+export function helperBridge(file, native = nativeBridge()) {
   return { call: (method, params, onEvent) => native.call("library.helperInstall", { file, stream: params?.stream }, onEvent) };
 }
 
-export async function jailbreakInstall(file, name, { onInstalled = () => {}, native = globalThis.ifizboxNative, open } = {}) {
+export async function jailbreakInstall(file, name, { onInstalled = () => {}, native = nativeBridge(), open } = {}) {
   const run = open ?? (await import("./ipa-install.js")).openIpaInstall;
   return run({ url: file, name, native: helperBridge(file, native), onInstalled });
 }
@@ -1365,7 +1366,7 @@ async function renderOptions(body, route, file) {
   kg.append(kul, kfoot);
   body.append(kg);
   drawKeep();
-  originalState(globalThis.ifizboxNative, entry.bundleId).then((s) => { orig = s; if (kfoot.isConnected) drawKeep(); }, () => {});
+  originalState(nativeBridge(), entry.bundleId).then((s) => { orig = s; if (kfoot.isConnected) drawKeep(); }, () => {});
 }
 
 // B164: Sign Options' Icon row: the label, the value at the right and the Choose (or Reset) button inside the row

@@ -83,6 +83,9 @@ html[data-theme="dark"] .glyph-github { background-color: var(--dk-glyph); }
 .glyph-changes { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fff' stroke-width='2.6' stroke-linecap='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 7v5l3.5 2.5'/%3E%3C/svg%3E"); }
 .glyph-loading { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fff' stroke-width='2.6' stroke-linecap='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 7v5l3.5 2.5'/%3E%3C/svg%3E"); }
 .glyph-loading { opacity: .6; }
+.glyph-more { background-color: #3f80e0; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23fff'%3E%3Cpath d='M10.2 3h3.6v7.2H21v3.6h-7.2V21h-3.6v-7.2H3v-3.6h7.2z'/%3E%3C/svg%3E"); }
+/* B266: More Sources keeps its blue in the green row (which colours the other state glyphs) */
+.home-row.green .home-glyph.glyph-more { background-color: #3f80e0; }
 /* ==== } look-only ==== */
 
 /* The help links: a white list with #999 edges like Cydia's (the tiles' tokens), taller rows whose text may wrap. */

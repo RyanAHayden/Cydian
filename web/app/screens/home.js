@@ -517,15 +517,8 @@ function paintTile(t) {
   a.href = t.href;
   a.dataset.state = t.kind;
   a.querySelector(".cell-label").textContent = t.label;
-  const icon = a.querySelector(".cell-icon");
-  icon.className = "cell-icon home-glyph glyph-" + t.kind;
-  // B266: More Sources wears its own row tile (the blue plus, this Style's art) in place of a green glyph.
-  if (t.kind === "more") {
-    icon.style.backgroundColor = "transparent";
-    icon.style.backgroundImage = `url("${rowIcon("moreSources").src}")`;
-    icon.style.backgroundSize = "100% 100%";
-  } else icon.removeAttribute("style");
-  state.lastTile = t;
+  // B266: .glyph-more is More Sources' blue plus (icons/rowicons.js home tiles), kept blue in the green row.
+  a.querySelector(".cell-icon").className = "cell-icon home-glyph glyph-" + t.kind;
   state.tileKind = t.kind;
   const row = state.moreRow;
   if (row) row.hidden = !showsMoreSourcesRow(t.kind); // nav/slide.js slides the rows under it
@@ -847,11 +840,7 @@ function renderRoot(body) {
   state.moreRow = home.querySelector("." + MORE_SOURCES_ROW);
   if (state.moreRow) state.moreRow.hidden = !showsMoreSourcesRow(state.tileKind);
   // Theme > Style swaps the Why tile's and the link rows' icons at once, without a reload (iOS 6 <-> iOS 7).
-  followStyle(home, () => {
-    why.ensureWhyStyle();
-    repaintLinkIcons(groups, homeLinks());
-    if (state.lastTile?.kind === "more") paintTile(state.lastTile); // the tile's plus in the new Style
-  });
+  followStyle(home, () => { why.ensureWhyStyle(); repaintLinkIcons(groups, homeLinks()); });
   // The website before iFizBox is installed: everything below the iFizBox App card is locked; a tap asks first. Not
   // Settings (F123: unlocked like Home, as its tab was), nor help, guides and credits (F156, lockHomeLinks).
   if (browsingLocked({ mode: settings.mode })) {

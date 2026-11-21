@@ -8,9 +8,13 @@ like see what's new is".
 - `stateTile()` returns `{ kind: "more", label: "More Sources", href: MORE_SOURCES_HREF }` where it gave See What's
   New (sources loaded, none failed, upgrade count unknown). Loading, Add a Source, Upgrades Available, Failed and
   Up to Date are unchanged.
-- `paintTile()` draws the More Sources row icon (`rowIcon("moreSources")`, the blue plus, this Style's art) inline
-  on the tile's glyph in place of a green glyph, so the tile keeps the green row's highlighted look with More
-  Sources' blue icon. It repaints when Theme > Style changes.
+- The tile's glyph is a new `more` Home tile in icons/rowicons.js (iOS 6: the row's blue `#3f80e0` and filled plus;
+  iOS 7: `#007aff` and the line plus), with its generated `.glyph-more` lines in home.css and ios7.css plus one rule
+  each so the green row doesn't recolour it. The tile keeps the green row's highlighted look with More Sources'
+  blue icon.
+- What failed first: I drew the icon inline in `paintTile()` from `rowIcon("moreSources")`. The gate refused it:
+  rowicons.test.js "F339: every glyph Home's tiles name is in the map" wants each `kind` in ICON_SETS' home tiles.
+  So that went beyond the task's listed files (rowicons.js, home.css, ios7.css), with additions only.
 - The More Sources row in Home's list (`MORE_SOURCES_ROW`) gets `hidden` while the tile is More Sources
   (`showsMoreSourcesRow`); nav/slide.js slides the rows when it goes or comes back.
 - The link is the row's own (`#/sources/more`, Sources > More on Home's stack through router mountLink).

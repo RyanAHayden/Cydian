@@ -551,16 +551,17 @@ test("B46: Delete is confirmed by an iOS 6 action sheet; Cancel does nothing", a
   assert.deepEqual(ran, []);
   assert.equal(await confirmDelete(rec, { mode: "jailbreak", run, sheet: async () => 0 }), true);
   assert.deepEqual(ran, [["uninstall", "com.example.delta"]]);
-  // Remove from List: the one line as the sheet's title.
-  await confirmDelete(rec, { mode: "site", run, sheet: async (o) => { sheets.push(o); return 0; } });
-  assert.deepEqual(sheets[1], { title: HOME_SCREEN, buttons: [REMOVE], destructive: 0 });
-  assert.deepEqual(ran.at(-1), ["forget", "com.example.delta"]);
+  // B265: Remove from List (the swipe's button, the hold sheet's) drops the record at once: no sheet.
+  assert.equal(await confirmDelete(rec, { mode: "site", run, sheet: () => assert.fail("no confirm sheet") }), true);
+  assert.equal(await confirmDelete({ ...rec, actual: null }, { mode: "jailbreak", run, sheet: () => assert.fail("no confirm sheet") }), true);
+  assert.deepEqual(ran.slice(1), [["forget", "com.example.delta"], ["forget", "com.example.delta"]]);
+  assert.equal(sheets.length, 1);
   // Still installed (sideload): an alert, nothing dropped.
   const alerts = [];
   assert.equal(await confirmDelete({ ...rec, installed: true }, { mode: "sideload", run, sheet: () => assert.fail(),
     alert: async (o) => alerts.push(o) }), false);
   assert.equal(alerts[0].title, "Still Installed");
-  assert.equal(ran.length, 2);
+  assert.equal(ran.length, 3);
   // iFizBox's own row: nothing.
   assert.equal(await confirmDelete({ ...rec, self: true }, { mode: "jailbreak", run, sheet: () => assert.fail() }), false);
 });

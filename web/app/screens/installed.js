@@ -107,9 +107,9 @@ import { tweakCountText } from "../core/tweaks.js"; // F302a
 // icon, I had to remove it again"). In the jailbreak app, an app the helper sees in installd's containers (`actual`, I4)
 // is uninstalled (ifizbox-helper uninstall-app, backend-native.js uninstallApp) behind a HUD, then its record goes.
 // Where iFizBox can't uninstall (the sideload app, the site, a record of an app that is gone) the button is Remove from
-// List, and the sheet says in one line that deleting the app itself is done from the Home Screen. In the sideload app
-// a row the shell reports installed (signing.isInstalled) isn't hidden: iOS's word wins over the record. Every one is
-// confirmed by an iOS 6 action sheet first (deleteAction, confirmDelete).
+// List, which drops the record at once (the app page's footer says deleting the app itself is done from the Home
+// Screen). In the sideload app a row the shell reports installed (signing.isInstalled) isn't hidden: iOS's word wins
+// over the record. A real uninstall is confirmed by an iOS 6 action sheet first (deleteAction, confirmDelete).
 
 // B36: every row on the apps list opens a page (the source's package page, else an installed-app page for the record,
 // #installed/app:<id>), a hold opens an action sheet (Open, Re-sign, Save Signed IPA, Remove: what applies) and a left
@@ -1133,8 +1133,10 @@ export function statusText(line) {
   return m ? m[1] : null;
 }
 
-// The swipe's or the sheet's Delete: the iOS 6 action sheet ('Delete <App>' red, Cancel; Remove from List with its
-// one line), then the action. "installed" only explains (an alert). -> true when it went ahead.
+// The swipe's or the sheet's Delete: the iOS 6 action sheet ('Delete <App>' red, Cancel), then the uninstall. Remove
+// from List drops the record at once, with no sheet: it only forgets iFizBox's record, and the swipe's red button or the
+// hold sheet's was the choice already (Manage's Delete keeps its own confirm). "installed" only explains (an alert).
+// -> true when it went ahead.
 export async function confirmDelete(r, { mode = detectMode(), sheet = showActionSheet, alert = showAlert, run = runDelete, li = null, after = null } = {}) {
   const a = deleteAction(r, { mode });
   if (!a) return false;
@@ -1142,6 +1144,10 @@ export async function confirmDelete(r, { mode = detectMode(), sheet = showAction
     li?.classList.remove("armed");
     await alert({ title: "Still Installed", message: a.note, buttons: ["OK"] });
     return false;
+  }
+  if (a.kind === "forget") {
+    await run(a, r, { li, after });
+    return true;
   }
   const i = await sheet({ title: a.note ?? "", buttons: [a.button], destructive: 0 });
   if (i !== 0) { li?.classList.remove("armed"); return false; }

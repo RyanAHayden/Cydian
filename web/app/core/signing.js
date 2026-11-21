@@ -762,8 +762,9 @@ export function needsResign(installed, { now = new Date(), window = RESIGN_WINDO
     const sig = signatureState(a.expires, { now, window });
     const old = olderSigner(a, installed?.signer);
     if (!old && (!sig || sig.state === "ok")) continue;
-    const short = sig?.state === "expired" ? "Signature expired: re-sign it to open it again"
-      : sig?.state === "soon" ? `Signature ends ${sig.days < 1 ? "today" : `in ${plural(sig.days, "day")}`}` : OLDER_SIGNER_TEXT;
+    const ends = sig?.state === "expired" ? "Signature expired: re-sign it to open it again"
+      : sig?.state === "soon" ? `Signature ends ${sig.days < 1 ? "today" : `in ${plural(sig.days, "day")}`}` : null;
+    const short = ends && old ? `${ends} · signed by an older ${NAME}` : ends ?? OLDER_SIGNER_TEXT;
     out.push({ id: a.bundleId, name: a.name || a.bundleId, version: sig?.text ?? "", installed: a.version || null, sig: sig?.state ?? null,
       short, expires: a.expires, change: "resign", ...(old ? { olderSigner: true } : {}) });
   }

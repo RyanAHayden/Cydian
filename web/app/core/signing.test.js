@@ -120,7 +120,7 @@ test("needsResign: an app with an older signer stamp (or none, as 0.18.0's recor
   const rows = needsResign(installed, { now, window: 2 });
   assert.deepEqual(rows.map((r) => [r.id, r.sig, r.version, r.olderSigner ?? false]),
     [["soon", "soon", "Today", true], ["old", "ok", "5 days", true], ["fix", "ok", "5 days", true], ["v0", "ok", "5 days", true]]);
-  assert.equal(rows[0].short, "Signature ends today"); // the end of the signature says more than its signer
+  assert.equal(rows[0].short, "Signature ends today · signed by an older iFizBox"); // both reasons, the end first
   assert.ok(rows.slice(1).every((r) => r.short === OLDER_SIGNER_TEXT && r.change === "resign"));
   assert.match(OLDER_SIGNER_TEXT, /^Signed by an older iFizBox: /);
   // with an upgrade, the upgrade re-signs it

@@ -147,8 +147,9 @@ export async function signingSetUp(mode, { ready = signingReady, status = () => 
 // the tab bar; its pages open on Home's stack, router.js settingsRoute) is its own group, F135: first, directly under
 // the tiles (user 2026-11-18: "move settings up on the main page and give it an icon"). F159: it has the tiles' inset,
 // so it lines up with Featured/Signing above. F223: its gear is Settings > General's (icons/rowicons.js, the same
-// PAGE_ICONS entry Settings' root draws), one gear in both places (user 2026-11-18).
-export const SETTINGS_ICON = rowIcon(PAGE_ICONS.general);
+// PAGE_ICONS entry Settings' root draws), one gear in both places (user 2026-11-18). Read when Home draws, not at
+// import, so it is the Style showing then (iOS 6 or iOS 7's tile).
+export const settingsIcon = (style) => rowIcon(PAGE_ICONS.general, style);
 // Settings shares its row with Theme (Settings > Theme) as two halves, like the Featured | Signing tiles (user
 // 2026-11-18: "split the homescreen setting button to have setting and theme"); render() makes the group a pair.
 export const THEME_ICON = "home-glyph glyph-theme";
@@ -156,7 +157,7 @@ export const THEME_ICON = "home-glyph glyph-theme";
 // while Settings > Device says so (as F144).
 const guidesLite = () => isLite(settings.deviceType());
 export function homeLinks() {
-  return [{ pair: true, rows: [{ label: "Settings", href: format(settingsRoute()), icon: SETTINGS_ICON, cls: "home-settings-row" },
+  return [{ pair: true, rows: [{ label: "Settings", href: format(settingsRoute()), icon: settingsIcon(), cls: "home-settings-row" },
     { label: "Theme", href: format(settingsRoute(["theme"])), icon: { cls: THEME_ICON }, cls: "home-settings-row" }] }, {
     rows: [
       { label: "Upgrading & Jailbreaking Help", href: format({ tab: "home", path: ["help"] }) },
@@ -192,6 +193,37 @@ export function lockHomeLinks(groups, links) {
     shut.forEach((s, j) => { if (s && cells[j]) { cells[j].classList.add("home-locked"); marked.push(cells[j]); } });
   });
   return marked;
+}
+// Repaints the row tiles Home's link groups drew (groups, as lockHomeLinks) with links' icons: homeLinks() read again
+// after Theme > Style changes, so Settings' gear and More Sources' tile are the new Style's at once. Returns how many.
+export function repaintLinkIcons(groups, links) {
+  let n = 0;
+  links.forEach((section, i) => {
+    const cells = groups[i]?.querySelectorAll(".cell") ?? [];
+    section.rows.forEach((r, j) => {
+      const img = cells[j]?.querySelector(".cell-icon > img");
+      if (!r.icon?.src || !img || img.src === r.icon.src) return;
+      img.src = r.icon.src;
+      n++;
+    });
+  });
+  return n;
+}
+// Calls onStyle each time <html data-style> changes (Theme > Style, and its live preview on the theme lists) while
+// box is on the page; stops once box has left it. Returns the stop function.
+export function followStyle(box, onStyle, doc = globalThis.document, Observer = globalThis.MutationObserver) {
+  const root = doc?.documentElement;
+  if (!root || typeof Observer !== "function") return () => {};
+  let last = root.dataset?.style;
+  const mo = new Observer(() => {
+    if (!box.isConnected) { mo.disconnect(); return; }
+    const now = root.dataset?.style;
+    if (now === last) return;
+    last = now;
+    onStyle(now);
+  });
+  mo.observe(root, { attributes: true, attributeFilter: ["data-style"] });
+  return () => mo.disconnect();
 }
 // A tap on anything in box marked .home-locked asks (askToBrowse) instead of opening; other taps go through.
 export function askOnLocked(box, ask) {
@@ -779,6 +811,8 @@ function renderRoot(body) {
   for (const group of groups) group.classList.add("home-links");
   links.forEach((l, i) => { if (l.pair) groups[i].querySelector(".table")?.classList.add("home-pair"); });
   home.append(list);
+  // Theme > Style swaps the Why tile's and the link rows' icons at once, without a reload (iOS 6 <-> iOS 7).
+  followStyle(home, () => { why.ensureWhyStyle(); repaintLinkIcons(groups, homeLinks()); });
   // The website before iFizBox is installed: everything below the iFizBox App card is locked; a tap asks first. Not
   // Settings (F123: unlocked like Home, as its tab was), nor help, guides and credits (F156, lockHomeLinks).
   if (browsingLocked({ mode: settings.mode })) {

@@ -12,6 +12,10 @@
 //      back (the edge strip is off on the website, so --site skips this one);
 //   4. sheet: opens one through the sheet scaffold (nav/sheet.js showSheet: every sheet in the app is built on it;
 //      none opens from the fake bridge's empty state without data) and closes it with its Done button;
+//   5. gallery: opens the screenshots gallery (screens/altstore.js previewSlot) above a group of rows and samples
+//      every frame: the rows below must never overlap the gallery's visible part and must move with its edge;
+//   6. skeleton: swaps a loading skeleton for content, at rest and with the page marked as mid-push: no fading
+//      copy of the skeleton, and no fade at all mid-push;
 // and through all of it records every animation that runs: `transitionrun` and `animationstart` events, and every
 // Web Animation (CSS ones included) caught by polling document.getAnimations() each frame and by wrapping
 // Element.animate. It fails if any of them animates a layout property (height, width, top/left, margins,
@@ -223,6 +227,91 @@ try {
   await until(`document.querySelectorAll('.sheet').length === ${before}`, 3000);
   check(await ev("document.querySelectorAll('.sheet').length") === before, "Done closes the sheet");
   await settle();
+
+  // 5. B195: the screenshots gallery opening on a page (screens/altstore.js previewSlot, as an app or package page
+  // draws it, with a group of rows under it). Every frame, the gallery's visible bottom (its pictures, cut by the
+  // slot's clip) must not reach past the top of the rows below, and those rows must move with it. With --shots the
+  // animations run at a tenth of their speed and the step is shot every 150 ms (6-gallery-NN.png), to look at by eye.
+  const SLOW = SHOTS ? 10 : 1;
+  if (SHOTS) await send("Animation.setPlaybackRate", { playbackRate: 1 / SLOW });
+  const galleryRun = ev(`(async () => {
+    const body = document.querySelector(".page.is-top .page-body");
+    if (!body) return { error: "no page body" };
+    const { previewSlot } = await import("./screens/altstore.js");
+    const svg = encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="600" height="1300"><rect width="600" height="1300" fill="#c33"/></svg>');
+    const shots = [0, 1].map(() => ({ url: "data:image/svg+xml," + svg, width: 600, height: 1300 }));
+    const below = document.createElement("ul");
+    below.className = "table grouped smoke-below";
+    for (const t of ["Rating", "Works On", "Size"]) { const li = document.createElement("li"); li.className = "cell"; li.textContent = t; below.append(li); }
+    // The page first, with the slot's loading strip (as an app page opens while it waits for the App Store's
+    // screenshots); the pictures come once its own slides are done.
+    let give;
+    const slot = previewSlot("smoke", new Promise((r) => { give = r; }), { settleMs: 50 });
+    body.scrollTop = 0;
+    body.prepend(slot, below);
+    await new Promise((r) => setTimeout(r, ${600 * SLOW}));
+    give({ shots });
+    const frames = [];
+    const sample = () => {
+      const s = slot.getBoundingClientRect();
+      const clip = getComputedStyle(slot).overflowY !== "visible" ? s.bottom : Infinity;
+      const content = Math.max(s.top, ...[...slot.querySelectorAll(".alt-shot, .shots-group, .shots-loading")].map((e) => e.getBoundingClientRect().bottom));
+      frames.push({ visible: Math.min(clip, content), next: below.getBoundingClientRect().top, open: Boolean(slot.querySelector(".alt-shot")) });
+    };
+    const t0 = performance.now();
+    await new Promise((done) => { const tick = () => { sample(); if (performance.now() - t0 < ${2500 * SLOW}) requestAnimationFrame(tick); else done(); }; requestAnimationFrame(tick); });
+    const res = await slot.gallery;
+    slot.remove(); below.remove();
+    return { frames, shown: res.shown };
+  })()`);
+  if (SHOTS) {
+    await sleep(600 * SLOW);
+    const end = Date.now() + 2500 * SLOW * 0.9;
+    for (let n = 0; Date.now() < end && n < 40; n++) { await shot(`6-gallery-${String(n).padStart(2, "0")}`); await sleep(150); }
+  }
+  const gallery = await galleryRun;
+  if (SHOTS) await send("Animation.setPlaybackRate", { playbackRate: 1 });
+  if (check(!gallery.error && gallery.shown > 0, `the gallery opened${gallery.error ? ": " + gallery.error : ""}`)) {
+    const f = gallery.frames;
+    const end = f.at(-1);
+    const gap = end.next - end.visible; // the rows' place under the gallery at rest
+    const over = f.filter((x) => x.visible > x.next + 1);
+    const moving = f.filter((x) => x.open && Math.abs(x.next - end.next) > 1);
+    const drift = Math.max(0, ...moving.map((x) => Math.abs(x.next - x.visible - gap)));
+    check(over.length === 0, `the rows below never overlap the gallery (${over.length} of ${f.length} frames${over.length ? `, worst ${Math.max(...over.map((x) => x.visible - x.next)).toFixed(1)}px` : ""})`);
+    check(moving.length >= 3, `the rows below slid down as it opened (${moving.length} moving frames)`);
+    check(drift <= 2, `the rows moved with the gallery's edge (off by at most ${drift.toFixed(1)}px)`);
+  }
+
+  // 6. B195: a page's loading skeleton swapped for its content leaves no fading copy of itself, and a page still in
+  // its push slide (.page.is-moving, set here by hand on the top page) fades nothing in either.
+  const skeleton = await ev(`(async () => {
+    const page = document.querySelector(".page.is-top");
+    const body = page?.querySelector(".page-body");
+    if (!body) return { error: "no page body" };
+    const { placeholder } = await import("./nav/ui.js");
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    const content = () => { const u = document.createElement("ul"); u.className = "table grouped smoke-content"; u.innerHTML = "<li class=cell>Loaded</li>"; return u; };
+    const swap = async (moving) => {
+      const ph = placeholder("page");
+      body.prepend(ph);
+      await wait(${500 * (SHOTS ? 10 : 1)});
+      page.classList.toggle("is-moving", moving);
+      const u = content();
+      ph.replaceWith(u);
+      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+      const ghosts = [...body.querySelectorAll("[data-slide-ghost]")].filter((g) => g.querySelector(".ph")).length;
+      const fading = u.getAnimations().filter((a) => a.playState === "running").length;
+      page.classList.toggle("is-moving", false);
+      u.remove();
+      return { ghosts, fading };
+    };
+    return { rest: await swap(false), push: await swap(true) };
+  })()`);
+  if (check(!skeleton.error, `a skeleton swap ran${skeleton.error ? ": " + skeleton.error : ""}`)) {
+    check(skeleton.rest.ghosts === 0 && skeleton.push.ghosts === 0, "a skeleton leaves no fading copy over the content");
+    check(skeleton.push.fading === 0, "mid-push the content comes in at once (no fade)");
+  }
 
   // the verdict
   const anims = await ev("window.__smoke.anims");

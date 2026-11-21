@@ -2,6 +2,9 @@
 
 `node tools/smoke/smoke.mjs` runs `web/app/` in headless Chromium and drives it like a finger: a push (Home >
 Settings > a Settings page), Back, an edge swipe back (CDP touch events), and a sheet opened and closed with Done.
+It also opens the screenshots gallery above a group of rows and checks every frame that the rows never overlap it
+and move with its edge, and that a loading skeleton swapped for content leaves no fading copy (none at all mid-push).
+With `--shots` the gallery step runs at a tenth of its speed and is shot every 150 ms (`6-gallery-NN.png`).
 Every animation on the way is recorded (`transitionrun`, `animationstart`, `document.getAnimations()` polled each
 frame, and `Element.animate`); it fails if one animates a layout property (height, width, top/left, margins,
 padding, ...), if a push/pop/swipe didn't land or didn't slide, or if the page threw.

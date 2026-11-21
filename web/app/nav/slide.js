@@ -12,6 +12,7 @@
 // with the last measure, FLIP style:
 //   - a box that moved starts at its old place (a translateY) and eases to the new one;
 //   - a box that is new fades in where it is; a box that went fades out where it was (a copy, laid over the page);
+//     a loading skeleton (.ph) goes at once, and a page still in its push slide fades nothing (B195);
 //   - a screen that redraws its page whole (el.replaceChildren(page)) is matched to the old one by structure: the same
 //     tag and first class among the same siblings, the same text first, so a redraw slides like an edit.
 // Only transform and opacity animate (docs/native.md "Feel": 120 Hz); measuring reads layout once per change, never
@@ -25,7 +26,9 @@ const ROOT = ".page-body, .sheet-body, .sheet-scroll, .search-results, .alert-sc
 const NOT_ROOT = ".progress-body";
 const SKIP = ".vlist, .progress-body, .pull-clip, .scroll-indicator, [data-noslide], [data-slide-ghost]";
 const LEAF = ".preview-slot, .ph";                 // measured as one box, not inside (the slot's content changes whole, faded in by altstore.js)
-const MAX_BOXES = 600;                             // a page with more boxes than this changes without sliding
+const STAND_IN = ".ph";                            // B195: a loading skeleton goes at once (no fading copy over the content it stood for)
+const PUSHING = ".page.is-moving";                 // B195: a page in the navigation push (app.js)
+const MAX_BOXES = 600;                            // a page with more boxes than this changes without sliding
 const MAX_DEPTH = 8;
 const FLOW = new Set(["block", "flex", "grid", "list-item", "flow-root", "table"]);
 const NO_TAGS = new Set(["SCRIPT", "STYLE", "TEMPLATE", "IMG", "SVG", "CANVAS", "VIDEO", "IFRAME", "INPUT", "TEXTAREA", "SELECT", "BR"]);
@@ -147,6 +150,14 @@ export function plan(prev, next, own = () => 0) {
     if (!o.parent || paired.has(o.parent)) leaves.push({ box: o, top: shownAt(o) });
   }
   return { moves, enters, leaves };
+}
+
+// B195: which of plan()'s enters and leaves fade. A loading skeleton (.ph) leaves at once: a fading copy of it over
+// the content it stood for is a half-faded skeleton. A page still in its navigation push (`pushing`) fades nothing
+// and takes its content at once, so the push carries no half-faded layer over the page below.
+export function fadesOf({ enters, leaves }, pushing = false) {
+  if (pushing) return { enters: [], leaves: [] };
+  return { enters, leaves: leaves.filter(({ box }) => !box.el?.matches?.(STAND_IN)) };
 }
 
 // ---- measuring (DOM) -------------------------------------------------------------------------------------------
@@ -340,8 +351,9 @@ function update(root, still = false) {
   for (const { box, from } of moves) {
     if (seen(box.top, box.height) || seen(box.top + from, box.height) || slides.has(box.el)) slideBox(box.el, from);
   }
-  for (const box of enters) if (seen(box.top, box.height)) fadeIn(box.el);
-  for (const { box, top: y } of leaves) if (seen(y, box.height)) fadeOut(root, box, y);
+  const fades = fadesOf({ enters, leaves }, Boolean(root.closest?.(PUSHING)));
+  for (const box of fades.enters) if (seen(box.top, box.height)) fadeIn(box.el);
+  for (const { box, top: y } of fades.leaves) if (seen(y, box.height)) fadeOut(root, box, y);
 }
 
 const rootFor = (node) => {

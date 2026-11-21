@@ -52,7 +52,7 @@ import { addNavIcon } from "../nav/navbar.js";
 import { haptic } from "../nav/haptic.js";
 import { showHUD } from "../nav/hud.js";
 import { showUndoBar } from "../nav/undobar.js"; // F242a
-import { slideChange } from "../nav/slide.js"; // B191
+import { slideChange, isWatched } from "../nav/slide.js"; // B191
 import { handleOf } from "../nav/go.js";
 import { APP_MODE_LABEL } from "../core/appqueue.js"; // F242a
 import { installedOnPhone } from "../core/appqueue.js"; // B136
@@ -1305,8 +1305,31 @@ function fillGallery(slot, shots, { image, settleMs }) {
 // height changed.
 function resizeSlot(slot, change) {
   const from = slot.offsetHeight || 0;
+  const watched = isWatched(slot);
   slideChange(slot, change);
-  return (slot.offsetHeight || 0) !== from;
+  const to = slot.offsetHeight || 0;
+  if (watched && to > from) revealSlot(slot, to - from);
+  return to !== from;
+}
+
+// B195: the slot grew by `by` px at once while the rows below start `by` px up and slide down (nav/slide.js); left
+// alone the full-height gallery shows under and over them as they go. So the slot clips its content and its box
+// slides down from `by` px up while its content slides the other way: the content stays put and only the clip's
+// bottom edge moves, in step with the rows below (the same .3s curve, started in the same frame). It reads as the
+// gallery opening downward with nothing overlapping. Transform only (120 Hz).
+const revealing = new WeakMap(); // slot -> its running reveal (the last one clears the clip)
+export function revealSlot(slot, by) {
+  if (typeof slot.animate !== "function" || !(by > 0)) return null;
+  if (globalThis.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches) return null;
+  const timing = { duration: DURATION, easing: EASE };
+  const box = slot.animate([{ transform: `translateY(${-by}px)` }, { transform: "none" }], timing);
+  const inner = [...slot.children].map((c) => c.animate?.([{ transform: `translateY(${by}px)` }, { transform: "none" }], timing));
+  slot.style.overflow = "hidden"; // not `clip`: iOS 15's WebKit lacks it; the slot is already a flow-root, so no reflow
+  revealing.set(slot, box);
+  const done = () => { if (revealing.get(slot) === box) { revealing.delete(slot); slot.style.overflow = ""; } };
+  box.onfinish = done;
+  box.oncancel = done;
+  return { box, inner };
 }
 
 function fadeIn(node) {

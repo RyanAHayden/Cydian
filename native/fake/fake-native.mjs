@@ -10,8 +10,8 @@
 // `net`: URL -> string | { status, body, headers } for net.fetch / net.packages (a missing URL answers 404;
 // net: null means offline, every request fails with "network: ..."). `env` goes to the helper (FAKE_FAIL=update).
 // F63: helper.run of apply-ask gives the helper a stdin pipe, which helper.answer { answer: keep | new } writes to.
-// F64: helper.cancel stops the running apply-ask (SIGKILL to its process group, again once the helper is gone; exit
-// 130 like the real helper's SIGINT to apt) until its first pmstatus: line.
+// F64: helper.cancel stops the running apply-ask (SIGKILL to its process group; exit 130 like the real helper's
+// SIGINT to apt) until its first pmstatus: line.
 // F59: ipa.install downloads into `ipaDir` (default: beside the prefix, ipa-cache/) and runs install-ipa there.
 // F57: paid packages (native/Sources/Paid.swift): `vendors` (native/fake/fake-vendor.mjs) answer net.request,
 // auth.session and paid.install's download; `device` is device.info's answer (null: MobileGestalt can't read the UDID;
@@ -162,9 +162,6 @@ export function createFakeNative({ prefix, remote, net = {}, env = {}, helper = 
         child.stderr.on("data", feed("err"));
         child.stdio[3].on("data", feed("status"));
         child.on("error", (e) => reject(new Error(`helper: can't start ifizbox-helper: ${e.message}`)));
-        // T62: a cancelled helper is gone, but 'close' waits for every process holding its pipes; one that outlived
-        // the first kill (the fake's `sleep $FAKE_DLWAIT`) once kept the run going for the whole wait.
-        child.on("exit", () => { if (run?.cancelled) killGroup(child.pid); });
         child.on("close", (code, signal) => {
           if (child.stdin) { if (answerTo === child.stdin) answerTo = null; child.stdin.destroy(); }
           if (running === run) running = null;

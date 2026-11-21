@@ -160,9 +160,11 @@ test("F64 cancelApply ends the run even when the download wait ignores SIGTERM",
   let cancelling = null;
   const started = Date.now();
   const r = await backend.apply([{ op: "install", id: "com.example.tweak", version: "0.9" }], (e) => {
-    if (e.fd === "status" && e.line.startsWith("dlstatus:") && !cancelling) cancelling = backend.cancelApply();
+    // Only once the wait ignores SIGTERM: an earlier Cancel would kill the shell before the stubborn part exists.
+    if (e.fd === "out" && e.line.startsWith("Waiting, deaf") && !cancelling) cancelling = backend.cancelApply();
   });
   await cancelling;
+  assert.ok(cancelling, "the fake's stubborn wait started");
   assert.equal(r.code, 130);
   assert.ok(Date.now() - started < 15000, "Cancel ends the wait, not the fake's 20 s download");
 });

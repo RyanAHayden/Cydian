@@ -25,12 +25,20 @@ The cancel no longer depends on any process acting on SIGTERM:
 - `helper.cancel` sends **SIGKILL** to the helper's process group, through a new `killGroup` helper. SIGKILL can't
   be blocked, caught or ignored. SIGINT wasn't an option: a test runner started in the background leaves it
   ignored.
-- When a cancelled helper exits, its group gets SIGKILL **again**. This is triggered by the `exit` event, not a
-  timer, so a process that slipped past the first kill can't hold the pipes open after that.
 - The fake helper takes a new `FAKE_DLWAIT_STUBBORN=1`: its download wait runs in a subshell that ignores TERM and
-  INT. A new test, `F64 cancelApply ends the run even when the download wait ignores SIGTERM`, turns the gate's
-  failure into a check that fails every time on the old code: in a scratch worktree of HEAD with only the test and
-  the fake helper copied in, it failed after 20018 ms, the same as the gate. With the fix it passes in about 7 ms.
+  INT, and once it does, prints `Waiting, deaf to SIGTERM and SIGINT`. A new test,
+  `F64 cancelApply ends the run even when the download wait ignores SIGTERM`, cancels on that line, which turns the
+  gate's failure into a check that fails every time on the old code. In a scratch worktree with main's
+  `fake-native.mjs` and the new test and fake helper copied in, it failed after about 20 s, the same as the gate.
+  With the fix it passes in about 10 ms.
+
+Spec review findings I fixed:
+- The test first cancelled on the `dlstatus:` line. On the old code, a cancel that landed before the stubborn
+  subshell existed could still pass, so the test now cancels on the subshell's own line.
+- A first version also sent the group a second SIGKILL when the cancelled helper exited. I dropped it: by then the
+  helper has been reaped, and with its group empty the pid could be reused. One group SIGKILL already reaches every
+  member, including a fork in progress.
+- `FAKE_DLWAIT_STUBBORN` without `FAKE_DLWAIT` ran `sleep ""`. Now it does nothing, like the plain wait.
 
 No timeout was widened. The exit code is still 130 for a cancelled run.
 

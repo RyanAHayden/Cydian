@@ -281,13 +281,15 @@ export function stopIpaInstall(native = undefined, { bridge = nativeBridge() } =
 // F88: an IPA installed from a URL or a link (no source page to say what it is): remembered by the bundle id the
 // helper reports, so the Installed tab's Apps page and Changes follow it. No version: I4's real version (the
 // jailbreak backend's installedApps) fills it in. An app already remembered (from its source's page, with its
-// source) keeps that record. Resolves the record, or null (no bundle id, already remembered, no store).
+// source) keeps that record; one from My IPAs (a `library:` key, no source) gives way to the URL install's, so the
+// app's page no longer says My IPAs. Resolves the record, or null (no bundle id, already remembered, no store).
+const myIpasRecord = (x) => typeof x?.key === "string" && x.key.startsWith("library:") && !x.source;
 export async function rememberIpa(r, name, { store = apps } = {}) {
   const id = r?.bundleId;
   if (!id) return null;
   try {
     const s = await store();
-    if ((await s.all()).some((x) => x?.id === id)) return null;
+    if ((await s.all()).some((x) => x?.id === id && !myIpasRecord(x))) return null;
     return await recordInstall(s, { id, name: String(name ?? "").replace(/\.ipa$/i, "") || id, version: "" });
   } catch { return null; }
 }

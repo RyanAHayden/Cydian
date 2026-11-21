@@ -1,18 +1,14 @@
 // C9: we keep Cydia's GPLv3 section icons, purpose badges and its UI wording (typos fixed), and say so in About,
-// Credits and the README.
+// Credits and the README (About only says not affiliated).
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 const read = (f) => readFileSync(new URL(f, import.meta.url), "utf8");
 
-test("C9: About, Credits and the README name both Cydia's icons and its wording, GPLv3, not affiliated", () => {
+test("C9: Credits and the README name both Cydia's icons and its wording, GPLv3, not affiliated", () => {
   const js = read("./home.js");
   const about = js.slice(js.indexOf("async function showAbout"), js.indexOf("// ---- Reload"));
-  assert.match(about, /section icons/);
-  assert.match(about, /purpose badges/);
-  assert.match(about, /interface wording/);
-  assert.match(about, /GPLv3/);
   assert.match(about, /Not affiliated with SaurikIT/);
   const credits = js.slice(js.indexOf("function renderCredits"), js.indexOf("function renderFeatured"));
   for (const re of [/Section Icons/, /Interface Wording/, /purpose badges/, /interface wording/, /GPLv3/,

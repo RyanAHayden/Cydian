@@ -19,6 +19,7 @@ import { IPA_MAX, overSiteLimit, overMemoryLimit, memoryLimit, IFIZBOX_ID, noteS
 import { withKeep, siteSigned, rememberSiteSigned, resignNote, RESIGN_TITLE, RESIGN_BUTTONS, installWarningText,
   INSTALL_WARNING_TITLE, INSTALL_WARNING_BUTTONS } from "../core/keepid.js";
 import { progressHUD } from "../nav/progress.js";
+import { noteSiteSignature } from "../core/installed.js"; // F342
 import { showAlert } from "../nav/alert.js";
 import { KNOWN_MALWARE, failed, keepIpaHash, refusing, storageOf, untilCancel } from "./common.js";
 import { identityNow, loadIdentity } from "./identity.js";
@@ -259,6 +260,8 @@ export async function signInBrowser({ url, name = "", onInstalled = () => {}, br
     ios?.stop(); // uploaded: watchInstall follows iOS from here
     if (h.cancelled) return false;
     if (after) rememberSiteSigned(storage, signed.bundleId || after.bundleId, after); // F334
+    // F342: the signature's end and signer stamp, for the install record onInstalled writes (core/installed.js)
+    noteSiteSignature([bundleId, signed.originalId, signed.bundleId], { expires: signed.expires, signer: signed.signer });
     onInstalled({ ...body, bundleId: signed.bundleId, name: signed.name, version: signed.version });
     const app = name || signed.name || "The app";
     if (intoEarly && clock() - early.at < EARLY_WINDOW) {

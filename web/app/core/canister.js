@@ -25,6 +25,8 @@
 // request per pause for an empty answer, so Canister keeps the 2-character rule, counted in characters (an emoji
 // or a CJK Extension B character is one character but two UTF-16 units).
 
+import { plainText } from "./plaintext.js";
+
 export const CANISTER = "https://api.canister.me/v2/jailbreak";
 const SEARCH_LIMIT = 50;
 const TTL = 10 * 60 * 1000;
@@ -181,7 +183,8 @@ export function repoFrom(r, { have = [] } = {}) {
   const repo = repoOf(r, have instanceof Set ? have : haveSetOf(have));
   if (!repo) return null;
   const count = Number.isFinite(r.package_count) ? r.package_count : null;
-  return { ...repo, slug: repo.slug || str(r.id, 80), count, description: str(r.description, 300),
+  // B272: a repo's own emoji (NSCake 🧁) stay out of its name and description, as in every other row.
+  return { ...repo, name: plainText(repo.name), slug: repo.slug || str(r.id, 80), count, description: plainText(str(r.description, 300)),
     https: typeof r.origin_uses_https === "boolean" ? r.origin_uses_https : /^https:/i.test(repo.uri),
     gpg: typeof r.origin_has_release_gpg === "boolean" ? r.origin_has_release_gpg : null,
     payment: r.origin_supports_payment_v1 === true || r.origin_supports_payment_v2 === true || Boolean(r.sileo_endpoint) };

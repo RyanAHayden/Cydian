@@ -250,10 +250,20 @@
 /* ==== } look-only ==== */
 
 /* F305: Find More Sources (screens/findmore.js). The Sources list's last row: a grey "+" icon. Find More's rows are
-   Recommended's (.rec-row, .rec-get); Add turns green at once, with the small spinner while the repo is added. */
-.find-add .find-spinner { display: inline-block; width: 12px; height: 12px; margin: 0 4px 0 -4px; vertical-align: -2px; }
+   Recommended's (.rec-row); B272: ADD / ADDED is More Sources' price button (.rec-add, below), centred on the row,
+   holding the small spinner while the repo is added. The directory row's "opens outside" mark is a drawn arrow out of
+   a box, not the ↗ character (iOS draws that as a colour emoji). */
+.find-row .find-add { /* the row's own selector: myipas.css .price-btn (position: relative) may load after this */
+  position: absolute; right: 10px; top: 50%; margin: -12px 0 0;
+  display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box;
+  height: 24px; min-width: 62px; padding: 0 9px; cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.find-add .find-spinner { display: inline-block; width: 12px; height: 12px; margin: 0; }
 .find-directory .cell-inner { padding-right: 36px; }
-.find-external { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); }
+/* B272: the mark is placed on its own row; without this it was placed on the list, and sat halfway down it (beside
+   Limneos Repo, as a ↗ emoji on the phone). */
+.find-directory { position: relative; }
+.find-external { position: absolute; right: 14px; top: 50%; width: 13px; height: 13px; margin-top: -6.5px; }
 /* A repo's page: the head row's icon sits in the letter's 29px slot, clipped, as on a source row; the <img> shows
    only once it loads (source-icon.js removes it when no URL answers), so a failed icon leaves the letter. */
 .find-head .cell-icon { position: relative; overflow: hidden; }
@@ -262,8 +272,10 @@
 .find-head .cell-icon img { background: #fff; }
 .find-head .cell-icon img:not(.loaded) { opacity: 0; }
 .find-more-row .cell-icon { background: linear-gradient(#e9edf2, #c9d0da); background-origin: border-box; color: #385487; font-weight: bold; }
-.rec-get.find-add.adding, .rec-get.find-add.added { border-color: #3a9b39; color: #3a9b39; background: #fff; }
-.find-external { color: #7f7f7f; font-size: 14px; }
+:root {
+  --find-external: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 13 13'%3E%3Cpath d='M5.5 2.5h-3v8h8v-3' fill='none' stroke='%23000' stroke-width='1.4'/%3E%3Cpath d='M7.5 1.5h4v4M11.5 1.5l-5.5 5.5' fill='none' stroke='%23000' stroke-width='1.4'/%3E%3C/svg%3E");
+}
+.find-external { background: #7f7f7f; -webkit-mask: var(--find-external) center / contain no-repeat; mask: var(--find-external) center / contain no-repeat; }
 .find-credit a { color: inherit; text-decoration: underline; }
 .find-warn .cell-detail { color: #a86a10; }
 .find-label .cell-detail .trust-word { color: inherit; }

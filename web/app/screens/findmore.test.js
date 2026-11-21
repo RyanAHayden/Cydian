@@ -108,7 +108,7 @@ test("Add: a Known Safe · Canister repo adds at once; an Unknown one asks Unkno
   assert.equal(await addRepo({ ...chariz(), uri: `https://${PIRACY_HOSTS[0]}/` }, "ctx", opts), false, "a piracy repo is never added from here");
 });
 
-test("Add: the row's button turns green at once, and back to Add when the add fails", async () => {
+test("Add: the row's button holds the spinner at once, ADDED once in, back to ADD when the add fails", async () => {
   const b = document.createElement("button");
   const states = [];
   let fail = false;
@@ -116,12 +116,13 @@ test("Add: the row's button turns green at once, and back to Add when the add fa
   const alerts = [];
   const opts = { button: b, backend, changed: () => {}, alert: async (a) => { alerts.push(a.message); return { index: 0 }; } };
   await addRepo(chariz(), null, opts);
-  assert.deepEqual(states[0], ["Added", true], "green with the spinner while it's added");
+  assert.deepEqual(states[0], ["", true], "the spinner alone while it's added");
+  assert.equal(b.textContent, "ADDED");
   assert.equal(b.classList.contains("added"), true);
   assert.equal(b.disabled, true);
   fail = true;
   await addRepo(chariz(), null, opts);
-  assert.equal(b.textContent, "Add");
+  assert.equal(b.textContent, "ADD");
   assert.equal(b.disabled, false);
   assert.deepEqual(alerts, ["No Release file"]);
 });
@@ -159,9 +160,12 @@ test("Find More: Popular on Canister, Add on each row, ios-repo-updates under Ot
   const rows = f.el.querySelectorAll(".find-row");
   assert.ok(rows.length > 5);
   const havoc = rows.find((li) => li.dataset.slug === "havoc");
-  assert.equal(havoc.querySelector(".find-add").textContent, "Added", "a repo already in the list says Added");
+  assert.equal(havoc.querySelector(".find-add").textContent, "ADDED", "a repo already in the list says ADDED");
   const ch = rows.find((li) => li.dataset.slug === "chariz");
-  assert.equal(ch.querySelector(".find-add").textContent, "Add");
+  assert.equal(ch.querySelector(".find-add").textContent, "ADD");
+  // B272: More Sources' ADD / ADDED (the price button), not Recommended's old blue pill
+  assert.ok(ch.querySelector(".find-add").classList.contains("price-btn") && ch.querySelector(".find-add").classList.contains("rec-add"));
+  assert.ok(!ch.querySelector(".rec-get"));
   assert.match(ch.textContent, /Known Safe/);
   const poom = rows.find((li) => li.dataset.slug === "poomsmart");
   assert.match(poom.textContent, /Unknown · /, "a tier 2 repo on no list is Unknown");

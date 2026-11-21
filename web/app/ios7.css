@@ -475,3 +475,19 @@ html[data-style="ios7"] .menu-items { border-width: 0; border-radius: 8px; }
 html[data-style="ios7"] .menu-item { font-size: 14px; font-weight: 300; letter-spacing: .28px; line-height: 36px; }
 html[data-style="ios7"] .menu-item + .menu-item { border-left-width: .5px; }
 html[data-style="ios7"] .queue-hint-text { border-width: 0; border-radius: 8px; font-weight: 300; letter-spacing: .28px; }
+
+/* B272: ADD / ADDED on More Sources and Find More (sources.css .rec-add, iOS 6's price button there): the iOS 7 App
+   Store's flat button, a 1pt tinted outline with tinted text on nothing, filled with the tint and white text while
+   held; ADDED greys out like its INSTALLED. [data-theme] so myipas.css's .price-btn, which may load later, can't
+   win back. */
+html[data-style="ios7"][data-theme="light"] { --i7-get-dim: #c7c7cc; --i7-get-dim-text: #8e8e93; }
+html[data-style="ios7"][data-theme="dark"] { --i7-get-dim: #3a3a3c; --i7-get-dim-text: #8e8e93; }
+html[data-style="ios7"][data-theme] .rec-add {
+  font-size: 13px; font-weight: 500; color: var(--i7-tint); text-shadow: none;
+  border: 1px solid var(--i7-tint); border-radius: 4px; background: none; box-shadow: none;
+}
+html[data-style="ios7"][data-theme] .rec-add:active:not(:disabled) { color: var(--i7-tint-text); background: var(--i7-tint); box-shadow: none; }
+html[data-style="ios7"][data-theme] .rec-add.added, html[data-style="ios7"][data-theme] .rec-add:disabled {
+  color: var(--i7-get-dim-text); border-color: var(--i7-get-dim); background: none;
+}
+html[data-style="ios7"][data-theme] .rec-add.adding { color: var(--i7-tint); border-color: var(--i7-tint); }

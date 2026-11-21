@@ -18,6 +18,16 @@
 - The list says each not-yet-clean item is queued; the segmented-control rules were not, so I filed **C56** (low).
   The floating tab bar is C52.
 
+## Spec review
+
+A fresh subagent was given only the diff and the brief. It found nothing missing or wrong.
+- Fixed: Brushed Metal's etched text was listed under "Not yet clean, each queued as its own cleanup", but it is a
+  rule on purpose and will not be queued. It now sits in the palettes paragraph. The segmented line now makes clear
+  that `ios6.css`'s control reads the `--seg*` tokens, not palettes.css.
+- Kept: settings.css in the lazily-loaded note. It loads the same way and has `:root` tokens, so leaving it out
+  would make the note incomplete.
+- plan/TODO.md showed as modified. `run plan add` wrote it when it filed C56; it was not edited by hand.
+
 ## Tried and failed
 
 none

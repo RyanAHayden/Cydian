@@ -63,8 +63,8 @@
 // Two lanes. Signing: `ahead` apps at a time in the run's order are downloaded and signed. Installing: one app at a
 // time: the first signed row is handed to iOS (installLaneNext, B263: never held by a row ahead of it that is still
 // downloading or signing), and the next waits for iOS to finish it (or for it to fail or be stopped). iFizBox's own
-// IPA goes only after every other row has ended, so iOS closing iFizBox to install it can't cut the others off. A download or signing phase that sends no progress for `stallMs` fails its row
-// ("stopped at Signing 50%"), and that app's job is aborted, so the queue moves on. The log gets one line per phase per
+// IPA goes only after every other row has ended, so iOS closing iFizBox to install it can't cut the others off.
+// A download or signing phase that sends no progress for `stallMs` fails its row ("stopped at Signing 50%"), and that app's job is aborted, so the queue moves on. The log gets one line per phase per
 // app (Downloading Delta 48 MB, Signed Delta, Asked iOS to install Delta, Installed Delta / the reason it failed);
 // percents only move the row's bar and the bottom status.
 // SPDX-License-Identifier: GPL-3.0-or-later

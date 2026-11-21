@@ -232,7 +232,7 @@
     try { real = window.indexedDB || null; } catch (e) { /* refused outright: the stand-in from the start */ }
     var memory = null;
     var stand = function () { return (memory = memory || memoryIndexedDB()); };
-    var refused = function (e) { return e && (e.name === "SecurityError" || /security|denied/i.test(String(e.message))); };
+    var refused = function (e) { return e && (e.name === "SecurityError" || /security context/i.test(String(e.message))); };
     // the real factory until it refuses; then the stand-in for every call after
     var use = function (method, args) {
       if (!memory && real) {

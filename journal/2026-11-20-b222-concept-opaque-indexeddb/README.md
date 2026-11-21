@@ -17,7 +17,7 @@ times, and for any page opened in an opaque origin (a `data:` tab, a sandboxed f
 
 - `tools/concept/shell.js`
   - `window.indexedDB` is a small factory now. It uses the browser's own IndexedDB until `open()` (or
-    `deleteDatabase()`) throws a refusal (`SecurityError`, or a message with "security" or "denied"), or until
+    `deleteDatabase()`) throws a refusal (`SecurityError`, or a message with "security context"), or until
     reading `window.indexedDB` throws or gives nothing. After that, `memoryIndexedDB()` answers every call. Where
     IndexedDB works, nothing changes: the real request goes straight back to the app. `indexedDB.memory` says
     which one answers (check.mjs reads it).
@@ -47,7 +47,19 @@ times, and for any page opened in an opaque origin (a `data:` tab, a sandboxed f
   sources (0 rows)` and `Home's tile isn't Add a Source`. The website mode passed with 2 rows. After the
   shell.js change: jailbreak 4 rows, Lite 4 rows, website 10 rows, all clean (after the serviceWorker fix too).
 - The full default matrix with all three modes (iphone-se and iphone-17-pro-max × light:classic and dark:gunmetal,
-  drag checks, then the sandboxed pass): see the result below.
+  drag checks, then the sandboxed pass): 311 ok, "concept check: all clean". After the review narrowed the
+  refusal check, I re-ran the sandboxed pass (iphone-se, dark:gunmetal, all three modes): all clean, and the stand-in
+  answered in each mode.
+
+## Review (spec axis)
+
+- Fixed: the refusal check matched any message with "denied". It now matches only `SecurityError` or
+  "security context".
+- Kept, though not in the brief: the `navigator.serviceWorker` guard (the sandboxed website run fails without it),
+  the gate test (`idb.test.mjs`, `test_shell_idb.py`: it tests this change), and `databases()` / `cmp()` on the
+  factory (part of IndexedDB's surface, a few lines).
+- The review also noted that the stand-in matches exact keys only, not `IDBKeyRange`. web/app uses no key ranges,
+  indexes or cursors.
 
 ## Tried and failed
 

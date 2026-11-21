@@ -185,6 +185,52 @@ enum UpdateCheck {
                       found: c.found.filter { !mine($0) })
     }
 
+    // B264: any app's install or re-sign has been handed to iOS (any of `ids`: its bundle ID as installed, the
+    // source's; `version`: the one handed over): its row comes off Changes' count at once, as B124's `without` does
+    // for iFizBox's own update, so the icon drops even while the page sleeps in the background. An update row (a page
+    // key) goes only when `version` reaches that update's (a re-sign keeps the version, so an update stays counted); a
+    // Needs Re-sign row (`resign`, the apps the page counted there: updates.resigns) goes either way. One app is one
+    // row (Changes files an app with both under its update). -> the counts and the re-sign rows left.
+    static func afterHandOff(_ ids: Set<String>, version: String, _ c: Counts, resign: Set<String>) -> (counts: Counts, resign: Set<String>) {
+        let done = { (k: String) -> Bool in
+            guard let id = keyID(k), ids.contains(id) else { return false }
+            return DebVersion.compare(version, String(k.dropFirst(id.count + 1))) >= 0
+        }
+        let row = c.pageKeys.contains(where: done) || !resign.isDisjoint(with: ids)
+        let after = Counts(pageCount: max(0, c.pageCount - (row ? 1 : 0)), pageKeys: c.pageKeys.filter { !done($0) },
+                           found: c.found.filter { !done($0) })
+        return (after, resign.subtracting(ids))
+    }
+
+    // B264: the push server's registration (web/app/core/push.js registration, as the page last sent it) once an app
+    // (any of `ids`) has been handed to iOS at `version`: its entry in `apps` at that version, and the update keys it
+    // reached gone from `known` and `counted`, so the server's next push badge (worker badgeFor) doesn't count that
+    // update again while the page can't send its own. nil when nothing in it changes (a re-sign, an app it doesn't follow).
+    static func pushAfterHandOff(_ body: [String: Any], ids: Set<String>, version: String) -> [String: Any]? {
+        var out = body
+        var changed = false
+        if let apps = body["apps"] as? [[String: Any]] {
+            out["apps"] = apps.map { a -> [String: Any] in
+                guard let id = a["id"] as? String, ids.contains(id), let v = a["version"] as? String,
+                      DebVersion.compare(version, v) > 0 else { return a }
+                changed = true
+                var moved = a
+                moved["version"] = version
+                return moved
+            }
+        }
+        let reached = { (k: String) -> Bool in
+            guard let id = keyID(k), ids.contains(id) else { return false }
+            return DebVersion.compare(version, String(k.dropFirst(id.count + 1))) >= 0
+        }
+        for key in ["known", "counted"] {
+            guard let list = body[key] as? [String] else { continue }
+            let kept = list.filter { !reached($0) }
+            if kept.count != list.count { out[key] = kept; changed = true }
+        }
+        return changed ? out : nil
+    }
+
     // B124: the watch list once iFizBox has handed iOS `version` of itself: its entries (any of `ids`) at that version,
     // so a background run before the new version's first launch doesn't find and badge the same update again. Never
     // lowers a version.

@@ -217,5 +217,53 @@ test("B158: the icon badge is the latest count, set one at a time") {
     check(s.done() == 0, "handed off: 0")
 }
 
+test("B264: each app's re-sign or install handed to iOS takes its Changes row off the icon badge") {
+    // Changes counted 5: two updates (Alpha, Beta) and three re-signs (Gamma, Delta, Echo).
+    let c = UpdateCheck.Counts(pageCount: 5, pageKeys: ["alpha 2.0", "beta 3.1"], found: [])
+    let resign: Set<String> = ["gamma", "delta", "echo"]
+    // a re-sign of Gamma: 4, Gamma no longer among the re-sign rows
+    var r = UpdateCheck.afterHandOff(["gamma", "gamma.src"], version: "1.0", c, resign: resign)
+    check(r.counts.badge == 4 && r.resign == ["delta", "echo"], "re-signed: \(r)")
+    // then Delta and Echo: 2 (the updates stay)
+    r = UpdateCheck.afterHandOff(["delta"], version: "1", r.counts, resign: r.resign)
+    r = UpdateCheck.afterHandOff(["echo"], version: "1", r.counts, resign: r.resign)
+    check(r.counts.badge == 2 && r.resign.isEmpty && r.counts.pageKeys.count == 2, "both: \(r)")
+    // Alpha's update installed (by its source's ID): 1
+    r = UpdateCheck.afterHandOff(["alpha.signed", "alpha"], version: "2.0", r.counts, resign: r.resign)
+    check(r.counts.badge == 1 && r.counts.pageKeys == ["beta 3.1"], "updated: \(r)")
+    // a re-sign of Beta (still 3.0) leaves its 3.1 update counted
+    let kept = UpdateCheck.afterHandOff(["beta"], version: "3.0", r.counts, resign: r.resign)
+    check(kept.counts == r.counts, "a re-sign keeps the update: \(kept)")
+    // a newer version than the counted update also ends it; the same app twice counts once
+    r = UpdateCheck.afterHandOff(["beta"], version: "3.2", r.counts, resign: ["beta"])
+    check(r.counts.badge == 0 && r.resign.isEmpty, "one row: \(r)")
+    // an app Changes didn't count changes nothing; 0 stays 0
+    check(UpdateCheck.afterHandOff(["other"], version: "9", c, resign: resign).counts == c, "not counted")
+    let zero = UpdateCheck.Counts(pageCount: 0, pageKeys: [], found: [])
+    check(UpdateCheck.afterHandOff(["gamma"], version: "1", zero, resign: ["gamma"]).counts.badge == 0, "never negative")
+    // a background find of the same update goes too
+    let bg = UpdateCheck.Counts(pageCount: 0, pageKeys: [], found: ["alpha 2.0"])
+    check(UpdateCheck.afterHandOff(["alpha"], version: "2.0", bg, resign: []).counts.badge == 0, "found: gone")
+}
+
+test("B264: the push server's registration follows an update handed to iOS") {
+    let body: [String: Any] = ["token": "t", "apps": [["id": "alpha", "name": "Alpha", "version": "1.0", "source": "s"],
+                                                      ["id": "beta", "name": "Beta", "version": "3.0", "source": "s"]],
+                               "known": ["alpha 2.0", "beta 3.1"], "counted": ["alpha 2.0"]]
+    guard let after = UpdateCheck.pushAfterHandOff(body, ids: ["alpha.signed", "alpha"], version: "2.0") else {
+        return check(false, "Alpha 2.0 handed off: changed")
+    }
+    let apps = after["apps"] as? [[String: Any]] ?? []
+    check(apps.first?["version"] as? String == "2.0" && apps.last?["version"] as? String == "3.0", "Alpha at 2.0, Beta as it was")
+    check(after["known"] as? [String] == ["beta 3.1"] && after["counted"] as? [String] == [], "its update key gone")
+    check(after["token"] as? String == "t", "the rest as sent")
+    // a re-sign (same version) and an app it doesn't follow change nothing
+    check(UpdateCheck.pushAfterHandOff(body, ids: ["beta"], version: "3.0") == nil, "re-sign: nothing")
+    check(UpdateCheck.pushAfterHandOff(body, ids: ["other"], version: "9") == nil, "not followed: nothing")
+    // no `counted` (no ignored versions): it stays absent
+    let plain = UpdateCheck.pushAfterHandOff(["apps": body["apps"]!, "known": ["alpha 2.0"]], ids: ["alpha"], version: "2.0")
+    check(plain?["counted"] == nil && plain?["known"] as? [String] == [], "counted stays absent")
+}
+
 print(failures == 0 ? "all passed" : "\(failures) failed")
 exit(failures == 0 ? 0 : 1)

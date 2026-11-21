@@ -459,3 +459,44 @@ test("B136: a Sent to iOS row is recorded only once iOS has the app", () => with
   assert.deepEqual(s.recorded, ["b", "a"]); // once
   s.page.close();
 }));
+
+// B264: each app's end (installed or re-signed) tells the run's owner once, after Installed's record was asked for,
+// so the badge counts again while the run goes on (in the background too); a stopped app tells nothing.
+test("B264: onAppEnd once per app that ends, with its record's promise; not for a stopped one", () => withDom(async () => {
+  const s = setup([app("a", "Alpha", "resign"), app("b", "Beta"), app("c", "Gamma")]);
+  const ends = [];
+  const done = runAppRun(s.queue.list(), { queue: s.queue, lanes: s.l, record: async (j) => s.recorded.push(j.id), open: () => s.page,
+    onAppEnd: (r, recorded) => ends.push([r.id, recorded === null ? null : typeof recorded.then]) });
+  await settle();
+  await s.l.release("a");
+  assert.deepEqual(ends.map((e) => e[0]), ["a"]);
+  const rows = rowsOf(s.page);
+  rows[1].children[1].click(); // Beta's stop
+  await settle();
+  await s.l.release("c");
+  await done;
+  assert.deepEqual(ends.map((e) => e[0]), ["a", "c"]);
+  assert.ok(ends.every(([, t]) => t === null || t === "function"));
+}));
+
+test("B264: runAppQueueRun counts the badge as each app ends, after its record, without holding the app", async () => {
+  const { runAppQueueRun } = await import("./queue.js");
+  const q = createAppQueue();
+  q.add(app("a", "Alpha", "resign"));
+  const sent = [];
+  const keep = (_n, on) => sent.push(on);
+  let counted = 0, deps = null, wrote = null;
+  const recount = () => { counted++; return new Promise(() => {}); }; // a count the page never finishes (asleep)
+  await runAppQueueRun(q.list(), { queue: q, ready: async () => true, keep, recount, lanes: {},
+    run: async (js, d) => { deps = d; return { ok: true }; } });
+  assert.deepEqual(sent, [true]); // Confirm
+  deps.onAppEnd({ id: "a" }, new Promise((f) => { wrote = f; }));
+  await settle();
+  assert.equal(counted, 0); // waits for Installed's record
+  wrote({ before: null, wrote: null });
+  await settle();
+  assert.equal(counted, 1);
+  assert.deepEqual(sent, [true]); // no hold for the count: it can't keep the silent audio going
+  deps.onClose();
+  assert.equal(sent.at(-1), false);
+});

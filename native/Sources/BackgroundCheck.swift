@@ -32,6 +32,12 @@ enum BackgroundCheck {
     // B124: the "<id> <version>" keys the last background run found (its badge's other part); app.badge drops them,
     // since the page's count then stands for everything.
     static let foundKey = "ifizbox.updates.foundKeys"
+    // B264: the bundle IDs of Changes' Needs Re-sign rows in its last count (updates.resigns), so an app's re-sign
+    // handed to iOS takes its row off the icon badge (appHandedOff) while the page can't count.
+    static let pageResignKey = "ifizbox.updates.pageResign"
+    // B264: the push server's registration as the page last sent it ({server, body} JSON: push.registered), so an
+    // update handed to iOS reaches the server's badge while the page can't send its own (appHandedOff).
+    static let pushRegistrationKey = "ifizbox.push.registration"
     static let interval: TimeInterval = 4 * 3600
     static let maxBytes = 8 << 20 // AltStore's own source is about 1 MB; the biggest seen (F9) under 8 MB
     private static let queue = DispatchQueue(label: "com.ryha.ifizbox.updates")
@@ -67,6 +73,77 @@ enum BackgroundCheck {
                 Apt.reply(c, ["scheduled": schedule()], nil)
             }
         }
+        // B264: updates.resigns {ids}: the apps Changes counted under Needs Re-sign (screens/changes.js badge), sent
+        // with each count.
+        b.on("updates.resigns") { c in
+            let ids = (c.params["ids"] as? [Any] ?? []).compactMap { $0 as? String }
+            queue.async {
+                UserDefaults.standard.set(ids.sorted(), forKey: pageResignKey)
+                Apt.reply(c, nil, nil)
+            }
+        }
+        // B264: push.registered {server, body}: what core/push.js has on the push server; {} once Push is off.
+        b.on("push.registered") { c in
+            let server = c.params["server"] as? String, body = c.params["body"] as? [String: Any]
+            let data = server.flatMap { s in body.flatMap { try? JSONSerialization.data(withJSONObject: ["server": s, "body": $0]) } }
+            queue.async {
+                if let data { UserDefaults.standard.set(data, forKey: pushRegistrationKey) }
+                else { UserDefaults.standard.removeObject(forKey: pushRegistrationKey) }
+                Apt.reply(c, nil, nil)
+            }
+        }
+    }
+
+    // B264: the push server's copy of the page's list after a hand-off (UpdateCheck.pushAfterHandOff), sent again
+    // from here. On this queue.
+    private static func pushHandedOff(ids: Set<String>, version: String) {
+        guard let data = UserDefaults.standard.data(forKey: pushRegistrationKey),
+              let reg = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+              let server = reg["server"] as? String, let body = reg["body"] as? [String: Any],
+              let next = UpdateCheck.pushAfterHandOff(body, ids: ids, version: version),
+              let url = URL(string: server + "/api/push/register"),
+              let json = try? JSONSerialization.data(withJSONObject: next),
+              let saved = try? JSONSerialization.data(withJSONObject: ["server": server, "body": next]) else { return }
+        UserDefaults.standard.set(saved, forKey: pushRegistrationKey)
+        var r = URLRequest(url: url, timeoutInterval: 20)
+        r.httpMethod = "POST"
+        r.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        r.httpBody = json
+        DispatchQueue.main.async {
+            var task = UIBackgroundTaskIdentifier.invalid
+            let end = { if task != .invalid { UIApplication.shared.endBackgroundTask(task); task = .invalid } }
+            task = UIApplication.shared.beginBackgroundTask(withName: "ifizbox.push") { end() }
+            URLSession.shared.dataTask(with: r) { _, _, _ in DispatchQueue.main.async { end() } }.resume()
+        }
+    }
+
+    // B264: an app's install or re-sign has been handed to iOS (`ids`: its bundle ID as installed and the source's;
+    // `version`: the one handed over): the icon badge drops its Changes row now (UpdateCheck.afterHandOff), not when
+    // the page next counts, which in the background may only be once iFizBox is opened again. The watch list moves it
+    // to that version, as selfHandedOff does, so a background run doesn't badge the same update again. The page's
+    // next count stands over this one. Sideload build only; any queue but this one's own.
+    static func appHandedOff(ids: Set<String>, version: String) {
+        guard AppMode.current == .sideload else { return }
+        let d = UserDefaults.standard
+        let n: Int? = queue.sync {
+            let before = UpdateCheck.Counts(pageCount: d.integer(forKey: pageCountKey),
+                                            pageKeys: Set(d.stringArray(forKey: pageKeysKey) ?? []),
+                                            found: d.stringArray(forKey: foundKey) ?? [])
+            let resign = Set(d.stringArray(forKey: pageResignKey) ?? [])
+            let after = UpdateCheck.afterHandOff(ids, version: version, before, resign: resign)
+            save(UpdateCheck.handedOff(loadWatch(), ids: ids, version: version), known: loadKnown())
+            pushHandedOff(ids: ids, version: version)
+            guard after.counts != before || after.resign != resign else { return nil }
+            d.set(after.counts.pageCount, forKey: pageCountKey)
+            d.set(after.counts.pageKeys.sorted(), forKey: pageKeysKey)
+            d.set(after.counts.found, forKey: foundKey)
+            d.set(after.resign.sorted(), forKey: pageResignKey)
+            return after.counts.badge
+        }
+        guard let n else { return }
+        WidgetStore.save(count: n, names: []) // N8: the widget shows the same count
+        if n == 0 { UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: [Notifications.upgradesID]) }
+        Notifications.setIcon(n) // B158: in order with the page's app.badge
     }
 
     @discardableResult

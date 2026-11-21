@@ -852,8 +852,10 @@ enum IDevice {
     }
 
     /// Connects once with the stored pairing: "is the pairing still good and LocalDevVPN on". Blocking.
+    static func verify() throws -> Kind { try verify(tailscale: nil) }
+
     /// B274: `tailscale` pins the route (Tailscale's Test Connection checks the pairing through Tailscale only).
-    static func verify(tailscale pinned: Bool? = nil) throws -> Kind {
+    static func verify(tailscale pinned: Bool?) throws -> Kind {
         try watched("verify") { w in
             let s = try Session(watch: w, tailscale: pinned)
             if let u = try? s.udid() { PhoneID.remember(u) } // a check is a free chance to learn it
@@ -943,7 +945,7 @@ enum IDevice {
                 note("iOS lists \(run.bundleID ?? "the app") \(run.version ?? ""): installed")
                 progress(.install(1))
                 return
-            } catch let f as Failure where !run.connected && isEarlyEOF(f) {
+            } catch let f as Failure where !run.connected && isEarlyEOF(f) && IDevice.pairing()?.kind == .remotePairing {
                 // B274: Pair Again, not the socket error (the row and its log say what to do)
                 let via = Tailscale.useForInstall() ? "Tailscale" : "LocalDevVPN"
                 ilog("first connect reset during pair-verify through \(via): \(f.text); the pairing is stale")

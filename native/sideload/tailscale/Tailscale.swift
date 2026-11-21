@@ -329,7 +329,12 @@ enum TailscaleBridge {
         // verifyManualPairing and dropped the channel, while this test said Connected). With `verify` and a pairing
         // kept, it connects once with it through Tailscale (IDevice.verify) and answers `verify_failed` with the
         // shell's error in `detail` (the page words it: core/installroute.js verifyFailure).
-        if verify, r["ok"] as? Bool == true, IDevice.pairing() != nil, Tailscale.useForInstall() {
+        // No pairing kept: reaching the phone isn't "apps install over Tailscale" yet (the page's Not Paired Yet).
+        if verify, r["ok"] as? Bool == true, IDevice.pairing() == nil {
+            r["ok"] = false
+            r["code"] = "not_paired"
+            r["paired"] = false
+        } else if verify, r["ok"] as? Bool == true, Tailscale.useForInstall() {
             do {
                 _ = try IDevice.verify(tailscale: true)
                 r["verified"] = true

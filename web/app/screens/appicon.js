@@ -119,6 +119,8 @@ export async function pickOwn(key, name, store, { native = nativeBridge(), mode 
   }
   const { index } = await ask({ title: RESIGN_TITLE, message: resignMessage(), buttons: ["Cancel", "Install"], cancel: 0 });
   if (index !== 1) return "cancelled";
+  // B240: the pick's own tellIcon answers resign_needed (not in the bundle yet): no "Use Your Icon Again?" over it
+  asked.add(name);
   store.set(key, name); // kept through the update: the reopened app's tellIcon switches to it
   const run = install ?? (await import("../signing/route.js")).installOnDevice;
   let ok = false;

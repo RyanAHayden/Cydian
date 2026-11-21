@@ -24,7 +24,17 @@
   app.icon answers resign_needed, so the same offer covers it. No offer on a return from the background in the same
   launch: that is also when iOS's install prompt is up or installing, and asking then would race the update.
 - No Swift change was needed (`native/Sources/AppIcon.swift` already answers resign_needed for this state).
-- Only the tone on screen's pick is checked (Lite's app.icon applies only that one, as before).
+- Only the tone on screen's pick is checked (Lite's app.icon applies only that one, as before). A lost own icon
+  picked for the other tone is offered when the Home Screen's tone changes to it (its app.icon then answers
+  resign_needed), not at launch.
+
+## Spec review
+
+- Found: pickOwn sets the pick before its Install, so its own tellIcon got resign_needed and the new offer popped
+  "Use Your Icon Again?" over the re-sign that was starting (Theme Icon there would undo the pick mid-install).
+  Fixed: pickOwn marks the picture as asked for this launch before it sets the pick; test added.
+- Noted as asked-for extras, kept: a re-sign that fails to start puts the theme icon back (the brief's own
+  alternative, so Settings matches the Home Screen); asked once per picture per launch.
 
 ## Checks
 

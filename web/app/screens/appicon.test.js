@@ -215,3 +215,14 @@ test("the lost-icon message names the app", () => {
   assert.match(lostMessage("Box"), /^This copy of Box was installed without your icon/);
   assert.match(lostMessage("Box"), /use the theme's icon\.$/);
 });
+
+test("a pick's own Install isn't met by the lost-icon offer while its re-sign starts", async () => {
+  resetAsked();
+  const f = fakes({ ready: { ready: false, canResign: true } });
+  assert.equal(await pickOwn("lightIcon", "owne5", f.store, { native: f.native, mode: "sideload", alert: f.alert, install: f.install }), "installing");
+  // the pick's tellIcon answers resign_needed: the bundle doesn't hold the picture until the update lands
+  assert.equal(await offerResign("owne5", f.store, { alert: f.alert, install: f.install }), "asked");
+  assert.equal(f.alerts.length, 1, "only pickOwn's question");
+  assert.equal(f.installs.length, 1);
+  assert.equal(f.values.lightIcon, "owne5");
+});

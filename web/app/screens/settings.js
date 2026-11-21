@@ -1493,7 +1493,9 @@ function drawMain(el) {
         const { id, status, failure, kept } = await deviceSigningState(el);
         if (!failure && typeof CustomEvent === "function") globalThis.dispatchEvent?.(new CustomEvent("ifizbox:signing-status", { detail: kept })); // F244
         offerInstall(missingStep(status, getServer()) == null); // F177
-        return { certificate: failure ? { text: "Unknown" } : certificateDetail(kept, { staged: Boolean(id?.p12 || id?.profile) }) };
+        // B250: `ready` (a certificate kept) lets the status cell say Import Your Certificate; unknown when the read failed
+        return { certificate: failure ? { text: "Unknown" } : certificateDetail(kept, { staged: Boolean(id?.p12 || id?.profile) }),
+          ...(failure ? {} : { ready: Boolean(kept) }) };
       },
       apps: async () => {
         const n = nativeBridge();

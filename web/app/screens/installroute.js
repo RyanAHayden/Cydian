@@ -512,7 +512,8 @@ async function openVPN(native, alert) {
 //                 Signing Server)
 //   Signing       Certificate > (days left), Signed Apps > (count)
 //   How Signing Works >
-// `links` holds the hrefs, `signing()` resolves {certificate: {text, red}}, `apps()` the Signed Apps count (text),
+// `links` holds the hrefs, `signing()` resolves {certificate: {text, red}, ready} (`ready`: a certificate kept; false turns
+// the status cell into Import Your Certificate, B250), `apps()` the Signed Apps count (text),
 // `checkServer` is Settings' Check Server and `host()` the Signing Server's host.
 export const MAIN_ROWS = ["status", "action", "with", "certificate", "apps", "help"];
 
@@ -567,6 +568,7 @@ export function mainPage({ store, native = nativeBridge(), alert = showAlert, li
   ["with", "certificate", "apps"].forEach((k, i) => { slots[k] = slotOf(cells[i + 2].querySelector(".cell-detail")); });
 
   let known; // idevice.status once read
+  let certificate; // B250: signing.status has an identity (signing()'s `ready`); undefined until read
   const paintStatus = (s) => {
     now = s;
     icon.className = `status-icon tone-${s.tone}`;
@@ -584,9 +586,9 @@ export function mainPage({ store, native = nativeBridge(), alert = showAlert, li
     const n = ++asked;
     const choice = store.get(ROUTE_KEY);
     const h = host();
-    if (choice !== "iphone") { paintStatus(installStatus(choice, undefined, { host: h })); slots.with.set(withDetail(choice)); }
+    if (choice !== "iphone") { paintStatus(installStatus(choice, undefined, { host: h, certificate })); slots.with.set(withDetail(choice)); }
     else if (lastChoice && lastChoice !== choice) { paintStatus(CHECKING); title.wait(); subtitle.wait(); slots.with.wait(); } // just picked
-    else if (!lastChoice && lastStatus) { paintStatus(installStatus(choice, lastStatus, { host: h })); slots.with.set(withDetail(choice, lastStatus)); } // F301: the last answer at once
+    else if (!lastChoice && lastStatus) { paintStatus(installStatus(choice, lastStatus, { host: h, certificate })); slots.with.set(withDetail(choice, lastStatus)); } // F301: the last answer at once
     lastChoice = choice;
     const reads = [
       status(native).then((st) => {
@@ -595,12 +597,21 @@ export function mainPage({ store, native = nativeBridge(), alert = showAlert, li
         known = st;
         rememberStatus(st);
         const c = store.get(ROUTE_KEY);
-        paintStatus(installStatus(c, st, { host: h }));
+        paintStatus(installStatus(c, st, { host: h, certificate }));
         slots.with.set(withDetail(c, st));
       }),
       Promise.resolve().then(signing).catch(() => null).then((v) => {
         if (n < signingShown) return;
         signingShown = n;
+        // B250: no certificate kept: the status cell says Import Your Certificate (and back once one is)
+        const had = certificate;
+        certificate = typeof v?.ready === "boolean" ? v.ready : undefined;
+        if (certificate !== had) {
+          const c = store.get(ROUTE_KEY);
+          // This iPhone with this refresh's idevice.status still out: Checking… until it answers
+          const st = c !== "iphone" ? undefined : statusShown === n ? known : undefined;
+          paintStatus(installStatus(c, st, { host: h, certificate }));
+        }
         slots.certificate.set(v?.certificate?.text ?? "Unknown", { red: Boolean(v?.certificate?.red) });
       }),
       Promise.resolve().then(apps).catch(() => "").then((v) => {
@@ -616,6 +627,7 @@ export function mainPage({ store, native = nativeBridge(), alert = showAlert, li
     if (a === "checkServer") return checkServer();
     if (a === "openVPN") return openVPN(native, alert).then(refresh);
     if (a === "pair") return goTo("pair");
+    if (a === "certificate") return navGo(links.certificate); // B250: the Certificate page, as its row opens
     if (a === "signIn") return tailscaleSignIn(native, alert, refresh, null, { hud: true });
     if (a === "openTailscale") return openApp(native, alert, TAILSCALE_URL, "Tailscale");
     if (a === "useTailscale") { await busy("Switching", () => call(native, "tailscale.setConnect", { value: "auto" }).catch(() => {})); return refresh(); }

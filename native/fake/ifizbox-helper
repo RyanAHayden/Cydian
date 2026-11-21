@@ -494,7 +494,9 @@ I $name $ver $old" ;;
     st "dlstatus:$name:20:Retrieving $name"
     echo "Get:1 https://fake.example ./ $name $ver [100 B]"
   done
-  [ -n "${FAKE_DLWAIT:-}" ] && sleep "$FAKE_DLWAIT"
+  # The sleep holds none of the helper's pipes: should Cancel's signal miss it (it did under load), the orphan can't
+  # keep fake-native's run open for the rest of the wait.
+  [ -n "${FAKE_DLWAIT:-}" ] && sleep "$FAKE_DLWAIT" </dev/null >/dev/null 2>&1 3>&-
   printf '%s\n' "$plan" | while read -r kind name ver old; do
     [ -n "$kind" ] || continue
     [ -n "${FAKE_SLOW:-}" ] && sleep "$FAKE_SLOW"

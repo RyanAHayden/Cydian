@@ -4,6 +4,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { copyFileSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdtempSync, rmSync } from "node:fs"; // T63
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createNativeBackend } from "./backend-native.js";
 import { createCatalog, ALL } from "./core/catalog.js";
@@ -137,14 +139,28 @@ test("F63 apply without a console keeps the old conffile (plain apply, --force-c
 });
 
 test("F64 cancelApply while apt downloads stops the run before dpkg: nothing changes", async (t) => {
-  const { backend, fx } = setup(t, { env: { FAKE_DLWAIT: "20" } });
+  // Under load Cancel's signal once missed the fake's `sleep`, which then held the helper's pipes for the whole 20 s.
+  // The helper's `sleep` here always ignores SIGTERM, so that case runs every time: the run must end anyway.
+  const bin = mkdtempSync(join(tmpdir(), "cancel-sleep-"));
+  const pidFile = join(bin, "pid");
+  t.after(() => {
+    try { process.kill(Number(readFileSync(pidFile, "utf8")), "SIGKILL"); } catch { /* not started, or gone */ }
+    rmSync(bin, { recursive: true, force: true });
+  });
+  writeFileSync(join(bin, "sleep"), `#!/bin/sh\ntrap '' TERM\necho $$ > '${pidFile}.new'\nmv '${pidFile}.new' '${pidFile}'\nPATH=\${PATH#*:}\nexec sleep "$@"\n`);
+  chmodSync(join(bin, "sleep"), 0o755);
+  const { backend, fx } = setup(t, { env: { FAKE_DLWAIT: "20", PATH: `${bin}:${process.env.PATH}` } });
   const before = readFileSync(join(fx.prefix, "var/lib/dpkg/status"), "utf8");
   const events = [];
   let cancelling = null;
   const started = Date.now();
   const r = await backend.apply([{ op: "install", id: "com.example.tweak", version: "0.9" }], (e) => {
     events.push(e);
-    if (e.fd === "status" && e.line.startsWith("dlstatus:") && !cancelling) cancelling = backend.cancelApply();
+    // Cancel once that sleep runs (its pid is written), not on the line before it: the window the gate hit.
+    if (e.fd === "status" && e.line.startsWith("dlstatus:") && !cancelling) {
+      cancelling = untilFile(pidFile).then(() => backend.cancelApply());
+      cancelling.catch(() => {}); // reported by `await cancelling` below, not as an unhandled rejection meanwhile
+    }
   });
   await cancelling;
   assert.equal(r.code, 130); // 128 + SIGINT
@@ -170,6 +186,13 @@ test("respring runs the helper's respring verb", async (t) => {
   await backend.respring();
   assert.deepEqual(native.calls.at(-1).params.words, ["respring"]);
 });
+
+// T63: resolves once `file` exists; rejects after 10 s, so a helper that never gets there fails instead of hanging.
+async function untilFile(file) {
+  for (const end = Date.now() + 10000; !existsSync(file); await new Promise((r) => setTimeout(r, 10))) {
+    if (Date.now() > end) throw new Error(`${file} never appeared`);
+  }
+}
 
 async function loaded(backend) {
   const catalog = createCatalog();

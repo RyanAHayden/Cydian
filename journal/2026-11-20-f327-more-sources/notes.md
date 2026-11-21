@@ -58,10 +58,18 @@ Concept: https://claude.ai/artifact/AC5Fa8J4xqSqh66wCddGPV (user-approved 2026-1
   rows, groups, Home row, tags, piracy check and badge count. The Manage, Find More wiring and Home lock tests were
   updated to the new rows.
 - 3x renders (capture.mjs from F316, 402x874 @3, web/app served on 127.0.0.1:8791) in `shots/`. Jailbroken = the
-  website with Settings > Device rootless; Lite = `--mode sideload` (the fake shell). Kept: jailbroken Sources,
-  Home, More Sources, Find App Sources and More Sources' bottom in light and dark (some of each); Lite Sources, Home,
-  More Sources and Find App Sources. The jailbroken site's sources show Not Responding / HTTP 404 because a static
-  server has no `/api/fetch` proxy. Only the rows' look matters here.
+  website with Settings > Device rootless; Lite = `--mode sideload` (the fake shell). Sources, Home and More Sources
+  in light and dark for both builds (`shots/*.png` jailbroken, `shots/lite/*.png`), plus Find App Sources (dark) and
+  More Sources' bottom (jailbroken, dark). The jailbroken site's sources show Not Responding / HTTP 404 because a
+  static server has no `/api/fetch` proxy. Only the rows' look matters here. In Lite the fake shell's Upgrade banner
+  covers the top of the page.
+- Spec review (fresh agent, diff + brief only). What it raised, and what was done:
+  - Find Tweak Sources shows in Lite, and Find App Sources is the not-added recommended list: kept, see Decisions.
+  - Not every render combination existed: re-captured the full set.
+  - Extras: the Manage merge, the Jailbreak row, the split groups in the jailbroken Sources list (the concept shows
+    two bands) and the per-group search headers: kept, see Decisions.
+  - The guides.js "Recommended Sources" wording is outside this task's files: filed as C57.
+  - Two Tweak Sources groups in Lite can't happen: Lite's shown list is AltStore only (`sourcesFor("none")`).
 
 ## What failed on the way
 

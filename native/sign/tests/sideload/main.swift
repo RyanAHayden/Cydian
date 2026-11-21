@@ -467,4 +467,26 @@ test("This iPhone: a dropped connection is not a failed install (B246)") {
     check(fr.summary == "5.0 MB/s in front", "front only: \(fr.summary)")
 }
 
+test("This iPhone: a second look while installd is quiet (B251)") {
+    let after = HereRecheck.lookAfter, every = HereRecheck.lookEvery
+    check(after < 180 && every < 180, "looks come well before installd's 180 s limit")
+    var l = HereRecheck.SecondLook()
+    check(!l.due(quiet: after - 1), "not before \(after) s of quiet")
+    check(l.due(quiet: after), "a look at \(after) s of quiet")
+    check(!l.due(quiet: after + 1), "one look at a time")
+    check(!l.due(quiet: after + every - 1), "not again before \(every) s more")
+    check(l.due(quiet: after + every), "again \(every) s later")
+    // installd's next percentage starts the clock again: the looks start over
+    check(!l.due(quiet: 2), "the step moved: no look")
+    check(l.lastAt == nil, "and the looks start over")
+    check(l.due(quiet: after), "the first look comes again after \(after) s")
+
+    check(!HereRecheck.SecondLook.ends(nil), "couldn't ask iOS: nothing changes, keep waiting on installd")
+    check(!HereRecheck.SecondLook.ends(.notYet), "not listed yet: keep waiting")
+    check(!HereRecheck.SecondLook.ends(.sameAsBefore), "still the earlier copy: keep waiting")
+    // a reinstall of the same version reads cannotTell from the first look while installd may still be verifying
+    check(!HereRecheck.SecondLook.ends(.cannotTell), "can't tell: the long limit decides, never a look")
+    check(HereRecheck.SecondLook.ends(.installed), "the new copy listed: installed")
+}
+
 if failures == 0 { print("all passed") } else { print("\(failures) failed"); exit(1) }

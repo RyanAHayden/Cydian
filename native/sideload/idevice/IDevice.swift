@@ -353,11 +353,33 @@ enum IDevice {
         private var step = "starting", limit = Limit.tunnel, last = Date()
         private var closer: OpaquePointer? // an AdapterHandle clone, only for adapter_close; freed here
         private(set) var detail = ""
+        // B251: called by the watchdog with the step's quiet seconds, for this step only (begin clears it)
+        private var quietHook: ((TimeInterval) -> Void)?
+        private var stepNo = 0
+        private var stopWhy: String? // set: the watchdog ends the step now (a second look found the work done)
 
         func begin(_ s: String, _ l: TimeInterval) {
-            lock.lock(); step = s; limit = l; last = Date(); lock.unlock()
+            lock.lock(); step = s; limit = l; last = Date(); quietHook = nil; stepNo += 1; lock.unlock()
             IDevice.ilog("step: \(s) (limit \(Int(l)) s)")
         }
+        /// B251: `f` gets the quiet seconds on every watchdog tick while the current step runs; it must not block.
+        /// Returns the step's number, for stop(_:step:).
+        func whileQuiet(_ f: @escaping (TimeInterval) -> Void) -> Int {
+            lock.lock(); defer { lock.unlock() }
+            quietHook = f
+            return stepNo
+        }
+        var hook: ((TimeInterval) -> Void)? { lock.lock(); defer { lock.unlock() }; return quietHook }
+        /// B251: ends step `n` now, if it is still the step running: `then` runs first, under the lock, so whatever
+        /// it records is there before the watchdog acts. False when the step already ended.
+        func stop(_ why: String, step n: Int, then: () -> Void) -> Bool {
+            lock.lock(); defer { lock.unlock() }
+            guard n == stepNo, stopWhy == nil else { return false }
+            then()
+            stopWhy = why
+            return true
+        }
+        var stopRequest: String? { lock.lock(); defer { lock.unlock() }; return stopWhy }
         func alive(_ d: String? = nil) { lock.lock(); last = Date(); if let d = d { detail = d }; lock.unlock() }
         var now: (step: String, limit: TimeInterval, quiet: TimeInterval) {
             lock.lock(); defer { lock.unlock() }
@@ -408,7 +430,20 @@ enum IDevice {
                 w.alive()
                 continue
             }
+            if let why = w.stopRequest {
+                // B251: the work is done elsewhere (a second look); the call still waits on the first connection
+                ilog("ending \(w.now.step): \(why); closing the tunnel")
+                let closed = w.closeTunnel()
+                if out.done.wait(timeout: .now() + Limit.grace) == .timedOut {
+                    ilog("the waiting call didn't come back (tunnel closed: \(closed)); leaving it")
+                } else if case .success(let v)? = out.result {
+                    ilog("\(what): done in \(String(format: "%.1f", Date().timeIntervalSince(t0))) s (finished on its own)")
+                    return v
+                }
+                throw Failure(code: "stopped", text: why)
+            }
             let n = w.now
+            w.hook?(n.quiet)
             guard n.quiet > n.limit else { continue }
             let why = "\(n.step): no answer from iOS for \(Int(n.limit)) s" + (w.detail.isEmpty ? "" : " (\(w.detail))")
             ilog("TIMEOUT \(why); closing the tunnel")
@@ -468,6 +503,7 @@ enum IDevice {
         var copyStart: Date?
         var installSent = false // installation_proxy got the install
         var askUntil: Date?     // after a drop, how long to keep asking iOS for the app (one deadline per install)
+        var lookedInstalled = false // B251: a second look found the new copy while installd's step was quiet
         init(ipa: URL, size: Int, remote: String, bundleID: String?, version: String?) {
             self.ipa = ipa; self.size = size; self.remote = remote; self.bundleID = bundleID; self.version = version
         }
@@ -626,6 +662,7 @@ enum IDevice {
         private let watch: Watch
         private var viaTailscale = false
         private let pinnedTailscale: Bool? // B246: the route a reconnect must use (nil: Tailscale.useForInstall)
+        private let second: Bool // B251: a second look beside the install's own session: shares its Tailscale relay
         let kind: Kind
         var via: String { viaTailscale ? "Tailscale" : "LocalDevVPN" }
         var tailnet: Bool { viaTailscale }
@@ -640,15 +677,23 @@ enum IDevice {
                 throw Failure(code: "connect_failed", text: want ? "Tailscale isn't back on yet" : "Tailscale came on; this install started over LocalDevVPN")
             }
             guard tailnet else { return (address, port) }
+            if second {
+                // the install's session runs the node and the relay; starting or stopping them here would cut it off
+                let local = Tailscale.mapPort(port)
+                guard local != port else { throw Failure(code: "connect_failed", text: "Tailscale: the install's relay isn't running") }
+                viaTailscale = true
+                return ("127.0.0.1", local)
+            }
             watch.begin("starting Tailscale", Limit.tunnel)
             let local = try Tailscale.beginInstall(port: port)
             viaTailscale = true
             return ("127.0.0.1", local)
         }
 
-        init(watch: Watch, tailscale pinned: Bool? = nil) throws {
+        init(watch: Watch, tailscale pinned: Bool? = nil, second: Bool = false) throws {
             self.watch = watch
             self.pinnedTailscale = pinned
+            self.second = second
             guard let (kind, data) = IDevice.pairing() else {
                 throw Failure(code: "not_paired", text: "pair this iPhone first (Settings > Installation)")
             }
@@ -789,7 +834,7 @@ enum IDevice {
             if let h = handshake { rsd_handshake_free(h) }
             if let a = adapter { adapter_free(a) }
             if let p = provider { idevice_provider_free(p) }
-            if viaTailscale { Tailscale.endInstall() }
+            if viaTailscale && !second { Tailscale.endInstall() }
         }
     }
 
@@ -878,6 +923,12 @@ enum IDevice {
                     try installTry(run, watch: w, note: note, progress: progress)
                 }
                 return
+            } catch where run.lookedInstalled {
+                // B251: a second look found the new copy while the install's own connection was quiet
+                ilog("installed (seen on a second connection); the first one ended with: \(error.localizedDescription)")
+                note("iOS lists \(run.bundleID ?? "the app") \(run.version ?? ""): installed")
+                progress(.install(1))
+                return
             } catch let f as Failure where run.connected && HereRecheck.shouldReconnect(code: f.code, lib: f.lib, reconnecting: firstDrop != nil) {
                 attempt += 1
                 if firstDrop == nil { firstDrop = f }
@@ -953,6 +1004,7 @@ enum IDevice {
             Unmanaged<ProgressBox>.fromOpaque(ctx).takeUnretainedValue().f(pct)
         }
         run.installSent = true
+        lookWhileQuiet(run, watch: w)
         let err = installation_proxy_install_with_callback(ip, run.remote, nil, cb, box.toOpaque())
         do {
             try check(err, "install_failed")
@@ -1000,6 +1052,63 @@ enum IDevice {
                 w.begin("waiting for iOS to list \(bid) \(version)", HereRecheck.askEvery + Limit.service)
                 Thread.sleep(forTimeInterval: HereRecheck.askEvery)
             }
+        }
+    }
+
+    /// B251: the looks' state for one installd step, shared by the watchdog's ticks and the look's own thread.
+    private final class Looker {
+        let lock = NSLock()
+        var state = HereRecheck.SecondLook()
+        var busy = false
+    }
+
+    /// B251: while installd's step is quiet, a second connection asks iOS for the app (HereRecheck.SecondLook); when
+    /// iOS lists the new copy, the step ends and install() reports it installed. Each look runs on its own thread
+    /// under its own Watch, so the watchdog's tick never waits on it. Nothing to ask without the bundle ID and version.
+    private static func lookWhileQuiet(_ run: HereRun, watch w: Watch) {
+        guard let bid = run.bundleID, let version = run.version else { return }
+        let looker = Looker()
+        var step = 0
+        step = w.whileQuiet { quiet in
+            looker.lock.lock()
+            guard !looker.busy, looker.state.due(quiet: quiet) else { looker.lock.unlock(); return }
+            looker.busy = true
+            looker.lock.unlock()
+            ilog("installd quiet for \(Int(quiet)) s: asking iOS for \(bid) \(version) on a second connection")
+            let th = Thread {
+                let v = secondLook(run, bid: bid, version: version)
+                looker.lock.lock(); looker.busy = false; looker.lock.unlock()
+                guard HereRecheck.SecondLook.ends(v) else { return }
+                let stopped = w.stop("iOS lists \(bid) \(version) (asked on a second connection)", step: step) {
+                    run.lookedInstalled = true
+                }
+                ilog(stopped ? "second look: installed; ending the wait for installd" : "second look: installed, but the step had already ended")
+            }
+            th.stackSize = 4 << 20 // as watched's own threads
+            th.qualityOfService = .userInitiated
+            th.start()
+        }
+    }
+
+    /// B251: one second look: a session of its own beside the install's (sharing its route), installation_proxy
+    /// Browse for the app, and the verdict; nil when iOS couldn't be asked (the route is down, or a second
+    /// connection wasn't let in). A look that sees the new copy installed removes the staged IPA, as the install
+    /// would have.
+    private static func secondLook(_ run: HereRun, bid: String, version: String) -> HereRecheck.Verdict? {
+        do {
+            return try watched("second look") { (w: Watch) -> HereRecheck.Verdict in
+                let s = try Session(watch: w, tailscale: run.tailnet, second: true)
+                let ip = try s.installationProxy()
+                defer { installation_proxy_client_free(ip) }
+                let now = try appState(ip, bid, watch: w)
+                let v = HereRecheck.verdict(version: version, before: run.before ?? .unknown, now: now)
+                ilog("second look: iOS lists \(bid): \(now.map(describe) ?? "nothing") -> \(v)")
+                if v == .installed { removeStaged(run.remote, session: s, watch: w) }
+                return v
+            }
+        } catch {
+            ilog("second look: couldn't ask iOS (\(error.localizedDescription)); waiting on installd")
+            return nil
         }
     }
 

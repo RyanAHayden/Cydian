@@ -969,6 +969,25 @@ import { d1 } from "./src/d1-sqlite.js";
   console.log("worker host in parts (B215): ok");
 }
 
+// B217: /sign/upload's parts outlive the link, as /sign/host's: done gives the upload's key a fresh ttl, so a part
+// put just before the first ttl ran out must still last that second ttl (2*ttl+300 from its PUT).
+{
+  const ttls = {};
+  const kv = { ...env.HOSTED, put: async (k, v, o) => { ttls[k] = o?.expirationTtl; return env.HOSTED.put(k, v, o); } };
+  const uenv = { ...env, HOSTED: kv };
+  const at = (path, init) => w.fetch(new Request("https://sign.example" + path, init), uenv);
+  const app = new Uint8Array(PART + 3);
+  app[0] = 0x50; app[1] = 0x4b;
+  const up = await (await at(`/sign/upload?bundleid=com.any.app&version=1&title=Any&size=${app.length}`, { method: "POST" })).json();
+  assert.equal((await at(`/sign/upload/${up.token}/0`, { method: "PUT", body: app.slice(0, PART) })).status, 200);
+  assert.equal((await at(`/sign/upload/${up.token}/1`, { method: "PUT", body: app.slice(PART) })).status, 200);
+  const done = await at(`/sign/upload/${up.token}/done`, { method: "POST" });
+  assert.equal(done.status, 200);
+  assert.equal(ttls[`up.${up.token}`], 600, "the link lasts ttl from done");
+  for (const i of [0, 1]) assert.equal(ttls[`up.${up.token}.${i}`], 2 * 600 + 300, `part ${i} outlives the link`);
+  console.log("worker upload parts outlive the link (B217): ok");
+}
+
 // F178/B165: iFizBox's AltStore source at https://<DOMAIN>/repo/source.json: the latest release's source.json
 // (live the moment a release is published), else the deployed web/app/source.json (ASSETS) when GitHub fails; and
 // the site's proxy answers its own /repo/ URLs without fetching itself.

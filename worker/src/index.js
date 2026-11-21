@@ -443,8 +443,9 @@ async function uploads(req, u, env, ttl, ctx = null) {
     const body = new Uint8Array(await req.arrayBuffer());
     if (body.byteLength !== partLen(meta, i)) return fail("bad_request", `Part ${i + 1} should be ${partLen(meta, i)} bytes.`);
     if (i === 0 && (body[0] !== 0x50 || body[1] !== 0x4b)) return fail("bad_ipa", "That isn't an IPA (a zip archive).");
-    // parts outlive the upload's own key by a few minutes, so a link never points at half an app
-    await env.HOSTED.put(partKey(p[1], i), body.buffer, { expirationTtl: ttl + 300, metadata: { n: body.byteLength } });
+    // parts outlive the upload's own key, which gets a fresh ttl at done (B217: as /sign/host's parts): a part put
+    // just before the first ttl ran out still lasts the link's whole ttl, so a link never points at half an app
+    await env.HOSTED.put(partKey(p[1], i), body.buffer, { expirationTtl: 2 * ttl + 300, metadata: { n: body.byteLength } });
     return json({ ok: true, part: i });
   }
   const st = /^\/sign\/up\/([0-9a-f]{48})\/status$/.exec(u.pathname);

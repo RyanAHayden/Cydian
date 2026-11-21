@@ -20,6 +20,14 @@
   -webkit-tap-highlight-color: transparent;
 }
 .tw-add .loading-spinner { width: 12px; height: 12px; margin: 0; }
+/* B267: the Add Tweaks flow's tweak lists (screens/tweakrow.js): Cydia's list row, a 29pt icon, the name over version
+   · author. The package's Icon is cropped into the box (a big logo never spills over the rows); the section icon
+   under it shows until it loads, or when it fails. */
+.tw-list-row .cell-text { flex: 1; min-width: 0; }
+.tw-list-row .cell-label, .tw-list-row .cell-subtitle { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.tw-list-row .cell-inner { text-align: left; width: 100%; }
+.cell-icon.tw-icon { position: relative; overflow: hidden; width: 29px; height: 29px; }
+.cell-icon.tw-icon img { position: absolute; inset: 0; width: 100%; height: 100%; max-width: none; object-fit: cover; }
 /* Installed: "2 Tweaks" after a signed app's subtitle, packages.css .sig-pill's shape in grey; "Tweak Update" in green */
 .tweak-pill { display: inline-block; vertical-align: 1px; margin-left: 5px; height: 15px; padding: 0 6px; }
 
@@ -53,6 +61,9 @@
 }
 html[data-theme="dark"] .tw-add { color: var(--text); text-shadow: none; border-color: var(--dk-btn-edge); background: var(--dk-btn); background-origin: border-box; }
 html[data-theme="dark"] .tw-add.on { color: var(--text); border-color: var(--dk-btn-edge); background: var(--dk-green); }
+.cell-icon.tw-icon { background: transparent center / cover no-repeat; border-radius: 6px; }
+.cell-icon.tw-icon img { opacity: 0; background: #fff; }
+.cell-icon.tw-icon img.loaded { opacity: 1; }
 .tw-locked .cell-label, .tw-locked .cell-detail, .tw-locked .cell-subtitle { opacity: .45; }
 .tweak-pill {
   border-radius: 8px;

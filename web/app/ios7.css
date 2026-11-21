@@ -88,6 +88,16 @@ html[data-style="ios7"][data-theme="light"] {
   --action-cancel: rgba(248,248,248,.97); --action-cancel-pressed: #e5e5e5;
   --action-cancel-text: #007aff; --action-cancel-emboss: none;
   --store-head: #f7f7f7; --store-head-edge: #c8c7cc; --store-head-emboss: none;
+  /* sources.css's Done ("Button (Gloss Blue)"): iOS 7's Done is bold tinted text with no box, in the nav bar and on
+     the bars over the page (the banner's Upgrade, the reload bar's Cancel, the undo bar's Undo) */
+  --done-btn-edge: transparent; --done-btn-edge-top: transparent; --done-btn: none; --done-btn-pressed: none;
+  /* the notification banner (nav/banner.js): iOS 7's dark banner, flat, white title and message, no embosses */
+  --banner: #1a1a1a; --banner-shadow: none; --banner-edge: transparent; --banner-icon-shadow: none;
+  --banner-emboss: none; --banner-title: #fff; --banner-text: #fff; --banner-timer: rgba(255,255,255,.3);
+  --i7-banner-tint: #0a84ff; /* the tint as iOS draws it on a dark ground */
+  /* the reload bar (nav/reloadbar.js): a flat iOS 7 toolbar, the tab bar's #f7f7f7 under a hairline, black text */
+  --reload-bar: linear-gradient(var(--i7-hairline), var(--i7-hairline)) top / 100% .5px no-repeat, #f7f7f7;
+  --reload-text: #000; --reload-emboss: none; --i7-reload-spinner: var(--spinner-gray);
 }
 
 /* ---- OLED Black: the same shapes, white on black; ios6.css's dark rules read the --dk-* tokens ---- */
@@ -139,6 +149,13 @@ html[data-style="ios7"][data-theme="dark"] {
   --action-btn-pressed: #2c2c2e; --action-btn-pressed-text: #0a84ff; --action-btn-pressed-emboss: none;
   --action-destructive: #1c1c1e; --action-destructive-text: #ff453a; --action-destructive-emboss: none;
   --action-cancel-text: #0a84ff; --action-cancel-emboss: none; --action-cancel-pressed: #2c2c2e;
+  --done-btn-edge: transparent; --done-btn-edge-top: transparent; --done-btn: none; --done-btn-pressed: none;
+  /* the banner a step above the black page, with a hairline under it; the reload bar black under a hairline */
+  --banner: #1c1c1e; --banner-shadow: none; --banner-edge: #38383a; --banner-icon-shadow: none;
+  --banner-emboss: none; --banner-title: #fff; --banner-text: #fff; --banner-timer: rgba(255,255,255,.3);
+  --i7-banner-tint: #0a84ff;
+  --reload-bar: linear-gradient(var(--i7-hairline), var(--i7-hairline)) top / 100% .5px no-repeat, #000;
+  --reload-text: #fff; --reload-emboss: none; --i7-reload-spinner: var(--spinner-white);
 }
 
 /* ---- Look-only rules: type, and the shapes no token carries ---- */
@@ -257,3 +274,12 @@ html[data-style="ios7"][data-theme="dark"] .search-cancel { background: none; }
 html[data-style="ios7"] .action-button { font-size: 20px; font-weight: 400; border-radius: 4px; }
 html[data-style="ios7"] .action-button.cancel { font-weight: 600; }
 html[data-style="ios7"][data-theme="dark"] .action-button.destructive { background: var(--action-destructive); }
+
+/* The bars over the page: the banner's Upgrade is bold tinted text centred in its 30pt box (the 44pt line-height of
+   the nav bar's buttons pushed it down); the banner's title semibold, its icon iOS 7's rounder corner; the reload
+   bar's status line semibold over iOS 7's grey spinner in White. */
+html[data-style="ios7"] .banner .banner-action { font-size: 15px; font-weight: 600; line-height: 28px; color: var(--i7-banner-tint); }
+html[data-style="ios7"] .banner-text strong { font-weight: 600; }
+html[data-style="ios7"] .banner-icon { border-radius: 7px; }
+html[data-style="ios7"] .reload-text { font-size: 15px; font-weight: 600; }
+html[data-style="ios7"] .reload-spinner { background-image: var(--i7-reload-spinner); }

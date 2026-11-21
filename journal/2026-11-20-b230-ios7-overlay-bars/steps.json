@@ -1,0 +1,13 @@
+[{"eval": "(()=>{localStorage.clear();localStorage.setItem('ifizbox.firstVisit','later');localStorage.setItem('ifizbox.device','iphoneos-arm64');localStorage.setItem('ifizbox.style','ios7');localStorage.setItem('ifizbox.appearance','light');localStorage.setItem('ifizbox.darkTheme','oled');return 1})()"},
+ {"nav": "#/home", "ms": 4000},
+ {"eval": "(async()=>{const b=await import('./nav/banner.js');const r=await import('./nav/reloadbar.js');b.showBanner({message:'iFizBox 0.18.0 is out.',action:{label:'Upgrade'},duration:60000});r.showReloadBar('Downloading Packages',{onCancel:()=>{}});return document.documentElement.dataset.style+' '+document.documentElement.dataset.theme})()"},
+ {"wait": 1500}, {"shot": "white"},
+ {"eval": "(()=>{localStorage.setItem('ifizbox.appearance','dark');return 1})()"},
+ {"nav": "#/home", "ms": 4000},
+ {"eval": "location.reload()"}, {"wait": 4000},
+ {"eval": "(async()=>{const b=await import('./nav/banner.js');const r=await import('./nav/reloadbar.js');b.showBanner({message:'iFizBox 0.18.0 is out.',action:{label:'Upgrade'},duration:60000});r.showReloadBar('Downloading Packages',{onCancel:()=>{}});return document.documentElement.dataset.style+' '+document.documentElement.dataset.theme})()"},
+ {"wait": 1500}, {"shot": "oled"},
+ {"eval": "(()=>{localStorage.setItem('ifizbox.style','ios6');localStorage.setItem('ifizbox.appearance','light');location.reload();return 1})()"}, {"wait": 4000},
+ {"eval": "(async()=>{const b=await import('./nav/banner.js');const r=await import('./nav/reloadbar.js');b.showBanner({message:'iFizBox 0.18.0 is out.',action:{label:'Upgrade'},duration:60000});r.showReloadBar('Downloading Packages',{onCancel:()=>{}});return document.documentElement.dataset.style+' '+document.documentElement.dataset.theme})()"},
+ {"wait": 1500}, {"shot": "ios6-unchanged"}
+]

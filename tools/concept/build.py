@@ -181,6 +181,37 @@ def palettes(app_modules):
         out[key] = [{"value": v, "label": l} for v, l in opts]
     if not out["lightTheme"] or not out["darkTheme"]:
         raise SystemExit("concept: couldn't read the theme lists from core/settings.js")
+    out["styles"] = styles(js, out)
+    return out
+
+
+def styles(js, lists):
+    """Theme > Style's eras, read from core/settings.js: the style setting's options (its `default` first in the
+    Theme menu, with the lightTheme/darkTheme lists as its themes) and STYLE_PALETTES (an era's own theme per tone).
+    Each: {value, label, default, own, themes: {light: [{value, label}], dark: [...]}} (own: the era has its own
+    themes, not the lists, so the frame stores no lightTheme/darkTheme pick for it). An era's theme is labelled as the
+    same value is in the theme lists (oled: OLED Black), else by its value capitalised (white: White)."""
+    m = re.search(r'key:\s*"style".*?default:\s*"([^"]+)".*?options:\s*\[(.*?)\]\s*,', js, re.S)
+    if not m:
+        raise SystemExit("concept: couldn't read Theme > Style's eras from core/settings.js")
+    default, opts = m.group(1), re.findall(r'value:\s*"([^"]+)",\s*label:\s*"([^"]+)"', m.group(2))
+    own = {}
+    pm = re.search(r"STYLE_PALETTES\s*=\s*\{(.*?)\}\s*;", js, re.S)
+    for era, body in re.findall(r'(\w+)\s*:\s*\{([^{}]*)\}', pm.group(1) if pm else ""):
+        own[era] = dict(re.findall(r'(light|dark)\s*:\s*"([^"]+)"', body))
+    known = {o["value"]: o["label"] for o in lists["lightTheme"] + lists["darkTheme"]}
+    out = []
+    for value, label in opts:
+        if value in own:
+            if set(own[value]) != {"light", "dark"}:
+                raise SystemExit(f"concept: STYLE_PALETTES.{value} in core/settings.js needs a light and a dark theme")
+            themes = {t: [{"value": p, "label": known.get(p, p[:1].upper() + p[1:])}] for t, p in own[value].items()}
+        else:
+            themes = {"light": lists["lightTheme"], "dark": lists["darkTheme"]}
+        out.append({"value": value, "label": label, "default": value == default, "own": value in own, "themes": themes})
+    if not any(s["default"] for s in out):
+        raise SystemExit("concept: Theme > Style's default isn't one of its options in core/settings.js")
+    out.sort(key=lambda s: not s["default"])  # stable: the default era first, the rest in the app's order
     return out
 
 

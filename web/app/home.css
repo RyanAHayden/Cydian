@@ -61,11 +61,13 @@ html[data-theme="dark"] .home {
 .home-pair > .cell + .cell > .cell-inner { box-shadow: none; } /* not a table's divider highlight */
 .home-row.green > .table { background: var(--tile-green); }
 
-/* Glyphs: 29px rounded squares with a white symbol, drawn here (original art, no logos). */
+/* Glyphs: 29px rounded squares with a white symbol (original art, no logos). The .glyph-* rules (here, the jailbreak
+   tile's and the Theme glyph's below) are icons/rowicons.js homeGlyphRules("ios6"), its ICON_SETS "home" entries;
+   change them there (rowicons.test.js checks this file). ios7.css carries iOS 7's set. */
 .home-glyph { box-shadow: none; background-position: center; background-repeat: no-repeat; background-size: 21px 21px; }
 .glyph-github { background-color: #333; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fff' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M8 6 2 12l6 6M16 6l6 6-6 6M14 4l-4 16'/%3E%3C/svg%3E"); }
 .glyph-sources { background-color: #5c7aa3; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23fff'%3E%3Cpath d='M3 4h18v4H3zM4 9h16v11H4zm5 3v2h6v-2z' fill-rule='evenodd'/%3E%3C/svg%3E"); }
-.glyph-discord { background-color: #7289da; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23fff' d='M19.3 5.4A16.6 16.6 0 0 0 15.2 4l-.5 1a15.3 15.3 0 0 0-5.4 0l-.5-1a16.5 16.5 0 0 0-4.1 1.4C2.1 9.3 1.4 13.2 1.8 17a16.7 16.7 0 0 0 5 2.5l1.1-1.7a10.8 10.8 0 0 1-1.7-.8l.4-.3a11.9 11.9 0 0 0 10.8 0l.4.3a10.8 10.8 0 0 1-1.7.8l1.1 1.7a16.6 16.6 0 0 0 5-2.5c.5-4.4-.7-8.3-2.9-11.6zM8.5 14.6c-1 0-1.8-.9-1.8-2s.8-2 1.8-2 1.8.9 1.8 2-.8 2-1.8 2zm7 0c-1 0-1.8-.9-1.8-2s.8-2 1.8-2 1.8.9 1.8 2-.8 2-1.8 2z'/%3E%3C/svg%3E"); } /* the old blurple and Clyde */
+.glyph-discord { background-color: #7289da; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23fff' d='M19.3 5.4A16.6 16.6 0 0 0 15.2 4l-.5 1a15.3 15.3 0 0 0-5.4 0l-.5-1a16.5 16.5 0 0 0-4.1 1.4C2.1 9.3 1.4 13.2 1.8 17a16.7 16.7 0 0 0 5 2.5l1.1-1.7a10.8 10.8 0 0 1-1.7-.8l.4-.3a11.9 11.9 0 0 0 10.8 0l.4.3a10.8 10.8 0 0 1-1.7.8l1.1 1.7a16.6 16.6 0 0 0 5-2.5c.5-4.4-.7-8.3-2.9-11.6zM8.5 14.6c-1 0-1.8-.9-1.8-2s.8-2 1.8-2 1.8.9 1.8 2-.8 2-1.8 2zm7 0c-1 0-1.8-.9-1.8-2s.8-2 1.8-2 1.8.9 1.8 2-.8 2-1.8 2z'/%3E%3C/svg%3E"); }
 .glyph-featured { background-color: #fc0; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23fff'%3E%3Cpath d='m12 1.5 3.2 6.9 7.3.8-5.4 5 1.5 7.3L12 17.8l-6.6 3.7 1.5-7.3-5.4-5 7.3-.8z'/%3E%3C/svg%3E"); }
 .glyph-themes { background-color: #1a82fb; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23fff'%3E%3Cpath d='M2 4h20v13H2zm2 2v9h16V6zM9 18h6l1 3H8z' fill-rule='evenodd'/%3E%3C/svg%3E"); }
 .glyph-browse { background-color: #f39c12; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23fff'%3E%3Cpath d='M3 3h8v8H3zm10 0h8v8h-8zM3 13h8v8H3zm10 0h8v8h-8z'/%3E%3C/svg%3E"); }
@@ -78,7 +80,8 @@ html[data-theme="dark"] .glyph-github { background-color: var(--dk-glyph); }
 .glyph-upgrades { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23fff'%3E%3Cpath d='M12 2 3 11h6v10h6V11h6z'/%3E%3C/svg%3E"); }
 .glyph-failed { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23fff'%3E%3Cpath d='M10 3h4l-.6 12h-2.8zm0 15h4v3h-4z'/%3E%3C/svg%3E"); }
 .glyph-current { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fff' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m4 12.5 5 5L20 6.5'/%3E%3C/svg%3E"); }
-.glyph-changes, .glyph-loading { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fff' stroke-width='2.6' stroke-linecap='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 7v5l3.5 2.5'/%3E%3C/svg%3E"); }
+.glyph-changes { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fff' stroke-width='2.6' stroke-linecap='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 7v5l3.5 2.5'/%3E%3C/svg%3E"); }
+.glyph-loading { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fff' stroke-width='2.6' stroke-linecap='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 7v5l3.5 2.5'/%3E%3C/svg%3E"); }
 .glyph-loading { opacity: .6; }
 /* ==== } look-only ==== */
 

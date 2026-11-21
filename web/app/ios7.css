@@ -341,7 +341,7 @@ html[data-style="ios7"] .action-button.cancel { font-weight: 600; }
    draws a .5pt line across its top instead: the dimming's colour in White, the alert's line colour in OLED Black
    (the dimmed black page would hide it). Their 1pt transparent border goes, so the line runs edge to edge. */
 html[data-style="ios7"][data-theme="light"] { --i7-action-line: rgba(0,0,0,.4); }
-html[data-style="ios7"][data-theme="dark"] { --i7-action-line: #38383a; }
+html[data-style="ios7"][data-theme="dark"] { --i7-action-line: var(--i7-alert-line); }
 html[data-style="ios7"] {
   --action-sheet-pad: 8px 8px; --action-sheet-pad-bottom: 8px;
   --action-gap: 8px; --action-list-gap: 0px; --action-list-bleed: 0px;

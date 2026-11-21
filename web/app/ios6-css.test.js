@@ -363,7 +363,7 @@ test("F341: action sheet and alert geometry are era hooks; iOS 7 sets the kit's"
   assert.match(src, /\n\.alert-buttons\.stacked \{[^}]*gap: var\(--alert-stacked-gap\);/);
   assert.match(src, /\n\.alert-button \{[^}]*height: var\(--alert-button-h\);/);
   for (const v of ["--action-sheet-pad: 8px 8px", "--action-sheet-pad-bottom: 8px", "--action-gap: 8px", "--action-list-gap: 0px",
-    "--action-list-bleed: 0px", "--action-title-margin: 0 0 -8px", "--action-cancel-gap: 0px",
+    "--action-list-bleed: 0px", "--action-title-margin: 0 0 -8px", "--action-title-pad: 14px 16px", "--action-cancel-gap: 0px",
     "--alert-w: 270px", "--alert-pad: 18px 16px 0", "--alert-buttons-margin: 8px -16px 0", "--alert-buttons-gap: 0px",
     "--alert-stacked-gap: 0px", "--alert-button-h: 44px"]) assert.ok(ios7.includes(v), `ios7.css ${v}`);
   // the lines are the buttons' own now, not drawn on the box from its bottom

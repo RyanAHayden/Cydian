@@ -49,7 +49,16 @@ rounded buttons with the title floating above them, and the alert kept iOS 6's 3
   button, two (with a field, the right one pressed) and three stacked, in iOS 6, iOS 7 White and OLED Black.
   Geometry read back: sheet buttons x=8 w=374, 44pt each, Cancel 8pt under the block and 8pt over the bottom; alert
   270 wide, buttons flush with its sides and bottom, 44pt. iOS 6: all five shots pixel-identical to main.
-  Shots in `shots/`.
+  Shots in `shots/`: crops of the script's `white-sheet`, `oled-sheet`, `white-alert2` and `oled-alert3`; the iOS 6
+  before/after pairs were compared with PIL's `ImageChops.difference` (no bounding box) and not committed.
+
+## Spec review
+
+Fixed: the test now checks `--action-title-pad`; OLED Black's sheet line reads `var(--i7-alert-line)` instead of
+repeating its value. Kept on purpose: the alert's bottom buttons take the box's 7pt corners (without them a pressed
+edge-to-edge button pokes out of the rounded box), the `--i7-action-line` token, and `--alert-buttons-margin`
+repeating the box's 16pt side padding (an era sets both together; a calc from `--alert-pad` can't take one side of a
+shorthand). The 44 vs 44.5pt row is under Not verified below.
 
 ## Not verified
 

@@ -50,14 +50,30 @@ export function refreshIcons(doc = globalThis.document) {
 // The message app.icon takes, for the tests and tellIcon.
 export const iconMessage = (read, onScreen) => ({ method: "app.icon", params: iconState(read, onScreen) });
 
+// B243: a switch the shell answers "failed: …" (iOS refused it) is sent again, after each of these waits in turn; a
+// newer change cancels the retry (it sends its own). Other refusals (an older shell, bad_params, resign_needed) aren't.
+export const RETRY_MS = [1000, 3000, 10000];
+// native/bridge.js turns "failed: <text>" into an Error with code "failed" and message <text>.
+export const retryable = (e) => e?.code === "failed" || /^failed\b/.test(String(e?.message ?? e ?? ""));
+
 let lastSent = "";
-export function tellIcon(onScreen, s = settings, native = nativeBridge()) {
+let sends = 0; // a reply counts only while no newer app.icon went out
+let retry = null;
+export function tellIcon(onScreen, s = settings, native = nativeBridge(), attempt = 0) {
   if (!nativeIcons(s) || !hasNativeCall(native)) return false;
   const { method, params } = iconMessage(readIcons((k) => s.get(k)), onScreen);
   const key = JSON.stringify(params);
   if (key === lastSent) return false;
   lastSent = key;
-  Promise.resolve(native.call(method, params)).catch(() => { lastSent = ""; }); // an older shell, or not active yet
+  const n = ++sends;
+  clearTimeout(retry);
+  retry = null;
+  Promise.resolve(native.call(method, params)).catch((e) => {
+    if (n !== sends) return; // a newer change went out after it
+    lastSent = ""; // so the next change, or the retry, sends it again
+    if (!retryable(e) || attempt >= RETRY_MS.length) return;
+    retry = setTimeout(() => { retry = null; if (n === sends) tellIcon(onScreen, s, native, attempt + 1); }, RETRY_MS[attempt]);
+  });
   return true;
 }
-export const resetTold = () => { lastSent = ""; };
+export const resetTold = () => { lastSent = ""; clearTimeout(retry); retry = null; };

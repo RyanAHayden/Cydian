@@ -56,8 +56,8 @@ enum AppIcon {
             if [light, dark, shown].contains(where: OwnIcons.isOwn) { return OwnIcons.applyShown(shown, c) }
             let name = setName(light: light, dark: dark, onScreen: shown, variants: variants, sets: sets)
             DispatchQueue.main.async {
-                whenActive {
-                    apply(name) { changed, quiet, err in
+                whenActive(dropped: { c.reply(["name": name ?? "AppIcon", "changed": false, "quiet": false], nil) }) {
+                    switchTo(name) { changed, quiet, err in
                         if let err = err { return c.reply(nil, "failed: \(err)") }
                         c.reply(["name": name ?? "AppIcon", "changed": changed, "quiet": quiet], nil)
                     }
@@ -67,19 +67,57 @@ enum AppIcon {
     }
 
     // Runs `f` now if the app is active, else once it becomes active (the latest call wins). On the main queue.
+    // B243: a call the latest replaces runs its `dropped` instead (it answers unchanged, so its promise settles).
     private static var waiting: (() -> Void)?
+    private static var waitingDropped: (() -> Void)?
     private static var observer: NSObjectProtocol?
-    static func whenActive(_ f: @escaping () -> Void) {
-        if UIApplication.shared.applicationState == .active { waiting = nil; return f() }
+    static func whenActive(dropped: (() -> Void)? = nil, _ f: @escaping () -> Void) {
+        let before = waitingDropped
+        waitingDropped = nil
+        if UIApplication.shared.applicationState == .active { waiting = nil; before?(); return f() }
         waiting = f
+        waitingDropped = dropped
+        before?()
         guard observer == nil else { return }
         observer = NotificationCenter.default.addObserver(forName: UIApplication.didBecomeActiveNotification,
                                                           object: nil, queue: .main) { _ in
             let f = waiting
             waiting = nil
+            waitingDropped = nil
             f?()
         }
     }
+
+    // B243: one switch at a time. iOS refuses a setAlternateIconName that comes while the last one is still going
+    // (its alert still up, in the sideload build), so a call that comes then waits for it; only the latest waiting
+    // one runs, and the one it replaces answers unchanged. On the main queue; `done` too.
+    private static var switching = false
+    private static var queued: (name: String?, done: (Bool, Bool, String?) -> Void)?
+    static func switchTo(_ name: String?, done: @escaping (Bool, Bool, String?) -> Void) {
+        if switching {
+            queued?.done(false, false, nil)
+            queued = (name, done)
+            return
+        }
+        switching = true
+        turn += 1
+        let mine = turn
+        let next = {
+            guard switching, turn == mine else { return }
+            switching = false
+            if let q = queued {
+                queued = nil
+                switchTo(q.name, done: q.done)
+            }
+        }
+        // A completion that never comes (the private call on some iOS) mustn't hold every later switch
+        DispatchQueue.main.asyncAfter(deadline: .now() + 60, execute: next)
+        apply(name) { changed, quiet, err in
+            done(changed, quiet, err)
+            next()
+        }
+    }
+    private static var turn = 0
 
     // On the main queue; `done(changed, quiet, error)` too.
     static func apply(_ name: String?, done: @escaping (Bool, Bool, String?) -> Void) {
@@ -391,8 +429,8 @@ enum OwnIcons {
     static func applyShown(_ shown: String, _ c: Bridge.Call) {
         let finish = { (name: String?) in
             DispatchQueue.main.async {
-                AppIcon.whenActive {
-                    AppIcon.apply(name) { changed, quiet, err in
+                AppIcon.whenActive(dropped: { c.reply(["name": name ?? "AppIcon", "changed": false, "quiet": false], nil) }) {
+                    AppIcon.switchTo(name) { changed, quiet, err in
                         if let err = err { return c.reply(nil, "failed: \(err)") }
                         c.reply(["name": name ?? "AppIcon", "changed": changed, "quiet": quiet], nil)
                     }

@@ -19,6 +19,14 @@
       "category": "utilities",
       "versions": [
         {
+          "version": "0.18.4",
+          "date": "2026-11-21T16:42:00Z",
+          "localizedDescription": "Re-sign without downloading again: each app keeps the IPA it was installed from, and Add Tweaks lists only tweaks for that app.\nRe-sign, Re-sign All and the queue sign from the IPA kept at install when it still matches, and each app goes to iOS as soon as it is signed.\nAdd Tweaks lists tweaks made for the app first (Works in: <app>), then ones for every app; paid Havoc and Chariz tweaks find their seller.\nHold Install on a package or app page to pick which version to install.\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.18.4",
+          "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.18.4/iFizBox.ipa",
+          "size": 35781116,
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "0.18.3",
           "date": "2026-11-21T06:42:57Z",
           "localizedDescription": "Installs on This iPhone survive a dropped connection: the copy resumes and a finished install counts as installed.\nLeaving the app, locking it or a VPN blip during an install no longer ends in \"failed\".\nTailscale's Test Connection says Not Paired Yet with a Pair button instead of No Answer.\nApps from a source keep the source's name (RyukGram, not Instagram).\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.18.3",
@@ -168,14 +176,6 @@
           "localizedDescription": "Version 0.9.6\nF204: archive ticked tasks\nF204 Top notices stop moving the page: banner under the nav bar (5s/8s timer line, pause on touch, tap/swipe up), reload bar on top of the tab bar, scrollers get 44pt room; no has-banner/has-reload push\nB41 App page: Related tab icons fill their tile over the letter fallback; header icon and Share inset 21px like the grouped rows\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.9.6",
           "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.9.6/iFizBox.ipa",
           "size": 5154509,
-          "minOSVersion": "15.0"
-        },
-        {
-          "version": "0.9.5",
-          "date": "2026-11-18T21:28:19Z",
-          "localizedDescription": "Version 0.9.5\nApp: turn off shake to undo (accidental Undo Typing alerts)\nSearch: iOS 6 Cancel button right of the field, clears it and hides the keyboard\nF178 iFizBox's AltStore source at https://ifizbox.com/repo/source.json (Worker /repo route, release asset fallback) and lite/full kept apart: the jailbreak app hides the lite IPA, the sideload app offers no .deb or APT repo\nRelease notes: https://github.com/RyanAHayden/iFizBox/releases/tag/v0.9.5",
-          "downloadURL": "https://github.com/RyanAHayden/iFizBox/releases/download/v0.9.5/iFizBox.ipa",
-          "size": 5147762,
           "minOSVersion": "15.0"
         }
       ]

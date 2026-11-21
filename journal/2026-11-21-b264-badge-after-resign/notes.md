@@ -30,15 +30,13 @@ its count until iFizBox was opened again.
   sets the badge.
 - `screens/apprun.js runAppRun`: new dep `onAppEnd(row, recorded)`, called once per row that reaches `installed`
   (re-signed, installed, or Sent to iOS), after Installed's record was asked for (`recorded`: its promise or null).
-- `signing/queue.js heldLanes`: `during(promise)`, held like a lane until the promise settles.
-- `screens/queue.js`: `recountChanges()` (lazy import of changes.js). `runAppQueueRun` passes `onAppEnd` that waits
-  for the record, then holds the app (`during`) while `recount()` runs, so in the background iFizBox stays running
-  until the badge is set, including after the run's last app. `runAppQueue` (the website and the old one-at-a-time
+- `screens/queue.js`: `recountChanges()` (lazy import of changes.js). `runAppQueueRun` passes `onAppEnd`, which
+  waits for the record, then recounts (no hold; see below). `runAppQueue` (the website and the old one-at-a-time
   path) recounts after each app.
 - Tests: `screens/changes-recount.test.js` (new: re-sign drops the count; a late older count never wins),
-  `screens/apprun.test.js` (onAppEnd per ended row, not a stopped one; runAppQueueRun holds while counting),
-  `signing/queue.test.js` (`during`), `screens/appqueue.test.js` (runAppQueue recounts per app),
-  `worker/test-push.mjs` (installed version no longer counted).
+  `screens/apprun.test.js` (onAppEnd per ended row, not a stopped one; runAppQueueRun recounts after the record,
+  without a hold), `screens/appqueue.test.js` (runAppQueue recounts per app), `core/push.test.js` (the shell gets
+  the registration, and `{}` on Push off), `worker/test-push.mjs` (installed version no longer counted).
 
 ## The background half: the shell drops the row itself
 
@@ -65,8 +63,18 @@ is the user's report. B124 already had the shell drop iFizBox's own update from 
 - Tests: `native/sign/tests/updates/main.swift` ("B264: …"), `native/test_updates.py`
   `test_every_hand_off_drops_its_row` (wiring), `changes-recount.test.js` (the page sends `updates.resigns`).
 
-Push server (`worker badgeFor`): unchanged. It never counts re-signs. After an install the page's recount sends the
-new version with the watch list (`syncPush`), so it no longer counts that update. The worker test now covers that.
+Push server (`worker badgeFor`): the worker is unchanged (it never counts re-signs), but the server only learns
+an install from the page's `syncPush`, which can't run while the page sleeps. So:
+- `core/push.js` hands the shell what the server has (`push.registered {server, body}`) on enable and on each sync,
+  and `{}` on Push off (the shell forgets, so it can never re-register a device the user turned off).
+- `UpdateCheck.pushAfterHandOff` (pure, tested): the registration with the handed-off app at its new version and
+  the update keys it reached gone from `known` / `counted`. nil for a re-sign or an app it doesn't follow.
+- `BackgroundCheck.appHandedOff` → `pushHandedOff`: POSTs it to `<server>/api/push/register` inside a background
+  task and keeps it as the new copy.
+
+The page-side hold from the first commit (`heldLanes.during`) is gone: the phone showed the page can sleep in the
+middle of its recount, and a hold waiting on that would keep the shell's silent audio going until its 10 minute
+limit. The page still recounts at each app's end (no hold), which serves the foreground.
 
 ## Phone checks (iPhone 15 Pro, iOS 27, Lite 0.18.3 built from this branch, `tools/ui-15.sh install`)
 
@@ -89,7 +97,19 @@ new version with the watch list (`syncPush`), so it no longer counts that update
    the background.** The page's bridge log showed no `app.badge` while hidden, so the shell's `appHandedOff` set
    it. Back in front the patched page counted 6 again (the patch still said "tomorrow"), and after a reload the
    real count was 5.
-5. Cleanup: B264 Test uninstalled (`ios uninstall`), removed from Installed's list, its source deleted, the
+5. Two apps in one background run (build with the push change; "B264 Alpha" / "B264 Beta", `com.ryha.b264a/b`,
+   Beta padded with 70 MB so its hand-off comes later; only their two upgrades queued, by row swipes, so no
+   other task's app was re-signed):
+   - 2.0 run: icon 9 → 7 → 6, but the truth was 7 (`ios apps`: both at 2.0). Changes showed 8 on reopening: Alpha's
+     2.0 was never recorded on the page (its watch still had Alpha 1.0). Filed as **B278**. I could not tell
+     where the extra drop came from (no page log on that run).
+   - 3.0 run, with a page bridge log from Web Inspector: **icon 9 → 8 → 7 in the background, one step per app**.
+     The log: both `signing.prepare` in front. Alpha's `signing.open` answered at 56:16.8 while hidden, then the page
+     counted 8 while hidden (`updates.watch` without Alpha's key, `app.badge 8`). Beta's `signing.open` answered at
+     56:24.9, and **the page then slept**: its next message came at 57:11 once opened. So the 8 → 7 in the
+     background was the shell's `appHandedOff`, which is the user's case (the last app ends, the page sleeps).
+     On reopening, `shown()` re-sent the stale 8 and the recount sent 7 0.1 s later.
+6. Cleanup: B264 Test uninstalled (`ios uninstall`), removed from Installed's list, its source deleted, the
    inspector patches gone with a page reload, `tailscale serve --https=8471` off.
 
 Screenshots in `ref/15/screens/b264-*.png` (gitignored).
@@ -108,9 +128,14 @@ Screenshots in `ref/15/screens/b264-*.png` (gitignored).
   offer failed for reasons outside this task (missing IPAs, an App ID mismatch), and a fresh app's signature has 341
   days, so the re-sign check used a page-side patch to count it (Phone checks 4). The shell's drop on a real re-sign
   hand-off ran, and the pure rule is tested on Linux.
-- **2+ apps dropping one by one in one background run.** Each run had one app that could hand off. The per-app
-  drop is the same call per hand-off, and the Swift test walks 5 → 4 → … → 0.
+- **2+ apps dropping one by one: shown for installs (3.0 run), not for re-signs.** The 2.0 run ended one below the
+  truth (6 vs 7), and I couldn't pin down why. The likeliest link is B278 (the page's missing record for Alpha), but
+  that is not proven. Worth watching once B278 lands.
+- **The push re-registration from the shell reaching the server.** Not checked against the server's database. The
+  pure body change is tested, and the call compiles in the sideload build.
 - **The hosted-link and local-link routes** (`Sideload.swift` link hand-offs): only This iPhone was run on the
   phone. Same call, after the same record save.
 - **The server's push badge after a run**: no push was sent (the check needs the worker's cron and a new update).
-  Covered by `worker/test-push.mjs` and by reading that the page's recount re-sends the watch list.
+  Covered by `worker/test-push.mjs` and the Swift test of `pushAfterHandOff`.
+- **A hand-off iOS then refuses**: the icon stays one low until the page counts again (as B124 already does for
+  iFizBox itself). Not run.

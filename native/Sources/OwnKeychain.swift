@@ -1,7 +1,7 @@
 // iFizBox's own secrets (the signing identity and its .p12, the App Store Connect key, the account key, the review
 // token, payment secrets) go in the app's own Keychain group, TEAM.<its bundle ID>, when the signature lists it.
 // A signer that keeps an app's data puts that group first and TEAM.<App ID> second (Profile.keychainGroups); under an
-// explicit App ID such as com.ryha.sideload every app signed with that profile has the second group too, so an item
+// explicit App ID (one App ID for many apps, as a signing service's profile) every app signed with that profile has the second group too, so an item
 // written there (no access group: the default group, which older signs made TEAM.<App ID>) is readable and
 // deletable by all of them. Signed without our own group (SideDrop's signer, the jailbreak build), group is nil and
 // items are written as before.

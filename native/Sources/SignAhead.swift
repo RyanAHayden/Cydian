@@ -39,6 +39,7 @@ enum SignAhead {
     private static func forget(_ tok: String) -> Bool {
         guard let k = kept.removeValue(forKey: tok) else { return false }
         try? FileManager.default.removeItem(at: k.output)
+        Sideload.dropOriginal(k.app.bundleID, sha256: k.record.sha256) // F343: never installed
         return true
     }
 
@@ -65,11 +66,13 @@ enum SignAhead {
         SignBridge.queue.async {
             // where the IPA comes from, and the edits it is signed with
             let source: String, options: SignOptions
+            var record: SignedRecord? = nil // F343: Re-sign's, whose kept IPA it signs from when it can
             if let bid = c.params["record"] as? String, !bid.isEmpty {
                 guard let r = SignedRecords.only(Sideload.records(), bundleID: bid).first else {
                     job.end()
                     return answer(nil, "not_signed: \(Brand.name) has no record of signing \(bid)")
                 }
+                record = r
                 source = r.url
                 var o = SignOptions(r.options)
                 // F302a: a tweak update re-signs from the record with the tweaks the page sends (the newer .deb)
@@ -97,7 +100,8 @@ enum SignAhead {
                             try? FileManager.default.removeItem(at: file)
                             throw error
                         }
-                        let (app, record, output) = try sign(file, url: source, id: id, profile: profile, options: options, emit: emit, log: log, job: job)
+                        let (app, record, output) = try sign(file, url: source, id: id, profile: profile, options: options, emit: emit, log: log, job: job,
+                                                             sha256: sha) // F343
                         keepInLibrary(c, output: output, app: app, record: record, options: options, id: id, log: log) // B229
                         let tok = SignBridge.token()
                         kept[tok] = Kept(output: output, app: app, record: record)
@@ -119,6 +123,7 @@ enum SignAhead {
                 } catch { return fail(Sideload.Failed(text: "gone: that app isn't in My IPAs any more")) }
             }
             guard let url = Apt.httpURL(source) else { job.end(); return answer(nil, "bad_url: not an http(s) URL") }
+            if let r = record, let file = Sideload.takeOriginal(r, log: log) { return signThat(file) } // F343
             log("Downloading \(url.absoluteString)")
             // B104: a recorded app's http link was let through at install; a new one follows the page's insecure
             let http: Sideload.HTTPPolicy = (c.params["record"] as? String ?? "").isEmpty ? Sideload.httpPolicy(c) : .fallback
@@ -151,7 +156,7 @@ enum SignAhead {
     // signAndOpen's first half (Sideload.swift): the same checks, logs and signer. `input` is deleted after.
     private static func sign(_ input: URL, url: String, id: SecIdentity, profile: Profile, options: SignOptions,
                              emit: @escaping (String, Double) -> Void, log: @escaping (String) -> Void,
-                             job: SignJob) throws -> (SignedApp, SignedRecord, URL) {
+                             job: SignJob, sha256: String? = nil) throws -> (SignedApp, SignedRecord, URL) {
         let output = SignBridge.work.appendingPathComponent("\(SignBridge.token())-ahead.ipa")
         defer { try? FileManager.default.removeItem(at: input) }
         do {
@@ -173,7 +178,8 @@ enum SignAhead {
             let record = SignedRecord(bundleID: app.bundleID, originalBundleID: app.originalBundleID, name: app.name,
                                       version: app.version, url: url, signed: Date(),
                                       expires: profile.signatureExpiry(certificate: identity.certificate), options: options.stored,
-                                      signer: app.stamp) // B259
+                                      signer: app.stamp, // B259
+                                      sha256: Sideload.keepOriginal(input, app: app, source: url, sha256: sha256, log: log)) // F343
             return (app, record, output)
         } catch {
             try? FileManager.default.removeItem(at: output)
@@ -201,6 +207,7 @@ enum SignAhead {
                 switch r {
                 case .failure(let e):
                     job.end()
+                    SignBridge.queue.async { Sideload.dropOriginal(k.app.bundleID, sha256: k.record.sha256) } // F343
                     Apt.reply(c, nil, job.cancelled ? SignBridge.text(SignJob.cancelledError) : (e as? Sideload.Failed)?.text ?? SignBridge.text(e))
                 case .success(let (app, rec)):
                     var j: [String: Any] = ["bundleId": app.bundleID, "originalBundleId": app.originalBundleID, "name": app.name,

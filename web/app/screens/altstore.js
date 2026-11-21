@@ -39,7 +39,7 @@ import { compareVersions } from "../core/apt.js";
 import { altVersionList } from "../core/catalog.js"; // B232: Install Which Version? offers what Version History does
 import { ignoreVersionLabel, withVersionButton, versionToStore, IGNORE_VERSION } from "../core/appupdates.js"; // F281
 import { queueApp } from "./queue.js";
-import { descriptionGroup } from "./description.js";
+import { descriptionGroup, growOpen } from "./description.js";
 import { storeHeader, headerLine, storeTabs, tileRow, worksOnTile, sizeTile, sectionTile, ratingTile, updatedTile, whatsNewGroup } from "./storepage.js";
 import { reviewsTab } from "./reviews.js";
 import { reviewsApi, reviewsBase, pageRating } from "../core/reviews.js";
@@ -837,7 +837,8 @@ export function renderApp(body, route, pkg, source, { related = null } = {}) {
     const g = card([text]);
     g.prepend(el("h2", "group-header", "From the App Store"));
     if (short) {
-      const more = grouped([{ rows: [{ label: "More", onClick: () => { text.textContent = m.description; more.remove(); } }] }]).querySelector("li");
+      // B271: it grows downward in place, the page not scrolled (growOpen).
+      const more = grouped([{ rows: [{ label: "More", onClick: () => growOpen(text, () => { text.textContent = m.description; more.remove(); }) }] }]).querySelector("li");
       g.querySelector(".table").append(more);
     }
     storeText.replaceChildren(g);

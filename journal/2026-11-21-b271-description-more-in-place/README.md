@@ -29,9 +29,14 @@ to the description); for More it scrolled the page down by the whole opened text
   passes the Less row's top and moves with it, the group's bottom edge moves with the Less row's bottom; then Less
   folds it and scrolls back with the row under the finger. With `--shots` it runs at a tenth of the speed.
 
-There is one description component for every page that has one (IPA app page and AltStore pages in altstore.js, the
-package page in browse.js) and one frontend for the site and both builds, so this covers all of them; the F181
-store page style draws What's New, not a folded description.
+- `web/app/screens/altstore.js`: the app page's second folded text, the "From the App Store" card (its More row goes
+  when tapped), goes through `growOpen` too (the spec review found it): it used to swap the text at once. There the
+  text gets no clip of its own (nothing follows it in its table); the table's rounded edge slides with the group
+  below. Smoke step 7b checks it (scroll held, edge off by 0.0px).
+
+Folded texts with More: `descriptionGroup` (IPA app page and AltStore pages in altstore.js, the package page in
+browse.js) and the App Store card (altstore.js). One frontend serves the site and both builds; the F181 store page
+style draws What's New, not a folded text.
 
 ## Tried and dropped
 

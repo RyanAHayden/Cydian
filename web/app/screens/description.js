@@ -84,18 +84,25 @@ export function growOpen(box, open) {
   endGrow(box);
   const scroller = box.closest?.(SCROLLER);
   const top = scroller ? scroller.scrollTop : null;
+  const table = box.closest?.(".table") ?? null;
   const from = box.offsetHeight || 0;
+  const tableFrom = table?.offsetHeight || 0;
   open();
   if (scroller && scroller.scrollTop !== top) scroller.scrollTop = top;
   const by = (box.offsetHeight || 0) - from;
   if (!(from > 0 && by > 0) || typeof box.animate !== "function" || reducedMotion()) return null;
   const timing = { duration: DURATION, easing: EASE };
-  const a = box.animate([{ clipPath: `inset(0 0 ${by}px 0)` }, { clipPath: "inset(0 0 0 0)" }], timing);
-  const table = box.closest?.(".table");
-  const anims = [a, table?.animate?.(tableClip(table, by), timing)].filter(Boolean);
+  // The text's own clip only hides it behind a row that follows it in its table (the Less row); where its More row
+  // just goes (the App Store card), the table's clip is the one edge.
+  const followed = Boolean(table?.lastElementChild && !table.lastElementChild.contains(box));
+  const a = followed || !table ? box.animate([{ clipPath: `inset(0 0 ${by}px 0)` }, { clipPath: "inset(0 0 0 0)" }], timing) : null;
+  const tableBy = table ? (table.offsetHeight || 0) - tableFrom : 0;
+  const t = tableBy > 0 ? table.animate?.(tableClip(table, tableBy), timing) : null;
+  const anims = [a, t].filter(Boolean);
+  if (!anims.length) return null;
   growing.set(box, anims);
-  a.onfinish = () => { if (growing.get(box) === anims) growing.delete(box); };
-  return a;
+  anims[0].onfinish = () => { if (growing.get(box) === anims) growing.delete(box); };
+  return anims[0];
 }
 
 export function descriptionGroup(text, header = "Description") {

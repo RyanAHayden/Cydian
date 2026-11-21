@@ -91,6 +91,20 @@ test("B271: growOpen keeps the scroll position and uncovers the text downward fr
   assert.ok(a.cancelled, "Less while it opens stops it");
 });
 
+test("B271: where the More row just goes (the App Store card), only its table's rounded edge slides", () => {
+  const scroller = { scrollTop: 80 };
+  const anims = [];
+  const animate = (frames, timing) => { const a = { frames, timing, cancel() {} }; anims.push(a); return a; };
+  const table = { offsetHeight: 200, animate };
+  const box = { offsetHeight: 155, animate, contains: (n) => n === box, closest: (sel) => (sel === ".table" ? table : sel.includes(".page-body") ? scroller : null) };
+  table.lastElementChild = box;
+  growOpen(box, () => { box.offsetHeight = 655; table.offsetHeight = 656; scroller.scrollTop = 600; }); // row gone: +500 -44
+  assert.equal(scroller.scrollTop, 80, "no jump");
+  assert.equal(anims.length, 1, "no clip of its own on the text");
+  assert.match(anims[0].frames[0].clipPath, /^inset\(0 0 456px 0 round /);
+  assert.match(anims[0].frames[1].clipPath, /^inset\(0 0 0 0 round /);
+});
+
 test("B271: growOpen with no layout (not on screen) just opens, still without moving the page", () => {
   const box = { offsetHeight: 0, animate() { throw new Error("nothing to slide"); } };
   let opened = false;

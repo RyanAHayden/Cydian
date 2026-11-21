@@ -73,6 +73,7 @@ import { apps, appRows, appUpgrades, removeInstall, onAppsChange, MODES, MODE_LA
 import { signedAppsNamed } from "../core/installed.js"; // B150
 import { recordInstall, unrecordedSigned, sourceRecordFor } from "../core/installed.js"; // B156
 import { creditedRecords, recreditedRecords, urlCredit, recordWithCredit } from "../core/installed.js"; // B247
+import { siteSignedApps } from "../core/installed.js"; // F342
 import { mediaUrl } from "./depiction.js";
 import { rememberedApps } from "../app-updates.js";
 import { signatureState, signedIndex, resignWindow } from "../core/signing.js";
@@ -734,6 +735,7 @@ async function loadApps(appView) {
   }
   if (signed && recordsApps()) restoreSourceRecords(signed, rows).catch(() => {}); // B156
   if (signed && recordsApps()) loadTweakUpdates(appView, signed, seq); // F302a
+  if (site) appView.signed = siteSignedApps(rows); // F342: the website's signatures on its records (no "?" for the rest)
   drawApps(appView, appListRows(rows, () => null), new Map(), site, hasStatus);
   const ids = await installedIds;
   if (seq !== appView.seq) return;
@@ -775,7 +777,7 @@ function drawAppList(appView) {
   const { listRows, cands, site, hasStatus } = appView.last;
   for (const n of appView.tail ?? []) n.remove();
   // F91: the signature pill in place of the version (the version stays in the subtitle).
-  const signed = appView.signed ? withSignatures(listRows, appView.signed, { window: resignWindow((k) => settings.get(k)), show: settings.get("showExpiry"), marked: true }) : { rows: listRows, extra: [] };
+  const signed = appView.signed ? withSignatures(listRows, appView.signed, { window: resignWindow((k) => settings.get(k)), show: settings.get("showExpiry"), marked: !site }) : { rows: listRows, extra: [] };
   // F127: User (A–Z) or Recent (by day) on the root, narrowed by the search; the jailbreak app's Apps page as before.
   const appSecs = recordsApps() ? appSections(signed.rows, { mode: appView.mode, query: appView.query }) : [{ rows: signed.rows }];
   const extra = recordsApps() ? queryRows(signed.extra, appView.query) : signed.extra;
@@ -1262,7 +1264,7 @@ async function renderAppPage(body, route, ctx) {
   let signed = null;
   try {
     const [records, installed] = await Promise.all([rememberedApps().catch(() => []), signedApps()]);
-    signed = signedIndex(installed).get(id) ?? null;
+    signed = signedIndex(installed ?? (detectMode() === "site" ? siteSignedApps(records) : null)).get(id) ?? null; // F342
     rec = (records ?? []).find((x) => x?.id === id) ?? null;
     if (rec) [rec] = await withInstalled([rec]); // B46
   } catch { /* drawn from what there is */ }

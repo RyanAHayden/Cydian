@@ -30,6 +30,7 @@ import { showAlert } from "../nav/alert.js";
 import { dayTitle, filterGroups, filterRows, defaultScope } from "../core/changes.js";
 import { apps, installedIds, onAppsChange } from "../core/installed.js";
 import { signedAppsNamed } from "../core/installed.js"; // B150
+import { siteSignedApps, siteSignerNow } from "../core/installed.js"; // F342
 import { settings } from "../settings-store.js";
 import { sourceFilter } from "../core/sources.js";
 import { detectMode } from "../core/settings.js";
@@ -126,10 +127,14 @@ export const badgeCount = (upgrades, resign = []) => (upgrades?.available?.lengt
 
 // The apps iFizBox signed that are inside the re-sign window, from signing.installed (sideload app only; [] anywhere
 // else or when the call fails). `upgrades`: those with an upgrade are left to it.
-export async function resignNow(upgrades, { mode = detectMode(), native = nativeBridge(), get = (k) => settings.get(k), now = new Date() } = {}) {
-  if (mode !== "sideload" || typeof native?.call !== "function") return [];
+// F342: on the website, the install records that carry the website's signature (core/installed.js siteSignedApps).
+export async function resignNow(upgrades, { mode = detectMode(), native = nativeBridge(), get = (k) => settings.get(k), now = new Date(),
+  records = () => apps().then((s) => s.all()), signer = siteSignerNow } = {}) {
   let installed;
-  try { installed = await signedAppsNamed(native); } catch { return []; } // B150: a source app keeps its source name
+  if (mode === "site") {
+    try { installed = siteSignedApps(await records(), await signer()); } catch { return []; }
+  } else if (mode !== "sideload" || typeof native?.call !== "function") return [];
+  else try { installed = await signedAppsNamed(native); } catch { return []; } // B150: a source app keeps its source name
   const skip = new Set((upgrades?.available ?? []).map((r) => r?.id).filter(Boolean));
   return needsResign(installed, { now, window: resignWindow(get), skip });
 }

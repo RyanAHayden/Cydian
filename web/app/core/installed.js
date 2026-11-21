@@ -89,7 +89,8 @@ export function findUpgrades(installed, candidateOf, holds = [], { dpkgHolds = t
 // the records newest first, marks the ones a source now has a newer version of, and Edit or a swipe removes one
 // the user deleted from the phone. Jailbreak mode doesn't record: it reads dpkg's status file as above.
 //
-//   appRecord(app, now)                 -> { id, name, version, key, source, sourceName, icon, date }
+//   appRecord(app, now)                 -> { id, name, version, key, source, sourceName, icon, date, expires?, signer? }
+//                                          (F342: the website's signature, below)
 //   recordInstall(store, app, now)      -> the record, put in the store (one per app id: a reinstall replaces it)
 //   removeInstall(store, id)
 //   undoRecord(store, id, before, wrote) B170: an IPA run's record undone (iOS reported the app missing): `before` back
@@ -108,15 +109,82 @@ export function appRecord(app, now = Date.now()) {
   if (!id) throw new Error("An app needs an id to be recorded");
   return {
     id, name: text(app.name) || id, version: text(app.version), key: app.key ?? null, source: text(app.source) || null,
-    sourceName: text(app.sourceName) || null, icon: app.icon ?? null, date: now,
+    sourceName: text(app.sourceName) || null, icon: app.icon ?? null, date: now, ...signatureOf(app),
   };
 }
 
 export async function recordInstall(store, app, now = Date.now()) {
-  const rec = appRecord(app, now);
+  const sig = takeSiteSignature(app?.id, now); // F342: the website's sign of this app, just before
+  const rec = appRecord(sig ? { ...app, ...sig } : app, now);
   await store.put(rec);
   for (const f of appListeners) f();
   return rec;
+}
+
+// ---- F342: the website's signature on its install records ------------------------------------------------------
+// The website signs in the browser (websign-job.js), so no shell keeps a signed record for it. The sign's end and
+// signer stamp (core/websign.js signatureEnd, webSignerStamp) go on the install record instead: signInBrowser notes
+// them for the app's IDs just before its onInstalled, and the record that onInstalled writes for one of those IDs takes
+// them. Installed's days left and Changes' Needs Re-sign then read the records as the app reads signing.installed.
+//   signatureOf(app)                     { expires?, signer? } of a record (valid ones only), for appRecord
+//   noteSiteSignature(ids, sig, now)     the sign just made, for the next record of one of `ids` (SITE_SIGNATURE_WAIT)
+//   takeSiteSignature(id, now)           that note, once (recordInstall), or null
+//   siteSignedApps(records, current)     signing.installed's shape from the records that carry a signature:
+//                                        { apps: [{ bundleId, name, version, expires, signer }], signer: current }
+//   siteSignerNow({ fetcher })           this website's current stamp: WEB_SIGNER_VERSION and the hosted dylib's hash
+// Records written before F342 carry neither and stay out: nothing says the website signed them.
+export const SITE_SIGNATURE_WAIT = 30 * 60 * 1000; // Ready to Install can wait a while for its tap
+const siteSignatures = new Map();
+
+export function signatureOf(app) {
+  const out = {};
+  const t = Date.parse(app?.expires ?? "");
+  if (Number.isFinite(t)) out.expires = new Date(t).toISOString();
+  const v = Number(app?.signer?.version);
+  if (Number.isFinite(v)) out.signer = { version: v, groupFix: text(app.signer.groupFix) || null };
+  return out;
+}
+
+export function noteSiteSignature(ids, sig, now = Date.now()) {
+  const keep = signatureOf(sig);
+  if (!Object.keys(keep).length) return;
+  const note = { ...keep, at: now };
+  for (const id of new Set((Array.isArray(ids) ? ids : [ids]).map(text).filter(Boolean))) siteSignatures.set(id, note);
+}
+
+export function takeSiteSignature(id, now = Date.now()) {
+  const note = id ? siteSignatures.get(text(id)) : null;
+  if (!note) return null;
+  for (const [k, n] of siteSignatures) if (n === note) siteSignatures.delete(k);
+  if (now - note.at > SITE_SIGNATURE_WAIT) return null;
+  const { at, ...sig } = note; // eslint-disable-line no-unused-vars
+  return sig;
+}
+
+export function siteSignedApps(records, current = null) {
+  const apps = [];
+  for (const r of records ?? []) {
+    if (!r?.id || r.self) continue;
+    const sig = signatureOf(r);
+    if (!sig.expires && !sig.signer) continue;
+    apps.push({ bundleId: r.id, name: text(r.name) || r.id, version: text(r.version), ...sig });
+  }
+  return { apps, signer: current };
+}
+
+let signerNow = null;
+export function siteSignerNow({ fetcher = globalThis.fetch } = {}) {
+  signerNow ??= (async () => {
+    // loaded here, not at startup (module-graph.test.js): groupfix.js brings core/tweaks.js
+    const [{ GROUPFIX }, { webSignerStamp, groupFixHash }] = await Promise.all([import("./groupfix.js"), import("./websign.js")]);
+    let hash = null;
+    try {
+      const r = await fetcher(new URL(`../${GROUPFIX.file}`, import.meta.url));
+      if (r.ok) hash = await groupFixHash(new Uint8Array(await r.arrayBuffer()));
+    } catch { /* no dylib: the version alone decides */ }
+    return webSignerStamp(hash);
+  })();
+  return signerNow;
 }
 
 export async function removeInstall(store, id) {

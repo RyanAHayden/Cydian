@@ -390,4 +390,43 @@ test("This iPhone self-update: close once installd accepted the install (B159, B
     check(d.copiedAt == t0 && d.closeAt == t0.addingTimeInterval(SelfCloseClock.accepted), "a 0% status without copied() counts too")
 }
 
+test("This iPhone: a dropped connection is not a failed install (B246)") {
+    // the user's error: idevice's Socket(Kind(UnexpectedEof)) is code 1
+    check(HereRecheck.isDropped(code: "install_failed", lib: 1), "UnexpectedEof (Socket, 1) is a drop")
+    check(HereRecheck.isDropped(code: "timeout", lib: nil), "the watchdog's timeout is a drop")
+    for c: Int32 in [17, 19, 101, 103, 109] { check(HereRecheck.isDropped(code: "upload_failed", lib: c), "code \(c) is a drop") }
+    for c: Int32 in [13, 15, 107, 203] { check(!HereRecheck.isDropped(code: "install_failed", lib: c), "installd's code \(c) is a real failure") }
+    check(!HereRecheck.isDropped(code: "install_failed", lib: nil), "a failure of our own isn't a drop")
+
+    let old = HereRecheck.AppState(path: "/private/var/containers/Bundle/Application/A/X.app", version: "383", shortVersion: "383.0")
+    let new = HereRecheck.AppState(path: "/private/var/containers/Bundle/Application/B/X.app", version: "384", shortVersion: "384.0")
+    check(HereRecheck.verdict(version: "384.0", before: .absent, now: nil) == .notYet, "not listed: not yet")
+    check(HereRecheck.verdict(version: "384.0", before: .absent, now: new) == .installed, "new app listed with its version: installed")
+    check(HereRecheck.verdict(version: "384", before: .absent, now: new) == .installed, "CFBundleVersion matches too")
+    check(HereRecheck.verdict(version: "384.0", before: .present(old), now: old) == .notYet, "still the old version: not yet")
+    check(HereRecheck.verdict(version: "384.0", before: .present(old), now: new) == .installed, "an update listed: installed")
+    var same = old; same.path = old.path
+    check(HereRecheck.verdict(version: "383.0", before: .present(old), now: same) == .sameAsBefore, "same version, same folder: the old copy")
+    var moved = old; moved.path = new.path
+    check(HereRecheck.verdict(version: "383.0", before: .present(old), now: moved) == .installed, "same version, new folder: a reinstall landed")
+    var noPath = old; noPath.path = nil
+    check(HereRecheck.verdict(version: "383.0", before: .present(noPath), now: noPath) == .cannotTell, "no folder to compare: can't tell")
+    check(HereRecheck.verdict(version: "384.0", before: .unknown, now: new) == .cannotTell, "before unknown: can't tell")
+    check(HereRecheck.verdict(version: "384.0", before: .unknown, now: old) == .notYet, "before unknown, other version: not yet")
+
+    let mb = 1 << 20
+    check(HereRecheck.resumeAt(remoteSize: 150 * mb + 1234, sent: 151 * mb, chunk: mb) == 150 * mb, "a cut-off chunk is sent again")
+    check(HereRecheck.resumeAt(remoteSize: 200 * mb, sent: 120 * mb, chunk: mb) == 120 * mb, "never past what was sent")
+    check(HereRecheck.resumeAt(remoteSize: 0, sent: 50 * mb, chunk: mb) == 0, "an empty file starts over")
+    check(HereRecheck.pause(1) < HereRecheck.pause(HereRecheck.reconnects), "the pause grows")
+
+    var sp = HereRecheck.CopySpeed()
+    sp.add(100 * mb, 10, front: true)
+    sp.add(10 * mb, 20, front: false)
+    check(sp.summary == "10.0 MB/s in front, 0.5 MB/s in the background", "speed summary: \(sp.summary)")
+    var fr = HereRecheck.CopySpeed()
+    fr.add(10 * mb, 2, front: true)
+    check(fr.summary == "5.0 MB/s in front", "front only: \(fr.summary)")
+}
+
 if failures == 0 { print("all passed") } else { print("\(failures) failed"); exit(1) }

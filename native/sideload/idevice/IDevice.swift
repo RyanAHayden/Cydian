@@ -15,6 +15,7 @@ import Foundation
 import IDeviceFFI
 import os
 import Security
+import UIKit
 
 enum IDevice {
     static let address = "10.7.0.1" // LocalDevVPN's loopback; the phone itself
@@ -27,7 +28,10 @@ enum IDevice {
 
     struct Failure: LocalizedError {
         let code: String, text: String
+        var lib: Int32? = nil // idevice's error code, when idevice gave the error (HereRecheck.droppedCodes)
         var errorDescription: String? { "\(code): \(text)" }
+        /// B246: the connection to iOS went away (a drop or the watchdog's timeout), not an answer from iOS.
+        var dropped: Bool { HereRecheck.isDropped(code: code, lib: lib) }
     }
 
     /// Throws idevice's error (and frees it). `code` is the bridge-facing prefix for this step.
@@ -36,7 +40,7 @@ enum IDevice {
         let msg = err.pointee.message.map { String(cString: $0) } ?? "error \(err.pointee.code)"
         let n = err.pointee.code
         idevice_error_free(err)
-        throw Failure(code: code, text: "\(msg) (\(n))")
+        throw Failure(code: code, text: "\(msg) (\(n))", lib: n)
     }
 
     // ---- The pairing, in the Keychain
@@ -390,8 +394,20 @@ enum IDevice {
             out.done.signal()
         }
         th.stackSize = 4 << 20 // idevice runs its futures on this thread (block_on)
+        th.qualityOfService = .userInitiated // B246: as IDevice.queue, so leaving the app doesn't demote the copy
         th.start()
+        var tick = Date()
         while out.done.wait(timeout: .now() + 0.5) == .timedOut {
+            // B246: a wait that took far longer than 0.5 s means iOS suspended the app (it left the front without
+            // KeepAlive holding it). The step's clock starts again: its call gets its whole limit after the app is
+            // back, rather than a timeout for the time nothing here could run.
+            let gap = Date().timeIntervalSince(tick)
+            tick = Date()
+            if gap > 5 {
+                ilog("the app was suspended for \(Int(gap)) s (\(AppFront.now ? "in front" : "in the background") now); \(w.now.step) gets its time again")
+                w.alive()
+                continue
+            }
             let n = w.now
             guard n.quiet > n.limit else { continue }
             let why = "\(n.step): no answer from iOS for \(Int(n.limit)) s" + (w.detail.isEmpty ? "" : " (\(w.detail))")
@@ -413,6 +429,46 @@ enum IDevice {
             ilog("\(what): FAILED at \(w.now.step) after \(String(format: "%.1f", Date().timeIntervalSince(t0))) s: \((e as? Failure)?.errorDescription ?? e.localizedDescription)")
             relayLibraryLog()
             throw e
+        }
+    }
+
+    /// B246: whether the app is in front, readable from any thread (for the copy's speed in the log and on the page,
+    /// and the watchdog's suspension note).
+    enum AppFront {
+        private static let lock = NSLock()
+        private static var front = true
+        private static var watching = false
+        static var now: Bool { lock.lock(); defer { lock.unlock() }; return front }
+        private static func set(_ f: Bool) { lock.lock(); front = f; lock.unlock() }
+
+        /// Starts following the app's state; call it on the main thread (idempotent).
+        static func watch() {
+            guard !watching else { return }
+            watching = true
+            set(UIApplication.shared.applicationState != .background)
+            let nc = NotificationCenter.default
+            nc.addObserver(forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: nil) { _ in
+                set(false); IDevice.ilog("the app went to the background")
+            }
+            nc.addObserver(forName: UIApplication.willEnterForegroundNotification, object: nil, queue: nil) { _ in
+                set(true); IDevice.ilog("the app is in front again")
+            }
+        }
+    }
+
+    /// B246: install() connects again after a drop and carries on where the last try stopped.
+    private final class HereRun {
+        let ipa: URL, size: Int, remote: String, bundleID: String?, version: String?
+        var connected = false   // the first try got as far as a session: later drops are worth connecting again
+        var before: HereRecheck.Before?  // what iOS listed before the install; nil until asked
+        var sent = 0            // bytes of the IPA iOS has
+        var copied = false      // the whole IPA is in PublicStaging
+        var speed = HereRecheck.CopySpeed()
+        var copyStart: Date?
+        var installSent = false // installation_proxy got the install
+        var installResent = false
+        init(ipa: URL, size: Int, remote: String, bundleID: String?, version: String?) {
+            self.ipa = ipa; self.size = size; self.remote = remote; self.bundleID = bundleID; self.version = version
         }
     }
 
@@ -794,68 +850,259 @@ enum IDevice {
     /// Installs a signed IPA on this phone (blocking; call it on `queue`). Every step has a time limit (Limit), so
     /// it ends with an error rather than waiting for ever. Installing this app itself works too: installd ends the
     /// process, so the call never returns then. `note` gets a line per step for the progress page's console.
-    static func install(_ ipa: URL, note: @escaping (String) -> Void = { _ in }, progress: @escaping (Step) -> Void) throws {
+    ///
+    /// B246: `bundleID` and `version` (the signed app's) let a dropped connection end well. A drop (the app left the
+    /// front, the tunnel or Tailscale reset) connects again, up to HereRecheck.reconnects times: during the copy it
+    /// carries on from the end of iOS's file; once the install was sent, it asks iOS for the app and reports it
+    /// installed when iOS lists the new copy. Only installd's own error (or a drop that never reconnects) fails.
+    static func install(_ ipa: URL, bundleID: String? = nil, version: String? = nil,
+                        note: @escaping (String) -> Void = { _ in }, progress: @escaping (Step) -> Void) throws {
         let size = (try? ipa.resourceValues(forKeys: [.fileSizeKey]).fileSize).flatMap { $0 } ?? 0
-        ilog("installing \(ipa.lastPathComponent) (\(mb(size)))")
-        try watched("install") { (w: Watch) -> Void in
-            let s = try Session(watch: w)
-            note(s.kind == .remotePairing ? "Connected to iOS through \(s.via) (RemotePairing tunnel)" : "Connected to iOS through \(s.via) (lockdown)")
-            progress(.connected)
-            let remote = "\(stagingDir)/\(UUID().uuidString).ipa"
-            try upload(ipa, size: size, to: remote, session: s, watch: w, note: note, progress: progress)
-            let ip = try s.installationProxy()
-            defer { installation_proxy_client_free(ip) }
-            w.begin("iOS installing the app (installd)", Limit.install)
-            note("iOS is installing it")
-            var lastPct: UInt64 = .max
-            let box = Unmanaged.passRetained(ProgressBox { pct in
-                w.alive("\(pct)% installed")
-                if pct != lastPct { lastPct = pct; ilog("installd: \(pct)%") }
-                progress(.install(Double(min(pct, 100)) / 100))
-            })
-            defer { box.release() }
-            let cb: @convention(c) (UInt64, UnsafeMutableRawPointer?) -> Void = { pct, ctx in
-                guard let ctx = ctx else { return }
-                Unmanaged<ProgressBox>.fromOpaque(ctx).takeUnretainedValue().f(pct)
+        ilog("installing \(ipa.lastPathComponent) (\(mb(size)))\(bundleID.map { " as \($0) \(version ?? "?")" } ?? "")")
+        let run = HereRun(ipa: ipa, size: size, remote: "\(stagingDir)/\(UUID().uuidString).ipa", bundleID: bundleID, version: version)
+        var attempt = 0
+        var firstDrop: Failure?
+        while true {
+            do {
+                try watched(attempt == 0 ? "install" : "install, connection \(attempt + 1)") { (w: Watch) -> Void in
+                    try installTry(run, watch: w, note: note, progress: progress)
+                }
+                return
+            } catch let f as Failure where f.dropped && run.connected {
+                attempt += 1
+                if firstDrop == nil { firstDrop = f }
+                let stage = run.installSent ? "while iOS was installing it" : run.copied ? "after the copy" : "during the copy (\(mb(run.sent)) of \(mb(size)))"
+                ilog("dropped \(stage): \(f.errorDescription ?? f.text) (try \(attempt) of \(HereRecheck.reconnects))")
+                guard attempt <= HereRecheck.reconnects else {
+                    let first = firstDrop ?? f
+                    throw Failure(code: first.code, text: "lost the connection to iOS \(stage) and couldn't get it back (\(first.text))", lib: first.lib)
+                }
+                note("Lost the connection to iOS \(stage): \(f.text). Connecting again (\(attempt) of \(HereRecheck.reconnects))")
+                Thread.sleep(forTimeInterval: HereRecheck.pause(attempt))
             }
-            let err = installation_proxy_install_with_callback(ip, remote, nil, cb, box.toOpaque())
-            if err == nil { ilog("installd: Complete") }
-            if let afc = try? s.afc() {
-                w.begin("removing the staged IPA", Limit.afcStep)
-                afc_remove_path(afc, remote).map(idevice_error_free); afc_client_free(afc)
-            }
-            try check(err, "install_failed")
-            progress(.install(1))
         }
+    }
+
+    /// One connection's worth of install(): connect, ask what iOS has (once), copy what iOS lacks, then install, or
+    /// after a drop, ask iOS whether the install it was sent landed.
+    private static func installTry(_ run: HereRun, watch w: Watch, note: @escaping (String) -> Void,
+                                   progress: @escaping (Step) -> Void) throws {
+        let s = try Session(watch: w)
+        let route = s.kind == .remotePairing ? "\(s.via) (RemotePairing tunnel)" : "\(s.via) (lockdown)"
+        if !run.connected {
+            note("Connected to iOS through \(route)")
+            progress(.connected)
+            run.connected = true
+        } else {
+            note("Connected to iOS again through \(route)")
+        }
+        if run.before == nil, let bid = run.bundleID {
+            do {
+                let ip = try s.installationProxy()
+                defer { installation_proxy_client_free(ip) }
+                let st = try appState(ip, bid, watch: w)
+                run.before = st.map { .present($0) } ?? .absent
+                ilog("before the install, iOS lists \(bid): \(st.map(describe) ?? "nothing")")
+            } catch let f as Failure where f.dropped {
+                throw f
+            } catch {
+                run.before = .unknown
+                ilog("before the install, couldn't ask iOS for \(bid): \(error.localizedDescription)")
+            }
+        }
+        if !run.copied {
+            try upload(run, session: s, watch: w, note: note, progress: progress)
+            run.copied = true
+        }
+        let ip = try s.installationProxy()
+        defer { installation_proxy_client_free(ip) }
+        if run.installSent {
+            if try askInstalled(run, ip, watch: w, note: note) {
+                removeStaged(run.remote, session: s, watch: w)
+                progress(.install(1))
+                return
+            }
+            // iOS still lists what it had: send the install again once, if the IPA is still staged
+            guard !run.installResent, staged(run.remote, session: s, watch: w) else {
+                removeStaged(run.remote, session: s, watch: w)
+                throw Failure(code: "install_failed", text: "lost the connection to iOS while it was installing, and iOS doesn't list \(run.bundleID ?? "the app") \(run.version ?? "") after \(Int(HereRecheck.askFor)) s")
+            }
+            run.installResent = true
+            note("iOS doesn't list the new copy: asking it to install the copied IPA again")
+        }
+        w.begin("iOS installing the app (installd)", Limit.install)
+        note("iOS is installing it")
+        var lastPct: UInt64 = .max
+        let box = Unmanaged.passRetained(ProgressBox { pct in
+            w.alive("\(pct)% installed")
+            if pct != lastPct { lastPct = pct; ilog("installd: \(pct)%") }
+            progress(.install(Double(min(pct, 100)) / 100))
+        })
+        defer { box.release() }
+        let cb: @convention(c) (UInt64, UnsafeMutableRawPointer?) -> Void = { pct, ctx in
+            guard let ctx = ctx else { return }
+            Unmanaged<ProgressBox>.fromOpaque(ctx).takeUnretainedValue().f(pct)
+        }
+        run.installSent = true
+        let err = installation_proxy_install_with_callback(ip, run.remote, nil, cb, box.toOpaque())
+        do {
+            try check(err, "install_failed")
+        } catch let f as Failure where f.dropped && run.bundleID != nil {
+            throw f // install() connects again and asks iOS; the staged IPA stays for a second try
+        } catch {
+            removeStaged(run.remote, session: s, watch: w)
+            throw error
+        }
+        ilog("installd: Complete")
+        removeStaged(run.remote, session: s, watch: w)
+        progress(.install(1))
+    }
+
+    /// After a drop once the install was sent: asks iOS for the app every HereRecheck.askEvery seconds, for up to
+    /// HereRecheck.askFor (installd goes on without us). True when iOS lists the new copy (or the version asked for,
+    /// when nothing tells it from what was there before); false when it still lists what it had, or nothing.
+    private static func askInstalled(_ run: HereRun, _ ip: OpaquePointer?, watch w: Watch, note: (String) -> Void) throws -> Bool {
+        guard let bid = run.bundleID, let version = run.version else {
+            throw Failure(code: "install_failed", text: "lost the connection to iOS while it was installing, and can't ask it for the app")
+        }
+        note("Asking iOS whether it installed \(bid) \(version)")
+        let until = Date().addingTimeInterval(HereRecheck.askFor)
+        var said = ""
+        while true {
+            let now = try appState(ip, bid, watch: w)
+            let v = HereRecheck.verdict(version: version, before: run.before ?? .unknown, now: now)
+            ilog("iOS lists \(bid): \(now.map(describe) ?? "nothing") -> \(v)")
+            switch v {
+            case .installed:
+                note("iOS lists \(bid) \(version): installed")
+                return true
+            case .cannotTell:
+                note("iOS lists \(bid) \(version); nothing tells it from the copy that was there, so it counts as installed")
+                return true
+            case .notYet, .sameAsBefore:
+                if Date() >= until { return false }
+                let line = v == .notYet ? "not yet" : "still the earlier copy"
+                if line != said { said = line; note("iOS doesn't list the new copy yet (\(line)); asking again") }
+                w.begin("waiting for iOS to list \(bid) \(version)", HereRecheck.askEvery + Limit.service)
+                Thread.sleep(forTimeInterval: HereRecheck.askEvery)
+            }
+        }
+    }
+
+    /// What iOS lists for the user app `bundleID` (installation_proxy Browse), or nil when it lists none.
+    private static func appState(_ ip: OpaquePointer?, _ bundleID: String, watch w: Watch) throws -> HereRecheck.AppState? {
+        w.begin("asking installation_proxy for \(bundleID)", Limit.service)
+        let opts = plist_new_dict()
+        defer { plist_free(opts) } // browse copies it
+        plist_dict_set_item(opts, "ApplicationType", plist_new_string("User"))
+        let ids = plist_new_array()
+        plist_array_append_item(ids, plist_new_string(bundleID))
+        plist_dict_set_item(opts, "BundleIDs", ids)
+        let attrs = plist_new_array()
+        for a in ["CFBundleIdentifier", "CFBundleVersion", "CFBundleShortVersionString", "Path"] {
+            plist_array_append_item(attrs, plist_new_string(a))
+        }
+        plist_dict_set_item(opts, "ReturnAttributes", attrs)
+        var list: UnsafeMutablePointer<plist_t?>?
+        var n = 0
+        try check(installation_proxy_browse(ip, opts, &list, &n), "install_failed")
+        defer { if let l = list { idevice_plist_array_free(l, UInt(n)) } }
+        func string(_ dict: plist_t?, _ key: String) -> String? {
+            guard let d = dict, plist_get_node_type(d) == PLIST_DICT, let v = plist_dict_get_item(d, key),
+                  plist_get_node_type(v) == PLIST_STRING else { return nil }
+            var p: UnsafeMutablePointer<CChar>?
+            plist_get_string_val(v, &p)
+            guard let c = p else { return nil }
+            defer { plist_mem_free(c) }
+            return String(cString: c)
+        }
+        guard let l = list else { return nil }
+        for i in 0..<n where string(l[i], "CFBundleIdentifier") == bundleID {
+            return HereRecheck.AppState(path: string(l[i], "Path"), version: string(l[i], "CFBundleVersion"),
+                                        shortVersion: string(l[i], "CFBundleShortVersionString"))
+        }
+        return nil
+    }
+
+    private static func describe(_ s: HereRecheck.AppState) -> String {
+        "\(s.shortVersion ?? "?") (\(s.version ?? "?")) at \(s.path.map { ($0 as NSString).lastPathComponent } ?? "?")"
+    }
+
+    /// Whether the IPA is still in PublicStaging (installd may have taken it).
+    private static func staged(_ remote: String, session s: Session, watch w: Watch) -> Bool {
+        guard let afc = try? s.afc() else { return false }
+        defer { afc_client_free(afc) }
+        w.begin("looking for the staged IPA", Limit.afcStep)
+        var info = AfcFileInfo()
+        guard afc_get_file_info(afc, remote, &info).map({ idevice_error_free($0) }) == nil else { return false }
+        defer { afc_file_info_free(&info) }
+        return info.size > 0
+    }
+
+    private static func removeStaged(_ remote: String, session s: Session, watch w: Watch) {
+        guard let afc = try? s.afc() else { return }
+        w.begin("removing the staged IPA", Limit.afcStep)
+        afc_remove_path(afc, remote).map(idevice_error_free); afc_client_free(afc)
     }
 
     static let chunk = 1 << 20
 
     static func mb(_ n: Int) -> String { String(format: "%.1f MB", Double(n) / 1_048_576) }
 
-    private static func upload(_ ipa: URL, size total: Int, to remote: String, session s: Session, watch w: Watch,
+    /// Copies the IPA to PublicStaging. B246: after a drop it carries on from the end of iOS's file (a whole chunk
+    /// back, HereRecheck.resumeAt) instead of starting over, and the speed in front and in the background goes to the
+    /// log and the page, for telling a slow copy in the background from a slow route.
+    private static func upload(_ run: HereRun, session s: Session, watch w: Watch,
                                note: (String) -> Void, progress: (Step) -> Void) throws {
-        let fh = try FileHandle(forReadingFrom: ipa)
+        let total = run.size, remote = run.remote
+        let fh = try FileHandle(forReadingFrom: run.ipa)
         defer { try? fh.close() }
         let afc = try s.afc()
         defer { afc_client_free(afc) }
         w.begin("opening \(remote) on iOS (AFC)", Limit.afcStep)
         afc_make_directory(afc, stagingDir).map(idevice_error_free) // there already: an error, and fine
+        var from = 0
+        if run.sent > 0 {
+            var info = AfcFileInfo()
+            if afc_get_file_info(afc, remote, &info).map({ idevice_error_free($0) }) == nil {
+                from = HereRecheck.resumeAt(remoteSize: Int(info.size), sent: run.sent, chunk: chunk)
+                afc_file_info_free(&info)
+            }
+        }
         var file: OpaquePointer?
-        try check(afc_file_open(afc, remote, AfcWrOnly, &file), "upload_failed")
+        if from > 0 {
+            try check(afc_file_open(afc, remote, AfcRw, &file), "upload_failed") // r+: keeps what iOS has
+            var pos: Int64 = 0
+            do { try check(afc_file_seek(file, Int64(from), 0 /* SEEK_SET */, &pos), "upload_failed") } catch {
+                afc_file_close(file).map(idevice_error_free)
+                throw error
+            }
+            try fh.seek(toOffset: UInt64(from))
+            ilog("AFC: carrying on from \(mb(from)) of \(mb(total)) (iOS had \(mb(run.sent)) when the connection dropped)")
+            note("Carrying on with the copy from \(mb(from)) of \(mb(total))")
+        } else {
+            try check(afc_file_open(afc, remote, AfcWrOnly, &file), "upload_failed")
+            note("Copying the IPA to iOS (\(mb(total)))")
+        }
         w.begin("copying the IPA to iOS (AFC)", Limit.upload)
-        note("Copying the IPA to iOS (\(mb(total)))")
-        var sent = 0, logged = 0
+        var sent = from, logged = from
+        run.sent = from
+        if run.copyStart == nil { run.copyStart = Date() }
         let t0 = Date()
+        var last = Date()
         do {
             while let d = try fh.read(upToCount: chunk), !d.isEmpty {
                 try d.withUnsafeBytes { try check(afc_file_write(file, $0.baseAddress?.assumingMemoryBound(to: UInt8.self), d.count), "upload_failed") }
                 sent += d.count
+                run.sent = sent
+                let now = Date()
+                run.speed.add(d.count, now.timeIntervalSince(last), front: AppFront.now)
+                last = now
                 w.alive("\(mb(sent)) of \(mb(total)) copied")
                 if sent - logged >= 8 * chunk || sent == total {
                     logged = sent
-                    let secs = max(Date().timeIntervalSince(t0), 0.001)
-                    ilog("AFC: \(mb(sent)) of \(mb(total)) (\(String(format: "%.1f", Double(sent) / 1_048_576 / secs)) MB/s)")
+                    let secs = max(now.timeIntervalSince(t0), 0.001)
+                    ilog("AFC: \(mb(sent)) of \(mb(total)) (\(String(format: "%.1f", Double(sent - from) / 1_048_576 / secs)) MB/s, \(AppFront.now ? "in front" : "in the background"))")
                 }
                 progress(.upload(total > 0 ? Double(sent) / Double(total) : 0))
             }
@@ -865,7 +1112,8 @@ enum IDevice {
         }
         w.begin("closing \(remote) on iOS (AFC)", Limit.afcStep)
         try check(afc_file_close(file), "upload_failed")
-        ilog("AFC: copied \(mb(sent)) in \(String(format: "%.1f", Date().timeIntervalSince(t0))) s")
-        note("Copied \(mb(sent)) to iOS")
+        let secs = Date().timeIntervalSince(run.copyStart ?? t0)
+        ilog("AFC: copied \(mb(sent)) in \(String(format: "%.1f", secs)) s: \(run.speed.summary)")
+        note("Copied \(mb(sent)) to iOS in \(Int(secs.rounded())) s (\(run.speed.summary))")
     }
 }

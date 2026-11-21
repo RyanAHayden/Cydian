@@ -515,13 +515,14 @@ enum Sideload {
             CloseForUpdate.exitBackstop("This iPhone self-update")
         } : nil
         if isSelf { DispatchQueue.main.async { CloseForUpdate.hereBegan(app: app) } }
-        DispatchQueue.main.async { KeepAlive.shared.begin() }
+        DispatchQueue.main.async { KeepAlive.shared.begin(); IDevice.AppFront.watch() }
         IDevice.queue.async {
             let result: Result<Void, Error>
             do {
                 try job?.check()
                 log?("Copying the IPA to iOS (\(Sideload.size(output))), then iOS installs it")
-                try IDevice.install(output, note: { log?($0) }) { st in
+                // B246: the bundle ID and version let a dropped connection ask iOS for the app instead of failing
+                try IDevice.install(output, bundleID: app.bundleID, version: app.version, note: { log?($0) }) { st in
                     switch st {
                     case .connected: emit?("here", 0.02); step?("copying", 0)
                     case .upload(let p): emit?("here", 0.02 + p * 0.28); step?("copying", p); if p >= 1 { closer?.copied() }
@@ -1206,7 +1207,18 @@ final class KeepAlive {
             p.play()
             DeviceLog.say("\(Brand.name) KeepAlive: audio interruption ended; silent loop playing again")
         }
+        // B246: iOS doesn't always send the interruption's end (another app's audio that never lets go). Coming back
+        // to the front starts the loop again while an install holds it, so leaving the app a second time keeps the
+        // install running rather than suspending it.
+        foreground = NotificationCenter.default.addObserver(forName: UIApplication.willEnterForegroundNotification, object: nil,
+                                                            queue: .main) { [weak self] _ in
+            guard let self = self, let p = self.player, !p.isPlaying else { return }
+            try? AVAudioSession.sharedInstance().setActive(true)
+            p.play()
+            DeviceLog.say("\(Brand.name) KeepAlive: back in front; silent loop playing again")
+        }
     }
+    private var foreground: NSObjectProtocol?
 
     func end() {
         DispatchQueue.main.async {

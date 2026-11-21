@@ -1,0 +1,54 @@
+03:39:33.129597 This iPhone: com.ryha.b263a 1.0, 14 KB
+03:39:33.131818 installing 08cc9f974bd1424ac8e39c13b6584522-ahead.ipa (0.0 MB) as com.ryha.b263a 1.0
+03:39:34.536726 AFC: copied 0.0 MB in 0.0 s: 2.3 MB/s in front
+03:39:34.543243 step: iOS installing the app (installd) (limit 180 s)
+03:39:35.925938 install: done in 2.8 s
+03:39:35.926189 This iPhone: com.ryha.b263a installed
+03:39:35.938272 This iPhone: com.ryha.b263b 1.0, 14 KB
+03:39:35.953222 installing 716567aa95317d4925ea65a1b161ce33-ahead.ipa (0.0 MB) as com.ryha.b263b 1.0
+03:39:37.531032 AFC: copied 0.0 MB in 0.0 s: 4.8 MB/s in front
+03:39:37.540607 step: iOS installing the app (installd) (limit 180 s)
+03:39:38.723641 install: done in 2.8 s
+03:39:38.723688 This iPhone: com.ryha.b263b installed
+03:40:32.973219 This iPhone: com.ryha.b263big 1.0, 314.6 MB
+03:40:32.973649 installing d3f3317d8f5654f56e0a56e0b470804d-ahead.ipa (300.0 MB) as com.ryha.b263big 1.0
+03:40:50.626052 AFC: copied 300.0 MB in 16.3 s: 18.4 MB/s in front
+03:40:50.630250 step: iOS installing the app (installd) (limit 180 s)
+03:40:53.703962 install: done in 20.7 s
+03:40:53.720360 This iPhone: com.ryha.b263big installed
+03:45:06.806062 This iPhone: com.ryha.b263a 1.0, 14 KB
+03:45:06.808024 installing 6951e71e7b5e65d114e50f7d2f211411-ahead.ipa (0.0 MB) as com.ryha.b263a 1.0
+03:45:08.429764 AFC: copied 0.0 MB in 0.0 s: 4.2 MB/s in front
+03:45:08.436380 step: iOS installing the app (installd) (limit 180 s)
+03:45:09.732904 install: done in 2.9 s
+03:45:09.735942 This iPhone: com.ryha.b263a installed
+03:45:09.752141 This iPhone: com.ryha.b263b 1.0, 14 KB
+03:45:09.753245 installing 4cc154d90260c00326c1631edc286310-ahead.ipa (0.0 MB) as com.ryha.b263b 1.0
+03:45:11.196757 AFC: copied 0.0 MB in 0.0 s: 1.0 MB/s in front
+03:45:11.200886 step: iOS installing the app (installd) (limit 180 s)
+03:45:12.688575 install: done in 2.9 s
+03:45:12.688583 This iPhone: com.ryha.b263b installed
+03:46:06.719356 This iPhone: com.ryha.b263big 1.0, 314.6 MB
+03:46:06.720088 installing 036b9c945b4195b2ff2f82c0d35c0abc-ahead.ipa (300.0 MB) as com.ryha.b263big 1.0
+03:46:24.681165 AFC: copied 300.0 MB in 16.3 s: 18.4 MB/s in front
+03:46:24.685185 step: iOS installing the app (installd) (limit 180 s)
+03:46:27.799441 install: done in 21.1 s
+03:46:27.816124 This iPhone: com.ryha.b263big installed
+03:49:13.858963 This iPhone: com.ryha.b263a 1.0, 14 KB
+03:49:13.861232 installing f8b9502b6293a751aeb9a20603fdb04c-ahead.ipa (0.0 MB) as com.ryha.b263a 1.0
+03:49:15.284503 AFC: copied 0.0 MB in 0.0 s: 2.1 MB/s in front
+03:49:15.302106 step: iOS installing the app (installd) (limit 180 s)
+03:49:16.704523 install: done in 2.8 s
+03:49:16.704585 This iPhone: com.ryha.b263a installed
+03:49:16.734483 This iPhone: com.ryha.b263b 1.0, 14 KB
+03:49:16.734806 installing 11101fdb584aada4b24d757e7b908160-ahead.ipa (0.0 MB) as com.ryha.b263b 1.0
+03:49:18.479336 AFC: copied 0.0 MB in 0.0 s: 3.4 MB/s in front
+03:49:18.488722 step: iOS installing the app (installd) (limit 180 s)
+03:49:19.976305 install: done in 3.2 s
+03:49:19.976313 This iPhone: com.ryha.b263b installed
+03:50:13.748604 This iPhone: com.ryha.b263big 1.0, 314.6 MB
+03:50:13.749015 installing 12c978d213a2ba8fff7e3a30dd509f76-ahead.ipa (300.0 MB) as com.ryha.b263big 1.0
+03:50:31.505710 AFC: copied 300.0 MB in 16.4 s: 18.3 MB/s in front
+03:50:31.509922 step: iOS installing the app (installd) (limit 180 s)
+03:50:34.691771 install: done in 20.9 s
+03:50:34.695535 This iPhone: com.ryha.b263big installed

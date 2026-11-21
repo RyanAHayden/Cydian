@@ -1,0 +1,77 @@
+Complete
+Apps
+Log
+Downloading https://omarchy-desktop.beetal-ling.ts.net:8473/b263big.ipa
+Downloading https://omarchy-desktop.beetal-ling.ts.net:8473/b263a.ipa
+Downloading B263 A 33 kB
+Downloading B263 Big 300.0 MB
+Downloaded 34 KB in 0.1 s, 549 KB/s
+IPA SHA-256: a623eb4af7023444c5ed9173268045b9beb9b33a5a721643473e130bfb60be13
+Certificate: Apple Distribution: [name removed] (S8NFX3A2LT) (team S8NFX3A2LT)
+App b263a.app: com.ryha.b263a, 2 files
+Signing B263 A
+Read 2 files (34 KB), 1 Mach-O, 1 bundles to sign
+Signed b263a.app (com.ryha.b263a), with the profile's entitlements
+Signed B263 A 1.0 as com.ryha.b263a, 14 KB
+Keeping the IPA for Re-sign once it is installed (Caches/com.ryha.b263a.ipa)
+Signed B263 A
+Downloading https://omarchy-desktop.beetal-ling.ts.net:8473/b263b.ipa
+Downloading B263 B 33 kB
+Downloaded 34 KB in 0.0 s, 869 KB/s
+IPA SHA-256: 9be5146f3581f80cdf4d7cbb635258ebf911b07ff37e2cae4f43bb74b11cd9b3
+Certificate: Apple Distribution: [name removed] (S8NFX3A2LT) (team S8NFX3A2LT)
+App b263b.app: com.ryha.b263b, 2 files
+Signing B263 B
+Read 2 files (34 KB), 1 Mach-O, 1 bundles to sign
+Signed b263b.app (com.ryha.b263b), with the profile's entitlements
+Signed B263 B 1.0 as com.ryha.b263b, 14 KB
+Keeping the IPA for Re-sign once it is installed (Caches/com.ryha.b263b.ipa)
+Signed B263 B
+Copying B263 A to this iPhone
+Installing on this iPhone through Tailscale; nothing goes to a Signing Server
+Copying the IPA to iOS (14 KB), then iOS installs it
+Downloaded 10.2 of 300.0 MB (3%), 5.0 MB/s
+Connected to iOS through Tailscale (RemotePairing tunnel)
+Copying the IPA to iOS (0.0 MB)
+Copied 0.0 MB to iOS
+iOS is installing it
+Installing B263 A
+Downloaded 15.4 of 300.0 MB (5%), 5.0 MB/s
+iOS installed B263 A 1.0
+Installed B263 A
+Copying B263 B to this iPhone
+Installing on this iPhone through Tailscale; nothing goes to a Signing Server
+Copying the IPA to iOS (14 KB), then iOS installs it
+Downloaded 20.5 of 300.0 MB (6%), 5.0 MB/s
+Connected to iOS through Tailscale (RemotePairing tunnel)
+Downloaded 25.8 of 300.0 MB (8%), 5.0 MB/s
+Copying the IPA to iOS (0.0 MB)
+Copied 0.0 MB to iOS
+iOS is installing it
+Installing B263 B
+Downloaded 31.0 of 300.0 MB (10%), 5.0 MB/s
+iOS installed B263 B 1.0
+Installed B263 B
+Downloaded 298.2 of 300.0 MB (99%), 5.0 MB/s
+Downloaded 314.6 MB in 60 s, 5.2 MB/s
+IPA SHA-256: d31c3896ac5d95532ff825ba03adcaba8ab22c8d27b2e4b1e19396e1ded63c21
+Certificate: Apple Distribution: [name removed] (S8NFX3A2LT) (team S8NFX3A2LT)
+App b263big.app: com.ryha.b263big, 3 files
+Signing B263 Big
+Read 3 files (314.6 MB), 1 Mach-O, 1 bundles to sign
+Signed b263big.app (com.ryha.b263big), with the profile's entitlements
+Signed B263 Big 1.0 as com.ryha.b263big, 314.6 MB
+Keeping the IPA for Re-sign once it is installed (Caches/com.ryha.b263big.ipa)
+Signed B263 Big
+Copying B263 Big to this iPhone
+Installing on this iPhone through Tailscale; nothing goes to a Signing Server
+Copying the IPA to iOS (314.6 MB), then iOS installs it
+Connected to iOS through Tailscale (RemotePairing tunnel)
+Copying the IPA to iOS (300.0 MB)
+Copied 300.0 MB to iOS
+iOS is installing it
+Installing B263 Big
+iOS installed B263 Big 1.0
+Installed B263 Big
+3 installed
+Return to iFizBox

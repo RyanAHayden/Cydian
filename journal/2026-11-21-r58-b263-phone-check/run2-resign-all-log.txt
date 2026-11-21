@@ -1,0 +1,75 @@
+Complete
+Retry All
+Apps
+Log
+Signing from the IPA kept at install (34 KB), no download
+IPA SHA-256: a623eb4af7023444c5ed9173268045b9beb9b33a5a721643473e130bfb60be13
+Signing from the IPA kept at install (34 KB), no download
+Certificate: Apple Distribution: [name removed] (S8NFX3A2LT) (team S8NFX3A2LT)
+App b263a.app: com.ryha.b263a, 2 files
+Signing B263 A
+Read 2 files (34 KB), 1 Mach-O, 1 bundles to sign
+Signed b263a.app (com.ryha.b263a), with the profile's entitlements
+Signed B263 A 1.0 as com.ryha.b263a, 14 KB
+Keeping the IPA for Re-sign once it is installed (Caches/com.ryha.b263a.ipa)
+IPA SHA-256: 9be5146f3581f80cdf4d7cbb635258ebf911b07ff37e2cae4f43bb74b11cd9b3
+Signed B263 A
+Certificate: Apple Distribution: [name removed] (S8NFX3A2LT) (team S8NFX3A2LT)
+The kept IPA is gone (iOS clears caches when storage runs low): downloading it again
+Downloading https://omarchy-desktop.beetal-ling.ts.net:8473/b263big.ipa
+App b263b.app: com.ryha.b263b, 2 files
+Signing B263 B
+Read 2 files (34 KB), 1 Mach-O, 1 bundles to sign
+Signed b263b.app (com.ryha.b263b), with the profile's entitlements
+Signed B263 B 1.0 as com.ryha.b263b, 14 KB
+Keeping the IPA for Re-sign once it is installed (Caches/com.ryha.b263b.ipa)
+Signed B263 B
+iFizBox: Not an http(s) URL
+Downloading B263 Big
+Copying B263 A to this iPhone
+Installing on this iPhone through Tailscale; nothing goes to a Signing Server
+Copying the IPA to iOS (14 KB), then iOS installs it
+Downloaded 10.6 of 300.0 MB (3%), 5.2 MB/s
+Connected to iOS through Tailscale (RemotePairing tunnel)
+Copying the IPA to iOS (0.0 MB)
+Copied 0.0 MB to iOS
+iOS is installing it
+Downloaded 16.0 of 300.0 MB (5%), 5.2 MB/s
+Installing B263 A
+iOS installed B263 A 1.0
+Re-signed B263 A, expires Oct 28, 2027
+Copying B263 B to this iPhone
+Installing on this iPhone through Tailscale; nothing goes to a Signing Server
+Copying the IPA to iOS (14 KB), then iOS installs it
+Downloaded 21.0 of 300.0 MB (6%), 5.0 MB/s
+Connected to iOS through Tailscale (RemotePairing tunnel)
+Copying the IPA to iOS (0.0 MB)
+Copied 0.0 MB to iOS
+iOS is installing it
+Downloaded 31.5 of 300.0 MB (10%), 5.0 MB/s
+Installing B263 B
+iOS installed B263 B 1.0
+Re-signed B263 B, expires Oct 28, 2027
+Downloaded 299.2 of 300.0 MB (99%), 4.9 MB/s
+Downloaded 314.6 MB in 60 s, 5.2 MB/s
+IPA SHA-256: d31c3896ac5d95532ff825ba03adcaba8ab22c8d27b2e4b1e19396e1ded63c21
+Certificate: Apple Distribution: [name removed] (S8NFX3A2LT) (team S8NFX3A2LT)
+App b263big.app: com.ryha.b263big, 3 files
+Signing B263 Big
+Read 3 files (314.6 MB), 1 Mach-O, 1 bundles to sign
+Signed b263big.app (com.ryha.b263big), with the profile's entitlements
+Signed B263 Big 1.0 as com.ryha.b263big, 314.6 MB
+Keeping the IPA for Re-sign once it is installed (Caches/com.ryha.b263big.ipa)
+Signed B263 Big
+Copying B263 Big to this iPhone
+Installing on this iPhone through Tailscale; nothing goes to a Signing Server
+Copying the IPA to iOS (314.6 MB), then iOS installs it
+Connected to iOS through Tailscale (RemotePairing tunnel)
+Copying the IPA to iOS (300.0 MB)
+Copied 300.0 MB to iOS
+iOS is installing it
+Installing B263 Big
+iOS installed B263 Big 1.0
+Re-signed B263 Big, expires Oct 28, 2027
+3 re-signed, 1 failed
+Return to iFizBox

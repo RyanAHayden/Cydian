@@ -33,7 +33,7 @@ import { signAndInstall } from "../signing/install.js";
 import { signingReady, getBring, getServer } from "../signing/identity.js";
 import { deviceStatus, statusReady } from "../signing/device.js";
 import { serverReachable } from "../signing/library.js";
-import { expiryWarning, expiryWarningDays, resignWindow, signingTile } from "../core/signing.js";
+import { expiryWarning, expiryWarningDays, resignWindow, signingTile, normalizeServer } from "../core/signing.js";
 import { rememberInstall } from "./signing.js";
 const featuredRefs = () => load("extras").then((m) => m.featuredRefs()); // F313: loaded with the Featured list
 import { browseList, browseListsFor, FRESH_DAYS, collection } from "../core/catalog.js";
@@ -607,7 +607,9 @@ export async function signingSlot(mode, { setUp = (m) => signingSetUp(m), identi
   reachable = (s) => serverReachable(s), server = getServer } = {}) {
   if (!showsSigningSlot(mode)) return { setUp: true, identity: null, serverUp: true, server: null };
   const ok = await setUp(mode).catch(() => false);
-  if (mode !== "sideload" || !ok) return { setUp: ok, identity: null, serverUp: true, server: null };
+  if (mode !== "sideload") return { setUp: ok, identity: null, serverUp: true, server: null };
+  // B245: not set up but with an https Signing Server: the certificate is the step left (slotTile says so).
+  if (!ok) return { setUp: false, identity: null, serverUp: true, server: httpsServer(server()) };
   const sv = server();
   const [ident, up] = await Promise.all([identity().catch(() => null), reachable(sv).catch(() => false)]);
   return { setUp: true, identity: ident, serverUp: Boolean(up), server: sv };
@@ -616,7 +618,18 @@ export async function signingSlot(mode, { setUp = (m) => signingSetUp(m), identi
 export function slotTile(mode, slot, { get, now, certShown = showsCertTile(mode) } = {}) {
   if (!showsSigningSlot(mode) || !slot) return null;
   const warning = certShown && slot.identity ? certWarning(slot.identity, { ...(get ? { get } : {}), ...(now ? { now } : {}) }) : null;
-  return signingTile({ setUp: slot.setUp, serverUp: slot.serverUp, server: slot.server, warning });
+  const t = signingTile({ setUp: slot.setUp, serverUp: slot.serverUp, server: slot.server, warning });
+  // B245: the sideload app with its Signing Server set (Installation & Signing says Ready to Install through it) and
+  // no certificate yet: the tile names the step left instead of "Nothing can be installed yet".
+  if (t?.kind === "setup" && mode === "sideload" && slot.server) return { ...t, subtitle: CERT_STEP_LEFT };
+  return t;
+}
+export const CERT_STEP_LEFT = "Import your certificate to install"; // fits the tile at 320pt
+// The Signing Server when installs can use it (an https:// address, as screens/signing.js serverReady), else null.
+// Settings > Signing has two steps (certificate, server), so with this set, not set up means no certificate.
+export function httpsServer(server) {
+  const s = normalizeServer(server);
+  return s && /^https:\/\//.test(s) ? s : null;
 }
 // The tile, kept up to date: Home showing again (Back from Settings > Signing), the app coming back, Settings'
 // Expiry Warning, Show Expiry Warning and Re-sign Reminder, and Settings > Signing's status ("ifizbox:signing-status",

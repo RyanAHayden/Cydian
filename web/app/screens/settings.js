@@ -67,7 +67,8 @@ import { signedAppRows } from "../core/signing.js";
 import { onPageShow, patchDetails, cellsOf } from "../nav/pagestate.js";
 import { refreshInstallation } from "./installroute.js";
 import { loadStyle, EASE, DURATION } from "../nav/motion.js";
-import { APP_ICONS, iconGroups } from "../core/settings.js";
+import { APP_ICONS, iconGroups, isOwnIcon } from "../core/settings.js";
+import { hasNativeCall } from "../native.js";
 import { nativeIcons, iconSrc, iconOf, iconImage, refreshIcons, tellIcon, clearHere, readIcons } from "../appicon.js";
 
 // F284: Installation & Signing's own sub-pages under signing/ (the main page's Signing rows), sideload build only.
@@ -578,7 +579,12 @@ function themePreview(tone) {
 // its footer says the icon follows the theme); off, a second group slides in under it with Light and Dark, each
 // with its icon's thumbnail, pushing theme/lightIcon or theme/darkIcon (iconPage). They start on the themes' own
 // icons, so turning the switch off changes nothing until one is picked. A pick applies to its mode only.
-const iconLabel = (name) => APP_ICONS.find((i) => i.value === name)?.label ?? name;
+const iconLabel = (name) => APP_ICONS.find((i) => i.value === name)?.label ?? (isOwnIcon(name) ? ownIcons?.ownLabel(name) ?? "Your Icon" : name);
+// F329: your own icons (screens/appicon.js), the jailbreak app only; loaded when Theme > App Icon draws, out of the
+// startup closure, so the grid behind it has it at once.
+let ownIcons = null;
+const ownOffered = () => settings.mode === "jailbreak" && hasNativeCall();
+const loadOwnIcons = () => import("./appicon.js").then((m) => (ownIcons = m));
 const iconThumb = (name) => ({ icon: { cls: "app-icon-thumb", src: iconSrc(name) } });
 
 // The groups' data, pure for the tests: [switch group, picks group].
@@ -604,6 +610,13 @@ function appIconGroups() {
       live: () => iconLabel(iconOf(defOf(r.key).iconTone)) })), footer: picks.footer },
   ]);
   const [group, pickGroup] = frag.querySelectorAll(".group");
+  // F329: a pick of your own icon is named from the shell's list, which may not be read yet
+  if (ownOffered()) {
+    loadOwnIcons().then((m) => m.loadIcons().then((list) => m.dropMissing(settings, list))).then(() => picks.rows.forEach((r, i) => {
+      const detail = pickGroup.querySelectorAll(".cell-detail")[i];
+      if (detail && isOwnIcon(r.icon)) detail.textContent = iconLabel(iconOf(defOf(r.key).iconTone));
+    })).catch(() => {});
+  }
   group.dataset.key = "appicon";
   pickGroup.dataset.key = "appicon-picks";
   const cell = group.querySelector(".cell-inner");
@@ -658,6 +671,16 @@ function iconPage(key) {
     table.append(grid);
     group.append(head, table);
     frag.append(group);
+  }
+  // F329: Your Icons (loaded by Theme > App Icon; a page opened straight from a link waits for the module)
+  if (ownOffered()) {
+    const make = (m) => m.ownIconsGroup({ key, now, store: settings });
+    if (ownIcons) frag.append(make(ownIcons));
+    else {
+      const slot = document.createElement("div");
+      frag.append(slot);
+      loadOwnIcons().then((m) => { if (slot.isConnected) slot.replaceWith(make(m)); }).catch(() => {});
+    }
   }
   return frag;
 }

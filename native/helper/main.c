@@ -47,6 +47,7 @@
 #include "paid.h"
 #include "policy.h"
 #include "launch.h"
+#include "ownicon.h" /* F329 */
 
 #include <dirent.h>
 #include <errno.h>
@@ -524,6 +525,39 @@ int main(int argc, char *argv[]) {
             return HELPER_EX_IOERR;
         }
         printf("Launch screen: %s\n", argv[2]);
+        return 0;
+    }
+
+    /* F329: own-icon copies your picture into the app's own icon set and runs nothing (ownicon.h). */
+    if (argc >= 2 && !strcmp(argv[1], "own-icon")) {
+        if (argc != 4 || !helper_own_slot_ok(argv[2]) || !helper_own_dir_ok(argv[3])) {
+            fprintf(stderr, "ifizbox-helper: own-icon takes a slot (a or b) and the picture's folder (absolute)\n");
+            return HELPER_EX_USAGE;
+        }
+        char app[PATH_MAX];
+        snprintf(app, sizeof app, "%s", expected);
+        char *slash = strrchr(app, '/');
+        if (slash) *slash = 0;
+        umask(022);
+        errno = 0;
+        if (helper_own_icon(app, argv[2], argv[3], &err)) {
+            fprintf(stderr, "ifizbox-helper: own-icon: %s%s%s\n", err, errno ? ": " : "", errno ? strerror(errno) : "");
+            return HELPER_EX_IOERR;
+        }
+        printf("App icon: own %s\n", argv[2]);
+        return 0;
+    }
+    if (argc >= 2 && !strcmp(argv[1], "own-icon-refresh")) {
+        if (argc != 2) { fprintf(stderr, "ifizbox-helper: own-icon-refresh takes no arguments\n"); return HELPER_EX_USAGE; }
+        char app[PATH_MAX];
+        snprintf(app, sizeof app, "%s", expected);
+        char *slash = strrchr(app, '/');
+        if (slash) *slash = 0;
+        if (helper_own_refresh(prefix, app, &err)) {
+            fprintf(stderr, "ifizbox-helper: own-icon-refresh: %s\n", err);
+            return HELPER_EX_EXEC;
+        }
+        printf("Refreshing the Home Screen icon\n");
         return 0;
     }
 

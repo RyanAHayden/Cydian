@@ -153,6 +153,10 @@ bundle() {
     for x in @2x @3x; do cp "icon/${icon/60x60/${pt}x${pt}}$x.png" "$app/AppIcon${pt}x${pt}$x.png"; done
   done
   cp "icon/$car" "$app/Assets.car"
+  # F329: your own icon's two loose sets (icon/alternates.py OWN_SLOTS), the primary icon until the helper writes one
+  for s in A B; do for pt in 20 29 40 60; do for x in @2x @3x; do
+    cp "icon/${icon/60x60/${pt}x${pt}}$x.png" "$app/IconOwn$s${pt}x$pt$x.png"
+  done; done; done
   # F323: every app icon at 180 px as this build's Home Screen shows it (Lite's sashed), for the page: Home's header
   # and Theme > App Icon's thumbnails (Bridge.swift AppScheme serves them as appicon/<icon>.png).
   rm -rf "$app/AppIconThumbs" && python3 icon/alternates.py thumbs "$app/AppIconThumbs" ${overlay:+--lite}

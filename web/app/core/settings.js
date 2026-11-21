@@ -152,12 +152,12 @@ export const SETTINGS = [
     // F323: Light's and Dark's icon while Match Theme is off: "theme" (the theme's own, where they start) or an icon
     // of APP_ICONS. Each pushes theme/<key>, a grid of icons (screens/settings.js iconPage).
     key: "lightIcon", section: "appicon", kind: "icon", feature: "app-icon", modes: BOTH, default: "theme",
-    label: "Light", iconTone: "light", options: [{ value: "theme", label: "Theme" }],
+    label: "Light", iconTone: "light", options: [{ value: "theme", label: "Theme" }], accepts: (v) => isOwnIcon(v), // F329
     footer: (mode) => "Pick an icon for each mode." + (mode === "sideload" ? " iOS shows an alert when it changes." : ""),
   },
   {
     key: "darkIcon", section: "appicon", kind: "icon", feature: "app-icon", modes: BOTH, default: "theme",
-    label: "Dark", iconTone: "dark", options: [{ value: "theme", label: "Theme" }],
+    label: "Dark", iconTone: "dark", options: [{ value: "theme", label: "Theme" }], accepts: (v) => isOwnIcon(v), // F329
   },
   {
     // F37: what kind of iPhone this is. The site only: the jailbreak app takes it from the bridge (deviceType) and
@@ -450,12 +450,13 @@ export function createSettings({ storage = globalThis.localStorage, mode = "site
     const d = def(key);
     const raw = store.get(PREFIX + key);
     const hit = raw == null ? null : d.options.find((o) => String(o.value) === raw);
+    if (!hit && raw != null && d.accepts?.(raw)) return raw; // F329: a value outside the list the setting takes
     return hit ? hit.value : defaultOf(d);
   }
 
   function set(key, value) {
     const d = def(key);
-    const hit = d.options.find((o) => o.value === value);
+    const hit = d.options.find((o) => o.value === value) ?? (d.accepts?.(value) ? { value } : null); // F329
     if (!hit) throw new Error(`${key}: ${JSON.stringify(value)} is not one of its options`);
     const was = key === "upgradeNotifications" ? get(key) : undefined;
     store.set(PREFIX + key, String(value));
@@ -916,8 +917,13 @@ export function iconFor(tone, get) {
   const own = paletteFor(tone, get("darkTheme"), get("lightTheme"));
   if (get("iconMatch") !== false) return own;
   const pick = get(tone === "dark" ? "darkIcon" : "lightIcon");
-  return APP_ICONS.some((i) => i.value === pick) ? pick : own;
+  return APP_ICONS.some((i) => i.value === pick) || isOwnIcon(pick) ? pick : own;
 }
+
+// F329: one of your own icons (screens/appicon.js), kept by the shell as <name>.png: "own" and a few [a-z0-9]. A pick
+// of one is shown like any icon (appicon/<name>.png); the shell's app.icon applies it.
+export const OWN_ICON = /^own[a-z0-9]{1,16}$/;
+export const isOwnIcon = (v) => typeof v === "string" && OWN_ICON.test(v);
 
 // F323: what the shell's app.icon takes: the icon for a light and for a dark Home Screen, and the one of the tone on
 // screen now (iOS 15-17 show only that one; native/Sources/AppIcon.swift picks the set).

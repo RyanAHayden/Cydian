@@ -22,6 +22,8 @@ attributes; the helper checks its words and `execve`s one apt command, or edits 
     ifizbox-helper uicache                                                  (the console's Reload Data)
     ifizbox-helper uninstall-app <bundle id>                                (Installed's Delete)
     ifizbox-helper remove-malware <path>...                                 (Malware Found's Delete)
+    ifizbox-helper own-icon a|b <dir>                                       (your own app icon into one set; ownicon.h)
+    ifizbox-helper own-icon-refresh                                         (uicache -p the app, detached; ownicon.h)
 
 | verb        | runs (from `/var/jb/usr/bin`)                                                               |
 |-------------|---------------------------------------------------------------------------------------------|

@@ -4,6 +4,7 @@ and the file name actool took the image from), and whose FACETKEYS tree holds th
 
     python3 carfile.py Assets.car      # one line per rendition: name, pixel size, scale
 """
+import re
 import struct
 import sys
 
@@ -144,9 +145,18 @@ def icon_problems(info, files, app, lite):
         problems.append("Assets.car has no AppIcon (has %s)" % ", ".join(names))
     # F323: setAlternateIconName finds nothing for a name Info.plist lists and the catalog lacks
     alternates = info.get("CFBundleIcons", {}).get("CFBundleAlternateIcons", {})
-    missing = sorted(n for n, d in alternates.items() if d.get("CFBundleIconName", n) not in names)
+    missing = sorted(n for n, d in alternates.items()
+                     if "CFBundleIconFiles" not in d and d.get("CFBundleIconName", n) not in names)
     if missing:
         problems.append("Assets.car lacks alternate icons Info.plist lists: %s" % ", ".join(missing[:5]))
+    # F329: the own-icon sets are loose PNGs (icon/alternates.py OWN_SLOTS), each stem <name><pt>x<pt> at @2x and @3x
+    for n, d in alternates.items():
+        for stem in d.get("CFBundleIconFiles", []):
+            m = re.search(r"(\d+)x\d+$", stem)
+            pt = int(m.group(1)) if m else 60
+            for s in (2, 3):
+                if png_size(files.get(app + "%s@%dx.png" % (stem, s), b"")) != (pt * s, pt * s):
+                    problems.append("alternate icon %s: %s@%dx.png missing or not %d px" % (n, stem, s, pt * s))
     prefix = "AppIconLite" if lite else "AppIcon"
     icons = [r for r in rends if r["file"].startswith("AppIcon") and r["width"]]
     for r in icons:

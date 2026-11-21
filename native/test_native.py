@@ -63,6 +63,9 @@ def copy_icons(app, lite=False):
         for s in (2, 3):
             shutil.copy(os.path.join(HERE, "icon", "%s%dx%d@%dx.png" % (src, pt, pt, s)),
                         os.path.join(app, "AppIcon%dx%d@%dx.png" % (pt, pt, s)))
+            for slot in "AB":  # F329: your own icon's loose sets, the primary until the helper writes one
+                shutil.copy(os.path.join(HERE, "icon", "%s%dx%d@%dx.png" % (src, pt, pt, s)),
+                            os.path.join(app, "IconOwn%s%dx%d@%dx.png" % (slot, pt, pt, s)))
     shutil.copy(os.path.join(HERE, "icon", "AssetsLite.car" if lite else "Assets.car"), os.path.join(app, "Assets.car"))
 
 

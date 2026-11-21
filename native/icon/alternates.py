@@ -149,10 +149,31 @@ BEGIN = "<!-- F323: the alternate icons, written by icon/alternates.py plist (do
 END = "<!-- end of icon/alternates.py's block -->"
 
 
+# F329: your own icon. Two sets of loose PNGs (CFBundleIconFiles, not the catalog), placeholders in the build
+# (native/build.sh copies the primary icon), that the jailbreak build's root helper overwrites with your picture
+# (helper/ownicon.h). Listed from the start, so applying one changes no Info.plist and needs no uicache (which closes
+# the running app); two, so a new picture goes into the set not on screen and the switch is a real change of name.
+OWN_SLOTS = ("a", "b")
+OWN_SIZES = (20, 29, 40, 60)  # every iPhone size the primary has: notifications, Settings, Spotlight, Home Screen
+
+
+def own_set(slot):
+    return "Icon-own%s" % slot
+
+
+def own_stem(slot, pt=60):
+    """A size's file stem: <stem>@2x.png and @3x.png in the app."""
+    return "IconOwn%s%dx%d" % (slot.upper(), pt, pt)
+
+
 def plist_block(indent="\t\t"):
     lines = [indent + BEGIN, indent + "<key>CFBundleAlternateIcons</key><dict>"]
     for name in sets():
         lines.append(indent + "\t<key>%s</key><dict><key>CFBundleIconName</key><string>%s</string></dict>" % (name, name))
+    for slot in OWN_SLOTS:
+        stems = "".join("<string>%s</string>" % own_stem(slot, pt) for pt in OWN_SIZES)
+        lines.append(indent + "\t<key>%s</key><dict><key>CFBundleIconFiles</key><array>%s</array></dict>"
+                     % (own_set(slot), stems))
     lines += [indent + "</dict>", indent + END]
     return "\n".join(lines)
 

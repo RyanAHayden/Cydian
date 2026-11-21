@@ -104,6 +104,7 @@ html.native .navbar, html.native .tabbar { display: none; }
   --group-margin: 10px 10px 0; --group-gap: 23px; --group-first-head: 10px; /* grouped tables, inset from the sides */
   --group-head-margin: 0 9px 7px; --group-foot-margin: 7px 9px 0;
   --cell-min-h: 43px; --cell-pad: 0 10px; --cell-gap: 8px;
+  --row-icon-in: -3px; --row-icon-after: 3px;                       /* F338: a row tile from the cell's padding; added to the gap after it */
   /* C45: the rest of ios6.css */
   --plain-cell-pad-y: 4px;                                          /* a plain table's cell, above and below */
   --section-head-h: 23px; --section-head-pad: 0 12px;               /* a plain table's sticky section header */
@@ -201,7 +202,7 @@ a.cell-inner, button.cell-inner { cursor: pointer; }
 .cell-count { flex: none; min-width: 26px; height: 20px; padding: 0 7px; }
 .cell-icon { flex: none; width: 29px; height: 29px; display: grid; place-items: center; }
 /* F205: iOS 6 Settings' row tiles: the tile 7pt in from the cell's edge and the label 11pt after it (ios6.css). */
-.cell-icon.row-icon { margin: 0 3px 0 -3px; }
+.cell-icon.row-icon { margin: 0 var(--row-icon-after) 0 var(--row-icon-in); }
 .cell-icon.row-icon img { display: block; width: 29px; height: 29px; }
 .cell-inner.chevron::after { content: ""; flex: none; width: 9px; height: 13px; margin-right: .5px; }
 /* F163 (nav/selection.js): the opened row's selection, a copy over the row that fades by opacity alone during the pop. */

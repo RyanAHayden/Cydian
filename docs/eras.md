@@ -120,6 +120,7 @@ the app supports iOS 15.0, so cascade layers are out.
 | `--group-margin`, `--group-gap`, `--group-first-head` | 10px 10px 0, 23px, 10px | grouped tables: inset, space between, the first header |
 | `--group-head-margin`, `--group-foot-margin` | 0 9px 7px, 7px 9px 0 | a group's header and footer |
 | `--cell-min-h`, `--cell-pad`, `--cell-gap` | 43px, 0 10px, 8px | every table cell |
+| `--row-icon-in`, `--row-icon-after` | -3px, 3px | a Settings row tile: its offset from the cell's padding, and what it adds to `--cell-gap` before the label |
 | `--plain-cell-pad-y` | 4px | a plain table's cell, above and below |
 | `--section-head-h`, `--section-head-pad` | 23px, 0 12px | a plain table's sticky section header |
 | `--pair-h`, `--pair-gap` | 44px, 9px | two buttons in one row (the button pair) |

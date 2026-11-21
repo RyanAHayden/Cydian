@@ -49,7 +49,8 @@ test("ios6.css places the tile as the 4S does: 7pt in, the label 11pt after", ()
   assert.match(rule, /box-shadow: none/);
   // C44: the layout is style.css's (its Era hooks): .cell-inner's 10px padding, 8px gap -> 7 and 11
   const layout = readFileSync(new URL("../style.css", import.meta.url), "utf8");
-  assert.match(layout, /\.cell-icon\.row-icon \{ margin: 0 3px 0 -3px; \}/);
+  assert.match(layout, /\.cell-icon\.row-icon \{ margin: 0 var\(--row-icon-after\) 0 var\(--row-icon-in\); \}/);
+  assert.match(layout, /--row-icon-in: -3px; --row-icon-after: 3px;/); // F338: iOS 6's values of the era hooks
   assert.match(layout, /--cell-pad: 0 10px;/);
   assert.match(layout, /--cell-gap: 8px;/);
   assert.match(layout, /\.cell-inner \{[^}]*gap: var\(--cell-gap\);[^}]*padding: var\(--cell-pad\);/);

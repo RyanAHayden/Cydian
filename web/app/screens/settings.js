@@ -585,7 +585,7 @@ const iconLabel = (name) => APP_ICONS.find((i) => i.value === name)?.label ?? (i
 // F329: your own icons (screens/appicon.js), the jailbreak app only; loaded when Theme > App Icon draws, out of the
 // startup closure, so the grid behind it has it at once.
 let ownIcons = null;
-const ownOffered = () => settings.mode === "jailbreak" && hasNativeCall();
+const ownOffered = () => (settings.mode === "jailbreak" || settings.mode === "sideload") && hasNativeCall(); // appicon.js ownIconsOffered
 const loadOwnIcons = () => import("./appicon.js").then((m) => (ownIcons = m));
 const iconThumb = (name) => ({ icon: { cls: "app-icon-thumb", src: iconSrc(name) } });
 

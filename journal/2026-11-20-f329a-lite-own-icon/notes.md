@@ -17,7 +17,7 @@
 - **Switching** (`AppIcon.swift`): `app.icon` with an own icon in Lite answers `resign_needed:` while the picture isn't
   in a set; once it is (after the update and a reopen), it switches to that set with the public call (iOS's alert).
   `lite_unsupported` is gone. New `app.icon.ready {name} -> {ready, canResign}` for the page.
-- **Page** (`screens/appicon.js`): Add is offered in the sideload build too. `pickOwn` (a cell tap, or Choose in Move
+- **Page** (`screens/appicon.js`, `screens/settings.js` ownOffered): Add is offered in the sideload build too. `pickOwn` (a cell tap, or Choose in Move
   and Scale): jailbreak, or Lite with the picture in place, just sets the pick; otherwise Lite asks "Use This Icon?"
   (it re-signs itself, takes about as long as an update, closes, and switches once opened again) and on Install runs
   `installOnDevice({params: {selfIcon}, host: true})`, the same flow as its own update. Cancel changes nothing; a
@@ -46,15 +46,37 @@
   deliberate, see Choices); `app.icon.ready`, the `self:bundle` Re-sign and the redraw after Add are what the flow
   needs, so kept; a pick left behind when iOS fails the install later is added to B240.
 
+## Phone run (reopened 2026-11-21, iPhone 15 Pro, iOS 27.0.1, 0.18.2 built from main)
+
+The first session blocked with a CONFIRM because B238 held the UI lock; this one ran the check itself.
+
+- **Bug found and fixed:** Theme > App Icon > Light / Dark showed no Your Icons group in Lite. `screens/settings.js`
+  `ownOffered` still allowed only the jailbreak build (`appicon.js ownIconsOffered` had been opened up, but the page
+  that draws the group asks settings.js). It now allows both builds, as ownIconsOffered does.
+- The flow then worked end to end, through the Dark row (the phone is in dark mode, so a Light pick wouldn't show
+  on the Home Screen). A 1024 px test PNG went in the app's Documents (afcclient). Add > Choose File > iFizBox >
+  F9Test opened Move and Scale with **LITE Sash ON** and the sash over the square and the preview (`15pro-13.jpg`).
+  Choose showed **Use This Icon?** with the update wording (`15pro-14.jpg`). Install ran the usual Running page:
+  "Own icon: 8 files of the own-icon sets replaced", signed 0.18.2, installed on This iPhone through Tailscale.
+  iFizBox closed. Opening it again brought iOS's "You have changed the icon" alert with the F9 picture and its LITE
+  sash (`15pro-17.jpg`), and the Home Screen showed the same icon (`15pro-18.jpg`). No restart was needed: the
+  icon was fresh at once.
+- Afterwards the app said Signing Needs Setup: the update had dropped the imported certificate and the pairing.
+  Cause: `ui-15.sh install` signs with the profile's `TEAM.*` keychain group, and the app's own signer puts
+  `TEAM.<bundle ID>` first, so items written under a rig install can't be reached after any self re-sign. This is
+  a rig mismatch, not this feature's (a user's Lite signed by iFizBox keeps its group). I put the phone back:
+  re-imported the team's ad hoc p12 and profile (`signing.import` over Web Inspector), re-paired (Developer Mode >
+  Pair with iFizBox, code typed), and Match Theme back on. Filed T66.
+- Match Theme back on didn't take the F9 icon off: `app.icon {gunmetal}` answered `changed: false`. iOS reported
+  `alternateIconName` nil while Icon-owna was on screen, so `AppIcon.apply` treated the primary as already shown. A
+  direct switch to Midnight (alert shown) and back put the Home Screen on the primary again. Filed B256 (it also
+  feeds `OwnIcons.pick`, which then always picks set a). It probably explains the B243 sighting.
+
 ## Not verified
 
-- **Nothing on a phone.** The whole flow (pick → alert → re-sign → hosted or This iPhone install → reopen → iOS's
-  icon alert → Home Screen shows the picture with its sash) wasn't run on the iPhone 15 Pro: its UI lock was held by
-  B238 the whole time I waited (over 15 minutes), so the task is blocked with a CONFIRM.
-  Unknowns only the phone answers: whether installd accepts the bundle-made IPA (it is the signer's usual input
-  shape, checked by the Linux signer test), whether the alternate icon name survives the update, and whether
-  SpringBoard draws the new picture for a set after the update.
-- `OwnIcons.sashed` and the Move and Scale sash switch's look were not seen rendered (UIKit drawing doesn't run on
-  Linux; no Chromium shot of the crop screen was taken).
+- The Light row, and a second picture (set b while a is on screen): not run. Since B256 (alternateIconName read as
+  nil), the second picture would go to set a again, which F329 found SpringBoard may draw stale.
+- The hosted route (`host: true`, no pairing): this phone installed through This iPhone (paired over Tailscale).
+- LITE Sash switched off: not run (only the default, on, was seen rendered).
 - A later update from the AltStore source puts the placeholders back in the own sets; the page then shows the pick
   but `app.icon` answers `resign_needed` until it is picked again. Not handled here: filed as B240.

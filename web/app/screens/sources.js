@@ -14,6 +14,7 @@ import { format } from "../router.js";
 import { getBackend } from "../backend.js";
 import { displayName, sourceIcons, sourceSubtitle, sourcesFor, sourceFilter, loadNeverLoaded } from "../core/sources.js";
 import { tweakSourcesFor, tweakSourcesOn } from "../core/sources.js"; // F302
+import { askTweakIndex, tweakSourceVerdict, shownTweakSources } from "../core/sources.js"; // F344a
 import { detectMode } from "../core/settings.js"; // F302
 
 // F302: the sideload app's group of APT sources (injectable tweaks only), under App Sources. F327: the list's groups
@@ -51,6 +52,8 @@ export const title = "Sources";
 // then counts the failures, and the page can be left while it runs. No count strip over the list: Cydia has none.
 // Each source's packages go to the catalog (Changes, Search) as soon as it has landed, not after the last one.
 
+export const TWEAK_HIDDEN_KEY = "ifizbox.hiddenTweakSources"; // F344a: kept, so a hidden source never shows first
+
 const state = {
   sources: null,   // the list as last loaded, sorted
   busy: false,     // a refresh is running
@@ -58,7 +61,9 @@ const state = {
   loading: new Set(), // keys being refreshed right now: their rows spin, the Sources badge spins (Cydia)
   rows: null,       // F233: the last refresh's rows (core/refreshrows.js), kept after it ends for the failed ones
   running: false,   // F233: a refresh (or a row's retry) is under way
+  tweakHidden: null, // F344a: keys of the sideload app's Tweak Sources with nothing for the user's apps (tweakJudge)
 };
+state.tweakHidden = loadTweakHidden();
 
 // C25: the root page can be on screen twice, its own tab and pushed on Home (Home's Loading Sources / Sources Failed
 // tile, Help's and the guides' Refresh Sources: router.js rootOn). Each copy has its own view; the list's data above is
@@ -570,8 +575,11 @@ function draw(view) {
   const searching = Boolean(view.query.trim());
   const list = filterSources(shown, view.query, displayName);
   // F302: the sideload app's APT sources, in their own group under the AltStore ones, counting injectable tweaks.
-  const tweakShown = tweakSourcesFor(ordered, settings.deviceType(), detectMode());
+  // F344a: minus the ones the Tweak Index found nothing in for the user's apps (searching finds those too).
+  const tweakAll = tweakSourcesFor(ordered, settings.deviceType(), detectMode());
+  const tweakShown = searching ? tweakAll : shownTweakSources(tweakAll, state.tweakHidden);
   const tweakList = filterSources(tweakShown, view.query, displayName);
+  if (tweakAll.length) judgeTweakSources(tweakAll);
   const top = searching ? [] : [{
     label: "All Sources",
     subtitle: "combined package list for the sources below",
@@ -612,6 +620,84 @@ function draw(view) {
   box.replaceChildren(ul);
   if (!list.length && !tweakList.length) {
     box.append(note(searching ? "No sources match." : "No sources. Tap Manage, then Sources."));
+  }
+}
+
+// ---- F344a: Tweak Sources with nothing for the user's apps leave the list -------------------------------------
+//
+// In the sideload app a Tweak Source the Tweak Index has fully checked, with no tweak that works in one of the user's
+// apps (My IPAs and the apps it signed, screens/tweaks.js signableApps) or in any app, is left out of the Tweak
+// Sources group (core/sources.js tweakSourceVerdict). Searching still finds it, and Manage still lists it (delete,
+// reorder). Unknown (no index, still being read, GitHub sources) shows it. A row that goes collapses (nav/ui.js), its
+// header with it when it was the group's last; one that comes back redraws the list. The index is asked once per ten
+// minutes a source, the user's apps re-read every 15 s at most; the hidden keys are kept on the device so the next launch draws without them.
+//   tweakJudge.enabled   false under node (tests switch it on with their own ask/apps), so tests never fetch
+export const tweakJudge = {
+  enabled: typeof globalThis.process?.versions?.node !== "string",
+  ask: (s) => import("./tweaks.js").then((m) => askTweakIndex(s, { base: m.indexBase() })),
+  apps: async () => (await (await import("./tweaks.js")).signableApps()).map((a) => a.bundleId),
+  every: 10 * 60 * 1000, // an index answer is kept this long
+  again: 15 * 1000,      // the user's apps are read again after this long
+};
+const judged = { at: 0, keys: "", p: null, answers: new Map() }; // answers: key -> { at, a }, the index's, `every` ms
+
+function loadTweakHidden(storage = globalThis.localStorage) {
+  try {
+    const v = JSON.parse(storage?.getItem(TWEAK_HIDDEN_KEY) ?? "[]");
+    return new Set(Array.isArray(v) ? v.filter((k) => typeof k === "string") : []);
+  } catch { return new Set(); }
+}
+function saveTweakHidden(set, storage = globalThis.localStorage) {
+  try { storage?.setItem(TWEAK_HIDDEN_KEY, JSON.stringify([...set])); } catch { /* not kept: judged again next launch */ }
+}
+
+// -> the judging promise (null when nothing was started: off, under way, or judged lately for these sources).
+// The user's apps are read again on a draw `again` ms after the last judging (an app just signed brings its
+// sources back); each source's index answer is kept `every` ms.
+export function judgeTweakSources(list, { now = Date.now() } = {}) {
+  if (!tweakJudge.enabled || judged.p) return null;
+  const keys = list.map((s) => s.key).join("\n");
+  if (keys === judged.keys && now - judged.at < tweakJudge.again) return null;
+  Object.assign(judged, { at: now, keys });
+  const answerOf = async (s) => {
+    const had = judged.answers.get(s.key);
+    if (had && now - had.at < tweakJudge.every) return had.a;
+    const a = await tweakJudge.ask(s).catch(() => null);
+    if (a) judged.answers.set(s.key, { at: now, a }); // nothing: asked again next time
+    return a;
+  };
+  judged.p = (async () => {
+    const ids = await tweakJudge.apps().catch(() => []);
+    const verdicts = await Promise.all(list.map(async (s) => [s.key, tweakSourceVerdict(await answerOf(s), ids)]));
+    const had = state.tweakHidden ?? new Set();
+    const next = new Set();
+    // null (not known this time): what was known before stands, so a slow answer doesn't bring a row back for a moment
+    for (const [k, v] of verdicts) if (v === false || (v === null && had.has(k))) next.add(k);
+    applyTweakHidden(next);
+    return next;
+  })().finally(() => { judged.p = null; });
+  return judged.p;
+}
+
+export function applyTweakHidden(next) {
+  const had = state.tweakHidden ?? new Set();
+  state.tweakHidden = next;
+  saveTweakHidden(next);
+  if ([...had].some((k) => !next.has(k))) { drawAll(); return; }
+  const gone = [...next].filter((k) => !had.has(k));
+  if (!gone.length) return;
+  for (const v of views.all()) {
+    if (v.query.trim() || !v.body) continue; // searching lists them all
+    const rows = [...v.body.querySelectorAll(".tweak-source-row")];
+    const going = rows.filter((li) => gone.includes(li.dataset.key));
+    if (!going.length) continue;
+    if (going.length === rows.length) {
+      // the group's last rows: its header goes too
+      let h = rows[0].previousElementSibling;
+      while (h && !h.classList.contains("section-header")) h = h.previousElementSibling;
+      if (h) collapse(h);
+    }
+    for (const li of going) collapse(li);
   }
 }
 

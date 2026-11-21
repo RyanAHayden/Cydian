@@ -19,6 +19,13 @@ test("the data files: APT repos with name/uri/dist/components; app sources with 
   const tweaks = raw(TWEAK_SOURCES_FILE);
   assert.ok(tweaks.length > 0);
   for (const s of tweaks) {
+    // F344a: a GitHub repo whose releases carry the tweak, for the sideload build only
+    if ("github" in s) {
+      assert.deepEqual(Object.keys(s).sort(), ["github", "inject", "name"]);
+      assert.equal(s.inject, true);
+      assert.match(s.github, /^[A-Za-z0-9-]+\/[A-Za-z0-9._-]+$/);
+      continue;
+    }
     // F302: "inject": true marks a Tweak Source the sideload build starts with
     assert.deepEqual(Object.keys(s).filter((k) => k !== "inject").sort(), ["components", "dist", "name", "uri"]);
     if ("inject" in s) assert.equal(s.inject, true);
@@ -34,7 +41,7 @@ test("the data files: APT repos with name/uri/dist/components; app sources with 
 
 test("loaded lists: keys added, own source filled from DOMAIN, deduped", async () => {
   const tweaks = await loadTweakSources();
-  assert.deepEqual(tweaks.map((s) => s.key), raw(TWEAK_SOURCES_FILE).map(sourceKey));
+  assert.deepEqual(tweaks.map((s) => s.key), raw(TWEAK_SOURCES_FILE).filter((s) => !s.github).map(sourceKey));
   const apps = await loadAppSources();
   assert.equal(apps[0], `https://${DOMAIN}/repo/source.json`);
   assert.equal(new Set(apps).size, apps.length);

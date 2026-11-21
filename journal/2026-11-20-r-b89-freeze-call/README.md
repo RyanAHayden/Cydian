@@ -21,7 +21,11 @@ The throwaway app was `com.ryha.r51test` (`R51Test`): `web/app/core/fixtures/sig
 bundle ID and name from the rig's `zsign -a -b com.ryha.r51test -n R51Test`, copied into iFizBox's Documents with
 `afcclient --container`. The phone had iFizBox 0.17.3 (3137). Each run was SIGN → INSTALL → Confirm, then iOS's
 "sign.ifizbox.com would like to install R51Test" prompt, then Home. The device log came from
-`pymobiledevice3 syslog live`; an excerpt is in `syslog-excerpt.txt`.
+`pymobiledevice3 syslog live`. `syslog-excerpt.txt` has the lines quoted below: the interruptions, the role and
+`taskState` updates, WebKit's suspend timer, the alarm firing and being dismissed, the finger touches, and
+appstored's fetch. The progress page's Log is in `shots/`: `r51-f.png` is run 1 with iOS's prompt up, and
+`r51-run2-c.png` is run 2's Log after the prompt closed. Home-screen shots are not kept, because they show
+Apple's icons.
 
 | Run | What interrupted the audio | What the log shows | End |
 |---|---|---|---|

@@ -91,8 +91,17 @@ export function stateTile({ sources = null, upgrades = null, refreshing = 0 } = 
     return { kind: "failed", label: `${failed} ${failed === 1 ? "Source" : "Sources"} Failed to Load`, href: SOURCES_HREF };
   }
   if (upgrades === 0) return { kind: "current", label: "Everything Up to Date", href: CHANGES_HREF };
-  return { kind: "changes", label: "See What's New", href: CHANGES_HREF };
+  // B266 (user 2026-11-21): where it said See What's New, More Sources takes the slot, highlighted in the green row
+  // with its own blue plus (paintTile), and its row in Home's list goes away (MORE_SOURCES_ROW).
+  return { kind: "more", label: "More Sources", href: MORE_SOURCES_HREF };
 }
+
+// F327: More Sources (screens/moresources.js), with the Sources tab's plus tile, on Home's own stack (router
+// mountLink): Back comes home. Home's list row and, B266, the state tile in its More Sources state.
+export const MORE_SOURCES_HREF = format({ tab: "sources", path: ["more"] });
+export const MORE_SOURCES_ROW = "home-more-sources";
+// B266: the More Sources row shows in Home's list unless the state tile is More Sources.
+export const showsMoreSourcesRow = (tileKind) => tileKind !== "more";
 
 // F79: Home's Install IPAs tile, beside Browse: the Installed tab's Install IPAs page (screens/myipas.js). F212: in the
 // jailbreak app too, now that the page lists /var/mobile/Documents' IPAs there and installs them with the helper.
@@ -162,9 +171,8 @@ export function homeLinks() {
     rows: [
       { label: "Upgrading & Jailbreaking Help", href: format({ tab: "home", path: ["help"] }) },
       { label: "Find Extensions for Applications", href: SEARCH_HREF, chevron: true },
-      // F327: More Sources (screens/moresources.js), with the Sources tab's plus tile, on Home's own stack (router
-      // mountLink): Back comes home.
-      { label: "More Sources", href: format({ tab: "sources", path: ["more"] }), icon: rowIcon("moreSources"), cls: "home-more-sources" },
+      // F327: More Sources (MORE_SOURCES_HREF); B266: hidden while the state tile is More Sources (paintTile).
+      { label: "More Sources", href: MORE_SOURCES_HREF, icon: rowIcon("moreSources"), cls: MORE_SOURCES_ROW },
     ],
   }, { header: "User Guides", rows: guideRows(format, guidesLite()) },
   { rows: [{ label: "Credits / Thank You", href: format({ tab: "home", path: ["credits"] }) }] }];
@@ -509,7 +517,18 @@ function paintTile(t) {
   a.href = t.href;
   a.dataset.state = t.kind;
   a.querySelector(".cell-label").textContent = t.label;
-  a.querySelector(".cell-icon").className = "cell-icon home-glyph glyph-" + t.kind;
+  const icon = a.querySelector(".cell-icon");
+  icon.className = "cell-icon home-glyph glyph-" + t.kind;
+  // B266: More Sources wears its own row tile (the blue plus, this Style's art) in place of a green glyph.
+  if (t.kind === "more") {
+    icon.style.backgroundColor = "transparent";
+    icon.style.backgroundImage = `url("${rowIcon("moreSources").src}")`;
+    icon.style.backgroundSize = "100% 100%";
+  } else icon.removeAttribute("style");
+  state.lastTile = t;
+  state.tileKind = t.kind;
+  const row = state.moreRow;
+  if (row) row.hidden = !showsMoreSourcesRow(t.kind); // nav/slide.js slides the rows under it
 }
 
 // ---- DOM -------------------------------------------------------------------------------------------------
@@ -795,6 +814,7 @@ function renderRoot(body) {
 
   const stateRow = tileRow("green", tile({ label: "", href: SOURCES_HREF, glyph: "loading" }));
   state.tile = stateRow.querySelector("a");
+  state.moreRow = null; // set once Home's list is drawn below
   paintTile(stateTile());
   // Locked Home (the website before iFizBox is installed): Signing full width at the top, Browse down among the
   // locked rows (user 2026-11-18); unlocked, Browse is the first row under GitHub | Discord.
@@ -823,8 +843,15 @@ function renderRoot(body) {
   for (const group of groups) group.classList.add("home-links");
   links.forEach((l, i) => { if (l.pair) groups[i].querySelector(".table")?.classList.add("home-pair"); });
   home.append(list);
+  // B266: the More Sources row goes while the state tile is More Sources (paintTile keeps it in step).
+  state.moreRow = home.querySelector("." + MORE_SOURCES_ROW);
+  if (state.moreRow) state.moreRow.hidden = !showsMoreSourcesRow(state.tileKind);
   // Theme > Style swaps the Why tile's and the link rows' icons at once, without a reload (iOS 6 <-> iOS 7).
-  followStyle(home, () => { why.ensureWhyStyle(); repaintLinkIcons(groups, homeLinks()); });
+  followStyle(home, () => {
+    why.ensureWhyStyle();
+    repaintLinkIcons(groups, homeLinks());
+    if (state.lastTile?.kind === "more") paintTile(state.lastTile); // the tile's plus in the new Style
+  });
   // The website before iFizBox is installed: everything below the iFizBox App card is locked; a tap asks first. Not
   // Settings (F123: unlocked like Home, as its tab was), nor help, guides and credits (F156, lockHomeLinks).
   if (browsingLocked({ mode: settings.mode })) {

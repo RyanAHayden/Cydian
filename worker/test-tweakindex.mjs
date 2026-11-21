@@ -42,6 +42,7 @@ r = await call(indexQuery(src), env, c);
 let j = await r.json();
 assert.equal(j.enabled, true);
 assert.equal(j.source, src.key);
+assert.equal(r.headers.get("Cache-Control"), "no-store", "a first answer isn't cached: the pass fills it");
 assert.equal(r.headers.get("Access-Control-Allow-Origin"), "*");
 assert.equal(c.jobs.length, 1);
 await Promise.all(c.jobs);
@@ -54,7 +55,9 @@ assert.equal(pass.pending, 0);
 assert.ok(!asked.some((u) => u.includes("instapro")), "paid .debs aren't downloaded");
 assert.ok(!asked.some((u) => u.includes("ytplus_0.9")), "only the newest version");
 assert.ok(!asked.some((u) => u.includes("theme")), "the Packages fields already refuse it");
-j = await (await call(indexQuery(src), env)).json();
+r = await call(indexQuery(src), env);
+assert.equal(r.headers.get("Cache-Control"), "public, max-age=300", "all read: cached a while");
+j = await r.json();
 const by = Object.fromEntries(j.tweaks.map((t) => [t.package, t]));
 assert.deepEqual(Object.keys(by).sort(), ["com.x.anyfont", "com.x.instapro", "com.x.sbcolor", "com.x.ytplus"]);
 assert.deepEqual(by["com.x.ytplus"].bundles, ["com.google.ios.youtube"]);
@@ -85,13 +88,16 @@ assert.ok(!j.tweaks.some((t) => t.package === "com.x.big"));
 
 // the cron: seeds the bundled inject sources from ASSETS and works within its budget
 const seen = [];
-const cronEnv = { TWEAKS: d1(), TWEAK_INDEX_PER_RUN: "3",
+const cronEnv = { TWEAKS: d1(), TWEAK_INDEX_PER_RUN: "5",
   ASSETS: { fetch: async () => Response.json([{ name: "R", uri: ROOT, dist: "./", components: [], inject: true }, { name: "No", uri: "https://other.example/", dist: "./" }]) } };
 packages = PACKAGES;
 const cron = await scheduled({}, cronEnv, null, { fetcher: async (u) => { seen.push(u); return fetcher(u); } });
 assert.equal(cron.sources, 1);
 assert.ok(seen.every((u) => u.startsWith(ROOT)), "only the inject source");
-assert.ok(seen.filter((u) => u.endsWith(".deb")).length <= 3);
+assert.ok(seen.length <= 5, `every fetch counts, Packages too (${seen.length})`);
+assert.equal(seen.filter((u) => u.endsWith(".deb")).length, 3, "the 3 free .debs, Packages.gz the 4th fetch");
+const small = await scheduled({}, { ...cronEnv, TWEAKS: d1(), TWEAK_INDEX_PER_RUN: "2" }, null, { fetcher });
+assert.equal(small.sources, 0, "too little left for a source's Packages");
 assert.deepEqual(await scheduled({}, {}, null), { enabled: false });
 
 // through the Worker's own handler

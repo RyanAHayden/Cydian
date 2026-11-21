@@ -66,6 +66,7 @@ test("Add Tweaks for an app: its tweaks, then every-app ones; no SpringBoard, no
   assert.deepEqual(rowInfo(p, { storage: s, sellers: new Set(["k"]) }).bundles, ["com.spotify.client"]);
   // madeForRows (the app page's count) counts only the tweaks naming the app
   assert.deepEqual((await madeForRows("com.google.ios.youtube", { rows: async () => rows, storage: s })).map((r) => r.id), ["com.i.yt"]);
+  assert.deepEqual(await madeForRows("com.burbn.instagram", { rows: async () => rows, storage: s }), [], "a paid guess isn't counted");
   // sellerKeys: a source whose payment_endpoint answers a URL
   const keys = await sellerKeys(rows, { sources: async () => [SRC], text: async () => "https://pay.example/api/\n" });
   assert.deepEqual([...keys], ["repo-a"]);
@@ -116,6 +117,11 @@ test("checkForApp: unchecked rows only, the app's name first, capped; onChecked 
   await c.done;
   assert.deepEqual(order, ["a.yt", "a.other"], "indexed and paid rows aren't checked here; the YouTube one first");
   assert.deepEqual(seen, ["a.yt", "a.other"]);
+  // an app KNOWN_APPS doesn't list: its own name puts its tweaks first
+  const own = [];
+  await checkForApp([{ id: "b.x", name: "Other", version: "1" }, { id: "b.apollo", name: "Apollo Plus", version: "1" }], "com.c.Apollo",
+    { storage: s, name: "Apollo", pkg: async (r) => ({ package: r.id }), check: async (st) => { own.push(st.package); return null; } }).done;
+  assert.deepEqual(own, ["b.apollo", "b.x"]);
   const capped = checkForApp(list, "x", { storage: s, max: 1, pkg: async (r) => ({ package: r.id }), check: async (st) => { order.push(st.package); return null; } });
   await capped.done;
   assert.equal(order.length, 3);

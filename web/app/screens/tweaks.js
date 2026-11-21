@@ -26,7 +26,7 @@ import { debOf, tweakTitle, withTweaksText, tweakSteps, madeFor, tweakUpdates, i
   HOW_TO_TEXT, tweakParams } from "../core/tweaks.js"; // F302a
 import { BUNDLE_ID } from "../brand.js"; // F302a
 import { INDEX_PATH, INDEX_URL, indexSource, indexQuery, entryInfo, paidEntry, paidHint, liteTweaks, worksInLine } from "../core/tweakindex.js"; // F344
-import { KNOWN_APPS, appNameOf } from "../core/tweaks.js"; // F344
+import { appNameOf } from "../core/tweaks.js"; // F344
 import { loadStyle } from "../nav/motion.js";
 import { tweakListRow } from "./tweakrow.js"; // B267
 import { isCommercial, paymentEndpointUrl, parseEndpoint, createPaymentClient, createCredentialStore, isFreePrice,
@@ -817,7 +817,9 @@ export async function madeForRows(bundleId, { rows = sourceTweakRows, storage, i
   if (!bundleId) return [];
   const list = await rows().catch(() => []);
   if (index) await index(list).catch(() => 0);
-  return liteTweaks(list, bundleId, (r) => cachedTweakInfo({ package: r.id, version: r.version }, { storage })).made;
+  // a paid tweak's guessed app (unverified) isn't counted: whether its source names a seller isn't asked here
+  const infoOf = (r) => { const i = cachedTweakInfo({ package: r.id, version: r.version }, { storage }); return i?.unverified ? null : i; };
+  return liteTweaks(list, bundleId, infoOf).made;
 }
 
 // ---- F344: the shared tweak index (worker/src/tweakindex.js, GET /api/tweaks) --------------------------------------
@@ -917,10 +919,11 @@ export async function appTweakRows(bundleId, { rows = sourceTweakRows, storage, 
   return { ...liteTweaks(list, bundleId, infoOf), rows: list, infoOf };
 }
 
-export function checkForApp(rows, bundleId, { onChecked = () => {}, storage, max = CHECK_MAX, check, pkg } = {}) {
+export function checkForApp(rows, bundleId, { onChecked = () => {}, storage, max = CHECK_MAX, check, pkg, name = "" } = {}) {
   let stopped = false;
-  const names = Object.keys(KNOWN_APPS).filter((id) => id.toLowerCase() === String(bundleId ?? "").toLowerCase());
-  const mentions = (r) => names.length && paidHint({ name: r.name, description: r.short }).some((id) => names.includes(id));
+  const want = String(bundleId ?? "").toLowerCase();
+  const known = name ? { [bundleId]: name } : {}; // the app's own name too, for apps KNOWN_APPS doesn't list
+  const mentions = (r) => Boolean(want) && paidHint({ name: r.name, description: r.short }, known).some((id) => id.toLowerCase() === want);
   const todo = (rows ?? []).filter((r) => r?.id && !r.paid && !cachedTweakInfo({ package: r.id, version: r.version }, { storage }));
   todo.sort((a, b) => Number(Boolean(mentions(b))) - Number(Boolean(mentions(a))));
   const done = checkTweakRows(todo, { storage, max, onChecked, stop: () => stopped, ...(check ? { check } : {}), ...(pkg ? { pkg } : {}) });
@@ -1163,7 +1166,7 @@ export function openAddTweaks({ bundleId, name = "", rows = sourceTweakRows, sto
       ({ made, any, infoOf } = l);
       // F344: the tweaks no index or earlier look has checked: checked here in the background, listed as they pass
       if (check && !closed) {
-        checking = check(l.rows, bundleId, { storage, onChecked: (r, info) => {
+        checking = check(l.rows, bundleId, { storage, name, onChecked: (r, info) => {
           if (!info?.ok) return;
           const next = liteTweaks(l.rows, bundleId, infoOf);
           if (next.made.length !== made.length || next.any.length !== any.length) { ({ made, any } = next); draw(); }

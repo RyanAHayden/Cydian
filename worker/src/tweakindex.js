@@ -153,11 +153,14 @@ async function refresh(db, src, fetcher) {
 }
 
 // One pass over a source: Packages when stale, then up to `budget` .debs checked. -> { refreshed, checked, pending }.
-export async function indexPass(env, src, { budget = ON_DEMAND, fetcher = env.FETCH ?? globalThis.fetch, force = false } = {}) {
+// `budget`: .debs at most; `cap`: outgoing fetches at most, Packages included (the cron's subrequest budget).
+export async function indexPass(env, src, { budget = ON_DEMAND, cap = Infinity, fetcher: plainFetch = env.FETCH ?? globalThis.fetch, force = false } = {}) {
   const db = env.TWEAKS;
   await schema(db);
   const row = (await sourceRow(db, src.key)) ?? (await addSource(db, src));
-  if (!row) return { refreshed: false, checked: 0, tried: 0, pending: 0 };
+  if (!row) return { refreshed: false, checked: 0, tried: 0, fetches: 0, pending: 0 };
+  let fetches = 0;
+  const fetcher = (...a) => { fetches++; return plainFetch(...a); };
   let refreshed = false;
   if (force || !row.refreshed || now() - row.refreshed > REFRESH_S) {
     try {
@@ -169,7 +172,7 @@ export async function indexPass(env, src, { budget = ON_DEMAND, fetcher = env.FE
     }
   }
   const todo = (await db.prepare("SELECT package, version, deb, tries FROM tweak_entries WHERE source = ? AND entry IS NULL AND tries < ? LIMIT ?")
-    .bind(src.key, TRIES, Math.max(0, budget)).all()).results ?? [];
+    .bind(src.key, TRIES, Math.max(0, Math.min(budget, cap - fetches))).all()).results ?? [];
   let checked = 0;
   for (const t of todo) {
     let entry = null;
@@ -195,7 +198,7 @@ export async function indexPass(env, src, { budget = ON_DEMAND, fetcher = env.FE
   const pending = (await db.prepare("SELECT COUNT(*) AS n FROM tweak_entries WHERE source = ? AND entry IS NULL AND tries < ?")
     .bind(src.key, TRIES).first())?.n ?? 0;
   await db.prepare("UPDATE tweak_sources SET pending = ? WHERE key = ?").bind(pending, src.key).run();
-  return { refreshed, checked, tried: todo.length, pending };
+  return { refreshed, checked, tried: todo.length, fetches, pending };
 }
 
 const sameId = (a, b) => String(a).toLowerCase() === String(b).toLowerCase();
@@ -235,7 +238,8 @@ export async function tweakIndex(req, env, ctx = null, { fetcher } = {}) {
   }
   const fresh = row ? await sourceRow(db, src.key) : null;
   return json({ enabled: true, source: src.key, known: Boolean(fresh), refreshed: fresh?.refreshed ?? 0, pending: fresh?.pending ?? 0,
-    ...(fresh?.error ? { error: fresh.error } : {}), tweaks }, 200, "public, max-age=300");
+    // still being read (a first answer, or .debs left): not cached, so the next ask sees what the pass found
+    ...(fresh?.error ? { error: fresh.error } : {}), tweaks }, 200, !fresh?.refreshed || fresh?.pending ? "no-store" : "public, max-age=300");
 }
 
 // The cron: the bundled inject sources seeded, then the sources with the most left (or the stalest) worked through.
@@ -262,8 +266,10 @@ export async function scheduled(event, env, ctx, { fetcher = env.FETCH ?? global
     const src = indexSource({ uri: row.uri, dist: row.dist, components: row.components }, row.arch);
     if (!src) continue;
     if (row.pending <= 0 && row.refreshed >= stale) continue;
-    const r = await indexPass(env, src, { budget, fetcher });
-    budget -= Math.max(1, r.tried ?? 0); // a failed download used a fetch too
+    // a source's Packages (up to 4 tries a component) count against the run's fetches, as its .debs do
+    if (budget < 4) break;
+    const r = await indexPass(env, src, { budget, cap: budget, fetcher });
+    budget -= Math.max(1, r.fetches ?? 0);
     checked += r.checked;
     sources++;
   }

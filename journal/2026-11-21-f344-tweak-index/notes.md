@@ -65,9 +65,22 @@ writing; `tweaks-index.test.js` covers it. This was already possible with B269's
   deploy for `TWEAKS`, the cron pass, and especially **CPU time**: `inspectTweakDeb` decompresses data.tar.* in JS
   (xz/lzma/zstd/bz2); on the Workers Free plan (10 ms CPU a request) a pass would be cut off (`exceededCpu`). The plan
   ifizbox.com is on isn't recorded in the repo. If it is Free, `TWEAK_INDEX_PER_RUN` can't fix it; the index then
-  needs the Paid plan (or a self-hosted runner). The subrequest cap (50 on Free) is respected by the budgets.
+  needs the Paid plan (or a self-hosted runner). Every outgoing fetch of a cron run (Packages tries included) counts
+  against `TWEAK_INDEX_PER_RUN`, so the default 20 stays under Free's 50 subrequests.
 - **Real Tweak Sources through the Worker** (BigBoss's 9k-package Packages, Havoc, Chariz): only the fake source in
   the test. The phone run exercised the on-device fallback, not the index.
 - **The site** (Chromium): not run; the site has no sideload mode Add Tweaks page without the app's bridge.
 - **Paid tweaks on the phone**: no source on the 15 with a payment endpoint was tried; covered by node tests only.
 - `node.mjs` (self-hosted) has no `TWEAKS` database: `/api/tweaks` answers `{enabled: false}` there.
+
+## Spec review (fresh subagent, diff + brief only)
+
+Fixed: `madeForRows` counted a paid tweak's guessed app (unverified) with no seller check, so it now skips those. The
+cron charged only .deb downloads against its budget, so now every fetch counts, Packages included. A first
+`/api/tweaks` answer (empty, a pass still running) was `max-age=300`, so it is now `no-store` until the source is read.
+`checkForApp` put the app's tweaks first only for apps KNOWN_APPS lists, so it now also uses the app's own name.
+Kept as they are: the split of decision 2 to F344a (above). User-added sources reach the index when an app first
+asks for them, and the cron keeps them after that. `rowInfo` lists a paid row from a source with no seller only when
+the phone already has a real verdict for it, which means its .deb was downloaded, so bought. GLOSSARY.md is the
+required glossary entry. `madeForRows` counts only tweaks that name the app, because counting every-app tweaks would
+show "N for This App" on every app.

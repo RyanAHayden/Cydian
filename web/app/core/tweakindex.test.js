@@ -6,7 +6,7 @@ import { indexSource, indexQuery, sourceFromQuery, indexTweaks, indexEntry, paid
   worksInLine } from "./tweakindex.js";
 import { inspectTweakDeb, appNameOf } from "./tweaks.js";
 import { parseControl } from "./apt.js";
-import { DEBS, PACKAGES } from "./fixtures/tweaks/index-debs.js";
+import { DEBS, PACKAGES, makeDeb } from "./fixtures/tweaks/index-debs.js";
 
 test("indexSource: one canonical key per source; refuses what isn't a plain http(s) repo", () => {
   const a = indexSource({ uri: "https://repo.example/", dist: "./" });
@@ -41,6 +41,9 @@ test("entries: an app tweak names its app, SpringBoard is system-only, UIKit is 
   assert.equal(sb.systemOnly, true);
   const any = indexEntry(byPkg["com.x.anyfont@1.1"], inspectTweakDeb(DEBS["debs/anyfont_1.1.deb"]));
   assert.equal(any.anyApp, true);
+  const noDylib = indexEntry({ package: "p", version: "1" }, inspectTweakDeb(makeDeb([["./var/jb/Library/PreferenceBundles/P.bundle/Info.plist", "x"]])));
+  assert.equal(noDylib.ok, false, "no dylib: nothing to go into an app");
+  assert.deepEqual(liteTweaks([{ info: entryInfo(noDylib) }], "any.app", (r) => r.info), { made: [], any: [] });
   const paid = paidEntry(byPkg["com.x.instapro@3.0"]);
   assert.deepEqual(paid.bundles, ["com.burbn.instagram"]);
   assert.equal(paid.unverified, true);

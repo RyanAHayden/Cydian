@@ -349,16 +349,47 @@ export function pairFooter(p) {
   return p.text || "Starting…";
 }
 
-// What a failed idevice.verify means: { title, message, again } (`again`: offer Pair Again).
-export function verifyFailure(err) {
+// B258: the VPN a check went through, from idevice.status (`st`) and the error's words: "Tailscale" when the shell's
+// route is Tailscale (tailscale.use), LocalDevVPN when it is on; with neither on, the one the user set up
+// (setUpWithTailscale); with no status, Tailscale when the shell's error names it (Tailscale.swift, IDevice.swift).
+// (Both on: the shell connects through Tailscale whenever tailscale.use is set; see decideRoute.)
+export function verifyVPN(st, raw = "") {
+  if (st) {
+    if (st.tailscale?.use) return VPNS[1];
+    if (st.localDevVPN) return VPNS[0];
+    return setUpWithTailscale(st.tailscale) ? VPNS[1] : VPNS[0];
+  }
+  return /^connect_failed: Tailscale/i.test(raw) ? VPNS[1] : VPNS[0];
+}
+
+// B258: the phone took the connection, then reset the RemotePairing tunnel before it was up (idevice's
+// Socket(UnexpectedEof "early eof") from tunnel_create_rppairing): a pairing it no longer accepts while Pairing still
+// says Paired (R54, iPhone 15 Pro, over Tailscale). Unlike a refusal it isn't certain (a tunnel reset for another
+// reason reads the same), so it offers Pair Again without forgetting the pairing by itself (no `unusable`).
+export const earlyEOF = (raw) => /UnexpectedEof|early eof/i.test(raw);
+
+// What a failed idevice.verify means: { title, message, again } (`again`: offer Pair Again). `st` is the
+// idevice.status read for the check (null or left out: not known), which names the VPN the check went through.
+export function verifyFailure(err, st = null) {
   const raw = String(err?.message ?? err ?? "");
   const code = err?.code ?? raw.split(":")[0];
   // B220: refused on every port RemotePairing is advertised on, or turned down: the phone no longer has the pairing
   if (code === "refused" || code === "pairing_rejected" || (code === "connect_failed" && /connection refused/i.test(raw))) {
     return { title: "Pair Again", message: `This iPhone no longer accepts ${NAME}'s pairing, so every connection is refused. Pair again.`, again: true, unusable: true };
   }
+  if (code === "connect_failed" && earlyEOF(raw)) {
+    // (an EOF is read on a socket that was open: the TCP connect to RemotePairing had worked, so the route did too)
+    const through = st || /Tailscale/i.test(raw) ? ` through ${verifyVPN(st, raw)}` : "";
+    return { title: "Pair Again", message: `This iPhone answered${through}, then closed the connection: it no longer accepts ${NAME}'s pairing. Pair again.`, again: true };
+  }
   if (code === "connect_failed") {
-    return { title: `Turn On ${VPN}`, message: `${NAME} couldn't reach this iPhone. Turn ${VPN} on and try again.`, again: false };
+    const vpn = verifyVPN(st, raw);
+    // Tailscale's route was on and still didn't connect: turning it on isn't the answer (LocalDevVPN keeps its Turn
+    // On: idevice.status sees it on when 10.7.0.1 answers, and turning it off and on is what fixes a stale tunnel)
+    if (vpn === VPNS[1] && st?.tailscale?.use) {
+      return { title: "Couldn't Connect", message: `Tailscale is on, but ${NAME} couldn't reach this iPhone through it. Try again; if it keeps failing, turn the Tailscale app's VPN off and on.`, again: false };
+    }
+    return { title: `Turn On ${vpn}`, message: `${NAME} couldn't reach this iPhone. Turn ${vpn} on and try again.`, again: false };
   }
   return { title: "Pairing Didn't Work", message: `This iPhone didn't accept the pairing (${raw || "no answer"}). Pair again.`, again: true };
 }

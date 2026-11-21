@@ -5,6 +5,7 @@ import assert from "node:assert/strict";
 import { decideRoute, routeParams, tailscaleTestResult, tailscaleFooter, connectFooter, keyDaysLeft, aclRule, CONNECT_OPTIONS, storedRoute, pairState, pairEvent, pairFooter, pairFromNative, pinText, verifyFailure, ROUTE_OPTIONS, ALERTS, VPNS, vpnList, STORAGE_KEY, IPHONE_INTRO, setupState, vpnOn, CONNECT_ALERT, PAIR_GUIDE } from "./installroute.js";
 import { existsSync, readFileSync } from "node:fs";
 import { ringStyle } from "./installroute.js";
+import { verifyVPN } from "./installroute.js";
 import { SETTINGS } from "./settings.js";
 
 const mem = (v) => ({ getItem: (k) => (k === STORAGE_KEY ? v : null) });
@@ -213,4 +214,41 @@ test("the VPN apps' schemes match the native side and Info-sideload.plist", asyn
   assert.match(swift, /b\.on\("idevice\.vpnApps"\)/);
   const queries = /<key>LSApplicationQueriesSchemes<\/key><array>(.*?)<\/array>/.exec(plist)[1];
   for (const s of ["localdevvpn", "tailscale"]) assert.ok(queries.includes(`<string>${s}</string>`), s);
+});
+
+// B258: Check Connection names the VPN it went through, and an early eof after connecting means pair again.
+test("Check Connection: a connect failure names the route used; early eof is Pair Again", () => {
+  const cf = (m) => Object.assign(new Error(`connect_failed: ${m}`), { code: "connect_failed" });
+  const tsOn = { paired: "rp", localDevVPN: false, tailscale: { use: true, signedIn: true, address: "100.1.2.3" } };
+  const ldvOn = { paired: "rp", localDevVPN: true, tailscale: {} };
+  const tsOff = { paired: "rp", localDevVPN: false, tailscale: { connect: "tailscale", signedIn: true } };
+  const noneSetUp = { paired: "rp", localDevVPN: false, tailscale: {} };
+
+  // the R54 failure on the 15 Pro, over Tailscale
+  const eof = verifyFailure(cf('Socket(UnexpectedEof "early eof") (1)'), tsOn);
+  assert.equal(eof.title, "Pair Again");
+  assert.equal(eof.again, true);
+  assert.ok(!eof.unusable, "an early eof offers Pair Again but doesn't forget the pairing by itself");
+  assert.doesNotMatch(eof.message, /LocalDevVPN/);
+  assert.match(eof.message, /through Tailscale/);
+  assert.equal(verifyVPN(null, "connect_failed: x"), "LocalDevVPN");
+  assert.equal(verifyVPN({ localDevVPN: true, tailscale: { use: true } }), "Tailscale", "both on: the shell's route is Tailscale");
+  assert.equal(verifyFailure(cf("Socket(Kind(UnexpectedEof))")).title, "Pair Again");
+
+  // the route on, still no connection: name it, don't ask to turn it on
+  const ts = verifyFailure(cf("timeout"), tsOn);
+  assert.equal(ts.title, "Couldn't Connect");
+  assert.match(ts.message, /Tailscale is on/);
+  assert.doesNotMatch(ts.message, /Check that Tailscale is on/);
+  assert.doesNotMatch(ts.message, /LocalDevVPN/);
+  assert.equal(verifyFailure(cf("timeout"), ldvOn).title, "Turn On LocalDevVPN"); // LocalDevVPN's stays as it was
+
+  // neither on: the VPN the user set up
+  assert.equal(verifyFailure(cf("neither LocalDevVPN nor Tailscale is on"), tsOff).title, "Turn On Tailscale");
+  assert.equal(verifyFailure(cf("neither LocalDevVPN nor Tailscale is on"), noneSetUp).title, "Turn On LocalDevVPN");
+
+  // no status: the shell's words
+  assert.equal(verifyFailure(cf("Tailscale is off: turn it on in the Tailscale app")).title, "Turn On Tailscale");
+  assert.equal(verifyFailure(cf("no route")).title, "Turn On LocalDevVPN");
+  assert.equal(verifyFailure(cf("no route")).again, false);
 });

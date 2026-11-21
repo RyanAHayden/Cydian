@@ -39,6 +39,7 @@
 import AVFoundation
 import Foundation
 import ObjectiveC
+import os
 import UIKit
 import UserNotifications
 
@@ -724,7 +725,7 @@ enum Sideload {
                 let seen = "Install watch ended: installed \(installed.map { String($0) } ?? "unknown")"
                     + (handedOff ? " (handed off to iOS)" : "") + (dismissed ? " (prompt dismissed)" : "")
                     + "; " + InstallPrompt.summary(bid) + ", IPA fetched in full \(Handoff.wasServed(bid) ? "yes" : "no")"
-                NSLog("\(Brand.name) install \(bid): " + seen.replacingOccurrences(of: "%", with: "%%"))
+                DeviceLog.say("\(Brand.name) install \(bid): " + seen)
                 c.emit([["log": seen]])
                 InstallLog.detach(bid)
                 Apt.reply(c, ["installed": installed.map { $0 as Any } ?? NSNull(), "handedOff": handedOff, "dismissed": dismissed], nil)
@@ -1177,7 +1178,7 @@ final class KeepAlive {
             guard let self = self, raw.flatMap(AVAudioSession.InterruptionType.init) == .ended, let p = self.player else { return }
             try? AVAudioSession.sharedInstance().setActive(true)
             p.play()
-            NSLog("\(Brand.name) KeepAlive: audio interruption ended; silent loop playing again")
+            DeviceLog.say("\(Brand.name) KeepAlive: audio interruption ended; silent loop playing again")
         }
     }
 
@@ -1519,6 +1520,13 @@ enum Handoff {
     static let servedQuiet: TimeInterval = 30
 }
 
+// B228: this file's device-log lines. NSLog never reaches the device log on iOS 27 (idevicesyslog and pymobiledevice3
+// syslog live show none of it), os_log does, and %{public}@ keeps the text readable there, as IDevice.ilog.
+enum DeviceLog {
+    private static let log = OSLog(subsystem: "ifizbox.sideload", category: "install")
+    static func say(_ s: String) { os_log("%{public}@", log: log, type: .default, s) }
+}
+
 // B29: the install server's lines (each request iOS makes for the IPA, the bytes it got, a 404 after serving ended)
 // for the progress page's console. They come after signing.install (or library.install) has answered, when its
 // stream is closed, so they wait here per bundle ID until signing.progress (the page's follow of iOS's install)
@@ -1528,7 +1536,7 @@ enum InstallLog {
     private static var sinks = [String: (String) -> Void]()
 
     static func say(_ bundleID: String, _ line: String) {
-        NSLog("\(Brand.name) install \(bundleID): " + line.replacingOccurrences(of: "%", with: "%%"))
+        DeviceLog.say("\(Brand.name) install \(bundleID): " + line)
         DispatchQueue.main.async {
             if let sink = sinks[bundleID] { return sink(line) }
             var w = waiting[bundleID] ?? []

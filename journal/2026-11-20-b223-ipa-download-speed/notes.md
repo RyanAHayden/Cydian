@@ -36,16 +36,19 @@ The Log's "Downloaded 43 MB" line now says the time and rate: "Downloaded 43 MB 
 download again, the run's Log tells straight away whether the bytes came slowly (the network) or something else
 held the row on Downloading.
 
-`Sideload.download` also holds `KeepAlive` (the silent audio that already keeps iFizBox alive while iOS fetches a
-signed IPA) from the start of a download to its end, cancel and failure included (`Once`). Safari keeps
-downloading when you leave it; a plain URLSession task in a suspended app does not.
+Tried, then taken out after the spec review (not asked, and not shown to matter against the old build): holding
+`KeepAlive` (silent audio) for the length of `Sideload.download`, so a download keeps going in the background as
+Safari's does. Filed as R49 with how to check it. The background row below was measured with it in.
+
+All phone work held the `tools/ui-15.sh` lock (B223) and drove the screen through it; timings came from the app's
+web view through `pymobiledevice3 webinspector cdp` (port 9351).
 
 After, the new build (0.17.3 build 3092 from this branch) on the 15 Pro:
 
 | What | Time |
 | --- | --- |
 | `signing.prepare` of opentennis-ios.ipa, three runs | "Downloaded 43 MB in 1.5 s, 28.7 MB/s", "in 1.1 s, 39 MB/s", "in 1.2 s, 37.1 MB/s"; signed copy ready at 2.0 to 2.5 s |
-| 1.68 GB asset, Home pressed at 3 s, back at 57.6 s | 100% at 43.9 s, the whole download after the first 3 s done in the background, at an even ~38 MB/s |
+| 1.68 GB asset, Home pressed at 3 s, back at 57.6 s (build with KeepAlive, since taken out) | 100% at 43.9 s, the whole download after the first 3 s done in the background, at an even ~38 MB/s |
 
 ## Left on the phone
 
@@ -64,10 +67,9 @@ After, the new build (0.17.3 build 3092 from this branch) on the 15 Pro:
 
 - The user's own slow case was not reproduced: every run here took 1 to 2 s. Its cause (the network the phone was on
   at the time, most likely) is unknown; the new Log line is there to tell next time.
-- The old build (0.17.3 from the release) was only tried with 15 s in the background, where it kept going; whether
-  it stopped after about 30 s, as a suspended app's URLSession task should, was not tried. The new build kept going
-  for 40 s in the background.
-- That KeepAlive's audio session leaves the user's music alone during a download (it is `.mixWithOthers`, as it has
-  been for serving) was not checked by ear.
+- Whether a download stops after about 30 s in the background without KeepAlive was not tried (the old build was
+  only tried for 15 s, where it kept going): R49.
+- The committed build (Log line only, KeepAlive out) was not installed on the phone again; the line itself was seen
+  on the phone in the build that had both, and the KeepAlive removal is the revert of a separate block.
 - Cellular: the 15 Pro has no SIM (status bar "SOS"), so only Wi-Fi was timed.
 - Safari's time is from screenshots, about 1 s resolution.

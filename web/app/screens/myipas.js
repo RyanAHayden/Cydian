@@ -39,7 +39,8 @@ import { selectPreset } from "../nav/selection.js";
 import { cleanSourceUrl } from "../core/sources.js";
 import { detectMode } from "../core/settings.js";
 import { deviceError, phaseLabel, isCgBI, fromBase64 } from "../core/signing.js";
-import { apps, recordInstall } from "../core/installed.js";
+import { apps, recordInstall, onAppsChange } from "../core/installed.js";
+import { appQueue } from "../app-queue.js";
 import { MYIPAS, libraryRows, stateOf, formatBytes, ipaToken, fileOfToken, optionsParams, siteEntries, addSiteUrl,
   STATE_LABELS, addSiteFile, removeSiteEntry, openIpaStore, memoryIpaStore, listState, listStep, tapOpens,
   deleteSheetTitle, deleteButtonText, deleteEntries, holdActions, HOLD, libraryMode, ipaSections, installedIdOf, priceButton, priceTap, priceAway,
@@ -590,12 +591,27 @@ if (typeof window !== "undefined") {
   window.addEventListener("hashchange", () => { if (lib.state.editing && !listShown()) setManaging(false); });
   // Back from iOS's install prompt or another app: which IPAs are installed may have changed.
   document.addEventListener?.("visibilitychange", () => { if (document.visibilityState === "visible" && listShown()) recheck(); });
+  // B277: an app out of the IPA queue (installed, or cleared) or Installed's records changed: the list and the IPA's
+  // page read the library again (its signed copy, which IPA is on the phone), even under the run's page
+  appQueue.subscribe((e) => { if (e.type === "clear" || e.type === "clearAll") afterInstall(); });
+  onAppsChange(() => afterInstall());
   // A tap anywhere but a green INSTALL puts it back to SIGN (as the App Store's confirm button).
   document.addEventListener?.("pointerdown", (e) => {
     if (!lib.price.armed || e.target?.closest?.(".price-btn")) return;
     lib.price = priceAway(lib.price);
     repaintPrices();
   }, true);
+}
+
+// B277: after an install from the IPA queue (an IPA's own Install, Confirm, the run's page): Install IPAs reads the
+// library and which IPAs iOS has again (recheck), and the IPA's page is drawn again, while they are on a stack (not
+// only on screen: the list sits under the IPA's page). Several changes at once draw once.
+let againSoon = false;
+export function afterInstall({ list = () => { if (view.body?.isConnected) recheck(); },
+  page = () => { const v = view.ipa; if (v?.body?.isConnected) rerender(v.body, v.route); else view.ipa = null; } } = {}) {
+  if (againSoon) return;
+  againSoon = true;
+  setTimeout(() => { againSoon = false; list(); page(); }, 0);
 }
 
 // The price buttons again from lib (armed, busy) without rebuilding the rows.
@@ -1002,6 +1018,7 @@ export function siteIpaSections(details, onInstall = () => {}) {
 }
 
 async function renderIpa(body, route, file) {
+  view.ipa = { body, route }; // B277: drawn again when an install ends (afterInstall)
   body.append(placeholder("page"));
   let entry, identity;
   try { ({ entry, identity } = await entryOf(file)); } catch (e) {
@@ -1219,14 +1236,27 @@ async function install(file, row = null) {
 // returns "cancelled" (truthy: nothing else installs it). The job carries the file as its key, so Installed's record
 // says which IPA is on the phone.
 export async function queueLibraryInstall(entry, { reachable = serverReachable, add = queueApp, installed = lib.installed,
-  shared = lib.shared, alert = showAlert } = {}) {
+  shared = lib.shared, alert = showAlert, versionOf = installedVersionOf } = {}) {
   const id = installedIdOf(entry);
   const job = libraryJob(entry, { installed: Boolean(id && installed?.[id]) });
   if (!job) return false;
   if (!(await confirmReplace(entry, { shared, alert }))) return "cancelled";
   if (!(await Promise.resolve().then(() => reachable()).catch(() => false))) return false;
+  // B277: the version on the phone, so Confirm says Upgrade (or Downgrade) for another version, not Reinstall
+  if (job.installed != null) job.installed = (await Promise.resolve().then(() => versionOf(id)).catch(() => null)) || job.installed;
   add({ ...job, key: job.key ?? libraryKey(entry.file) });
   return true;
+}
+
+// B277: the installed version of the app with bundle ID `id`: Installed's record, else the shell's record of signing
+// it (signing.installed: on iOS 27 Installed's record may never be written, B229), else null (not known).
+export async function installedVersionOf(id, { records = async () => (await apps()).all(), native = nativeBridge(),
+  signed = async () => (await native.call("signing.installed", {}))?.apps ?? [] } = {}) {
+  if (!id) return null;
+  const rec = ((await Promise.resolve().then(records).catch(() => [])) ?? []).find((r) => r?.id === id);
+  if (rec?.version) return rec.version;
+  const own = ((await Promise.resolve().then(signed).catch(() => [])) ?? []).find((r) => r?.bundleId === id || r?.originalBundleId === id);
+  return own?.version || null;
 }
 
 // F212: the jailbreak app's Install for a library file: Install IPA's console (screens/ipa-install.js, as a URL's or a

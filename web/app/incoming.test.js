@@ -34,7 +34,7 @@ test("F89 install: the website's Open in iFizBox asks, then installs the IPA wit
   assert.deepEqual(opened, ["#/installed/myipas"]);
   assert.equal(u.alerts[0].title, "Install IPA");
   assert.match(u.alerts[0].message, /^My App\nhttps:\/\/e\.example\/My App\.ipa$/);
-  assert.deepEqual(ran, [{ url: "https://e.example/My App.ipa", name: "My App" }]);
+  assert.deepEqual(ran.map(({ url, name }) => ({ url, name })), [{ url: "https://e.example/My App.ipa", name: "My App" }]);
   u.answer = 0; // Cancel
   await handleIncoming(link, { ...u.deps, install: async (o) => ran.push(o), open: () => {} });
   assert.equal(ran.length, 1);

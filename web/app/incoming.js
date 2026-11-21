@@ -147,11 +147,11 @@ export function onReceiving({ hud = liveHUD } = {}) {
 }
 
 export async function handleIncoming(url, { native = nativeBridge(), alert = showAlert, hud = showHUD,
-  review = null, add = null, shared = null, install = null, signIn = null, on = otherLinksOn, open = goHash, now = Date.now, reload = reloadInstalled } = {}) {
+  review = null, add = null, shared = null, install = null, signIn = null, on = otherLinksOn, open = goHash, now = Date.now, reload = reloadInstalled, drop = dropMyIpas } = {}) {
   const u = String(url ?? "");
   if (/^ifizbox:\/\/install\b/i.test(u)) {
     const ask = installAsk(u);
-    if (ask) await confirmInstall(ask.url, ask.name, `${ask.name || ipaFileName(ask.url)}\n${ask.url}`, { alert, install, open, reload });
+    if (ask) await confirmInstall(ask.url, ask.name, `${ask.name || ipaFileName(ask.url)}\n${ask.url}`, { alert, install, open, reload, drop });
     return "install";
   }
   if (/^ifizbox:\/\/myipas\b/i.test(u)) {
@@ -193,7 +193,7 @@ export async function handleIncoming(url, { native = nativeBridge(), alert = sho
     return "tab";
   }
   const other = parseOtherLink(u);
-  if (other) return handleOtherLink(u, other, { native, alert, hud, add, install, on, open, now, reload });
+  if (other) return handleOtherLink(u, other, { native, alert, hud, add, install, on, open, now, reload, drop });
   return null;
 }
 
@@ -208,7 +208,7 @@ const goHash = (hash) => { if (typeof location !== "undefined") location.hash = 
 
 // F83: another sideloader's link. On: iFizBox does what that app would have (a source, an IPA). Off, or a link only
 // that app understands (a certificate export, a pairing callback): handed back.
-async function handleOtherLink(u, other, { native, alert, hud, add, install, on, open, now, reload }) {
+async function handleOtherLink(u, other, { native, alert, hud, add, install, on, open, now, reload, drop }) {
   if (!on() || other.action === "other") return handBack(u, other, { native, alert, now, off: !on() });
   if (other.action === "source") {
     open(format({ tab: "sources", path: ["manage", "sources"] }));
@@ -216,7 +216,7 @@ async function handleOtherLink(u, other, { native, alert, hud, add, install, on,
     await run({ showHUD: hud }, { url: other.url });
     return "other-source";
   }
-  await confirmInstall(other.url, "", `${other.app} link: ${ipaFileName(other.url)}\n${other.url}`, { alert, install, open, reload });
+  await confirmInstall(other.url, "", `${other.app} link: ${ipaFileName(other.url)}\n${other.url}`, { alert, install, open, reload, drop });
   return "other-install";
 }
 
@@ -226,18 +226,29 @@ async function handleOtherLink(u, other, { native, alert, hud, add, install, on,
 // IPA and a tapped .ipa link do, and remembers it for Installed's Apps.
 // B281: once the run ends, Installed loads the signed records again (screens/installed.js reloadSigned): this install
 // writes no record of its own, so its list row and the app's page would keep the record from before.
-async function confirmInstall(url, name, message, { alert, install, open, reload = reloadInstalled }) {
+// B283: when the install lands, the app's My IPAs record goes (screens/installed.js dropMyIpasRecord), from the
+// install's own answer, so a run that waits for a connection (rememberInstall) drops it too when it ends.
+async function confirmInstall(url, name, message, { alert, install, open, reload = reloadInstalled, drop = dropMyIpas }) {
   open(format({ tab: "installed", path: ["myipas"] }));
   const { index } = await alert({ title: "Install IPA", message, buttons: ["Cancel", "Install"], cancel: 0 });
   if (index !== 1) return false;
   const run = install ?? (await defaultInstall());
+  let dropping = null;
+  const onInstalled = (r) => { dropping = Promise.resolve().then(() => drop(r)).catch(() => {}); };
   try {
-    await run({ url, name });
+    await run({ url, name, onInstalled });
   } finally {
+    await dropping;
     await Promise.resolve().then(() => reload()).catch(() => {});
   }
   return true;
 }
+
+// Installed's dropMyIpasRecord, loaded only once an install lands (never under node --test).
+const dropMyIpas = async (answer) => {
+  if (typeof document === "undefined") return false;
+  return (await import("./screens/installed.js")).dropMyIpasRecord(answer);
+};
 
 // Installed's reloadSigned, loaded only once an install ends (and never under node --test, where no page runs).
 const reloadInstalled = async () => {

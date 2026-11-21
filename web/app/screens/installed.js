@@ -1301,6 +1301,31 @@ export function reloadSigned({ load = loadAllApps, draw = renderAppPage } = {}) 
   return n;
 }
 
+// B283: a My IPAs install writes a device record (key library:<file>, sourceName "My IPAs"); a later install of the
+// same app from a URL (an ifizbox://install link, another sideloader's IPA link) writes none, so that record kept the
+// app's page on "Source: My IPAs" while the shell's signed record said the URL. Once such an install ends, the app's
+// My IPAs record goes, but only when the shell's signed record for it is not a My IPAs one (the install did land, from
+// a URL): the app then reads as any URL install does, its signed-only row and page. keptIpa finds My IPAs' signed copy
+// by bundle ID, not through this record, so Save Signed IPA stays; Re-sign signs from the signed record's URL.
+// A source's record stays (Changes and Update read its source). The jailbreak build and the website keep no signed
+// record of the shell's, so nothing is dropped there.
+//   await dropMyIpasRecord(answer, { store, signed })   answer: the install's { bundleId }, or null -> true if dropped
+export const libraryRecord = (rec) => !!rec && !rec.source && String(rec.key ?? "").startsWith("library:");
+
+export async function dropMyIpasRecord(answer, { store = apps, signed = signedApps } = {}) {
+  const id = typeof answer?.bundleId === "string" ? answer.bundleId : null;
+  if (!id) return false;
+  try {
+    const sig = signedIndex(await signed()).get(id) ?? null;
+    if (!sig || fromMyIpas(sig)) return false;
+    const s = await store();
+    const rec = (await s.all()).find((r) => r?.id === id && !r.self) ?? null;
+    if (!libraryRecord(rec)) return false;
+    await removeInstall(s, id); // onAppsChange: the lists load again
+    return true;
+  } catch { return false; }
+}
+
 // Registers `body` as an app page, as renderAppPage does (tests).
 export const openAppPage = (body, route, ctx = null) => appPages.open(body, { route, ctx });
 

@@ -42,6 +42,11 @@ rounded buttons with the title floating above them, and the alert kept iOS 6's 3
 - My first capture runs showed the desktop "Open on your iPhone" page and re-used the page between cases (hash-only
   navigation): the script now sets an iPhone UA, the app shell's fake bridge, and goes through about:blank.
 
+- The first gate run failed `theme-palette.test.js` ("every dark rule paints with tokens"): a dark `.action-title`
+  rule read `--dk-action-btn`, which is not a palette token and is allowed only on `.action-sheet`/`.action-button`
+  selectors. The title's colour is now `--i7-action-cell`, set in ios7.css's two tone blocks; the renders are
+  identical to before.
+
 ## Checked
 
 - `node --test web/app/ios6-css.test.js`: 20 pass.

@@ -340,8 +340,8 @@ html[data-style="ios7"] .action-button.cancel { font-weight: 600; }
    at 3x and Chromium drops some of them, so the buttons touch and each one after the first (or after the title)
    draws a .5pt line across its top instead: the dimming's colour in White, the alert's line colour in OLED Black
    (the dimmed black page would hide it). Their 1pt transparent border goes, so the line runs edge to edge. */
-html[data-style="ios7"][data-theme="light"] { --i7-action-line: rgba(0,0,0,.4); }
-html[data-style="ios7"][data-theme="dark"] { --i7-action-line: var(--i7-alert-line); }
+html[data-style="ios7"][data-theme="light"] { --i7-action-line: rgba(0,0,0,.4); --i7-action-cell: var(--action-btn); }
+html[data-style="ios7"][data-theme="dark"] { --i7-action-line: var(--i7-alert-line); --i7-action-cell: var(--dk-action-btn); }
 html[data-style="ios7"] {
   --action-sheet-pad: 8px 8px; --action-sheet-pad-bottom: 8px;
   --action-gap: 8px; --action-list-gap: 0px; --action-list-bleed: 0px;
@@ -352,8 +352,7 @@ html[data-style="ios7"] .action-list { border-radius: 3px; }
 html[data-style="ios7"] .action-list > .action-button { border-width: 0; border-radius: 0; }
 html[data-style="ios7"] .action-list > .action-button + .action-button,
 html[data-style="ios7"] .action-title + .action-list > .action-button:first-child { box-shadow: inset 0 .5px 0 var(--i7-action-line); }
-html[data-style="ios7"] .action-title { background: var(--action-btn); border-radius: 3px 3px 0 0; }
-html[data-style="ios7"][data-theme="dark"] .action-title { background: var(--dk-action-btn); }
+html[data-style="ios7"] .action-title { background: var(--i7-action-cell); border-radius: 3px 3px 0 0; } /* a button's colour */
 html[data-style="ios7"] .action-title + .action-list { border-top-left-radius: 0; border-top-right-radius: 0; }
 html[data-style="ios7"][data-theme="dark"] .action-button.destructive { background: var(--action-destructive); }
 

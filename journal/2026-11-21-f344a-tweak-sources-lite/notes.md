@@ -52,6 +52,15 @@ iOS itself; none was kept as a Lite default. A curated multi-repo "Tweaks" sourc
 repos) was considered; one GitHub Tweak Source per repo needs no new source kind, shows each project's own name and
 avatar and can be deleted one by one, so that is what was done.
 
+## Spec review (fresh subagent, diff + brief only)
+
+Fixed: judging ran at most once per ten minutes, so an app signed just now left its sources hidden that long. Index
+answers are now kept ten minutes per source, and the user's apps are read again on a draw 15 s after the last
+judging. Also fixed a missing space in tweak-sources.json. Kept as they are: community evidence (see Not verified);
+the per-source check uses its own `askTweakIndex` rather than `appTweakRows`, because `appTweakRows` answers per app
+and the Sources tab needs the whole source; the docs paragraph (docs say what is current) and the tests; the cron
+seeding and too-big .debs (Not verified).
+
 ## Checks
 
 - `node --test web/app/core/tweaksources-lite.test.js web/app/screens/sources-tweakhidden.test.js
@@ -72,4 +81,7 @@ avatar and can be deleted one by one, so that is what was done.
   no run in a browser, since the site has no sideload mode.
 - **Too-big .debs**: the Worker marks a .deb over 16 MB as done with no entry, so a source whose only app tweaks are
   that big could read as "nothing usable" and be hidden. Not seen; left as it is.
+- **The Worker's cron seeds nothing now**: it seeded the `inject` APT entries, and every `inject` entry is a GitHub
+  repo now. BigBoss, Havoc and Chariz reach the index when a phone first asks for them (the on-demand pass), then
+  the cron keeps them. Their first verdicts come later than before; none of this is deployed yet.
 - **YTLite's licence**: the repo states none; it is listed as a source (its own releases), nothing is copied.

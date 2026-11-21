@@ -629,16 +629,17 @@ function draw(view) {
 // apps (My IPAs and the apps it signed, screens/tweaks.js signableApps) or in any app, is left out of the Tweak
 // Sources group (core/sources.js tweakSourceVerdict). Searching still finds it, and Manage still lists it (delete,
 // reorder). Unknown (no index, still being read, GitHub sources) shows it. A row that goes collapses (nav/ui.js), its
-// header with it when it was the group's last; one that comes back redraws the list. Judged once per ten minutes for
-// the same sources; the hidden keys are kept on the device so the next launch draws without them.
+// header with it when it was the group's last; one that comes back redraws the list. The index is asked once per ten
+// minutes a source, the user's apps re-read every 15 s at most; the hidden keys are kept on the device so the next launch draws without them.
 //   tweakJudge.enabled   false under node (tests switch it on with their own ask/apps), so tests never fetch
 export const tweakJudge = {
   enabled: typeof globalThis.process?.versions?.node !== "string",
   ask: (s) => import("./tweaks.js").then((m) => askTweakIndex(s, { base: m.indexBase() })),
   apps: async () => (await (await import("./tweaks.js")).signableApps()).map((a) => a.bundleId),
-  every: 10 * 60 * 1000,
+  every: 10 * 60 * 1000, // an index answer is kept this long
+  again: 15 * 1000,      // the user's apps are read again after this long
 };
-const judged = { at: 0, keys: "", p: null };
+const judged = { at: 0, keys: "", p: null, answers: new Map() }; // answers: key -> { at, a }, the index's, `every` ms
 
 function loadTweakHidden(storage = globalThis.localStorage) {
   try {
@@ -651,14 +652,23 @@ function saveTweakHidden(set, storage = globalThis.localStorage) {
 }
 
 // -> the judging promise (null when nothing was started: off, under way, or judged lately for these sources).
+// The user's apps are read again on a draw `again` ms after the last judging (an app just signed brings its
+// sources back); each source's index answer is kept `every` ms.
 export function judgeTweakSources(list, { now = Date.now() } = {}) {
   if (!tweakJudge.enabled || judged.p) return null;
   const keys = list.map((s) => s.key).join("\n");
-  if (keys === judged.keys && now - judged.at < tweakJudge.every) return null;
+  if (keys === judged.keys && now - judged.at < tweakJudge.again) return null;
   Object.assign(judged, { at: now, keys });
+  const answerOf = async (s) => {
+    const had = judged.answers.get(s.key);
+    if (had && now - had.at < tweakJudge.every) return had.a;
+    const a = await tweakJudge.ask(s).catch(() => null);
+    if (a) judged.answers.set(s.key, { at: now, a }); // nothing: asked again next time
+    return a;
+  };
   judged.p = (async () => {
     const ids = await tweakJudge.apps().catch(() => []);
-    const verdicts = await Promise.all(list.map(async (s) => [s.key, tweakSourceVerdict(await tweakJudge.ask(s).catch(() => null), ids)]));
+    const verdicts = await Promise.all(list.map(async (s) => [s.key, tweakSourceVerdict(await answerOf(s), ids)]));
     const had = state.tweakHidden ?? new Set();
     const next = new Set();
     // null (not known this time): what was known before stands, so a slow answer doesn't bring a row back for a moment

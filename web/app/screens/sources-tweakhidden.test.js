@@ -44,3 +44,18 @@ test("judging: nothing usable hides, unknown keeps what was known, kept on the d
   const back = await sources.judgeTweakSources([...list, { key: "deb:https://new/:./" }], { now: 1001 + sources.tweakJudge.every });
   assert.deepEqual([...back], ["deb:https://havoc/:./"]);
 });
+
+test("an app signed since: its sources come back on the next judging, from the kept answers, no new ask", async () => {
+  let apps = [];
+  let asks = 0;
+  const key = "deb:https://ig/:./";
+  Object.assign(sources.tweakJudge, {
+    enabled: true, apps: async () => apps, ask: async () => { asks++; return done([{ package: "i", ok: true, bundles: ["com.burbn.instagram"] }]); },
+  });
+  const t0 = 10 * sources.tweakJudge.every;
+  assert.deepEqual([...await sources.judgeTweakSources([{ key }], { now: t0 })], [key]);
+  apps = ["com.burbn.instagram"];
+  assert.equal(sources.judgeTweakSources([{ key }], { now: t0 + 1000 }), null, "not within `again`");
+  assert.deepEqual([...await sources.judgeTweakSources([{ key }], { now: t0 + sources.tweakJudge.again })], []);
+  assert.equal(asks, 1);
+});

@@ -30,6 +30,18 @@ one candidate; B156's restore by URL another). The fix takes the bundle ID out o
   `queueinstall.test.js` expect the credit in the params now.
 - `docs/signing.md`: a "Which source's app it is" item under Re-sign All.
 
+## Spec review
+
+- Fixed: the user's rename lost to the credit's name in the lists. The shell now hands back the credit with
+  `shownName` as its name.
+- Fixed: a copy (installed under the profile's ID) credited the app that kept the original ID through
+  `originalBundleId`. `creditIndex` now matches the original ID only where no signed app is installed under it.
+- Kept, though the review called it unasked: `candidates()` asks the record's own source first, and `urlCredit`
+  back-fills older records. Both are "credit the app to the source and entry it was actually installed from", and
+  `urlCredit` is the only thing that fixes the user's copy as it is now.
+- Not done: Signed Apps' and Needs Re-sign's rows show no source for any app (version and bundle ID only), so there
+  is no source line there to correct. The install page already shows the caller's (source's) name (B150).
+
 ## Tried and dropped
 
 - Sending the credit on a marked app's Re-sign (`resignApp` with a url): `installOnDevice` gives the insecure-link

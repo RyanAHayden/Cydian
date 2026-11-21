@@ -71,6 +71,10 @@ test("the credit names it in Signed Apps, Needs Re-sign and Installed, over the 
 test("an installed-as ID (profile's) matches by the original ID", () => {
   const as = { ...signedRyuk, bundleId: `${IG}.ABCDE` };
   assert.equal(creditedRecords([atRec], { apps: [as] })[0].name, "RyukGram");
+  // a RyukGram copy beside AppTesters' Instagram (kept the original ID, no credit): Instagram's record isn't touched
+  const real = { ...signedRyuk, url: AT_URL, credit: undefined };
+  assert.equal(creditedRecords([atRec], { apps: [as, real] })[0], atRec);
+  assert.equal(creditedRecords([{ ...atRec, id: as.bundleId }], { apps: [as, real] })[0].name, "RyukGram");
 });
 
 test("an unrecorded app gets its record from the credit, not the first source listing the ID (B156)", () => {

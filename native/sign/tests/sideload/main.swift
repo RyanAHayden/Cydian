@@ -306,6 +306,9 @@ test("B247: source credit on the signed record") {
     check((r.json["credit"] as? [String: Any])?["name"] as? String == "RyukGram" && r.shownName == "RyukGram", "json and shown name")
     check(JSONSerialization.isValidJSONObject(r.json), "valid json")
     check(r.options == SignOptions().stored, "left out of the options' ==")
+    var mine = r
+    mine.options.name = "Mine"; mine.name = "Mine"
+    check((mine.json["credit"] as? [String: Any])?["name"] as? String == "Mine", "the rename is the credit's name on signing.installed")
     let old = SignedRecords.decode(Data(#"[{"bundleID":"a","originalBundleID":"a","name":"A","version":"1","url":"u","signed":"2026-11-17T00:00:00Z","options":{"removeExtensions":[],"fixArm64e":true}}]"#.utf8))
     check(old.first?.options.credit == nil && old.first?.json["credit"] == nil && old.first?.shownName == "A", "older record: no credit")
 }

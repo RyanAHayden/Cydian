@@ -201,12 +201,17 @@ export function creditOf(app) {
   return { name, source: text(c.source) || null, sourceName: text(c.sourceName) || null, key: text(c.key) || null };
 }
 
+// By installed ID; by original ID only where no signed app is installed under that ID: a copy (installed under the
+// profile's ID) never credits the app that kept the original one (RyukGram copy beside AppTesters' Instagram).
 function creditIndex(installed) {
   const out = new Map();
-  for (const a of Array.isArray(installed?.apps) ? installed.apps : []) {
+  const apps = Array.isArray(installed?.apps) ? installed.apps : [];
+  const installedAs = new Set(apps.map((a) => a?.bundleId).filter(Boolean));
+  for (const a of apps) { const c = creditOf(a); if (c && a.bundleId) out.set(a.bundleId, c); }
+  for (const a of apps) {
     const c = creditOf(a);
-    if (!c) continue;
-    for (const id of [a.bundleId, a.originalBundleId]) if (id && !out.has(id)) out.set(id, c);
+    const id = a?.originalBundleId;
+    if (c && id && !installedAs.has(id) && !out.has(id)) out.set(id, c);
   }
   return out;
 }

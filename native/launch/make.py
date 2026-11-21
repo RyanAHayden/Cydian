@@ -61,7 +61,8 @@ def stops(*pairs):
 #               (rrggbb, alpha), so a theme whose line is opaque has it 1 pt lower than the page (see the journal)
 #   tab_gloss:  the bar's 48 pt from 1 pt down; tab_base: the bar's colour under it and on its first point
 #   tab_shadow: the alpha the tab bar's 2.5 pt shadow starts at, when not 0.18 (White has none)
-# Besides Settings' palettes, the eras' own (core/settings.js STYLE_PALETTES): white (OLED Black is oled's set).
+# Besides Settings' palettes, the eras' own (core/settings.js STYLE_PALETTES): white, and their OLED Black's launch
+# sets (STYLE_LAUNCH): oled7, oled13.
 CLASSIC_TAB = dict(tab_line=("ffffff", 0.1), tab_gloss=stops((0, "2f2f2f"), (0.495, "151515"), (0.495, "000000"),
                                                             (1, "000000")), tab_base="000000")
 THEMES = {
@@ -111,6 +112,14 @@ THEMES = {
     "white": dict(pins=("efeff4", "efeff4"), nav_line="adadad", nav_hi=("f7f7f7", 1),
                   nav_gloss=stops((0, "f7f7f7"), (1, "f7f7f7")), nav_shadow=0, tab_line=("adadad", 1),
                   tab_gloss=stops((0, "f7f7f7"), (1, "f7f7f7")), tab_base="f7f7f7", tab_shadow=0),
+    # B235: iOS 7's and iOS 13's OLED Black (ios7.css, ios13.css; core/settings.js STYLE_LAUNCH): a flat #000 ground and
+    # bars, no highlight, gloss or shadows, and the bars' hairline (#262626, #38383a) as the 1 pt line views.
+    "oled7": dict(pins=("000000", "000000"), nav_line="262626", nav_hi=("000000", 1),
+                  nav_gloss=stops((0, "000000"), (1, "000000")), nav_shadow=0, tab_line=("262626", 1),
+                  tab_gloss=stops((0, "000000"), (1, "000000")), tab_base="000000", tab_shadow=0),
+    "oled13": dict(pins=("000000", "000000"), nav_line="38383a", nav_hi=("000000", 1),
+                   nav_gloss=stops((0, "000000"), (1, "000000")), nav_shadow=0, tab_line=("38383a", 1),
+                   tab_gloss=stops((0, "000000"), (1, "000000")), tab_base="000000", tab_shadow=0),
 }
 
 

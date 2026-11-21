@@ -41,6 +41,9 @@ def settings_palettes():
     # B231: the eras' own themes (STYLE_PALETTES), e.g. iOS 7's White, which no theme list offers
     table = re.search(r"export const STYLE_PALETTES = \{(.*?)\};", settings, re.S).group(1)
     out += [v for v in re.findall(r'(?:light|dark): "([a-z]+)"', table) if v not in out]
+    # B235: the launch sets an era's theme opens on instead of the iOS 6 one of its name (STYLE_LAUNCH)
+    table = re.search(r"export const STYLE_LAUNCH = \{(.*?)\};", settings, re.S).group(1)
+    out += re.findall(r'[a-z]+: "([a-z0-9]+)"', table)
     return sorted(set(out))
 
 
@@ -175,16 +178,20 @@ class LaunchThemes(unittest.TestCase):
         light_nav = self.block(self.ios6, ".navbar")
         light_nav = self.token(re.search(r"background:(.*?);", light_nav, re.S).group(1))
         light_tab = self.token(re.search(r"background:(.*?);", self.block(self.ios6, ".tabbar"), re.S).group(1))
-        if key == "white":  # B231: iOS 7's flat bars, its hairlines flattened over the bar (make.py)
-            b = self.block(read("web", "app", "ios7.css"), 'html[data-style="ios7"][data-theme="light"]')
+        # B231: iOS 7's White; B235: iOS 7's and iOS 13's OLED Black. Flat bars, the hairline flattened over the bar
+        eras = {"white": ("ios7", "light", "i7", ""), "oled7": ("ios7", "dark", "i7", "dk-"),
+                "oled13": ("ios13", "dark", "i13", "dk-")}
+        if key in eras:
+            era, tone, p, dk = eras[key]
+            b = self.block(read("web", "app", era + ".css"), 'html[data-style="%s"][data-theme="%s"]' % (era, tone))
             ground = hex6(self.var(b, "pin-dark"))
-            bar = hex6(self.var(b, "i7-bar"))
-            line = make.mix(make.hexrgb(bar), (0, 0, 0), colour(self.var(b, "i7-hairline"))[1])
-            line = "%02x%02x%02x" % line
+            bar = hex6(self.var(b, p + "-bar"))
+            hc, ha = colour(self.var(b, p + "-hairline"))
+            line = "%02x%02x%02x" % make.mix(make.hexrgb(bar), make.hexrgb(hc), ha)
             for name, layer in (("nav-bar", "bottom"), ("tabbar", "top")):
-                self.assertEqual(self.var(b, name), "linear-gradient(var(--i7-hairline), var(--i7-hairline)) %s / "
-                                 "100%% .5px no-repeat, #%s" % (layer, bar), name)
-            self.assertEqual(self.var(b, "nav-shadow"), "none")
+                self.assertEqual(self.var(b, dk + name), "linear-gradient(var(--%s-hairline), var(--%s-hairline)) %s / "
+                                 "100%% .5px no-repeat, %s" % (p, p, layer, self.var(b, p + "-bar")), name)
+            self.assertEqual(self.var(b, dk + "nav-shadow"), "none")
             self.assertEqual(self.var(b, "tabbar-shadow"), "none")
             flat = make.stops((0, bar), (1, bar))
             return dict(pins=(ground, hex6(self.var(b, "pin-light"))), nav_line=line, nav_hi=(bar, 1), nav_gloss=flat,

@@ -912,6 +912,13 @@ export const STYLE_DEFAULT = byKey.get("style").default;
 export const STYLE_KEY = "ifizbox.style";
 export const STYLE_PALETTES = { ios7: { light: "white", dark: "oled" }, ios13: { light: "white", dark: "oled" } };
 
+// B235: the launch set (native/launch/make.py THEMES) an era's own theme opens on, where the iOS 6 set of the same
+// name draws other bars: iOS 7's and iOS 13's OLED Black have flat #000 bars with a hairline (#262626, #38383a), not
+// iOS 6's glossed ones. The page keeps data-palette "oled" (ios7.css and ios13.css draw it by data-style); only the
+// shell's app.theme (screens/settings.js) carries the launch key, for its ground and its next splash.
+export const STYLE_LAUNCH = { ios7: { oled: "oled7" }, ios13: { oled: "oled13" } };
+export const launchKey = (style, palette) => STYLE_LAUNCH[style]?.[palette] ?? palette;
+
 // F202: the nav hooks an era turns on (docs/eras.md, "Nav hooks"): `nav: "large"` puts <html data-nav="large"> (large
 // titles, nav/navbar.js setLargeTitles), `sheet: "card"` puts <html data-sheet="card"> (card sheets, nav/sheet.js).
 // iOS 6 and iOS 7 turn none on. screens/settings.js applyTheme sets them with the style.

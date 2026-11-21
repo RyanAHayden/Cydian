@@ -48,10 +48,15 @@ test("applyTheme posts app.theme to the bridge once per change", () => {
   settings.set("style", "ios7");
   settings.set("appearance", "light");
   applyTheme(doc, win);
-  assert.deepEqual(sent.at(-1).params, { style: "light", theme: "light", darkPalette: "oled", lightPalette: "white", statusBar: "dark" });
+  // B235: iOS 7's OLED Black opens on its own launch set (oled7: flat bars), the page still data-palette "oled"
+  assert.deepEqual(sent.at(-1).params, { style: "light", theme: "light", darkPalette: "oled7", lightPalette: "white", statusBar: "dark" });
   settings.set("appearance", "dark");
   applyTheme(doc, win);
-  assert.deepEqual(sent.at(-1).params, { style: "dark", theme: "dark", darkPalette: "oled", lightPalette: "white" });
+  assert.deepEqual(sent.at(-1).params, { style: "dark", theme: "dark", darkPalette: "oled7", lightPalette: "white" });
+  assert.equal(doc.documentElement.dataset.palette, "oled");
+  settings.set("style", "ios13"); // B235: iOS 13's, its #38383a hairline
+  applyTheme(doc, win);
+  assert.deepEqual(sent.at(-1).params, { style: "dark", theme: "dark", darkPalette: "oled13", lightPalette: "white" });
   settings.set("style", "ios6");
   applyTheme(doc, win); // back in iOS 6, the pick again
   assert.deepEqual(sent.at(-1).params, { style: "dark", theme: "dark", darkPalette: "gunmetal", lightPalette: "classic" });

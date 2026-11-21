@@ -19,6 +19,7 @@ html[data-style="ios7"] {
   --group-margin: 35px 0 0; --group-gap: 35px; --group-first-head: 0px;
   --group-head-margin: 0 15px 7px; --group-foot-margin: 7px 15px 0;
   --cell-min-h: 44px; --cell-pad: 0 15px;
+  --row-icon-in: 0px; --row-icon-after: 7px;  /* the kit's row tile 15pt in, its label 15pt after (gap 8 + 7) */
   --sw-w: 51px; --sw-h: 31px; --sw-knob-size: 31px; --sw-travel: 20px;  /* the kit's 51 x 31 switch, its knob the track's height */
   --settings-seg-margin: 0 15px;                                   /* Theme's Mode, inset like a label */
   --home-inset: 0px; --home-tile-pad: 0 15px;                      /* Home's tiles edge to edge, content 15pt in */
@@ -213,10 +214,14 @@ html[data-style="ios7"] .grouped .cell + .cell {
 }
 html[data-style="ios7"] .grouped .cell + .cell > .cell-inner { box-shadow: none; }
 /* On a row with an icon the separator starts where the label does: the 15pt inset, the 29pt tile and the cell's gap
-   (a row tile's -3 / +3pt margins cancel), or the 24pt theme swatch. */
+   (a row tile adds its --row-icon-in / --row-icon-after margins), or the 24pt theme swatch. */
 html[data-style="ios7"] .grouped .cell + .cell:has(> .cell-inner > .cell-icon) {
   background-position: calc(15px + 29px + var(--cell-gap)) 0;
   background-size: calc(100% - 15px - 29px - var(--cell-gap)) .5px;
+}
+html[data-style="ios7"] .grouped .cell + .cell:has(> .cell-inner > .cell-icon.row-icon) {
+  background-position: calc(15px + var(--row-icon-in) + 29px + var(--row-icon-after) + var(--cell-gap)) 0;
+  background-size: calc(100% - 15px - var(--row-icon-in) - 29px - var(--row-icon-after) - var(--cell-gap)) .5px;
 }
 html[data-style="ios7"] .grouped .cell + .cell:has(> .cell-inner > .cell-icon.theme-swatch) {
   background-position: calc(15px + 24px + var(--cell-gap)) 0;

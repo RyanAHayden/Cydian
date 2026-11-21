@@ -307,3 +307,13 @@ test("F331: era hooks don't reuse a look token's name, and the new geometry read
   const ios7 = readFileSync(new URL("./ios7.css", import.meta.url), "utf8");
   for (const v of ["--sw-w: 51px", "--sw-h: 31px", "--sw-travel: 20px", "--settings-seg-margin: 0 15px", "--home-inset: 0px"]) assert.ok(ios7.includes(v), v);
 });
+
+test("F338: the row tile's place is an era hook; iOS 7 puts it 15pt in, the label 15pt after, the separator there", () => {
+  const base = readFileSync(new URL("./style.css", import.meta.url), "utf8");
+  const ios7 = readFileSync(new URL("./ios7.css", import.meta.url), "utf8");
+  assert.match(base, /--row-icon-in: -3px; --row-icon-after: 3px;/);
+  assert.match(base, /\n\.cell-icon\.row-icon \{ margin: 0 var\(--row-icon-after\) 0 var\(--row-icon-in\); \}/);
+  assert.match(ios7, /--cell-pad: 0 15px;/);
+  assert.match(ios7, /--row-icon-in: 0px; --row-icon-after: 7px;/); // 15 + 0 = 15pt in; 7 + --cell-gap 8 = 15pt after
+  assert.match(ios7, /\.cell-icon\.row-icon\) \{\s*background-position: calc\(15px \+ var\(--row-icon-in\) \+ 29px \+ var\(--row-icon-after\) \+ var\(--cell-gap\)\) 0;/);
+});

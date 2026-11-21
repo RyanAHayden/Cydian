@@ -43,7 +43,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { modeOf } from "./queue.js";
 import { compareVersions } from "./apt.js";
-import { installOptions } from "./altstore.js";
+import { installOptions, signableDownload } from "./altstore.js";
 
 export const SELF_ID = "com.ryha.ifizbox";
 
@@ -109,7 +109,7 @@ export function appJob(pkg, { installed = null, version = null, source = null } 
   const v = (version && app.versions?.find((x) => x.version === version)) || app.versions?.[0];
   if (!v) return null;
   const o = installOptions(v, app.sourceUrl);
-  if (!o.download || o.itms) return null;
+  if (!o.download || o.itms || !signableDownload(v.downloadURL).ok) return null; // B269: the lists' check too
   return {
     id: app.bundleIdentifier || pkg.row?.id, name: app.name || pkg.row?.name || null, version: v.version || null, installed,
     url: o.download, size: v.size ?? null, icon: app.iconURL ?? null, key: pkg.key ?? null, source: app.sourceUrl ?? null,

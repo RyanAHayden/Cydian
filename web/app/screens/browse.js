@@ -81,7 +81,10 @@ import { appQueue } from "../app-queue.js"; // F213: the sideload build's rows q
 import { APP_MODE_LABEL } from "../core/appqueue.js";
 import { rowAppJob, queueOriginalCheck } from "./altstore.js";
 import { queueApp } from "./queue.js";
-import { worksInGroup, addToApp } from "./tweaks.js"; // F302
+import { worksInGroup, addToApp, addableTweakRows } from "./tweaks.js"; // F302
+
+// B269: in the sideload build a Tweak Source's list leaves out the tweaks already checked and refused on this device.
+export const sideloadListRows = (rows, mode = detectMode()) => (mode === "sideload" ? addableTweakRows(rows) : rows);
 
 const ROW_HEIGHT = 58;
 
@@ -170,7 +173,7 @@ export function render(body, route, ctx) {
   const p = pageOf(route);
   switch (p.page) {
     case "sections": return isAltKey(p.key) ? renderAltSource(body, route, p.key, ctx) : renderSections(body, route, p.key, ctx);
-    case "section": return renderList(body, route, () => catalog.list(p.key, p.value), true);
+    case "section": return renderList(body, route, async () => sideloadListRows(await catalog.list(p.key, p.value)), true);
     case "author": return renderAuthor(body, route, p.value);
     case "package": return renderPackage(body, route, p.key, p.value, ctx);
     case "versions": return renderVersions(body, route, p.key, p.value);

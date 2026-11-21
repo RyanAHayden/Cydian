@@ -229,6 +229,12 @@ function infoStore(storage = globalThis.localStorage) {
 
 export function cachedTweakInfo(st, { storage } = {}) { return st?.package ? infoStore(storage).get(debKey(st)) : null; }
 
+// B269: a Tweak Source's list rows without the tweaks whose .deb was checked on this device and can't go into an app
+// (for iOS itself, a library, a daemon…), so no row leads to that refusal again. Unchecked rows stay.
+export function addableTweakRows(rows, { storage } = {}) {
+  return (rows ?? []).filter((r) => cachedTweakInfo({ package: r?.id, version: r?.version }, { storage })?.ok !== false);
+}
+
 async function defaultFetchDeb(url) {
   const { getBackend } = await import("../backend.js");
   const r = await getBackend().fetch(url);

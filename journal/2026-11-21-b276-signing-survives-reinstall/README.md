@@ -31,6 +31,6 @@ and the profile is a file in Application Support; both go with the container.
 - Delete + reinstall on the iPhone 15 Pro (the task's Check): not run in this unattended session. It needs a fresh
   container on the phone (deleting the app) and the imported identity on it; the 15 Pro's present Keychain state is
   unknown here, and deleting the app on the owner's test phone also drops anything else in its container. The
-  gate builds the Swift and runs the source test only. A follow-up device check is filed (see commit).
+  gate builds the Swift and runs the source test only. The device check is filed as R59.
 - A reinstall signed by a different team: the Keychain items of the old team's group are not readable then, so it
   starts at Needs Setup as before (by design, not checked on a phone).

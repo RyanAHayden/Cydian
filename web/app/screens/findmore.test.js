@@ -199,6 +199,18 @@ test("a repo's page: Trust (Label, Why, HTTPS, Signed Releases) and Packages; Tw
   assert.doesNotMatch(jb.textContent, /Tweaks for Sideloaded Apps/);
 });
 
+test("a repo's page: the head icon sits clipped in the letter's slot and shows only once it loads", async () => {
+  const page = fakePage();
+  await renderRepo(page, "bigboss", null, { api: fakeApi(), sources: async () => [], sideload: () => false });
+  const icon = page.querySelector(".find-head")?.querySelector(".cell-icon");
+  assert.ok(icon, "the head row keeps its letter slot");
+  const css = readFileSync(new URL("../sources.css", import.meta.url), "utf8");
+  const rule = (sel) => css.match(new RegExp(`^${sel.replace(/[.*()]/g,"\\$&")} \\{([^}]*)\\}`, "m"))?.[1] ?? "";
+  assert.match(rule(".find-head .cell-icon"), /overflow: hidden/);
+  assert.match(rule(".find-head .cell-icon img"), /inset: 0; width: 100%; height: 100%/);
+  assert.match(rule(".find-head .cell-icon img:not(.loaded)"), /opacity: 0/, "a failed icon leaves the letter");
+});
+
 test("View Repo's link keeps the row, so the repo's page names it at once", async () => {
   const href = repoHref(chariz());
   assert.equal(href, "#/sources/manage/find/chariz");

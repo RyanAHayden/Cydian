@@ -15,16 +15,19 @@
   // A reload on Theme > Light or Theme > Dark shows that list's preview (screens/settings.js previewOf).
   var m = /^#\/(?:home\/)?settings\/(?:(?:theme|display)\/)?(lightTheme|darkTheme)\/?$/.exec((window.location && window.location.hash) || "");
   // F201: iOS 7 has its own two themes (core/settings.js STYLE_PALETTES) and no theme lists to preview.
-  var ios7 = s === "ios7";
-  if (m && !ios7) dark = m[1] === "darkTheme";
+  // F202: iOS 13 the same, and its card sheets (STYLE_HOOKS; its large titles wait for the app's nav/navbar.js).
+  var era = s === "ios7" || s === "ios13" ? s : "ios6";
+  var own = era !== "ios6"; // an era with its own White / OLED Black pair
+  if (m && !own) dark = m[1] === "darkTheme";
   var root = document.documentElement;
-  root.setAttribute("data-style", ios7 ? "ios7" : "ios6");
+  root.setAttribute("data-style", era);
+  if (era === "ios13") root.setAttribute("data-sheet", "card");
   root.setAttribute("data-theme", dark ? "dark" : "light");
   // Each tone's themes, in core/settings.js's order, and the default (its `default`: Gunmetal, Classic): a new theme
   // adds its name here, beside its ios6.css or palettes.css block (F200), and its top-bar colour below.
   var darks = ["oled", "gunmetal", "midnight", "linen", "nord", "dracula", "leather", "felt", "wood"],
     lights = ["classic", "sepia", "solarized", "legalpad", "metal"];
-  var palette = ios7 ? (dark ? "oled" : "white")
+  var palette = own ? (dark ? "oled" : "white")
     : dark ? (darks.indexOf(d) >= 0 ? d : "gunmetal") : (lights.indexOf(l) >= 0 ? l : "classic");
   root.setAttribute("data-palette", palette);
   // The browser's top bar too (screens/settings.js THEME_COLORS): index.html's meta says light until now.

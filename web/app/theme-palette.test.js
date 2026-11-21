@@ -5,6 +5,7 @@ import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
 import { runInNewContext } from "node:vm";
 import { themeFor, paletteFor, themeState, createSettings, DARK_PALETTES, LIGHT_PALETTES } from "./core/settings.js";
+import { STYLES, hooksOf } from "./core/settings.js"; // F202
 import { applyTheme, settings, THEME_COLORS } from "./screens/settings.js";
 
 const here = new URL(".", import.meta.url);
@@ -41,7 +42,7 @@ function boot({ appearance = null, lightTheme = null, darkTheme = null, systemDa
   ctx.window = ctx;
   runInNewContext(read("theme-boot.js"), ctx);
   const out = { theme: attrs["data-theme"], palette: attrs["data-palette"], color: meta.attrs.content };
-  return withStyle ? { ...out, style: attrs["data-style"] } : out;
+  return withStyle ? { ...out, style: attrs["data-style"], ...(attrs["data-sheet"] ? { sheet: attrs["data-sheet"] } : {}) } : out;
 }
 
 test("theme-boot.js agrees with themeFor and paletteFor for every Appearance, dark theme and system", () => {
@@ -151,6 +152,40 @@ test("F201: ios7.css is linked after palettes.css and only styles html[data-styl
   const sels = [...css.matchAll(/([^{}]+)\{/g)].map((m) => m[1].trim());
   assert.ok(sels.length > 20);
   for (const sel of sels) for (const one of sel.split(/,(?![^(]*\))/)) assert.match(one.trim(), /^html\[data-style="ios7"\]/, one);
+});
+
+// F202: iOS 13 has the same pair as iOS 7 and turns on card sheets before first paint (its large titles wait for
+// the app: nav/navbar.js draws them); themeState and theme-boot.js agree for every Mode, system and preview.
+test("F202: iOS 13's White and OLED Black and its card sheets, the same in themeState and theme-boot.js", () => {
+  const previews = [[null, ""], ["light", "#/home/settings/theme/lightTheme"], ["dark", "#/home/settings/theme/darkTheme"]];
+  for (const appearance of [null, "auto", "light", "dark"]) for (const systemDark of [false, true]) for (const [preview, hash] of previews) {
+    const store = createSettings({ storage: mem({ "ifizbox.style": "ios13", "ifizbox.appearance": appearance }) });
+    const got = themeState({ style: store.get("style"), appearance: store.get("appearance"), lightTheme: "sepia", darkTheme: "nord", preview }, systemDark);
+    const tone = appearance === "dark" || (appearance !== "light" && systemDark) ? "dark" : "light";
+    const what = JSON.stringify({ appearance, systemDark, preview });
+    assert.deepEqual(got, { theme: tone, palette: tone === "dark" ? "oled" : "white", style: "ios13" }, what);
+    assert.deepEqual(boot({ style: "ios13", appearance, lightTheme: "sepia", darkTheme: "nord", systemDark, hash, withStyle: true }),
+      { theme: got.theme, palette: got.palette, color: THEME_COLORS[got.palette], style: "ios13", sheet: "card" }, what);
+  }
+  assert.deepEqual(STYLES, ["ios6", "ios7", "ios13"]);
+  assert.deepEqual([hooksOf("ios13"), hooksOf("ios7"), hooksOf("ios6")],
+    [{ nav: "large", sheet: "card" }, { nav: null, sheet: null }, { nav: null, sheet: null }]);
+});
+
+// F202: ios13.css is linked after palettes.css and ios7.css, before wide.css, and every rule in it is scoped to
+// html[data-style="ios13"], so iOS 6 and iOS 7 never see it; it keeps iOS 6's filled tab glyphs (no glyph of its own).
+test("F202: ios13.css is linked after palettes.css and only styles html[data-style=ios13]", () => {
+  const links = [...read("index.html").matchAll(/<link rel="stylesheet" href="([^"]+)"/g)].map((m) => m[1]);
+  assert.ok(links.indexOf("ios13.css") > links.indexOf("ios7.css"));
+  assert.ok(links.indexOf("ios13.css") > links.indexOf("palettes.css"));
+  assert.ok(links.indexOf("ios13.css") < links.indexOf("wide.css"));
+  const css = read("ios13.css").replace(/\/\*[\s\S]*?\*\//g, "");
+  const sels = [...css.matchAll(/([^{}]+)\{/g)].map((m) => m[1].trim());
+  assert.ok(sels.length > 20);
+  for (const sel of sels) for (const one of sel.split(/,(?![^(]*\))/)) assert.match(one.trim(), /^html\[data-style="ios13"\]/, one);
+  assert.doesNotMatch(css, /--glyph:/, "filled tabs: ios6.css's glyphs");
+  // 120 Hz: nothing that animates or blurs
+  assert.doesNotMatch(css, /transition|animation|backdrop-filter|will-change/);
 });
 
 // F325: the textured themes (Leather, Felt, Wood; Legal Pad, Brushed Metal): a texture drawn in CSS where Linen's

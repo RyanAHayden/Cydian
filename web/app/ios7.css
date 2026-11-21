@@ -334,6 +334,27 @@ html[data-style="ios7"][data-theme="dark"] .search-cancel { background: none; }
    #f3f3f3 buttons and a #ebebeb Cancel (the colour tokens above). */
 html[data-style="ios7"] .action-button { font-size: 21px; font-weight: 400; border-radius: 3px; }
 html[data-style="ios7"] .action-button.cancel { font-weight: 600; }
+/* F341: the kit's geometry. The choices are one block with 3pt corners, 44pt buttons split by .5pt separators, 8pt
+   from the screen's sides and its bottom, Cancel 8pt under the block; the title sits inside the block, in its first
+   cell. The kit's separator is a .5pt gap where the dimmed page shows through; a .5pt flex gap lands on half pixels
+   at 3x and Chromium drops some of them, so the buttons touch and each one after the first (or after the title)
+   draws a .5pt line across its top instead: the dimming's colour in White, the alert's line colour in OLED Black
+   (the dimmed black page would hide it). Their 1pt transparent border goes, so the line runs edge to edge. */
+html[data-style="ios7"][data-theme="light"] { --i7-action-line: rgba(0,0,0,.4); }
+html[data-style="ios7"][data-theme="dark"] { --i7-action-line: #38383a; }
+html[data-style="ios7"] {
+  --action-sheet-pad: 8px 8px; --action-sheet-pad-bottom: 8px;
+  --action-gap: 8px; --action-list-gap: 0px; --action-list-bleed: 0px;
+  --action-title-margin: 0 0 -8px; --action-title-pad: 14px 16px; /* -8: the sheet's 8pt gap closed under the title */
+  --action-cancel-gap: 0px;
+}
+html[data-style="ios7"] .action-list { border-radius: 3px; }
+html[data-style="ios7"] .action-list > .action-button { border-width: 0; border-radius: 0; }
+html[data-style="ios7"] .action-list > .action-button + .action-button,
+html[data-style="ios7"] .action-title + .action-list > .action-button:first-child { box-shadow: inset 0 .5px 0 var(--i7-action-line); }
+html[data-style="ios7"] .action-title { background: var(--action-btn); border-radius: 3px 3px 0 0; }
+html[data-style="ios7"][data-theme="dark"] .action-title { background: var(--dk-action-btn); }
+html[data-style="ios7"] .action-title + .action-list { border-top-left-radius: 0; border-top-right-radius: 0; }
 html[data-style="ios7"][data-theme="dark"] .action-button.destructive { background: var(--action-destructive); }
 
 /* The bars over the page: the banner's Upgrade is bold tinted text centred in its 30pt box (the 44pt line-height of
@@ -378,11 +399,15 @@ html[data-style="ios7"] .pkg-row {
   background: var(--i7-keyline) 51px 0 / calc(100% - 51px) 100% no-repeat, var(--plain); /* from the name, 51pt in */
 }
 
-/* Alert ("Alert" in the kit): a white box with 7pt corners, black 17pt semibold title, 13pt message, tinted 17pt
-   buttons with no box under a .5pt rgba(0,0,0,.3) line, a .5pt line between two side by side; the default (last)
-   button semibold. The box keeps iOS 6's padding and button gaps (no hook yet), so the lines are drawn on the box
-   itself, edge to edge, from its bottom: the button row starts 54pt up (11pt padding + the 43pt button), and the line
-   sits 2pt above that, in the 4pt gap over the row. */
+/* Alert ("Alert" in the kit): a 270pt white box with 7pt corners, black 17pt semibold title, 13pt message, tinted 17pt
+   buttons with no box, edge to edge in a 44pt row under a .5pt rgba(0,0,0,.3) line, a .5pt line between two side by
+   side; the default (last) button semibold. The row has no gaps and meets the box's sides and bottom (its margin
+   undoes the box's 16pt side padding), so each button draws its own lines: one across its top, and one down its left
+   when it follows another in a row. The bottom buttons take the box's corners so a press stays inside them. */
+html[data-style="ios7"] {
+  --alert-w: 270px; --alert-pad: 18px 16px 0;
+  --alert-buttons-margin: 8px -16px 0; --alert-buttons-gap: 0px; --alert-stacked-gap: 0px; --alert-button-h: 44px;
+}
 html[data-style="ios7"][data-theme="light"] {
   --i7-alert: rgba(248,248,248,.97); --i7-alert-line: rgba(0,0,0,.3); --i7-alert-pressed: rgba(0,0,0,.08);
   --i7-alert-dim: rgba(0,0,0,.25); --i7-alert-field: #fff; --i7-alert-field-edge: #c8c7cc; --i7-scrim: rgba(0,0,0,.4);
@@ -394,35 +419,7 @@ html[data-style="ios7"][data-theme="dark"] {
 html[data-style="ios7"] .alert-scrim { background: var(--i7-scrim); }
 html[data-style="ios7"] .alert {
   border: 0; border-radius: 7px; box-shadow: none; color: var(--i7-label); text-shadow: none;
-  background:
-    linear-gradient(var(--i7-alert-line), var(--i7-alert-line)) 0 calc(100% - 56px) / 100% .5px no-repeat,
-    linear-gradient(var(--i7-alert-line), var(--i7-alert-line)) 50% 100% / .5px 56px no-repeat,
-    var(--i7-alert);
-}
-html[data-style="ios7"] .alert:has(> .alert-buttons > .alert-button:only-child) {
-  background: linear-gradient(var(--i7-alert-line), var(--i7-alert-line)) 0 calc(100% - 56px) / 100% .5px no-repeat, var(--i7-alert);
-}
-/* stacked buttons (three or more, or two long ones): 43pt with 9pt gaps, a line across each gap and over the first */
-html[data-style="ios7"] .alert:has(> .alert-buttons.stacked > :nth-child(2):last-child) {
-  background:
-    linear-gradient(var(--i7-alert-line), var(--i7-alert-line)) 0 calc(100% - 58.5px) / 100% .5px no-repeat,
-    linear-gradient(var(--i7-alert-line), var(--i7-alert-line)) 0 calc(100% - 109px) / 100% .5px no-repeat,
-    var(--i7-alert);
-}
-html[data-style="ios7"] .alert:has(> .alert-buttons.stacked > :nth-child(3):last-child) {
-  background:
-    linear-gradient(var(--i7-alert-line), var(--i7-alert-line)) 0 calc(100% - 58.5px) / 100% .5px no-repeat,
-    linear-gradient(var(--i7-alert-line), var(--i7-alert-line)) 0 calc(100% - 110.5px) / 100% .5px no-repeat,
-    linear-gradient(var(--i7-alert-line), var(--i7-alert-line)) 0 calc(100% - 161px) / 100% .5px no-repeat,
-    var(--i7-alert);
-}
-html[data-style="ios7"] .alert:has(> .alert-buttons.stacked > :nth-child(4):last-child) {
-  background:
-    linear-gradient(var(--i7-alert-line), var(--i7-alert-line)) 0 calc(100% - 58.5px) / 100% .5px no-repeat,
-    linear-gradient(var(--i7-alert-line), var(--i7-alert-line)) 0 calc(100% - 110.5px) / 100% .5px no-repeat,
-    linear-gradient(var(--i7-alert-line), var(--i7-alert-line)) 0 calc(100% - 162.5px) / 100% .5px no-repeat,
-    linear-gradient(var(--i7-alert-line), var(--i7-alert-line)) 0 calc(100% - 213px) / 100% .5px no-repeat,
-    var(--i7-alert);
+  background: var(--i7-alert);
 }
 html[data-style="ios7"] .alert::before { background: none; }
 html[data-style="ios7"] .alert-title { font-size: 17px; line-height: 22px; font-weight: 600; }
@@ -441,9 +438,15 @@ html[data-style="ios7"] .alert-button.cancel,
 html[data-style="ios7"] .alert-button.green,
 html[data-style="ios7"] .alert-button.red,
 html[data-style="ios7"] .alert-button:disabled {
-  border: 0; border-radius: 0; box-shadow: none; text-shadow: none; background: none;
+  border: 0; border-radius: 0; box-shadow: inset 0 .5px 0 var(--i7-alert-line); text-shadow: none; background: none;
   font-size: 17px; font-weight: 400; color: var(--i7-tint);
 }
+html[data-style="ios7"] .alert-buttons:not(.stacked) > .alert-button + .alert-button {
+  box-shadow: inset 0 .5px 0 var(--i7-alert-line), inset .5px 0 0 var(--i7-alert-line);
+}
+html[data-style="ios7"] .alert-buttons:not(.stacked) > .alert-button:first-child { border-bottom-left-radius: 7px; }
+html[data-style="ios7"] .alert-buttons:not(.stacked) > .alert-button:last-child { border-bottom-right-radius: 7px; }
+html[data-style="ios7"] .alert-buttons.stacked > .alert-button:last-child { border-radius: 0 0 7px 7px; }
 html[data-style="ios7"] .alert-button:last-child:not(.cancel) { font-weight: 600; }
 html[data-style="ios7"] .alert-button.red { color: var(--i7-red); }
 html[data-style="ios7"] .alert-button:disabled { color: var(--i7-alert-dim); opacity: 1; }

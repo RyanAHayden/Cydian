@@ -318,13 +318,14 @@ the way it sets colours, never on bare `:root`.
 
 The light palettes in `palettes.css` paint the chrome through tokens: their shared `html[data-theme="light"]` block
 maps the `--lt-*` colours onto `ios6.css`'s `--nav-bar`, `--bar-btn*`, `--bar-back*` and `packages.css`'s
-`--search-*`, `--scope-seg*`, `--store-head*` (see Palettes under [Writing an era](#writing-an-era)).
+`--search-*`, `--scope-seg*`, `--store-head*` (see Palettes under [Writing an era](#writing-an-era)). Brushed
+Metal's etched text stays a rule on purpose: its dark text skips Done, the red button, My IPAs' Delete and the
+console, which one token cannot.
 
 Not yet clean, each queued as its own cleanup:
 
-- the light palettes' App Store segmented-control rules in `palettes.css` (the control now reads `--seg*` tokens;
-  the rules have not moved onto them yet), and Brushed Metal's etched-text rule, which stays a rule on purpose (its
-  dark text skips Done, the red button, My IPAs' Delete and the console, which one token cannot);
+- the light palettes' App Store segmented-control rules in `palettes.css` (`ios6.css`'s control reads `--seg*`
+  tokens; the palettes still paint it with rules of their own);
 - the floating-tab-bar nav hook above.
 
 The screens' inline SVG art comes from the icon map below; the overlays `nav/` draws take theirs from CSS tokens

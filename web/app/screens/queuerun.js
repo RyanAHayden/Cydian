@@ -15,7 +15,8 @@
 //     "Stopping after X…", Cancel greyed; then Confirm again with what finished cleared from the queue and the
 //     footer "Stopped. N installed and cleared from the queue."), Close after a run with failures. Top right: Hide
 //     while it runs (the page slides away; a strip under every tab's nav bar reopens it, and the Installed badge
-//     counts what's left), Retry All once it ended with failures (failed, skipped and cancelled rows), Close when clean.
+//     counts what's left), Retry All once it ended with failures (failed, skipped and cancelled rows). A clean end has no bar
+//     buttons, as the 4S's "Complete": the finish button closes it.
 //   The bottom: the status and bar while it runs, then the finish button (core/progress.js chooseFinish over what
 //     was installed: Restart SpringBoard for a tweak, Reload Data for an app, Return to iFizBox).
 //
@@ -199,20 +200,18 @@ export async function runQueue({ jobs, plan }, deps) {
   };
 
   // ---- the bar ----
-  // B224: as Cydia's Running page on the 4S: plain black-bar buttons, Cancel at the top left; Close (not a blue Done)
-  // once it ends clean
+  // B224: as Cydia's Running page on the 4S: plain black-bar buttons, Cancel at the top left; no buttons once it ends
+  // clean (the 4S's Complete has none: the finish button closes it)
   const hide = barButton("Hide");
   const cancel = barButton("Cancel");
   const closeB = barButton("Close");
   const retryAll = barButton("Retry All");
-  const done = barButton("Close");
   hide.addEventListener("click", () => { page.hide(); strip.show(); tick(); });
   cancel.addEventListener("click", () => {
     if (cancel.disabled) return;
     if (run.cancel()) { cancel.disabled = true; for (const r of rows) draw(r); tick(); }
   });
   closeB.addEventListener("click", () => page.close());
-  done.addEventListener("click", () => page.close());
   retryAll.addEventListener("click", () => { const p = run.retryAll(); if (p) drive(p); });
   const retry = (id) => { const wasRunning = run.running; const p = run.retry(id); if (p && !wasRunning) drive(p); };
 
@@ -280,7 +279,7 @@ export async function runQueue({ jobs, plan }, deps) {
       deps.reopenConfirm?.(`Stopped. ${installed.length} installed and cleared from the queue.`);
       return result;
     }
-    page.bar(bad.length ? { left: closeB, right: retryAll } : { right: done });
+    page.bar(bad.length ? { left: closeB, right: retryAll } : {});
     page.finish({ label: choice.label, status: text, action: () => finishAction(choice) });
     if (page.hidden) strip.update();
     return result;

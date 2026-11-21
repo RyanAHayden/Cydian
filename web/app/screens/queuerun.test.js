@@ -108,8 +108,7 @@ test("a bad hash fails one package, skips what needs it, installs the rest; Retr
   s.page.bars.at(-1).right.click();
   for (let i = 0; i < 20 && !(s.page.finished && s.calls.logs.length === 2); i++) await settle();
   assert.deepEqual(s.calls.install.map(([id]) => id), ["other", "lib", "tweak"]);
-  assert.equal(s.page.bars.at(-1).right.textContent, "Close"); // B224: plain Close, not a blue Done
-  assert.ok(!s.page.bars.at(-1).right.className.includes("done"));
+  assert.equal(s.page.bars.at(-1).right ?? null, null); // B224: no bar buttons at a clean end, as the 4S's Complete
   assert.equal(s.page.bars.at(-1).left ?? null, null);
   assert.deepEqual(s.calls.auto.at(-1), ["lib"]);
   await settle();

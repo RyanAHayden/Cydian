@@ -21,7 +21,7 @@
 //   The nav bar, as F234's (B224: Cydia's on the 4S, "Running" then "Complete", plain buttons; Apps | Log on a band
 //     under it): Cancel at the top left while it runs (every app not finished is abandoned; then the app Confirm
 //     again with what finished cleared and the footer "Stopped. N installed and cleared from the queue."), Retry All
-//     at the top right after failures (Close at the top left), Close at the top right when clean. A pass that starts after the run ended (Retry All, a
+//     at the top right after failures (Close at the top left), no bar buttons when clean. A pass that starts after the run ended (Retry All, a
 //     row's retry, Try Again) empties the Log first: the last pass's lines belong to it only (B153).
 //   The bottom: the status and the bar while it runs, then Return to iFizBox. When iFizBox's own IPA went to iOS
 //     (B123, followSelf): locked on "Waiting for iOS" while the shell waits for iOS to download it, "Closing iFizBox"
@@ -340,14 +340,12 @@ export async function runAppRun(jobs, deps) {
   const cancel = barButton("Cancel"); // B224: Cydia's plain Cancel at the top left, not red
   const closeB = barButton("Close");
   const retryAll = barButton("Retry All");
-  const done = barButton("Close");
   let cancelled = false;
   cancel.addEventListener("click", () => {
     if (cancel.disabled) return;
     if (run.cancel()) { cancelled = true; cancel.disabled = true; for (const r of rows) draw(r); tick(); }
   });
   closeB.addEventListener("click", () => page.close());
-  done.addEventListener("click", () => page.close());
   retryAll.addEventListener("click", () => { const p = run.retryAll(); if (p) drive(p); });
   const retry = (id) => { const p = run.retry(id); if (p) drive(p); };
   const ownId = (id) => { const p = run.ownIdRetry(id); if (p) drive(p); };
@@ -386,7 +384,7 @@ export async function runAppRun(jobs, deps) {
       if (queue.size) reopenConfirm(`Stopped. ${installed.length} installed and cleared from the queue.`);
       return result;
     }
-    page.bar(bad.length ? { left: closeB, right: retryAll } : { right: done });
+    page.bar(bad.length ? { left: closeB, right: retryAll } : {}); // B224: a clean end has none, as the 4S's Complete
     // B49: iFizBox's own IPA is with iOS, which closes iFizBox to install it: nothing to tap
     const fin = sentSelf ? null : deps.finish?.(result); // B71a: the jailbreak run's (AppSync Unified's respring)
     const opener = sentSelf || fin ? null : openRow(rows, lanes); // B111: one app installed on This iPhone

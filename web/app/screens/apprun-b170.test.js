@@ -86,13 +86,13 @@ test("B170: a row's stop at iOS's prompt is never recorded, even when the shell 
   s.page.close();
 }));
 
-test("B170: the red Cancel records nothing it cancelled", () => withDom(async () => {
+test("B170: the run's Cancel records nothing it cancelled", () => withDom(async () => {
   const s = setup([app("a", "Alpha"), app("b", "Beta")], { deaf: true });
   const doc = fakeDoc();
   const done = runAppRun(s.queue.list(), { queue: s.queue, lanes: s.l, record: async (j) => s.recorded.push(j.id), open: () => s.page,
     doc, isInstalled: async () => ({ a: true, b: true }), reopenConfirm: () => {}, store: async () => memoryAppStore() });
   await settle();
-  s.page.bars.at(-1).right.click(); // Cancel while Alpha is with iOS
+  s.page.bars.at(-1).left.click(); // Cancel (B224: top left) while Alpha is with iOS
   const r = await done;
   assert.deepEqual(r.rows.map((x) => x.state), ["cancelled", "cancelled"]);
   await s.l.release("a");

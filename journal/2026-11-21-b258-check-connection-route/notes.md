@@ -28,6 +28,21 @@ said Paired. Check Connection told the user to turn on a VPN they weren't using.
 - screens/installroute-f301.test.js: its fixture is signed in to Tailscale with Connect With: Automatic, so with both
   VPNs off the answer is now "Turn On Tailscale", matching the status cell's "Tailscale Is Off".
 
+## Spec review
+
+Fixed: the early-eof Pair Again now says which VPN answered ("answered through Tailscale"). The Tailscale-on
+"Couldn't Connect" no longer tells the user to check that Tailscale is on (it is); it says to try again, then turn the
+VPN off and on. Check Connection's "Not Responding" timeout names the route from the status read instead of
+"LocalDevVPN (or Tailscale)".
+
+Kept, with the reasons:
+- "after connecting" isn't checked separately. An EOF can only be read on a socket that was open, and the error
+  comes from `tunnel_create_rppairing` after its TCP connect, so the match already implies it.
+- Both VPNs on → Tailscale. The shell's own rule (`tailscale.use`, decideRoute) connects through Tailscale then.
+- Neither on → "Turn On Tailscale" when the user set up Tailscale. This is the "name the route" part for that case.
+- `recheckPairing`: an early eof gives `again` without `unusable`, which still returns "failed" there, the same as
+  the old Turn On answer.
+
 ## Tests
 
 `node --test web/app/core/ web/app/screens/`: 1896 pass. New test in installroute.test.js covers the R54 error, the

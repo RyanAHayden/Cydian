@@ -5,6 +5,7 @@ import assert from "node:assert/strict";
 import { decideRoute, routeParams, tailscaleTestResult, tailscaleFooter, connectFooter, keyDaysLeft, aclRule, CONNECT_OPTIONS, storedRoute, pairState, pairEvent, pairFooter, pairFromNative, pinText, verifyFailure, ROUTE_OPTIONS, ALERTS, VPNS, vpnList, STORAGE_KEY, IPHONE_INTRO, setupState, vpnOn, CONNECT_ALERT, PAIR_GUIDE } from "./installroute.js";
 import { existsSync, readFileSync } from "node:fs";
 import { ringStyle } from "./installroute.js";
+import { verifyVPN } from "./installroute.js";
 import { SETTINGS } from "./settings.js";
 
 const mem = (v) => ({ getItem: (k) => (k === STORAGE_KEY ? v : null) });
@@ -229,12 +230,16 @@ test("Check Connection: a connect failure names the route used; early eof is Pai
   assert.equal(eof.again, true);
   assert.ok(!eof.unusable, "an early eof offers Pair Again but doesn't forget the pairing by itself");
   assert.doesNotMatch(eof.message, /LocalDevVPN/);
+  assert.match(eof.message, /through Tailscale/);
+  assert.equal(verifyVPN(null, "connect_failed: x"), "LocalDevVPN");
+  assert.equal(verifyVPN({ localDevVPN: true, tailscale: { use: true } }), "Tailscale", "both on: the shell's route is Tailscale");
   assert.equal(verifyFailure(cf("Socket(Kind(UnexpectedEof))")).title, "Pair Again");
 
   // the route on, still no connection: name it, don't ask to turn it on
   const ts = verifyFailure(cf("timeout"), tsOn);
   assert.equal(ts.title, "Couldn't Connect");
-  assert.match(ts.message, /through Tailscale/);
+  assert.match(ts.message, /Tailscale is on/);
+  assert.doesNotMatch(ts.message, /Check that Tailscale is on/);
   assert.doesNotMatch(ts.message, /LocalDevVPN/);
   assert.equal(verifyFailure(cf("timeout"), ldvOn).title, "Turn On LocalDevVPN"); // LocalDevVPN's stays as it was
 

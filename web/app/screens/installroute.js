@@ -23,7 +23,7 @@ import { showAlert } from "../nav/alert.js";
 import { copyText } from "../nav/menu.js";
 import { toBase64 } from "../core/signing.js";
 import { vpnRoute, connectAlert, LOCALDEVVPN_STORE, TAILSCALE_URL } from "../core/installroute.js";
-import { ROUTE_KEY, ROUTE_OPTIONS, VPNS, VPN_POLL, vpnList, vpnOn, IPHONE_INTRO, setupState, PAIR_GUIDE, pairEvent, pairFooter, pairFromNative, pinText, PAIR_STEPS, verifyFailure,
+import { ROUTE_KEY, ROUTE_OPTIONS, VPNS, VPN_POLL, vpnList, vpnOn, IPHONE_INTRO, setupState, PAIR_GUIDE, pairEvent, pairFooter, pairFromNative, pinText, PAIR_STEPS, verifyFailure, verifyVPN,
   CONNECT_OPTIONS, connectFooter, tailscaleFooter, tailscaleTestResult } from "../core/installroute.js";
 import { ringStyle, vpnWaitText } from "../core/installroute.js";
 import { tailscaleRoute } from "../core/installroute.js";
@@ -1015,7 +1015,7 @@ async function check(native, alert, redraw, store, mark = null) {
     mark?.show(true);
   } catch (e) {
     const why = isLate(e)
-      ? { title: NOT_RESPONDING, message: `This iPhone didn't answer in ${TIMEOUTS.verify / 1000} seconds. Check that ${VPN} (or Tailscale) is on, then check again.`, again: false }
+      ? { title: NOT_RESPONDING, message: `This iPhone didn't answer in ${TIMEOUTS.verify / 1000} seconds. Check that ${st ? verifyVPN(st) : `${VPN} (or Tailscale)`} is on, then check again.`, again: false }
       : verifyFailure(e, st);
     mark?.show(false);
     try {

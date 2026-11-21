@@ -2,7 +2,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createSettings, iconFor, iconState, iconGroups, clearOffered, APP_ICONS, LIGHT_PALETTES, DARK_PALETTES } from "./core/settings.js";
-import { iconMessage, tellIcon, resetTold, iconSrc, clearHere, readIcons } from "./appicon.js";
+import { iconMessage, tellIcon, resetTold, iconSrc, clearHere, readIcons, retryable } from "./appicon.js";
 
 function memStorage() {
   const m = new Map();
@@ -125,7 +125,9 @@ test("turning Match Theme back on after a Clear pick switches back, and a refuse
   let refuse = 0;
   const native = { call: (m, p) => {
     calls.push(p);
-    return refuse-- > 0 ? Promise.reject(new Error("failed: The operation couldn’t be completed. (NSPOSIXErrorDomain error 35.)")) : Promise.resolve({});
+    // as native/bridge.js's withCode hands the shell's "failed: <text>" on
+    const e = Object.assign(new Error("The operation couldn’t be completed. (NSPOSIXErrorDomain error 35.)"), { code: "failed" });
+    return refuse-- > 0 ? Promise.reject(e) : Promise.resolve({});
   } };
   globalThis.ifizboxNative = native;
   try {
@@ -168,6 +170,7 @@ test("turning Match Theme back on after a Clear pick switches back, and a refuse
 
     // Not an iOS refusal (an older shell): no retry, but the next change sends again
     native.call = (m, p) => { calls.push(p); return Promise.reject(new Error("unknown method app.icon")); };
+    assert.equal(retryable(new Error("failed: from a mock without the bridge")), true);
     s.set("darkTheme", "oled");
     tellIcon("light", s, native);
     await flush();

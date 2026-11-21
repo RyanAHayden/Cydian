@@ -56,7 +56,7 @@ enum AppIcon {
             if [light, dark, shown].contains(where: OwnIcons.isOwn) { return OwnIcons.applyShown(shown, c) }
             let name = setName(light: light, dark: dark, onScreen: shown, variants: variants, sets: sets)
             DispatchQueue.main.async {
-                whenActive {
+                whenActive(dropped: { c.reply(["name": name ?? "AppIcon", "changed": false, "quiet": false], nil) }) {
                     switchTo(name) { changed, quiet, err in
                         if let err = err { return c.reply(nil, "failed: \(err)") }
                         c.reply(["name": name ?? "AppIcon", "changed": changed, "quiet": quiet], nil)
@@ -67,16 +67,23 @@ enum AppIcon {
     }
 
     // Runs `f` now if the app is active, else once it becomes active (the latest call wins). On the main queue.
+    // B243: a call the latest replaces runs its `dropped` instead (it answers unchanged, so its promise settles).
     private static var waiting: (() -> Void)?
+    private static var waitingDropped: (() -> Void)?
     private static var observer: NSObjectProtocol?
-    static func whenActive(_ f: @escaping () -> Void) {
-        if UIApplication.shared.applicationState == .active { waiting = nil; return f() }
+    static func whenActive(dropped: (() -> Void)? = nil, _ f: @escaping () -> Void) {
+        let before = waitingDropped
+        waitingDropped = nil
+        if UIApplication.shared.applicationState == .active { waiting = nil; before?(); return f() }
         waiting = f
+        waitingDropped = dropped
+        before?()
         guard observer == nil else { return }
         observer = NotificationCenter.default.addObserver(forName: UIApplication.didBecomeActiveNotification,
                                                           object: nil, queue: .main) { _ in
             let f = waiting
             waiting = nil
+            waitingDropped = nil
             f?()
         }
     }
@@ -104,7 +111,7 @@ enum AppIcon {
             }
         }
         // A completion that never comes (the private call on some iOS) mustn't hold every later switch
-        DispatchQueue.main.asyncAfter(deadline: .now() + 15, execute: next)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 60, execute: next)
         apply(name) { changed, quiet, err in
             done(changed, quiet, err)
             next()
@@ -422,7 +429,7 @@ enum OwnIcons {
     static func applyShown(_ shown: String, _ c: Bridge.Call) {
         let finish = { (name: String?) in
             DispatchQueue.main.async {
-                AppIcon.whenActive {
+                AppIcon.whenActive(dropped: { c.reply(["name": name ?? "AppIcon", "changed": false, "quiet": false], nil) }) {
                     AppIcon.switchTo(name) { changed, quiet, err in
                         if let err = err { return c.reply(nil, "failed: \(err)") }
                         c.reply(["name": name ?? "AppIcon", "changed": changed, "quiet": quiet], nil)

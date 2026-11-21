@@ -53,7 +53,8 @@ export const iconMessage = (read, onScreen) => ({ method: "app.icon", params: ic
 // B243: a switch the shell answers "failed: …" (iOS refused it) is sent again, after each of these waits in turn; a
 // newer change cancels the retry (it sends its own). Other refusals (an older shell, bad_params, resign_needed) aren't.
 export const RETRY_MS = [1000, 3000, 10000];
-export const retryable = (e) => /^failed\b/.test(String(e?.message ?? e ?? ""));
+// native/bridge.js turns "failed: <text>" into an Error with code "failed" and message <text>.
+export const retryable = (e) => e?.code === "failed" || /^failed\b/.test(String(e?.message ?? e ?? ""));
 
 let lastSent = "";
 let sends = 0; // a reply counts only while no newer app.icon went out

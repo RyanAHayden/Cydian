@@ -29,6 +29,18 @@ unless `alternateIconName` is already nil. No alert means that call never ran or
 
 `web/app/screens/settings.js` needed no change: its path to `tellIcon` was already right.
 
+## Spec review
+
+- Fixed: the retry never fired on a device. `native/bridge.js` `withCode` turns the shell's `failed: <text>` into
+  an Error with `code` "failed" and message `<text>`, and the first `retryable` checked only the message. It now
+  checks `code`, and the test's mock rejects the way the bridge does.
+- Fixed: `whenActive` dropped a call that a later one replaced (app in the background) without answering it, so
+  its promise never settled. A replaced call now answers unchanged.
+- The guard that frees the switch line is now 60 s (15 s could free it while iOS's alert is still up; the page's
+  retry covers what still goes wrong).
+- Left as is: a replaced queued switch answers unchanged rather than with an error. The page already ignores a
+  reply once a newer app.icon went out.
+
 ## Tried
 
 - The iPhone 15 rig, to reproduce and then check the fix: `tools/ui-15.sh lock B243` answered "locked by B246"

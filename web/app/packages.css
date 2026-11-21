@@ -563,20 +563,28 @@ html.has-manage-toolbar .search-results::after { content: ""; }
 .dep-web { padding: 6px 12px; }
 .dep-web iframe { display: inline-block; max-width: 100%; height: auto; }
 /* ==== look-only { ==== a signature's days left */
+/* B241: the fills and the shadow are tokens, so an era (ios13.css) draws its own pills without rules of its own. */
+:root {
+  --sig-pill: linear-gradient(#b8eda6, #4fc232 48.8%, #3cb11d 50.5%, #24900a); /* ok */
+  --sig-pill-soon: linear-gradient(#fde0a0, #f6a724 48.8%, #f2990b 50.5%, #c97900);
+  --sig-pill-expired: linear-gradient(#f7b3b7, #e92d35 48.8%, #e70f19 50.5%, #c50103); /* .badge's red */
+  --sig-pill-unknown: linear-gradient(#d4d4d4, #9a9a9a 48.8%, #8c8c8c 50.5%, #6e6e6e);
+  --sig-pill-shadow: 0 1px 1.5px rgba(0,0,0,.45);
+}
 .sig-pill, .cell[class*="sig-row-"] .cell-detail, .pkg-row[data-change="resign"] .pkg-version {
   border-radius: 10px; font-size: 13px; font-weight: bold; line-height: 20px; letter-spacing: -.02em; color: #fff;
-  text-align: center; box-shadow: 0 1px 1.5px rgba(0,0,0,.45);
-  background: linear-gradient(#b8eda6, #4fc232 48.8%, #3cb11d 50.5%, #24900a); /* ok */
+  text-align: center; box-shadow: var(--sig-pill-shadow);
+  background: var(--sig-pill);
 }
 .sig-pill[data-sig="soon"], .cell.sig-row-soon .cell-detail, .pkg-row[data-change="resign"][data-sig="soon"] .pkg-version {
-  background: linear-gradient(#fde0a0, #f6a724 48.8%, #f2990b 50.5%, #c97900);
+  background: var(--sig-pill-soon);
 }
 .sig-pill[data-sig="expired"], .cell.sig-row-expired .cell-detail, .pkg-row[data-change="resign"][data-sig="expired"] .pkg-version {
-  background: linear-gradient(#f7b3b7, #e92d35 48.8%, #e70f19 50.5%, #c50103); /* .badge's red */
+  background: var(--sig-pill-expired);
 }
 .pkg-row[data-change="resign"] .pkg-version::before { content: none; }
 /* F221: an app marked as installed: no expiry known, a grey "?" with the same gloss (the grey of the pills' family). */
-.sig-pill[data-sig="unknown"] { background: linear-gradient(#d4d4d4, #9a9a9a 48.8%, #8c8c8c 50.5%, #6e6e6e); background-origin: border-box; }
+.sig-pill[data-sig="unknown"] { background: var(--sig-pill-unknown); background-origin: border-box; }
 .dep-rating { line-height: 0; }
 .dep-stars {
   --star: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath fill='%23c4c4c4' d='M10 1l2.6 6.2 6.9.4-5.3 4.4 1.7 6.6L10 15l-5.9 3.6 1.7-6.6L.5 7.6l6.9-.4z'/%3E%3C/svg%3E");

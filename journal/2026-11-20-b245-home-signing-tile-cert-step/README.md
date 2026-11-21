@@ -24,6 +24,14 @@ unchanged. Installation's cell is outside this task's file: filed as B250.
   setup.
 - `web/app/screens/home-certstep.test.js`: the new subtitle, the unchanged cases (no server, http server, website).
 
+## Spec review
+
+- "The subtitle may name the wrong step": no. The walkthrough has two steps (certificate, server; `missingStep`), so
+  not set up with an https server means the certificate. Said so in a comment by `httpsServer`.
+- "The tile still contradicts Ready to Install": that is Installation's cell, outside this task's file: B250.
+- "plan/TODO.md hand-edited": it was `run plan add` (B250). Kept.
+- Fixed: `httpsServer` normalized the server twice.
+
 ## Not verified
 
 - Not looked at on a phone (the iPhone 15 Pro rig): a one-line subtitle change on an existing tile, covered by the

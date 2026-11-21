@@ -626,7 +626,11 @@ export function slotTile(mode, slot, { get, now, certShown = showsCertTile(mode)
 }
 export const CERT_STEP_LEFT = "Import your certificate to install"; // fits the tile at 320pt
 // The Signing Server when installs can use it (an https:// address, as screens/signing.js serverReady), else null.
-export const httpsServer = (server) => (/^https:\/\//.test(normalizeServer(server) ?? "") ? normalizeServer(server) : null);
+// Settings > Signing has two steps (certificate, server), so with this set, not set up means no certificate.
+export function httpsServer(server) {
+  const s = normalizeServer(server);
+  return s && /^https:\/\//.test(s) ? s : null;
+}
 // The tile, kept up to date: Home showing again (Back from Settings > Signing), the app coming back, Settings'
 // Expiry Warning, Show Expiry Warning and Re-sign Reminder, and Settings > Signing's status ("ifizbox:signing-status",
 // its identity as the detail) after an import or removal. Stops once the row leaves the page.

@@ -406,7 +406,8 @@ async function tailscaleSignIn(native, alert, redraw, from = null, { hud = false
 // `budgetMs` is spent; a failure only the user can fix (approve the device, sign in again, refused, ...) ends it at
 // once. Answers { ok, code, ... } as tailscale.test does (not_responding when it didn't answer in TIMEOUTS.test).
 export const AFTER_SIGN_IN = { budgetMs: 30000, gapMs: 2500 };
-const FINAL_CODES = new Set(["needs_approval", "expired", "needs_login", "refused"]);
+// "error": tailscale.test itself failed (not signed in, the bridge refused it): trying again changes nothing.
+const FINAL_CODES = new Set(["needs_approval", "expired", "needs_login", "refused", "error"]);
 export async function testUntilConnected(native, now = () => Date.now()) {
   const t0 = now();
   for (;;) {

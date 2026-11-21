@@ -44,6 +44,11 @@ test("a failure only the user can fix ends it at once", async () => {
     assert.equal(r.code, code);
     assert.equal(native.count("tailscale.test"), 1, code);
   }
+  const calls = [];
+  const throwing = { call: (m) => { calls.push(m); return Promise.reject(Object.assign(new Error("not_signed_in: sign in to Tailscale first"), { code: "not_signed_in" })); } };
+  const r = await testUntilConnected(throwing);
+  assert.equal(r.code, "error");
+  assert.equal(calls.length, 1, "a call that fails outright isn't tried again");
 });
 
 test("it stops trying once the budget is spent and answers the last failure", async () => {

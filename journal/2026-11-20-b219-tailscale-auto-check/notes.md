@@ -23,6 +23,15 @@
   alert on success with the row spinner or HUD, the alert on failure, and refused going to B220's re-pair. The
   source check in `installroute-b220.test.js` now looks for `connectAfterSignIn` and not the "Signed In" alert.
 
+## Spec review
+
+- Fixed: a `tailscale.test` call that throws (not signed in, the bridge refused it) used to be retried for the
+  whole budget. Now it is final (`error` is in FINAL_CODES).
+- Kept as designed. The setup page skips `recheckPairing` after a sign-in, but its Connect step only shows while
+  the phone has no pairing (core setupState: `connect` needs `!paired`), so the recheck would answer "skipped"
+  anyway. When `refused` is followed by a verify that passes, the answer is "ok": the pairing works over the
+  route in use. The budget is checked before each try, so the worst case is 30 s plus one TIMEOUTS.test (25 s).
+
 ## Phone (iPhone 15 Pro, iOS 27.0.1)
 
 Built the Lite IPA from this branch (installroute.js in it has `connectAfterSignIn`), installed it with

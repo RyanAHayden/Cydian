@@ -16,6 +16,7 @@
 import { el } from "../nav/ui.js";
 import { showAlert } from "../nav/alert.js";
 import { showActionSheet } from "../nav/actionsheet.js";
+import { nativeBridge, hasNativeCall } from "../native.js";
 import { openIpaStore, memoryIpaStore } from "../core/myipas.js";
 import { prepareTweaks, tweakProblem, tweakKind, TWEAK_ACCEPT, ELLEKIT, checkElleKit, needsElleKit, withElleKit } from "../core/tweaks.js";
 import { inspectTweakDeb, targetsApp, worksInText, TWEAK_LIMIT, UnpackError } from "../core/tweaks.js"; // F302
@@ -267,7 +268,7 @@ export async function tweakDeb(st, { fetchDeb = defaultFetchDeb, paid = null } =
 //   await offerPaid(st, e, { paid, sheet, alert })   a PaidNeeded's action sheet: Sign In to <seller> or Buy for <price>;
 //                                                    true once it's done (try the add again)
 
-const bridge = () => (globalThis.ifizboxNative?.call ? globalThis.ifizboxNative : null);
+const bridge = () => (hasNativeCall() ? nativeBridge() : null);
 async function bridgeCall(method, params) {
   const n = bridge();
   if (!n) throw new Error("A paid tweak downloads in the app, signed in to its seller.");
@@ -717,7 +718,7 @@ function keptIdOf(job) {
 // tweak update, or tweaks added since: signing.installed's `tweaks` names), and then sends those. Params that already
 // carry tweaks (a Custom Install's) go as they are. Throws with words for a bad tweak.
 export async function keptTweakParams(params, job, { log = () => {}, store = tweakStore, ellekit = loadElleKit, toBase64 = null,
-  records = async () => (await globalThis.ifizboxNative?.call?.("signing.installed", {}))?.apps ?? [] } = {}) {
+  records = async () => (await nativeBridge()?.call?.("signing.installed", {}))?.apps ?? [] } = {}) {
   if (!params || params.tweaks !== undefined) return params;
   let id = keptIdOf(job), items;
   if (params.record) {

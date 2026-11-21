@@ -44,6 +44,7 @@ import { appQueue } from "../app-queue.js"; // F255: the jailbreak app's Upgrade
 import { pageViews } from "../nav/pageviews.js"; // C25
 import { go as navGo, handleOf } from "../nav/go.js";
 import { isInsecureSource } from "../core/sources.js"; // B192
+import { nativeBridge } from "../native.js";
 
 export const title = "Changes";
 
@@ -125,7 +126,7 @@ export const badgeCount = (upgrades, resign = []) => (upgrades?.available?.lengt
 
 // The apps iFizBox signed that are inside the re-sign window, from signing.installed (sideload app only; [] anywhere
 // else or when the call fails). `upgrades`: those with an upgrade are left to it.
-export async function resignNow(upgrades, { mode = detectMode(), native = globalThis.ifizboxNative, get = (k) => settings.get(k), now = new Date() } = {}) {
+export async function resignNow(upgrades, { mode = detectMode(), native = nativeBridge(), get = (k) => settings.get(k), now = new Date() } = {}) {
   if (mode !== "sideload" || typeof native?.call !== "function") return [];
   let installed;
   try { installed = await signedAppsNamed(native); } catch { return []; } // B150: a source app keeps its source name

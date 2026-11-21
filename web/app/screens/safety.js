@@ -28,10 +28,11 @@ import { sourceWarning, inputHost } from "../core/warnings.js";
 import { MALICIOUS_REASONS, OTHER_REASON, REPORT_TEXT_MAX, reportBody, reportsApi, malwareIpa, malwareAlert, bannerOf, ipaHash,
   WHY_LISTED, reportedAlert, INSTALL_ANYWAY } from "../core/malicious.js";
 import { reviewsBase } from "../core/reviews.js";
+import { nativeBridge } from "../native.js";
 
 const local = () => { try { return globalThis.localStorage ?? null; } catch { return null; } };
 const session = () => { try { return globalThis.sessionStorage ?? null; } catch { return null; } };
-const native = () => globalThis.ifizboxNative;
+const native = () => nativeBridge();
 export const trustedNow = (storage = local()) => loadTrusted(storage);
 
 async function openOutside(url) {

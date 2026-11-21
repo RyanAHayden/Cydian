@@ -15,6 +15,7 @@ import { signedAppsNamed } from "../core/installed.js"; // B150
 import { getServer } from "../signing/identity.js";
 import { chooseRoute } from "../signing/route.js";
 import { loadStyle } from "../nav/motion.js";
+import { nativeBridge } from "../native.js";
 
 function style() { loadStyle("signsheet.css"); }
 
@@ -22,7 +23,7 @@ const day = (iso) => { const d = new Date(iso ?? ""); return Number.isNaN(d.getT
 
 // `identity`: signing.status's identity (null without one). `redraw()` draws the page again (status asked anew).
 // F134: `dates` false (Settings > Signing > Show Expiry Dates off) leaves Signed Apps' days left out; Expired stays.
-export function signingExtras({ identity = null, redraw = () => {}, native = globalThis.ifizboxNative, alert = showAlert, hud = liveHUD, dates = true } = {}) {
+export function signingExtras({ identity = null, redraw = () => {}, native = nativeBridge(), alert = showAlert, hud = liveHUD, dates = true } = {}) {
   style();
   const box = document.createElement("div");
   box.className = "signed-apps";

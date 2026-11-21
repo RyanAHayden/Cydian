@@ -11,11 +11,12 @@ import { modal, runPaidInstall } from "./queue.js";
 import { catalog } from "../catalog.js";
 import { MODES, MODE_LABEL, parseSimulation, changeCount } from "../core/queue.js";
 import { NAME } from "../brand.js";
+import { nativeBridge } from "../native.js";
 
 const call = (native, method, params, onEvent) => native.call(`share.${method}`, params, onEvent);
 
 // { file: the staged name, name: what the user knows it as }. Resolves once the sheet (and any console) is done.
-export async function openDebConfirm({ file, name = "" }, { native = globalThis.ifizboxNative } = {}) {
+export async function openDebConfirm({ file, name = "" }, { native = nativeBridge() } = {}) {
   const cancel = barButton("Cancel");
   const ok = barButton("Confirm", "done");
   ok.hidden = true;

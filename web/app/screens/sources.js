@@ -41,6 +41,7 @@ import { labelCanister } from "./findmore.js"; // F305
 import * as more from "./moresources.js"; // F327: #/sources/more, More Sources
 import { pageViews } from "../nav/pageviews.js"; // C25
 import { setSourceErrorHooks } from "./sourceerror.js"; // B177
+import { nativeBridge } from "../native.js";
 
 export const title = "Sources";
 
@@ -85,7 +86,7 @@ function reset(button) {
 // button reads it when tapped (nav/alert.js), so there is no Paste bubble or Allow Paste on Add and no blue Type
 // state. The app shows that Paste only when a URL was copied (addFromPasteboard, below).
 // `native` and `open` are for tests (screens/addsource.test.js): the bridge, and manage.addSource.
-export async function addFromClipboard(ctx, button, { native = globalThis.ifizboxNative, open = manage.addSource } = {}) {
+export async function addFromClipboard(ctx, button, { native = nativeBridge(), open = manage.addSource } = {}) {
   if (native) return addFromPasteboard(ctx, button, native, open);
   reset(button);
   return open(ctx, null);
@@ -517,7 +518,7 @@ export function startRun(ctx, keys) {
     stop();
   };
   const steps = reloadSteps(keys.map((k) => byKey.get(k) ?? { key: k }), {
-    apt: Boolean(globalThis.ifizboxNative) && settings.deviceType() !== "none",
+    apt: Boolean(nativeBridge()) && settings.deviceType() !== "none",
     name: (s) => (s?.uri || s?.name ? displayName(s) : ""),
     onText: (t) => bar?.set(t),
   });

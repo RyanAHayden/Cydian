@@ -49,6 +49,7 @@ const guides = lazyNs("guides");
 import * as why from "./why.js"; // F303: Why <NAME> (#/home/why)
 import { NAME } from "../brand.js";
 import { rowIcon, PAGE_ICONS } from "../icons/rowicons.js";
+import { nativeBridge } from "../native.js";
 
 const DISCORD_URL = "https://discord.gg/3XASvpjbgp"; // Home's pair: GitHub | Discord (Cydia: Facebook | Twitter)
 
@@ -308,7 +309,7 @@ function homeNav(ctx) {
 // About, laid out like Cydia's on the 4S (ref/4s/screens/cydia-about.png): centred lines in groups with a blank line
 // between them, and one wide Close button.
 async function showAbout(ctx) {
-  const version = (await globalThis.ifizboxNative?.call?.("app.info", {}).catch(() => null))?.version;
+  const version = (await nativeBridge()?.call?.("app.info", {}).catch(() => null))?.version;
   await ctx.showAlert({
     title: `About ${NAME}`,
     message: `${version ? `Version ${version}` : `${NAME} Web`}\nFree and open source`
@@ -413,7 +414,7 @@ async function checkBuildOnce({ info = buildInfo, store = globalThis.localStorag
 }
 
 export function reloadHome(button, ctx, { refresh = () => refreshInBackground(ctx), settled = untilRefreshed, reload = loadNew, redraw = () => state.redraw?.(),
-  web = !globalThis.ifizboxNative } = {}) {
+  web = !nativeBridge() } = {}) {
   if (web) return withReloadSpinner(button, async () => { if (!(await refreshWebFiles())) location.reload(); });
   return withReloadSpinner(button, async () => {
     if ((await refresh()) === "cancelled") return; // F150: the reload bar's Cancel stops the whole Reload
@@ -642,7 +643,7 @@ function renderRoot(body) {
   const icon = el("img", "home-icon");
   // The website shows its WEB icon (the home-screen one), so it's never taken for the app (user 2026-11-18).
   // The sideload app shows its LITE icon (its Home Screen icon), the jailbreak app the plain one.
-  const g = !globalThis.ifizboxNative ? "icon-web-glossy" : settings.mode === "sideload" ? "icon-lite-glossy" : "icon-glossy";
+  const g = !nativeBridge() ? "icon-web-glossy" : settings.mode === "sideload" ? "icon-lite-glossy" : "icon-glossy";
   icon.src = `icons/${g}-76.png`;
   icon.srcset = `icons/${g}-76.png 1x, icons/${g}-152.png 2x, icons/${g}-228.png 3x`;
   icon.width = icon.height = 57;
@@ -650,7 +651,7 @@ function renderRoot(body) {
   // F323: the apps show the icon the app has now (the theme's, or Theme > App Icon's pick), as the Home Screen does;
   // screens/settings.js applyTheme repaints it when the theme or the pick changes. The website keeps its WEB icon.
   if (nativeIcons()) iconImage(icon, "current");
-  const limits = versionLimits(!globalThis.ifizboxNative ? "web" : settings.mode);
+  const limits = versionLimits(!nativeBridge() ? "web" : settings.mode);
   if (limits) {
     icon.classList.add("tappable");
     icon.alt = limits.title;
@@ -893,7 +894,7 @@ function renderCredits(body) {
     },
     ...softwareSections(),
   ])));
-  globalThis.ifizboxNative?.call?.("app.info", {}).then((i) => {
+  nativeBridge()?.call?.("app.info", {}).then((i) => {
     if (i?.version) body.querySelector(".cell-detail").textContent = i.version;
   }, () => {});
 }

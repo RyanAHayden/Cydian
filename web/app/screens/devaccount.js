@@ -21,13 +21,14 @@ import { parseProfile, fromBase64, toBase64, normalUdid } from "../core/signing.
 import { showHUD } from "../nav/hud.js";
 import { storedUdid, startUdid, watchUdid } from "./signing.js";
 import { ascGuideHref, ASC_GUIDE_LINK } from "./guides.js";
+import { nativeBridge } from "../native.js";
 
 const KEY = "ifizbox.asc";
 const CACHE = "ifizbox.asc.profiles";
 const ls = () => { try { return globalThis.localStorage ?? null; } catch { return null; } };
 const readJson = (k) => { try { return JSON.parse(ls()?.getItem(k) ?? "null"); } catch { return null; } };
 const writeJson = (k, v) => { try { v == null ? ls()?.removeItem(k) : ls()?.setItem(k, JSON.stringify(v)); } catch { /* blocked */ } };
-const nativeOf = (native) => native ?? globalThis.ifizboxNative ?? null;
+const nativeOf = (native) => native ?? nativeBridge() ?? null;
 
 export const siteKey = () => { const k = readJson(KEY); return k?.p8 && k.keyId && k.issuerId ? k : null; };
 export function siteRequest(k = siteKey(), { origin = globalThis.location?.origin ?? "", fetcher } = {}) {

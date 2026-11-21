@@ -33,6 +33,7 @@ import { NAME } from "../brand.js";
 import { showHUD } from "../nav/hud.js";
 import { slideChange } from "../nav/slide.js";
 import { go as navGo, back as navBack } from "../nav/go.js";
+import { nativeBridge } from "../native.js";
 
 export const PAGE = "installation";
 // F300: Installation & Signing's main page links to Install Apps With (`with`: the choice and the chosen route's
@@ -188,7 +189,7 @@ export function installationGroups(choice, st, { pick = () => {}, openVPN = () =
 }
 
 // `server`: the Signing Server's groups for Install Apps With's page (screens/settings.js serverSections).
-export async function drawInstallation(el, sub, { store, native = globalThis.ifizboxNative, alert = showAlert, server = () => [] } = {}) {
+export async function drawInstallation(el, sub, { store, native = nativeBridge(), alert = showAlert, server = () => [] } = {}) {
   const redraw = () => drawInstallation(el, sub, { store, native, alert, server });
   if (sub === "pair") return drawPair(el, { store, native, alert, redraw });
   return paintInstallation(el, { store, native, alert, redraw, server, sub: SUB_TITLES[sub] ? sub : null });
@@ -196,7 +197,7 @@ export async function drawInstallation(el, sub, { store, native = globalThis.ifi
 
 // F271: the choice and This iPhone's groups as a box of their own, for the top of Settings > Installation & Signing
 // (screens/settings.js puts it above the Certificate and Provisioning Profile groups). It repaints only itself.
-export function installationBlock({ store, native = globalThis.ifizboxNative, alert = showAlert } = {}) {
+export function installationBlock({ store, native = nativeBridge(), alert = showAlert } = {}) {
   const box = document.createElement("div");
   box.className = "install-route";
   const redraw = () => paintInstallation(box, { store, native, alert, redraw });
@@ -527,7 +528,7 @@ function slotOf(node, waitText = null) {
     wait() { node.classList.add("is-loading"); } };
 }
 
-export function mainPage({ store, native = globalThis.ifizboxNative, alert = showAlert, links, signing = async () => null, apps = async () => "",
+export function mainPage({ store, native = nativeBridge(), alert = showAlert, links, signing = async () => null, apps = async () => "",
   checkServer = () => {}, host = () => "" } = {}) {
   const box = el("div", "signing-page install-main");
   let now = CHECKING; // the status cell's answer (core installStatus)
@@ -1054,7 +1055,7 @@ export function installationRows(sub, st, { store } = {}) {
   const choice = sub === "iphone" ? "iphone" : store.get(ROUTE_KEY);
   return subGroups(installationGroups(choice, st), sub).flatMap((g) => g.rows);
 }
-export async function refreshInstallation(el, sub, { store, native = globalThis.ifizboxNative, patch } = {}) {
+export async function refreshInstallation(el, sub, { store, native = nativeBridge(), patch } = {}) {
   if (sub === "pair") return;
   const st = await status(native);
   patch(el, installationRows(SUB_TITLES[sub] ? sub : null, st, { store }));

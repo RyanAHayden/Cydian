@@ -45,6 +45,7 @@ import { NAME } from "../brand.js";
 import { showBanner } from "../nav/banner.js";
 import { go as navGo } from "../nav/go.js";
 import { failedBanner, FAILED_BANNER_MS } from "../core/aptupdate.js";
+import { nativeBridge, hasNativeCall } from "../native.js";
 
 const pkgHref = (key, id) => format({ tab: "sources", path: [key, `package:${id}`] });
 
@@ -373,7 +374,7 @@ export async function addSourceAndInstall(r, { backend, catalog, showHUD: hud, s
 
 // ---- paid packages ---------------------------------------------------------------------------------------
 
-const native = () => globalThis.ifizboxNative?.call ? globalThis.ifizboxNative : null;
+const native = () => hasNativeCall() ? nativeBridge() : null;
 
 class NeedsShell extends Error {
   constructor(method) {

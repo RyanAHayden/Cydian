@@ -30,6 +30,7 @@ import { NAME, SIGN_HOST } from "../brand.js";
 import { loadStyle } from "../nav/motion.js";
 import { go as navGo } from "../nav/go.js";
 import { mod } from "../lazy.js";
+import { nativeBridge } from "../native.js";
 // F313: free-apple-id.js loads with Settings' pages (router.js lazyFor), the only place the walkthrough is drawn.
 const freeRouteBlock = (...args) => mod("freeAppleId").freeRouteBlock(...args);
 
@@ -175,7 +176,7 @@ export function drawWalkthrough(el, { status = null, failure = "", certificate =
   const states = stepStates(status, { open, server: serverUrl });
   const page = h("div", "walkthrough");
   page.append(h("p", "group-footer walk-intro", allDone(states)
-    ? `All set: Install signs apps with your certificate ${globalThis.ifizboxNative ? "on this iPhone" : "in this browser"}.`
+    ? `All set: Install signs apps with your certificate ${nativeBridge() ? "on this iPhone" : "in this browser"}.`
     : "Two steps before the first install."));
   if (failure) page.append(h("p", "group-footer walk-failure", `The signer didn't answer: ${failure}`));
   if (status?.identityProblem) page.append(h("p", "group-footer walk-failure", status.identityProblem));
@@ -208,7 +209,7 @@ export function drawWalkthrough(el, { status = null, failure = "", certificate =
   }
   page.append(list, ...extra);
   // F254: the website's Use a Free Apple ID, under the certificate route (hidden unless the Apple relay is on)
-  if (!globalThis.ifizboxNative) page.append(freeRouteBlock());
+  if (!nativeBridge()) page.append(freeRouteBlock());
   const top = el.scrollTop;
   el.replaceChildren(page);
   el.scrollTop = top;

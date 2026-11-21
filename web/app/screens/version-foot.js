@@ -4,6 +4,7 @@
 import { el } from "../nav/ui.js";
 import { currentDevice } from "../device.js";
 import { NAME } from "../brand.js";
+import { nativeBridge } from "../native.js";
 
 // "iPhone17,3, iOS 26.1, iFizBox 0.1.1 (en-us)"; on the website "iPhone, iOS 26.1, iFizBox Web (en-us)".
 export function footLine({ machine = "", ios = "", version = "", web = false } = {}, lang = globalThis.navigator?.language ?? "en") {
@@ -28,7 +29,7 @@ export async function buildInfo(fetcher = globalThis.fetch) {
 // The two lines, filled in as the app's info and build.json answer: [foot, commit], to append at the bottom. The
 // second is buildLine: in the app the version and build from app.info (the running binary's Info.plist), the
 // commit from the bundled build.json; on the website all three from build.json.
-export function versionLines({ native = globalThis.ifizboxNative, info = buildInfo, ios = () => currentDevice().ios } = {}) {
+export function versionLines({ native = nativeBridge(), info = buildInfo, ios = () => currentDevice().ios } = {}) {
   const foot = el("p", "home-version", footLine({ ios: ios(), web: !native }));
   const commit = el("p", "home-version home-commit");
   let app = null, built = null;

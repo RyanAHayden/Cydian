@@ -36,6 +36,7 @@ import { settings } from "../settings-store.js";
 import { createSwitch } from "../nav/switch.js";
 import { NAME, DOMAIN } from "../brand.js";
 import { rowIcon } from "../icons/rowicons.js";
+import { nativeBridge } from "../native.js";
 
 const STATE_KEY = "ifizbox.account";
 
@@ -62,7 +63,7 @@ function idbKeys(name = "ifizbox-account") {
 }
 
 // The app's Keychain (no Face ID: the key is read at every launch), or IndexedDB in a shell without account.key.*.
-export function keyStore(native = globalThis.ifizboxNative) {
+export function keyStore(native = nativeBridge()) {
   const idb = idbKeys();
   if (!native?.call) return idb;
   let old = false;
@@ -95,7 +96,7 @@ const certBuild = (mode = detectMode()) => mode === "site" || mode === "sideload
 // Keychain here: the account carries tokens only, and a token it brings comes without a payment secret.
 const repoLogins = () => { try { return createCredentialStore({ storage: globalThis.localStorage }); } catch { return null; } };
 
-export async function collectHere({ syncCert = true, backend = getBackend(), store = settings, native = globalThis.ifizboxNative,
+export async function collectHere({ syncCert = true, backend = getBackend(), store = settings, native = nativeBridge(),
   mode = detectMode(), appStore = apps, load = loadIdentity, wishes = createWishlist(), logins = repoLogins() } = {}) {
   const sources = (await backend.sources().catch(() => [])).filter((s) => s?.uri).map((s) => sourceLine(exportLine(s)));
   const values = {};
@@ -125,7 +126,7 @@ export async function collectHere({ syncCert = true, backend = getBackend(), sto
 }
 const b64toUrl = (b64) => String(b64).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 
-export async function applyHere(c, { backend = getBackend(), store = settings, native = globalThis.ifizboxNative, mode = detectMode(),
+export async function applyHere(c, { backend = getBackend(), store = settings, native = nativeBridge(), mode = detectMode(),
   appStore = apps, wishes = createWishlist(), logins = repoLogins() } = {}) {
   // F309: a repo sign-in from another device (kept only where this device didn't sign in itself), or a sign-out
   for (const { base, token } of c.adoptLogins ?? []) await Promise.resolve().then(() => logins?.adopt(base, token)).catch(() => {});

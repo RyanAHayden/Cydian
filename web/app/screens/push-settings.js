@@ -7,8 +7,9 @@
 import { showHUD } from "../nav/hud.js";
 import { getServer } from "../signing/identity.js";
 import { pushInfo, enablePush, disablePush, setUserTurnedOff } from "../core/push.js";
+import { nativeBridge } from "../native.js";
 
-export function pushActions({ native = globalThis.ifizboxNative } = {}) {
+export function pushActions({ native = nativeBridge() } = {}) {
   const deps = () => ({ native, server: getServer() });
   return {
     info: () => pushInfo(deps()),

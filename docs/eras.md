@@ -285,11 +285,46 @@ Split, with their layout in their own rules and their paint in look-only stretch
 Their other colours (the alert, Delete, trust pills, Find More, the certificate tile, the status tiles) are still
 literal look rules: an era restyles them with look rules of its own.
 
+Split the same way, the small stylesheets. Each keeps its layout in its own rules, paints in the look-only stretches
+below, and opens its first stretch with a `:root` of the iOS 6 decorations it draws (gradients, glosses, gloss edges,
+shadows, embosses):
+
+| Sheet | Look-only stretches | Tokens |
+|---|---|---|
+| `altstore.css` | header, news cards and screenshots; More Permissions and the website's greyed Install row; the toggles' glyphs; the gallery's spinner and the Too Big alert | `--alt-id-shade`, `--alt-icon-shadow`, `--alt-name-emboss`, `--alt-glyph-emboss`, `--alert-btn-blue`, `--alert-btn-blue-edge`, `--alert-btn-blue-pressed` |
+| `progress.css` | the log's lines and jump button; the foot (status, bar, finish button); the queue run's segmented control; its rows, bars, stop and summary | `--progress-finish`, `--progress-finish-ring`, `--progress-finish-emboss`, `--progress-finish-pressed`, `--progress-finish-pressed-emboss`, `--progress-seg`, `--progress-seg-selected`, `--progress-seg-edge`, `--progress-seg-divider`, `--progress-seg-shadow`, `--progress-seg-emboss`, `--qr-bar`, `--qr-fill` |
+| `reviews.css` | the stars and Tap to Rate; Write a Review / More Reviews, the hidden note, Report; the Write a Review sheet; the App Store view's card | `--review-star-emboss`, `--review-btn`, `--review-btn-edge`, `--review-btn-emboss`, `--review-btn-pressed` |
+| `guides.css` | the answer text, steps and number badges; the terminal panel and its Copy button; the warning row, Copying Files' rows and glyphs | `--guide-num`, `--guide-num-edge`, `--guide-num-emboss`, `--guide-num-shine`, `--guide-done`, `--guide-done-edge`, `--guide-copy`, `--guide-copy-emboss`, `--guide-copy-pressed` |
+| `freeid.css` | the checklist's marks, fields and buttons; Developer Mode's step heads and badges | `--free-done`, `--free-done-edge`, `--free-failed`, `--free-failed-edge`, `--free-optional` |
+| `myipas.css` | the list's icons and lines, the File row, Delete; Install IPAs' fades, picks and New note; the price button | `--price-btn`, `--price-btn-edge`, `--price-btn-emboss`, `--price-btn-pressed`, `--price-btn-pressed-inset`, `--price-btn-go`, `--price-btn-go-edge`, `--price-btn-go-edge-top`, `--price-btn-go-emboss`, `--price-btn-go-pressed`, `--price-btn-fill` |
+| `signing.css` | the walkthrough's cards, badges, text and buttons; the certificate step's picture | `--walk-badge`, `--walk-badge-edge`, `--walk-badge-emboss`, `--walk-badge-shine`, `--walk-badge-done`, `--walk-badge-done-edge`, `--walk-badge-todo`, `--walk-action`, `--walk-action-edge`, `--walk-action-emboss`, `--walk-action-pressed` |
+| `signsheet.css` | the sign sheet's head, field rows and red Cancel; Settings > Signing's warnings and Signed Apps' rows | `--ss-icon-shadow`, `--ss-icon-placeholder`, `--ss-icon-letter-emboss`, `--ss-cancel`, `--ss-cancel-edge`, `--ss-cancel-emboss`, `--ss-cancel-pressed` |
+| `extras.css` | the featured banners and their titles | `--featured-title-emboss`, `--featured-title-shade` |
+| `queue.css` | queued packages in every list; Confirm's sections and the console; Continue Queuing, "needed by", the queue run's strip | `--console-bar`, `--console-btn`, `--console-btn-edge`, `--console-btn-pressed` |
+| `tweaks.css` | the tweak rows, the ADD button, the pills | myipas.css's `--price-btn*` (all but `-go-pressed` and `-fill`, same values), `--tweak-pill`, `--tweak-pill-up`, `--tweak-pill-shadow` |
+| `notiphone.css` | the hero, the domain, the steps' text | `--notiphone-icon-shadow` |
+| `account.css` | the account key | none |
+| `manage.css` | the grabber, the dragged row, the foot's links; Import's rows and the QR sheet | `--manage-grabber`, `--manage-drag-shadow` |
+
+`tweaks.css` and `myipas.css` both define the price button's tokens, so either can load without the other; an era
+sets them once for both. Their plain colours, the glyphs and badges drawn as SVG data URIs, and `freeid.css`'s
+pictures of today's iOS (`--dm-*`, modern iOS in every style on purpose) are still literal look rules: an era
+restyles them with look rules of its own.
+
+Tokens in a lazily loaded sheet (`signing.css`, `signsheet.css`, `myipas.css`, `freeid.css`, `tweaks.css`, and
+`settings.css`'s preview tokens; `nav/motion.js` `loadStyle`) come after any era sheet linked in `index.html`, so
+their `:root` blocks win over an era's bare `:root`. An era sets them on `html[data-style="…"][data-theme="…"]`,
+the way it sets colours, never on bare `:root`.
+
+The light palettes in `palettes.css` paint the chrome through tokens: their shared `html[data-theme="light"]` block
+maps the `--lt-*` colours onto `ios6.css`'s `--nav-bar`, `--bar-btn*`, `--bar-back*` and `packages.css`'s
+`--search-*`, `--scope-seg*`, `--store-head*` (see Palettes under [Writing an era](#writing-an-era)).
+
 Not yet clean, each queued as its own cleanup:
 
-- the other stylesheets (the small ones);
-- the light palettes' segmented-control rules in `palettes.css` (the control now reads `--seg*` tokens; the rules
-  have not moved onto them yet);
+- the light palettes' App Store segmented-control rules in `palettes.css` (the control now reads `--seg*` tokens;
+  the rules have not moved onto them yet), and Brushed Metal's etched-text rule, which stays a rule on purpose (its
+  dark text skips Done, the red button, My IPAs' Delete and the console, which one token cannot);
 - the floating-tab-bar nav hook above.
 
 The screens' inline SVG art comes from the icon map below; the overlays `nav/` draws take theirs from CSS tokens

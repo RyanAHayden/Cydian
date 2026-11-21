@@ -56,11 +56,11 @@ test("ios6.css places the tile as the 4S does: 7pt in, the label 11pt after", ()
 });
 
 test("F223: Home's Settings row and Settings > General draw one gear, from this file", async () => {
-  const { homeLinks, SETTINGS_ICON } = await import("../screens/home.js");
+  const { homeLinks, settingsIcon } = await import("../screens/home.js");
   const settingsRow = homeLinks()[0].rows.find((r) => r.label === "Settings");
   assert.equal(PAGE_ICONS.general, "general");
   assert.deepEqual(settingsRow.icon, rowIcon(PAGE_ICONS.general), "Home's Settings row is General's tile");
-  assert.equal(SETTINGS_ICON.src, rowIcon("general").src);
+  assert.equal(settingsIcon().src, rowIcon("general").src);
   assert.equal(ROW_ICONS.general[1], "gear");
   const home = readFileSync(new URL("../home.css", import.meta.url), "utf8");
   assert.doesNotMatch(home, /\.glyph-settings/, "no second gear drawn in home.css");
@@ -124,7 +124,7 @@ test("C51: the screens draw no inline SVG of their own: their art comes from the
 test("C51: Why's tile and Copying Files' tiles are the map's", async () => {
   const { homeTileCss, guideSvg, GUIDE_TILE_NAMES, ICON_SETS } = await import("./rowicons.js");
   const why = await import("../screens/why.js");
-  assert.ok(why.WHY_CSS.includes(`.home-glyph.glyph-why { ${homeTileCss("why", "ios6")}`));
+  assert.ok(why.whyCss("ios6").includes(`.home-glyph.glyph-why { ${homeTileCss("why", "ios6")}`));
   assert.match(homeTileCss("why", "ios6"), /^background-color: #d8820f; background-image: url\("data:image\/svg\+xml,%3Csvg [^"]*%3C\/svg%3E"\), linear-gradient\(#f4b03f, #d8820f\);$/);
   const guides = await import("../screens/guides.js");
   assert.deepEqual(guides.GLYPH_IDS, GUIDE_TILE_NAMES);

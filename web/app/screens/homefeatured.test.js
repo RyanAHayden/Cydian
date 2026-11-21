@@ -3,7 +3,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { homeLinks, SETTINGS_ICON, homeShowsFeatured, browseShowsFeatured } from "./home.js";
+import { homeLinks, settingsIcon, repaintLinkIcons, followStyle, homeShowsFeatured, browseShowsFeatured } from "./home.js";
+import { ensureWhyStyle } from "./why.js";
+import { rowIcon, homeTileCss } from "../icons/rowicons.js";
 import { homeFeatured, featuredPlaceholder, FEATURED_PLACEHOLDERS } from "./extras.js";
 
 const here = new URL(".", import.meta.url);
@@ -16,13 +18,13 @@ test("F135: Settings is Home's first group, its row with our gear at the left, T
   assert.equal(first.pair, true);
   assert.deepEqual(first.rows.map((r) => r.label), ["Settings", "Theme"]);
   assert.equal(first.rows[0].label, "Settings");
-  assert.equal(first.rows[0].icon, SETTINGS_ICON);
+  assert.deepEqual(first.rows[0].icon, settingsIcon());
   assert.ok(rest.every((g) => g.rows?.every((r) => r.label !== "Settings")), "Settings only once");
   assert.equal(rest.at(-1).rows[0].label, "Credits / Thank You");
 });
 
 test("F159: the Settings row's gear has the tiles' padding, so it lines up with them", () => {
-  assert.equal(SETTINGS_ICON.cls, "row-icon"); // F223: Settings > General's tile (rowicons.test.js)
+  assert.equal(settingsIcon().cls, "row-icon"); // F223: Settings > General's tile (rowicons.test.js)
   const css = read("../home.css");
   const rule = (sel) => css.match(new RegExp(sel.replace(/[.>]/g, (c) => "\\" + c) + " \\{([^}]*)\\}"))?.[1] ?? "";
   const decl = (body, prop) => body.match(new RegExp(`(?:^|;)\\s*${prop}:\\s*([^;]+)`))?.[1].trim();
@@ -90,3 +92,73 @@ test("F135: no banners or a failure empties the scroller; Not Jailbroken shows n
   const off = homeFeatured({ deviceType: () => "none" });
   assert.equal(off.children.length, 0);
 }));
+
+// B239: Theme > Style swaps Home's icons at once: the Settings gear and the Why tile are read when Home draws, and
+// Home repaints them when <html data-style> changes (no reload).
+test("B239: Home's Settings gear is the Style showing when Home draws, not the one at import", () => withDom((doc) => {
+  doc.documentElement.dataset.style = "ios7";
+  assert.equal(homeLinks()[0].rows[0].icon.src, rowIcon("general", "ios7").src);
+  doc.documentElement.dataset.style = "ios6";
+  assert.equal(homeLinks()[0].rows[0].icon.src, rowIcon("general", "ios6").src);
+  assert.notEqual(rowIcon("general", "ios6").src, rowIcon("general", "ios7").src, "the two Styles draw different tiles");
+}));
+
+test("B239: a Style change repaints the link rows' tiles Home already drew", async () => {
+  const { grouped } = await import("../nav/ui.js");
+  await withDom((doc) => {
+    doc.documentElement.dataset.style = "ios6";
+    const links = homeLinks();
+    const frag = grouped(links);
+    const groups = [...frag.children];
+    const gear = () => groups[0].querySelector(".cell-icon > img").src;
+    assert.equal(gear(), rowIcon("general", "ios6").src);
+    doc.documentElement.dataset.style = "ios7";
+    assert.ok(repaintLinkIcons(groups, homeLinks()) >= 2, "Settings and More Sources at least");
+    assert.equal(gear(), rowIcon("general", "ios7").src);
+    assert.equal(repaintLinkIcons(groups, homeLinks()), 0, "nothing left to repaint");
+  });
+});
+
+test("B239: followStyle calls back on a data-style change while its box is on the page, then stops", () => withDom((doc) => {
+  const observers = [];
+  class Observer {
+    constructor(cb) { this.cb = cb; this.on = false; observers.push(this); }
+    observe(target, opts) { this.on = true; this.target = target; this.opts = opts; }
+    disconnect() { this.on = false; }
+  }
+  const box = { isConnected: true };
+  const seen = [];
+  followStyle(box, (s) => seen.push(s), doc, Observer);
+  const mo = observers[0];
+  assert.equal(mo.target, doc.documentElement);
+  assert.deepEqual(mo.opts.attributeFilter, ["data-style"]);
+  doc.documentElement.dataset.style = "ios7";
+  mo.cb();
+  mo.cb(); // the same Style again: no second call
+  assert.deepEqual(seen, ["ios7"]);
+  box.isConnected = false;
+  doc.documentElement.dataset.style = "ios6";
+  mo.cb();
+  assert.deepEqual(seen, ["ios7"]);
+  assert.equal(mo.on, false, "stops once Home has left the page");
+}));
+
+test("B239: the Why tile's CSS is rewritten for the new Style, once per change", () => {
+  const added = [];
+  const doc = { documentElement: { dataset: { style: "ios6" } }, head: { append: (s) => added.push(s) },
+    getElementById: (id) => added.find((s) => s.id === id) ?? null, createElement: () => ({}) };
+  assert.equal(ensureWhyStyle(doc), true);
+  assert.ok(added[0].textContent.includes(homeTileCss("why", "ios6")));
+  assert.equal(ensureWhyStyle(doc), false, "same Style: nothing written");
+  doc.documentElement.dataset.style = "ios7";
+  assert.equal(ensureWhyStyle(doc), true);
+  assert.equal(added.length, 1, "the one <style>, rewritten");
+  assert.ok(added[0].textContent.includes(homeTileCss("why", "ios7")));
+  assert.notEqual(homeTileCss("why", "ios6"), homeTileCss("why", "ios7"));
+});
+
+test("B239: Home follows the Style for its link rows and the Why tile", () => {
+  assert.match(read("./home.js"), /followStyle\(home, \(\) => \{ why\.ensureWhyStyle\(\); repaintLinkIcons\(groups, homeLinks\(\)\); \}\);/);
+  assert.doesNotMatch(read("./home.js"), /^export const \w+ = rowIcon\(/m, "no row tile computed at import");
+  assert.doesNotMatch(read("./why.js"), /^export const \w+ = whyCss\(\)/m, "no Why CSS computed at import");
+});

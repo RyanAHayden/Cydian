@@ -8,8 +8,8 @@
 // Not-an-iPhone page desktops see first (notiphone.js).
 // It stays open while the website's Home is locked (home.js OPEN_WHILE_LOCKED).
 //
-// Styles live here (WHY_CSS, put in the document once by ensureWhyStyle) so the page and Home's tile need no new
-// stylesheet link; they use ios6.css's tokens only, so both palettes and every theme follow.
+// Styles live here (whyCss, put in the document by ensureWhyStyle, rewritten when the Style changes) so the page and
+// Home's tile need no new stylesheet link; they use ios6.css's tokens only, so both palettes and every theme follow.
 import { el, grouped } from "../nav/ui.js";
 import { format, settingsRoute } from "../router.js";
 import { NAME } from "../brand.js";
@@ -97,14 +97,23 @@ export const whyCss = (style = "ios6") => `
   background-size: 21px 21px, 100% 100%; background-repeat: no-repeat; background-position: center; }
 @media (min-width: 700px) { .why-page { max-width: 640px; margin: 0 auto; } }
 `;
-export const WHY_CSS = whyCss();
 
+// Puts the page's CSS in the document for the Style showing now, or rewrites it when the Style has changed since
+// (Theme > Style, iOS 6 <-> iOS 7: Home calls this again, so the Why tile swaps without a reload). Returns whether it
+// wrote anything.
+const written = new WeakMap(); // the <style> element -> the Style its CSS is for
 export function ensureWhyStyle(doc = globalThis.document) {
-  if (!doc?.head || doc.getElementById?.("why-style")) return false;
-  const s = doc.createElement("style");
-  s.id = "why-style";
-  s.textContent = whyCss(iconStyle(doc));
-  doc.head.append(s);
+  if (!doc?.head) return false;
+  const style = iconStyle(doc);
+  let s = doc.getElementById?.("why-style");
+  if (s && written.get(s) === style) return false;
+  if (!s) {
+    s = doc.createElement("style");
+    s.id = "why-style";
+    doc.head.append(s);
+  }
+  s.textContent = whyCss(style);
+  written.set(s, style);
   return true;
 }
 

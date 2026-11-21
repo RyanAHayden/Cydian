@@ -13,6 +13,7 @@
 #                                     its bundle ID, like the app's own signer) and install it; --as-is: no signing
 #   tools/ui-15.sh ME home            Home
 #   tools/ui-15.sh ME lock-button     lock the screen;  ME wake: wake and unlock it (no passcode on this phone)
+#   tools/ui-15.sh ME reboot          restart the phone, wait for it, bring WDA back and unlock it (about 1.5 min)
 #   tools/ui-15.sh ME shot NAME       screenshot -> ref/15/screens/NAME.png
 #   tools/ui-15.sh ME source          the frontmost app's accessibility tree (XML)
 #   tools/ui-15.sh unlock ME          release it; always do this when done, even after a failure
@@ -110,6 +111,13 @@ case $cmd in
   lock-button)  # a short side-button press: WDA's /wda/lock holds it, which on iOS 27 opens Siri
     up; post /wda/performIoHidEvent '{"page":12,"usage":48,"duration":0.05}' ;;
   wake) up; curl -sf -m 30 -X POST "$wda/wda/unlock" >/dev/null ;;
+  reboot)  # B238: iOS redraws notification icons only after a restart (docs/iphone15.md); back up and unlocked after
+    gi reboot >/dev/null || { echo "reboot failed: $run/ios.log" >&2; exit 1; }
+    wait_for '! gi list | grep -q "$udid"' 60 || { echo "the phone didn't go down" >&2; exit 1; }
+    wait_for 'gi list | grep -q "$udid"' 180 || { echo "the phone didn't come back in 3 minutes" >&2; exit 1; }
+    wait_for 'gi image list >/dev/null 2>&1' 60 || true  # lockdown answers a little after USB does
+    up; curl -sf -m 30 -X POST "$wda/wda/unlock" >/dev/null; curl -sf -m 30 -X POST "$wda/wda/homescreen" >/dev/null
+    echo "rebooted" ;;
   shot)
     dir=$here/ref/15/screens; mkdir -p "$dir"
     gi screenshot --output="$dir/$1.png" >/dev/null || { up; gi screenshot --output="$dir/$1.png" >/dev/null; }

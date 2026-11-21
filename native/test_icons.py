@@ -30,6 +30,9 @@ def bundle(lite):
     files = {APP + "AppIcon%dx%d@%dx.png" % (pt, pt, s): read("%s%dx%d@%dx.png" % (src, pt, pt, s))
              for pt, scales in carfile.ICON_SIZES.items() for s in scales}
     files[APP + "Assets.car"] = read("AssetsLite.car" if lite else "Assets.car")
+    for slot in "AB":  # F329: your own icon's sets, the primary icon until the helper writes one
+        for s in (2, 3):
+            files[APP + "IconOwn%s60x60@%dx.png" % (slot, s)] = read("%s60x60@%dx.png" % (src, s))
     return files
 
 
@@ -197,9 +200,13 @@ class Alternates(unittest.TestCase):
     def test_info_plist_lists_every_set(self):
         info = plistlib.loads(plist())
         alts = info["CFBundleIcons"]["CFBundleAlternateIcons"]
-        self.assertEqual(list(alts), list(alternates.sets()))
+        own = [alternates.own_set(s) for s in alternates.OWN_SLOTS]  # F329: your own icon's loose sets
+        self.assertEqual(list(alts), list(alternates.sets()) + own)
         for name, d in alts.items():
-            self.assertEqual(d, {"CFBundleIconName": name})
+            if name in own:
+                self.assertEqual(d, {"CFBundleIconFiles": [alternates.own_stem(name[-1])]})
+            else:
+                self.assertEqual(d, {"CFBundleIconName": name})
         with open(os.path.join(HERE, "Info.plist")) as f:
             text = f.read()
         self.assertEqual(alternates.plist_text(text), text, "rerun native/icon/alternates.py plist")

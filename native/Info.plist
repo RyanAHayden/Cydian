@@ -98,6 +98,8 @@
 			<key>Icon-clear-leather</key><dict><key>CFBundleIconName</key><string>Icon-clear-leather</string></dict>
 			<key>Icon-clear-felt</key><dict><key>CFBundleIconName</key><string>Icon-clear-felt</string></dict>
 			<key>Icon-clear-wood</key><dict><key>CFBundleIconName</key><string>Icon-clear-wood</string></dict>
+			<key>Icon-owna</key><dict><key>CFBundleIconFiles</key><array><string>IconOwnA60x60</string></array></dict>
+			<key>Icon-ownb</key><dict><key>CFBundleIconFiles</key><array><string>IconOwnB60x60</string></array></dict>
 		</dict>
 		<!-- end of icon/alternates.py's block -->
 	</dict>

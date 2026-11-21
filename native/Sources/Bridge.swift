@@ -136,8 +136,11 @@ final class AppScheme: NSObject, WKURLSchemeHandler {
         guard let url = task.request.url else { return task.didFailWithError(URLError(.badURL)) }
         let path = url.path.isEmpty || url.path == "/" ? "index.html" : String(url.path.dropFirst())
         // F323: appicon/<icon>.png is the app icon as this build's Home Screen shows it (build.sh's AppIconThumbs)
-        let base = path.hasPrefix("appicon/") ? AppScheme.thumbs : root
-        let file = base.appendingPathComponent(path.hasPrefix("appicon/") ? String(path.dropFirst(8)) : path).standardizedFileURL
+        // F329: appicon/own….png is one of your own icons, from the app's container (AppIcon.swift OwnIcons)
+        let icon = path.hasPrefix("appicon/") ? String(path.dropFirst(8)) : nil
+        let own = icon.map { $0.hasSuffix(".png") && OwnIcons.isOwn(String($0.dropLast(4))) } ?? false
+        let base = own ? OwnIcons.dir : icon != nil ? AppScheme.thumbs : root
+        let file = base.appendingPathComponent(icon ?? path).standardizedFileURL
         let inside = file.path.hasPrefix(base.path + "/")
         let data = inside ? try? Data(contentsOf: file) : nil
         let headers = ["Content-Type": AppScheme.mime(file.pathExtension), "Content-Length": "\(data?.count ?? 0)",

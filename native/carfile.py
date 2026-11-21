@@ -144,9 +144,16 @@ def icon_problems(info, files, app, lite):
         problems.append("Assets.car has no AppIcon (has %s)" % ", ".join(names))
     # F323: setAlternateIconName finds nothing for a name Info.plist lists and the catalog lacks
     alternates = info.get("CFBundleIcons", {}).get("CFBundleAlternateIcons", {})
-    missing = sorted(n for n, d in alternates.items() if d.get("CFBundleIconName", n) not in names)
+    missing = sorted(n for n, d in alternates.items()
+                     if "CFBundleIconFiles" not in d and d.get("CFBundleIconName", n) not in names)
     if missing:
         problems.append("Assets.car lacks alternate icons Info.plist lists: %s" % ", ".join(missing[:5]))
+    # F329: the own-icon sets are loose PNGs (icon/alternates.py OWN_SLOTS), at 60pt @2x and @3x
+    for n, d in alternates.items():
+        for stem in d.get("CFBundleIconFiles", []):
+            for s in (2, 3):
+                if png_size(files.get(app + "%s@%dx.png" % (stem, s), b"")) != (60 * s, 60 * s):
+                    problems.append("alternate icon %s: %s@%dx.png missing or not %d px" % (n, stem, s, 60 * s))
     prefix = "AppIconLite" if lite else "AppIcon"
     icons = [r for r in rends if r["file"].startswith("AppIcon") and r["width"]]
     for r in icons:

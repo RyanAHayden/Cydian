@@ -6,7 +6,7 @@ import { pageHandle } from "./go.js";
 import { fakeDocument, fakePage } from "./fakedom.test-helper.js";
 
 // C54: the large-title nav hook. Off (iOS 6) nothing is drawn; on, a root page's title sits big at the top of its
-// body and collapses into the bar as the body scrolls, by opacity and transform only.
+// body and collapses into the bar as the body scrolls, by opacity only.
 
 function page(doc, title = "Sources") {
   const body = fakePage();
@@ -33,23 +33,21 @@ test("collapse runs 0 to 1 over the large title's height", () => {
 
 test("the large title fades as it goes under the bar, and the bar title fades in only past half way", () => {
   const top = collapseStyle(0, 52);
-  assert.deepEqual(top, { large: { opacity: "1", transform: "none" }, bar: { opacity: "0" } });
+  assert.deepEqual(top, { large: { opacity: "1" }, bar: { opacity: "0" } });
   const half = collapseStyle(26, 52);
   assert.equal(half.large.opacity, "0.5");
   assert.equal(half.bar.opacity, "0");
   const three = collapseStyle(39, 52);
   assert.equal(three.bar.opacity, "0.5");
   const gone = collapseStyle(80, 52);
-  assert.deepEqual(gone, { large: { opacity: "0", transform: "none" }, bar: { opacity: "1" } });
+  assert.deepEqual(gone, { large: { opacity: "0" }, bar: { opacity: "1" } });
 });
 
-test("pulled past the top the large title grows from its left, up to 110%", () => {
-  assert.equal(collapseStyle(-40, 52).large.transform, "scale(1.05)");
-  assert.equal(collapseStyle(-500, 52).large.transform, "scale(1.1)");
-  assert.equal(collapseStyle(-40, 52).bar.opacity, "0");
+test("pulled past the top the large title stays in full and the bar title hidden", () => {
+  assert.deepEqual(collapseStyle(-40, 52), { large: { opacity: "1" }, bar: { opacity: "0" } });
 });
 
-test("only opacity and transform are written, on the large title and the bar title", () => {
+test("only opacity is written, on the large title and the bar title", () => {
   const doc = fakeDocument();
   const { body, item, h1 } = page(doc);
   const lt = attachLargeTitle(body, item, doc);
@@ -61,10 +59,9 @@ test("only opacity and transform are written, on the large title and the bar tit
     lt.update();
     const s = collapseStyle(y, LARGE_TITLE_H);
     assert.equal(lt.el.style.opacity, s.large.opacity);
-    assert.equal(lt.el.style.transform, s.large.transform);
     assert.equal(h1.style.opacity, s.bar.opacity);
   }
-  for (const k of Object.keys(lt.el.style)) assert.ok(["opacity", "transform"].includes(k), k);
+  for (const k of Object.keys(lt.el.style)) assert.equal(k, "opacity");
   for (const k of Object.keys(h1.style)) assert.equal(k, "opacity");
   lt.destroy();
   assert.equal(body.children.length, 0);
@@ -133,7 +130,7 @@ test("off by default; on draws root pages only; off again takes them away", () =
   assert.equal(root.body.firstElementChild.textContent, "Home");
   assert.equal(root.h1.style.opacity, "0");
   assert.equal(pushed.body.children.length, 0);
-  assert.equal(pushed.h1.style.opacity, undefined);
+  assert.deepEqual(Object.keys(pushed.h1.style), []); // the pushed page's bar title is never written
   setLargeTitles(false, doc);
   assert.equal(largeTitlesOn(doc), false);
   assert.equal(root.body.children.length, 0);

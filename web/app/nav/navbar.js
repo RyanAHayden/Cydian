@@ -33,13 +33,11 @@ export function addNavIcon(body, button, key = "icon") {
 //
 // With <html data-nav="large">, set by the era's JS through setLargeTitles(true), each tab's root page draws its
 // title as a big bold left title at the top of its body (a .large-title, its layout in style.css behind the hook),
-// which scrolls with the content. As it goes under the nav bar it fades out and the bar's own .nav-title fades in;
-// pulled past the top it grows a little from its left edge. Transform and opacity only, written once a frame while
-// the page scrolls, and only when they change. Off (iOS 6, the default) nothing is drawn, watched or written.
+// which scrolls with the content. As it goes under the nav bar it fades out and the bar's own .nav-title fades in.
+// Opacity only, written once a frame while the page scrolls, and only when it changes. Off (iOS 6, the default)
+// nothing is drawn, watched or written.
 
 export const LARGE_TITLE_H = 52;   // the large title's height when it can't be measured (style.css --large-title-h)
-const GROW_MAX = 0.1;              // pulled down, the title grows to at most 110%
-const GROW_PULL = 80;              // ... over this many pixels of pull
 
 export const largeTitlesOn = (doc = globalThis.document) => doc?.documentElement?.getAttribute?.("data-nav") === "large";
 
@@ -53,15 +51,11 @@ export function collapseOf(scrollTop, height = LARGE_TITLE_H) {
   return clamp01(scrollTop / height);
 }
 
-// One frame's styles: the large title's opacity and transform, the bar title's opacity. The bar title starts to show
-// only once the large title is more than half under the bar, and is in full when it has gone.
+// One frame's styles: the large title's opacity and the bar title's. The bar title starts to show only once the
+// large title is more than half under the bar, and is in full when it has gone.
 export function collapseStyle(scrollTop, height = LARGE_TITLE_H) {
   const p = collapseOf(scrollTop, height);
-  const grow = scrollTop < 0 ? 1 + GROW_MAX * clamp01(-scrollTop / GROW_PULL) : 1;
-  return {
-    large: { opacity: fmt(1 - p), transform: grow === 1 ? "none" : `scale(${fmt(grow)})` },
-    bar: { opacity: fmt(clamp01((p - 0.5) * 2)) },
-  };
+  return { large: { opacity: fmt(1 - p) }, bar: { opacity: fmt(clamp01((p - 0.5) * 2)) } };
 }
 
 // Draws the large title of the page whose body is `body` and nav item `item`, and keeps it in step: put back at the
@@ -88,7 +82,6 @@ export function attachLargeTitle(body, item, doc = globalThis.document) {
     if (!height) height = el.offsetHeight || LARGE_TITLE_H;
     const s = collapseStyle(body.scrollTop || 0, height);
     write(el, "opacity", s.large.opacity, last?.large.opacity);
-    write(el, "transform", s.large.transform, last?.large.transform);
     write(bar, "opacity", s.bar.opacity, last?.bar.opacity);
     last = s;
   };
@@ -157,8 +150,16 @@ export function setLargeTitles(on, doc = globalThis.document) {
   };
   const MO = globalThis.MutationObserver;
   if (MO) {
-    state.stackWatch = new MO(scan);
-    for (const stack of doc.querySelectorAll(".tab-stack")) state.stackWatch.observe(stack, { childList: true });
+    // Pages added to a stack, and stacks added to #screens (each watched once, MutationObserver dedupes targets).
+    const watch = () => {
+      const stacks = doc.querySelectorAll(".tab-stack");
+      for (const stack of stacks) state.stackWatch.observe(stack, { childList: true });
+      for (const host of new Set([...stacks].map((s) => s.parentNode).concat(doc.getElementById?.("screens")))) {
+        if (host) state.stackWatch.observe(host, { childList: true });
+      }
+    };
+    state.stackWatch = new MO(() => { watch(); scan(); });
+    watch();
   }
   scan();
 }

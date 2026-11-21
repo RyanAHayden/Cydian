@@ -1,6 +1,6 @@
 // The "Reloading Data" HUD: a dark rounded box with a 12-spoke spinner and a bold label, over a clear scrim that
 // eats taps until it goes. showHUD() returns hide(), and hide.done(label) ends it on a checkmark. Fades and spins by
-// opacity/transform only.
+// opacity/transform only. Its look (box, label, spinner and checkmark art) is all in ios6.css's HUD look-only stretch.
 
 export function showHUD(text = "Reloading Data") {
   const scrim = document.createElement("div");
@@ -22,9 +22,8 @@ export function showHUD(text = "Reloading Data") {
   // fades, so the end of a long job is plain to see.
   hide.done = (label = "Done", hold = 1100) => {
     if (hidden) return;
-    const svg = scrim.querySelector(".hud-spinner");
-    svg.outerHTML = '<svg class="hud-check" viewBox="0 0 36 36" aria-hidden="true"><circle cx="18" cy="18" r="15.5" fill="none" stroke="#fff" stroke-width="2.6"/>'
-      + '<path d="M10.5 18.5l5 5 10-11" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    // The checkmark's art is ios6.css's --hud-check, so a style can swap it.
+    scrim.querySelector(".hud-spinner").outerHTML = '<span class="hud-check" aria-hidden="true"></span>';
     scrim.querySelector(".hud-label").textContent = label;
     scrim.querySelector(".hud-check").animate([{ transform: "scale(.6)", opacity: 0 }, { transform: "scale(1.08)", opacity: 1, offset: 0.7 }, { transform: "none" }],
       { duration: 260, easing: "ease-out" });

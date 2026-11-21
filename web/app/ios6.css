@@ -440,9 +440,11 @@ html[data-theme="dark"] .pair-button.delete-button:is(:active, .is-pressed) {
 }
 .cell-icon {
   border-radius: 6px;
-  font-size: 15px; font-weight: bold; color: #fff;
-  background: #8c99b3; /* flat, like Home's tiles: no shadow or gloss */
+  font-size: 15px; font-weight: bold; color: var(--cell-icon-text);
+  /* flat, like Home's tiles: no shadow or gloss; a row's own colour (nav/ui.js icon.color) comes in --cell-icon-tint */
+  background: var(--cell-icon-tint, var(--cell-icon));
 }
+:root { --cell-icon: #8c99b3; --cell-icon-text: #fff; }
 /* F205: iOS 6 Settings' row tiles (icons/rowicons.js draws the flat tile and glyph as one SVG). Measured on the 4S: the
    tile 7pt in from the cell's edge and the label 11pt after it, so 3pt off .cell-inner's 10px padding and onto its gap
    (style.css). */
@@ -523,6 +525,11 @@ html[data-theme="dark"] .switch.is-held .sw-knob { background: var(--dk-sw-knob-
   text-shadow: var(--hud-emboss); font-size: 24px; font-weight: bold; line-height: 28px;
 }
 .hud-spinner { background: var(--spinner-large) center / 37px no-repeat; }
+/* hide.done()'s white circled checkmark (nav/hud.js), 36 pt. */
+:root {
+  --hud-check: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 36 36'%3E%3Ccircle cx='18' cy='18' r='15.5' fill='none' stroke='%23fff' stroke-width='2.6'/%3E%3Cpath d='M10.5 18.5l5 5 10-11' fill='none' stroke='%23fff' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+.hud-check { background: var(--hud-check) center / 36px no-repeat; }
 /* iOS 6's UIActivityIndicatorView styles (nav/spinner.js draws them; spinner.test.js keeps the two the same). */
 :root {
   --spinner-white: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cg stroke='%23fff' stroke-width='2' stroke-linecap='round'%3E%3Cline x1='10' y1='1' x2='10' y2='4' opacity='0.271'/%3E%3Cline x1='10' y1='1' x2='10' y2='4' transform='rotate(30 10 10)' opacity='0.271'/%3E%3Cline x1='10' y1='1' x2='10' y2='4' transform='rotate(60 10 10)' opacity='0.271'/%3E%3Cline x1='10' y1='1' x2='10' y2='4' transform='rotate(90 10 10)' opacity='0.271'/%3E%3Cline x1='10' y1='1' x2='10' y2='4' transform='rotate(120 10 10)' opacity='0.369'/%3E%3Cline x1='10' y1='1' x2='10' y2='4' transform='rotate(150 10 10)' opacity='0.463'/%3E%3Cline x1='10' y1='1' x2='10' y2='4' transform='rotate(180 10 10)' opacity='0.561'/%3E%3Cline x1='10' y1='1' x2='10' y2='4' transform='rotate(210 10 10)' opacity='0.659'/%3E%3Cline x1='10' y1='1' x2='10' y2='4' transform='rotate(240 10 10)' opacity='0.753'/%3E%3Cline x1='10' y1='1' x2='10' y2='4' transform='rotate(270 10 10)' opacity='0.851'/%3E%3Cline x1='10' y1='1' x2='10' y2='4' transform='rotate(300 10 10)' opacity='0.271'/%3E%3Cline x1='10' y1='1' x2='10' y2='4' transform='rotate(330 10 10)' opacity='0.271'/%3E%3C/g%3E%3C/svg%3E");
@@ -706,7 +713,11 @@ html[data-theme="dark"] .sign-pw-glyph.pw-right { background-color: var(--dk-pw-
     radial-gradient(circle, rgba(0,0,0,.55) .9px, transparent 1.3px) 0 0 / 4px 4px,
     radial-gradient(circle, rgba(255,255,255,.1) .9px, transparent 1.3px) 0 1px / 4px 4px,
     linear-gradient(#5e5e5e, #3a3a3a 50%, #262626);
-  --share-system-glyph: #f4f4f4; --share-system-glyph-emboss: drop-shadow(0 -1px 0 rgba(0,0,0,.6));
+  --share-system-glyph-emboss: drop-shadow(0 -1px 0 rgba(0,0,0,.6));
+  /* The system activities' glyphs (nav/sharesheet.js .share-glyph.glyph-<name>), #f4f4f4 on the metal, 36 pt: Copy
+     (UIActivityCopy's page with a folded corner and a plus, redrawn) and QR (three finder squares and a few modules). */
+  --share-glyph-copy: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 36 36'%3E%3Cpath d='M8 3h13l7 7v19H8z' fill='%23f4f4f4'/%3E%3Cpath d='M21 3v7h7' fill='none' stroke='%23000' stroke-opacity='.35' stroke-width='1.2'/%3E%3Cpath d='M16.5 14h3v4.5H24v3h-4.5V26h-3v-4.5H12v-3h4.5z' fill='%23000' fill-opacity='.45'/%3E%3C/svg%3E");
+  --share-glyph-qr: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 36 36'%3E%3Cg fill='none' stroke='%23f4f4f4' stroke-width='2.4'%3E%3Crect x='4.2' y='4.2' width='9.6' height='9.6'/%3E%3Crect x='22.2' y='4.2' width='9.6' height='9.6'/%3E%3Crect x='4.2' y='22.2' width='9.6' height='9.6'/%3E%3C/g%3E%3Cg fill='%23f4f4f4'%3E%3Crect x='7.5' y='7.5' width='3' height='3'/%3E%3Crect x='25.5' y='7.5' width='3' height='3'/%3E%3Crect x='7.5' y='25.5' width='3' height='3'/%3E%3Crect x='17' y='4' width='3' height='3'/%3E%3Crect x='17' y='10' width='3' height='5'/%3E%3Crect x='21' y='17' width='4' height='3'/%3E%3Crect x='28' y='17' width='4' height='4'/%3E%3Crect x='17' y='21' width='4' height='4'/%3E%3Crect x='24' y='24' width='3' height='3'/%3E%3Crect x='29' y='27' width='3' height='5'/%3E%3Crect x='21' y='29' width='5' height='3'/%3E%3Crect x='4' y='17' width='5' height='3'/%3E%3Crect x='11' y='17' width='3' height='3'/%3E%3C/g%3E%3C/svg%3E");
   --share-system-shine: linear-gradient(rgba(255,255,255,.22), rgba(255,255,255,.06));
   --share-app-gloss: linear-gradient(rgba(255,255,255,.18), rgba(0,0,0,.12)); /* over the app's --share-tint */
   --share-app-shine: linear-gradient(rgba(255,255,255,.5), rgba(255,255,255,.14));
@@ -734,7 +745,9 @@ html[data-theme="dark"] .sign-pw-glyph.pw-right { background-color: var(--dk-pw-
   content: ""; border-radius: 7.5px;
   background: var(--share-system-metal);
 }
-.share-icon.system svg { color: var(--share-system-glyph); filter: var(--share-system-glyph-emboss); }
+.share-glyph { background: center / 36px no-repeat; filter: var(--share-system-glyph-emboss); }
+.share-glyph.glyph-copy { background-image: var(--share-glyph-copy); }
+.share-glyph.glyph-qr { background-image: var(--share-glyph-qr); }
 .share-icon.system::after {
   content: ""; border-radius: 7.5px 7.5px 0 0;
   background: var(--share-system-shine);

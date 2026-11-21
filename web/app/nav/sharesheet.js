@@ -21,29 +21,23 @@ import { navItemOf } from "./navbar.js";
 
 const PER_PAGE = 9;
 
-const GLYPHS = {
-  // UIActivityCopy's shape, redrawn: a page with a folded corner and a plus.
-  copy: '<path d="M8 3h13l7 7v19H8z" fill="currentColor"/><path d="M21 3v7h7" fill="none" stroke="#000" stroke-opacity=".35" stroke-width="1.2"/>' +
-    '<path d="M16.5 14h3v4.5H24v3h-4.5V26h-3v-4.5H12v-3h4.5z" fill="#000" fill-opacity=".45"/>',
-  // A QR code's three finder squares and a few modules.
-  qr: '<g fill="none" stroke="currentColor" stroke-width="2.4"><rect x="4.2" y="4.2" width="9.6" height="9.6"/><rect x="22.2" y="4.2" width="9.6" height="9.6"/>' +
-    '<rect x="4.2" y="22.2" width="9.6" height="9.6"/></g><g fill="currentColor"><rect x="7.5" y="7.5" width="3" height="3"/>' +
-    '<rect x="25.5" y="7.5" width="3" height="3"/><rect x="7.5" y="25.5" width="3" height="3"/><rect x="17" y="4" width="3" height="3"/>' +
-    '<rect x="17" y="10" width="3" height="5"/><rect x="21" y="17" width="4" height="3"/><rect x="28" y="17" width="4" height="4"/>' +
-    '<rect x="17" y="21" width="4" height="4"/><rect x="24" y="24" width="3" height="3"/><rect x="29" y="27" width="3" height="5"/>' +
-    '<rect x="21" y="29" width="5" height="3"/><rect x="4" y="17" width="5" height="3"/><rect x="11" y="17" width="3" height="3"/></g>',
-};
+// The system activities' glyphs. Their art is ios6.css's --share-glyph-<name> tokens (.share-glyph.glyph-<name>), so
+// a style can swap it: Copy (UIActivityCopy's page with a folded corner and a plus) and QR (a QR code's corners).
+const GLYPHS = ["copy", "qr"];
 
 function iconOf(item) {
   const box = el("span", "share-icon");
-  if (item.glyph && GLYPHS[item.glyph]) {
+  if (GLYPHS.includes(item.glyph)) {
     box.classList.add("system");
-    box.innerHTML = `<svg viewBox="0 0 36 36" aria-hidden="true">${GLYPHS[item.glyph]}</svg>`; // our own constant markup
+    const glyph = el("span", `share-glyph glyph-${item.glyph}`);
+    glyph.setAttribute("aria-hidden", "true");
+    box.append(glyph);
   } else if (/^data:image\//.test(item.image ?? "")) {
     box.classList.add("app", "has-image");
     box.append(Object.assign(new Image(), { src: item.image, alt: "", className: "share-image" }));
   } else {
     box.classList.add("app");
+    // The app's own colour (data, not art): ios6.css paints it through --share-tint.
     if (/^#[0-9a-f]{3,8}$/i.test(item.color ?? "")) box.style.setProperty("--share-tint", item.color);
     box.append(el("span", "share-letter", String(item.letter ?? item.label ?? "?").slice(0, 2)));
   }

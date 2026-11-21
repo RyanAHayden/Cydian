@@ -325,7 +325,7 @@ input.sign-pw-input:read-only { cursor: default; }
   justify-content: center;
 }
 .share-icon.system::before { position: absolute; inset: 3px; }
-.share-icon.system svg { position: relative; width: 36px; height: 36px; }
+.share-icon.system .share-glyph { position: relative; width: 36px; height: 36px; }
 .share-icon.system::after { position: absolute; inset: 3px 3px 50%; }
 .share-icon.app::after { position: absolute; left: -6px; right: -6px; top: -26px; height: 54px; }
 .share-image { position: absolute; inset: 0; width: 100%; height: 100%; }

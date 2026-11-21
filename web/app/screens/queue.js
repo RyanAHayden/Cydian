@@ -612,7 +612,10 @@ async function readyToInstall(jobs = []) {
 
 // Confirm's run: each app in turn (runOrder: iFizBox last), each one out of the queue once iOS has it; the first
 // failure (its alert already shown) stops the run and leaves the rest queued. -> how many were installed.
-export async function runAppQueue(jobs, { queue = appQueue, install = installApp, record = recordApp, ready = readyToInstall } = {}) {
+// B264: Changes counts its badge (and the icon's) again, as an app's re-sign or install ends (screens/changes.js).
+export const recountChanges = () => import("./changes.js").then((m) => m.recountBadge()).catch(() => {});
+
+export async function runAppQueue(jobs, { queue = appQueue, install = installApp, record = recordApp, ready = readyToInstall, recount = recountChanges } = {}) {
   if (appRunning) return 0;
   appRunning = true;
   updateAppChrome();
@@ -627,6 +630,7 @@ export async function runAppQueue(jobs, { queue = appQueue, install = installApp
       done++;
       queue.clear(j.id);
       try { await record(j); } catch { /* no store: Installed won't list it */ }
+      recount(); // B264: a re-sign records nothing here, so nothing else counts it
     }
   } finally {
     appRunning = false;
@@ -649,7 +653,7 @@ async function useAppRun() {
 // B257: from Confirm (once the safety nets and the Signing walkthrough have let it run) the app is kept running in the
 // background (signing.hold) while any app signs or installs, and let go once none does or the page closes
 // (signing/queue.js heldLanes); `keep` stands in for holdApp (tests).
-export async function runAppQueueRun(jobs, { queue = appQueue, record = recordApp, ready = readyToInstall, run = null, lanes = null, keep = null } = {}) {
+export async function runAppQueueRun(jobs, { queue = appQueue, record = recordApp, ready = readyToInstall, run = null, lanes = null, keep = null, recount = recountChanges } = {}) {
   if (appRunning) return null;
   appRunning = true;
   updateAppChrome();
@@ -666,6 +670,8 @@ export async function runAppQueueRun(jobs, { queue = appQueue, record = recordAp
     const lanesHeld = held;
     return await (run ?? runAppRun)(jobs.filter((j) => queue.get(j.id)), {
       queue, record, lanes: lanesHeld,
+      // B264: each app's end counts the badge again, iFizBox kept running (in the background too) until it is set
+      onAppEnd: (r, recorded) => lanesHeld.during?.(Promise.resolve(recorded).catch(() => {}).then(() => recount())),
       onClose: () => { lanesHeld.release(); appRunning = false; updateAppChrome(); },
       reopenConfirm: (footer) => { appRunning = false; openAppConfirm(queue, { footer }); },
     });

@@ -199,9 +199,11 @@ export function followHandoff(run, rows, { isInstalled, doc = globalThis.documen
 
 // jobs: the app queue's (core/appqueue.js). deps: { queue, lanes ({ sign, install, discard }, phoneLanes's),
 //   record(job) (Installed's record of an install), reopenConfirm(footer), onClose(result), open (openProgress, tests),
-//   stallMs, later, clear (tests), finish(result) (B71a: { label, action } for the bottom button, or null) } ->a promise for the first end: { ok, stopped, rows, installed }.
+//   stallMs, later, clear (tests), finish(result) (B71a: { label, action } for the bottom button, or null),
+//   onAppEnd(row, recorded) (B264: an app's install or re-sign has just ended: the badge counts again; `recorded`
+//   settles once Installed's record of it is written, null when none is) } ->a promise for the first end: { ok, stopped, rows, installed }.
 export async function runAppRun(jobs, deps) {
-  const { queue, lanes, record = async () => {}, reopenConfirm = () => {}, open = openProgress } = deps;
+  const { queue, lanes, record = async () => {}, reopenConfirm = () => {}, open = openProgress, onAppEnd = () => {} } = deps;
   const page = open({ title: "Running" });
   const rows = appRows(jobs);
 
@@ -309,13 +311,16 @@ export async function runAppRun(jobs, deps) {
     keepAwake: deps.keepAwake ?? screenAwake, // F287: the screen stays on while the run works
     onChange: (r) => {
       draw(r);
-      if (r.state === "installed" && !cleared.has(r.id)) {
+      const endedNow = r.state === "installed" && !cleared.has(r.id);
+      if (endedNow) {
         cleared.add(r.id);
         if (isSelf(r)) sentSelf = true;
         queue.clear(r.id);
         if (r.unsure) Promise.resolve().then(() => handoff?.check()); // B76: iOS may have it already
       }
       recordIf(r); // B136: only once iOS has it (a confirm comes back here with unsure off)
+      // B264: after the record above is asked for (`recorded`: its promise, when one was written), so the count sees it
+      if (endedNow) try { onAppEnd(r, recorded.get(r.id) ?? null); } catch { /* the badge counts again on the next open */ }
       tick();
     },
     onLog: ({ id, kind, text }) => line(kind, text, id),

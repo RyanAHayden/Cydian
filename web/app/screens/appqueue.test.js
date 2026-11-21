@@ -81,3 +81,12 @@ test("app page (F80): installed, Modify's sheet offers Upgrade (and Downgrade); 
   const itms = { ...pkg, stanza: { ...pkg.stanza, ipa: { ...pkg.stanza.ipa, versions: [{ version: "2", downloadURL: "itms-services://?x" }] } } };
   assert.equal(await appPageAction(itms, null, base), false);
 });
+
+test("B264: Confirm's run counts the badge again after each app it re-signed or installed", async () => {
+  const q = createAppQueue();
+  for (const j of [job("a", { mode: "resign", url: null }), job("b")]) q.add(j);
+  const log = [];
+  assert.equal(await runAppQueue(q.list(), { queue: q, ready: async () => true, install: async (j) => { log.push(j.id); return true; },
+    record: async () => {}, recount: () => log.push("count") }), 2);
+  assert.deepEqual(log, ["a", "count", "b", "count"]);
+});

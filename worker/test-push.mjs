@@ -104,6 +104,10 @@ assert.equal(badgeFor({ ...dev, known: ["com.example.velvet 1.9"] }, by), 1, "a 
 assert.equal(badgeFor({ ...dev, known: ["com.example.velvet 2.0"], counted: [] }, by), 0, "the ignored version itself");
 assert.equal(badgeFor({ ...dev, known: ["com.example.velvet 1.9"], counted: [] }, by), 1, "the version after the ignored one");
 assert.equal(badgeFor({ ...dev, known: ["com.example.velvet 2.0"], counted: [] }, by, [{ id: "com.example.velvet" }]), 1, "never under the push");
+// B264: once an app's install ends, the page's recount sends its new version (core/push.js syncPush): a later push
+// never puts the old count back. A re-sign changes no version and is never in this count (only the page counts it).
+const installed = { ...dev, apps: dev.apps.map((a) => (a.id === "com.example.velvet" ? { ...a, version: "2.0" } : a)) };
+assert.equal(badgeFor({ ...installed, known: [] }, by), 0, "Velvet 2.0 installed: no longer counted");
 assert.equal(parseRegistration({ token: TOKEN_A, environment: "production", topic: SELF_ID, counted: ["a 1", 3, ""] }).device.counted.length, 2);
 assert.equal(parseRegistration({ token: TOKEN_A, environment: "production", topic: SELF_ID }).device.counted, null);
 

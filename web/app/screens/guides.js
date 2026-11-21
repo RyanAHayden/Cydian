@@ -19,6 +19,7 @@ import { NAME } from "../brand.js";
 import { GUIDE_ID as KEEP_GUIDE } from "../core/keepid.js";
 import { UDID_HOW } from "../core/signing.js";
 import { pageName } from "../core/signingpage.js";
+import { icon, guideSvg, GUIDE_TILE_NAMES } from "../icons/rowicons.js";
 
 // C32: the guide list, isLite and the guide links are in guide-index.js, which Home's root loads without this file.
 import { shows, GUIDES, guideIds, guideRows, ASC_GUIDE } from "./guide-index.js";
@@ -161,30 +162,14 @@ export function faqSections(lite) {
 }
 
 // ---- Copying Files --------------------------------------------------------------------------------------------
-// F176: every app and system row has a 29px icon: our own glyphs, drawn here as SVG in iOS 6's style (a top-lit
-// gradient tile, a white glyph with a dark drop, the gloss over the top half). Never Apple's, Microsoft's or
-// LocalSend's artwork (AGENTS.md): a folder, radio waves, swap arrows, a monitor, a window, a penguin of our own.
-const GLYPHS = {
-  files: ["#7cc0fb", "#1a6fd8", "<path d='M11 18h13l4 4h19v22H11z'/><path d='M11 25h36' stroke='#1a6fd8' stroke-width='2' fill='none' opacity='.35'/>"],
-  airdrop: ["#7fd0f7", "#1f8fd6", "<circle cx='29' cy='38' r='4.5'/><g fill='none' stroke='#fff' stroke-width='4' stroke-linecap='round'><path d='M20 31a12 12 0 0 1 18 0'/><path d='M14 25a20 20 0 0 1 30 0'/><path d='M9 19a28 28 0 0 1 40 0'/></g>"],
-  localsend: ["#6fe0bf", "#14916f", "<g fill='none' stroke='#fff' stroke-width='4.5' stroke-linecap='round' stroke-linejoin='round'><path d='M21 44V15m-8 8 8-8 8 8'/><path d='M37 14v29m-8-8 8 8 8-8'/></g>"],
-  pairdrop: ["#b9a3f7", "#5b3fc9", "<rect x='9' y='15' width='16' height='28' rx='3'/><rect x='33' y='15' width='16' height='28' rx='3'/><g fill='none' stroke='#5b3fc9' stroke-width='3' stroke-linecap='round'><path d='M17 37h0M41 37h0'/></g><path d='M27 29h4' stroke='#fff' stroke-width='3.5' stroke-linecap='round'/>"],
-  mac: ["#d9dde3", "#7c8592", "<rect x='9' y='12' width='40' height='27' rx='3'/><rect x='12' y='15' width='34' height='21' fill='#5e7fa8'/><path d='M24 39h10l2 7H22z'/><rect x='18' y='45' width='22' height='3' rx='1.5'/>"],
-  windows: ["#74b6f2", "#1d5fc0", "<rect x='9' y='13' width='40' height='32' rx='3'/><rect x='12' y='20' width='34' height='22' fill='#2f74d0'/><g fill='#1d5fc0'><circle cx='14' cy='16.5' r='1.5'/><circle cx='19' cy='16.5' r='1.5'/></g><path d='M15 24h12v7H15zM30 24h13v15H30zM15 34h12v5H15z' fill='#bcd8f6'/>"],
-  linux: ["#5d5d5d", "#1d1d1d", "<ellipse cx='29' cy='34' rx='13' ry='15'/><ellipse cx='29' cy='35' rx='8.5' ry='11' fill='#1d1d1d'/><circle cx='29' cy='19' r='9'/><g fill='#1d1d1d'><circle cx='25.5' cy='18' r='1.6'/><circle cx='32.5' cy='18' r='1.6'/></g><path d='M25 22h8l-4 4z' fill='#f6b73c'/><path d='M17 48h9l-2-4h-6zM32 48h9l-1-4h-6z' fill='#f6b73c'/>"],
-  filza: ["#ffc66b", "#e07e14", "<path d='M11 16h12l4 4h20v24H11z'/><g fill='none' stroke='#e07e14' stroke-width='3' stroke-linecap='round'><path d='M19 27v11h8M19 32h8'/></g><rect x='29' y='25' width='10' height='5' rx='1' fill='#e07e14'/><rect x='29' y='35' width='10' height='5' rx='1' fill='#e07e14'/>"],
-};
-// Flat like Home's tiles (no gloss): the tile's colour, the white glyph.
-export const glyphSvg = (id) => {
-  const [, colour, body] = GLYPHS[id];
-  return "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 58 58'>"
-    + `<rect width='58' height='58' fill='${colour}'/><g fill='#fff'>${body}</g></svg>`;
-};
+// F176: every app and system row has a 29px icon: our own glyphs (a folder, radio waves, swap arrows, a monitor, a
+// window, a penguin), drawn as SVG tiles from the icon map (icons/rowicons.js "guides", C51).
+export const glyphSvg = (id) => guideSvg(id);
 // A row's icon: the glyph as a picture over its tile colour and letter (shown if the picture can't load).
 export const glyph = (id, text) => ({
-  text, color: GLYPHS[id][1], cls: "guide-glyph", src: "data:image/svg+xml;charset=utf-8," + encodeURIComponent(glyphSvg(id)),
+  text, color: icon("guides", id)[1], cls: "guide-glyph", src: "data:image/svg+xml;charset=utf-8," + encodeURIComponent(glyphSvg(id)),
 });
-export const GLYPH_IDS = Object.keys(GLYPHS);
+export const GLYPH_IDS = GUIDE_TILE_NAMES;
 
 export const FILZA_CAN = ["Browse the whole file system", "Unzip and zip archives", "Edit plists and text files",
   "Open files shared from other apps", "Install .deb files"];

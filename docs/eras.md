@@ -163,5 +163,29 @@ Not yet clean, each queued as its own cleanup:
 - the other stylesheets (`packages.css`; the small ones);
 - the light palettes' segmented-control rules in `palettes.css` (they move onto tokens with that control);
 - the art the overlays in `nav/` draw from JS (HUD, spinner, share sheet, lock, placeholders);
-- inline SVG icons drawn from JS, to come from a per-style icon map;
 - the three nav hooks above.
+
+The screens' inline SVG art comes from the icon map below; the share sheet's activity glyphs are drawn in `nav/` with
+its other overlays.
+
+## Icon map
+
+Every SVG a screen draws from JS comes from one map, `ICON_SETS` in `web/app/icons/rowicons.js`, keyed by style and
+then by kind and icon name. iOS 6's set is `ICON_SETS.ios6`:
+
+| Kind | Keyed by | What it draws | Read through |
+|---|---|---|---|
+| `rows` | icon name -> `[tile colour, glyph]` | the 29pt row tiles (Settings, Manage, Account, Why, …) | `rowIcon(name)`, `tileSvg(name)` |
+| `glyphs` | glyph name -> paths | the white glyph on a row tile, 24 units | through `rows` |
+| `tile` | | the row tile's size, corners and glyph size | through `rows` |
+| `guides` | name -> `[light, colour, body]` | Copying Files' app and computer tiles | `guideSvg(name)` |
+| `home` | name -> `{ colour, gradient, svg }` | Home tiles a screen paints in its own CSS (Why) | `homeTileCss(name)` |
+| `tabs` | tab -> SVG | the tab bar's glyphs, the `--glyph` token of `.tab[data-tab]` | `tabGlyphTokens(style)` |
+
+An era adds `ICON_SETS.ios<N>` with only what it redraws (outline or filled glyphs, a tile shape, other colours):
+anything it leaves out falls back to iOS 6's entry, per name. The functions read the style from
+`<html data-style>` (`iconStyle()`), or take it as their last argument. The tab glyphs stay CSS tokens, in the stylesheet with the
+rest of a style's look: `ios6.css` holds `tabGlyphTokens("ios6")` and an era's stylesheet holds
+`tabGlyphTokens("ios<N>")`, and `rowicons.test.js` fails when either drifts from the map. The same test fails if a
+screen (`why.js`, `notiphone.js`, `manage.js`, `handoff.js`, `guides.js`, `account.js`) gains an inline SVG of its
+own. QR codes (`core/qr.js`) are data, not art, and stay out of the map.

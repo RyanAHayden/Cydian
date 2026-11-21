@@ -65,3 +65,71 @@ test("F223: Home's Settings row and Settings > General draw one gear, from this 
   const home = readFileSync(new URL("../home.css", import.meta.url), "utf8");
   assert.doesNotMatch(home, /\.glyph-settings/, "no second gear drawn in home.css");
 });
+
+// C51: the per-style icon map (docs/eras.md, "Icon map").
+test("C51: ios6.css's tab glyph tokens are the map's iOS 6 tabs, as tabGlyphTokens prints them", async () => {
+  const { ICON_SETS, tabGlyphTokens, cssSvgUrl } = await import("./rowicons.js");
+  const css = readFileSync(new URL("../ios6.css", import.meta.url), "utf8");
+  const inCss = {};
+  for (const m of css.matchAll(/^\.tab\[data-tab="(\w+)"\]\s*\{ --glyph: (url\("[^"]*"\)); \}/gm)) inCss[m[1]] = m[2];
+  const tabs = ICON_SETS.ios6.tabs;
+  assert.deepEqual(Object.keys(inCss), Object.keys(tabs), "one ios6.css rule per tab in the map, in its order");
+  for (const [tab, svg] of Object.entries(tabs)) assert.equal(inCss[tab], cssSvgUrl(svg), tab);
+  // the same rules, ios6.css only lines the braces up
+  assert.equal(tabGlyphTokens("ios6"),
+    Object.entries(inCss).map(([tab, url]) => `.tab[data-tab="${tab}"] { --glyph: ${url}; }`).join("\n"));
+});
+
+test("C51: an era stylesheet carries the tab glyph tokens of its own set", async () => {
+  const { ICON_SETS, tabGlyphTokens } = await import("./rowicons.js");
+  for (const style of Object.keys(ICON_SETS)) {
+    if (style === "ios6" || !ICON_SETS[style].tabs) continue;
+    const css = readFileSync(new URL(`../${style}.css`, import.meta.url), "utf8");
+    for (const line of tabGlyphTokens(style).split("\n")) assert.ok(css.includes(line), `${style}.css: ${line}`);
+  }
+});
+
+test("C51: the page's data-style picks the set, and an era falls back to iOS 6 for what it leaves out", async () => {
+  const { ICON_SETS, iconStyle, icon, tileSvg, rowIcon, guideSvg, homeTileCss } = await import("./rowicons.js");
+  assert.equal(iconStyle({ documentElement: { dataset: {} } }), "ios6");
+  assert.equal(iconStyle({ documentElement: { dataset: { style: "ios7" } } }), "ios7");
+  assert.equal(iconStyle(undefined), "ios6");
+  ICON_SETS.test = { rows: { general: ["#000000", "outline"] }, glyphs: { outline: [["s", "M2 2h20v20H2z", 1.5]] },
+    tile: { radius: 7 } };
+  try {
+    assert.equal(icon("rows", "general", "test")[0], "#000000");
+    assert.deepEqual(icon("rows", "theme", "test"), ICON_SETS.ios6.rows.theme, "left out: iOS 6's");
+    assert.equal(icon("rows", "general", "nope"), ICON_SETS.ios6.rows.general, "an unknown style draws iOS 6");
+    const svg = tileSvg("general", "test");
+    assert.match(svg, /rx="7" fill="#000000"/);
+    assert.match(svg, /stroke-width="1.5"/);
+    assert.match(tileSvg("theme", "test"), /rx="7"/, "the era's tile shape, iOS 6's glyph");
+    assert.notEqual(rowIcon("general", "test").src, rowIcon("general", "ios6").src, "cached per style");
+    assert.equal(guideSvg("files", "test"), guideSvg("files", "ios6"));
+    assert.equal(homeTileCss("why", "test"), homeTileCss("why", "ios6"));
+  } finally {
+    delete ICON_SETS.test;
+  }
+  assert.throws(() => guideSvg("nope"));
+  assert.throws(() => homeTileCss("nope"));
+});
+
+test("C51: the screens draw no inline SVG of their own: their art comes from the map (QR codes from core/qr.js)", () => {
+  for (const f of ["why", "notiphone", "manage", "handoff", "guides", "account"]) {
+    const src = readFileSync(new URL(`../screens/${f}.js`, import.meta.url), "utf8");
+    assert.doesNotMatch(src, /<svg|%3Csvg|viewBox|<path /i, f);
+  }
+});
+
+test("C51: Why's tile and Copying Files' tiles are the map's", async () => {
+  const { homeTileCss, guideSvg, GUIDE_TILE_NAMES, ICON_SETS } = await import("./rowicons.js");
+  const why = await import("../screens/why.js");
+  assert.ok(why.WHY_CSS.includes(`.home-glyph.glyph-why { ${homeTileCss("why", "ios6")}`));
+  assert.match(homeTileCss("why", "ios6"), /^background-color: #d8820f; background-image: url\("data:image\/svg\+xml,%3Csvg [^"]*%3C\/svg%3E"\), linear-gradient\(#f4b03f, #d8820f\);$/);
+  const guides = await import("../screens/guides.js");
+  assert.deepEqual(guides.GLYPH_IDS, GUIDE_TILE_NAMES);
+  for (const id of GUIDE_TILE_NAMES) {
+    assert.equal(guides.glyphSvg(id), guideSvg(id, "ios6"), id);
+    assert.equal(guides.glyph(id, "X").color, ICON_SETS.ios6.guides[id][1], id);
+  }
+});

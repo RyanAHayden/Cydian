@@ -142,7 +142,7 @@ test("B191: no transition in web/app/*.css animates a layout property", () => {
 // C44, docs/eras.md "Definition of clean": an era is one stylesheet of look plus the named hooks, never a layout rule.
 // Look properties are the paint and type ones below; everything else (box, position, flex/grid, overflow, wrapping,
 // touch and cursor behaviour) is layout and lives in style.css, moved only through its "Era hooks" tokens.
-export const LOOK = /^(--.+|color|color-scheme|accent-color|caret-color|opacity|filter|-webkit-backdrop-filter|backdrop-filter|box-shadow|text-shadow|content|background(-[a-z]+)*|border(-[a-z]+)*|outline(-[a-z]+)*|-webkit-mask(-[a-z]+)*|mask(-[a-z]+)*|font(-[a-z]+)*|line-height|letter-spacing|word-spacing|text-align|text-transform|text-decoration(-[a-z]+)*|-webkit-font-smoothing|-webkit-text-stroke(-[a-z]+)*|fill|stroke(-[a-z]+)*|list-style(-[a-z]+)*)$/;
+export const LOOK = /^(--.+|color|color-scheme|accent-color|caret-color|opacity|filter|-webkit-backdrop-filter|-webkit-box-reflect|backdrop-filter|box-shadow|text-shadow|content|background(-[a-z]+)*|border(-[a-z]+)*|outline(-[a-z]+)*|-webkit-mask(-[a-z]+)*|mask(-[a-z]+)*|font(-[a-z]+)*|line-height|letter-spacing|word-spacing|text-align|text-transform|text-decoration(-[a-z]+)*|-webkit-font-smoothing|-webkit-text-stroke(-[a-z]+)*|fill|stroke(-[a-z]+)*|list-style(-[a-z]+)*)$/;
 const splitDecls = (decl) => { // on ";" outside quotes and parentheses (data: URIs hold both)
   const out = [];
   let depth = 0, quote = "", cur = "";
@@ -272,4 +272,14 @@ test("C45: style.css holds the moved layout and the new hooks drive it", () => {
   for (const k of ["@keyframes hud-spin", "@keyframes ph-pulse", ".page-body::before", ".switch {", ".sw-knob {", ".reload-bar {", ".undo-bar {", ".pull-refresh {", ".share-sheet {"]) {
     assert.ok(base.includes(k), `${k} in style.css`);
   }
+});
+
+// T61: the reflections under the store icon and the Browse hero icon paint, so they sit in packages.css's look-only
+// stretches, where an era can turn them off.
+test("T61: packages.css's -webkit-box-reflect declarations all sit in look-only stretches", () => {
+  const src = readFileSync(new URL("./packages.css", import.meta.url), "utf8");
+  const reflects = (s) => cssRules(s).flatMap(({ sel, props }) => props.filter((p) => p === "-webkit-box-reflect").map(() => sel));
+  assert.deepEqual(reflects(src.replace(STRETCH, "")), []);
+  const inside = stretchesOf(src).flatMap(reflects);
+  for (const sel of [".store-icon", ".browse-hero-icon", ".browse-hero.is-loading .browse-hero-icon"]) assert.ok(inside.includes(sel), sel);
 });

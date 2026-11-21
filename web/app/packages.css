@@ -651,7 +651,6 @@ html.has-manage-toolbar .search-results::after { content: ""; }
 }
 .browse-hero-icon {
   position: relative; flex: none; width: 72px; height: 72px; overflow: hidden;
-  -webkit-box-reflect: below 2px linear-gradient(transparent 62%, rgba(255,255,255,.3));
 }
 .browse-hero-icon img, .browse-icon-row .cell-icon img, .roulette-icon img {
   position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
@@ -661,7 +660,6 @@ html.has-manage-toolbar .search-results::after { content: ""; }
 .browse-hero-desc { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .browse-hero-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: auto; padding-top: 8px; min-height: 24px; }
 .browse-hero-meta { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.browse-hero.is-loading .browse-hero-icon { -webkit-box-reflect: none; }
 /* Held (app.js PRESSABLE, 140 ms on a quick tap): the whole banner goes down, as the iOS 6 App Store's did: a flat
    dark veil over the card, above the icon and words, clipped by the card's radius. No glow or highlight. */
 .browse-hero::after { position: absolute; inset: 0; z-index: 1; pointer-events: none; }
@@ -693,6 +691,7 @@ html.has-manage-toolbar .search-results::after { content: ""; }
 }
 .browse-hero-icon {
   border-radius: 12.5px; background: center / cover no-repeat; box-shadow: 0 2px 4px rgba(0,0,0,.55);
+  -webkit-box-reflect: below 2px linear-gradient(transparent 62%, rgba(255,255,255,.3));
 }
 .browse-hero-icon img, .browse-icon-row .cell-icon img, .roulette-icon img { opacity: 0; background: #fff; }
 .browse-hero-icon img.loaded, .browse-icon-row .cell-icon img.loaded, .roulette-icon img.loaded { opacity: 1; }
@@ -702,7 +701,7 @@ html.has-manage-toolbar .search-results::after { content: ""; }
 .browse-hero-desc { font-size: 13px; line-height: 17px; color: rgba(255,255,255,.9); }
 .browse-hero-meta { font-size: 12px; color: rgba(255,255,255,.8); }
 .browse-hero.is-loading .ph-bar, .browse-hero.is-loading .ph-box { background: rgba(255,255,255,.18); }
-.browse-hero.is-loading .browse-hero-icon { box-shadow: none; }
+.browse-hero.is-loading .browse-hero-icon { box-shadow: none; -webkit-box-reflect: none; }
 .browse-hero::after { content: ""; background: rgba(0,0,0,.3); opacity: 0; }
 .browse-hero.is-pressed::after { opacity: 1; }
 .store-btn {
@@ -806,7 +805,6 @@ html[data-theme="dark"] .desc-link { color: var(--dk-link); }
 .store-head { display: flex; gap: 12px; padding: 14px 21px 30px; }
 .store-icon {
   position: relative; flex: none; width: 72px; height: 72px; align-self: flex-start;
-  -webkit-box-reflect: below 2px linear-gradient(transparent 62%, rgba(255,255,255,.35));
 }
 .store-icon .pkg-art.large, .store-icon .pkg-icon.large { width: 72px; height: 72px; }
 .store-icon .pkg-art.large .pkg-badge { left: 43px; top: 43px; width: 36px; height: 36px; z-index: 2; }
@@ -826,6 +824,7 @@ html[data-theme="dark"] .desc-link { color: var(--dk-link); }
   border-bottom: 1px solid var(--store-head-edge);
 }
 html[data-theme="dark"] .store-head { text-shadow: var(--emboss); background: var(--dk-store-head); border-bottom-color: var(--table-edge); }
+.store-icon { -webkit-box-reflect: below 2px linear-gradient(transparent 62%, rgba(255,255,255,.35)); }
 .store-icon .pkg-icon { border-radius: 12.5px; box-shadow: 0 1px 3px rgba(0,0,0,.45); }
 .store-icon .pkg-icon.cy { box-shadow: none; }
 .store-icon .pkg-icon.large .pkg-letter { font-size: 34px; }

@@ -31,7 +31,7 @@ lists the ones that do.
 ### Look and layout
 
 Look is what paints: `color`, `background*`, `border*` (including radius, image and width), `box-shadow`,
-`text-shadow`, `filter`, `backdrop-filter`, `opacity`, `mask*`, `outline*`, `font*`, `line-height`,
+`text-shadow`, `filter`, `backdrop-filter`, `-webkit-box-reflect`, `opacity`, `mask*`, `outline*`, `font*`, `line-height`,
 `letter-spacing`, `word-spacing`, `text-align`, `text-transform`, `text-decoration*`, `caret-color`,
 `color-scheme`, `content`, `fill`, `stroke*`, `list-style*`. The test's `LOOK` pattern is the list.
 
@@ -200,9 +200,8 @@ their layout in plain rules and paint in a look-only stretch after them.
 - Store header: `--store-head`, `--store-head-edge`, `--store-head-emboss`.
 - Sheets (`nav/sheet.js`) paint with `--plain` and their bar is a `.navbar`, so the nav bar's tokens restyle them;
   card sheets are the [nav hook](#nav-hooks) below.
-
-The store icon's and Browse hero's reflection (`-webkit-box-reflect`) paints but is not in the test's `LOOK` list,
-so it still sits in a layout rule.
+- Reflections: the store icon's and Browse hero icon's `-webkit-box-reflect` sit in packages.css's look-only
+  stretches; an era drops them with `-webkit-box-reflect: none`.
 
 ### Nav hooks
 

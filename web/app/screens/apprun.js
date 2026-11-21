@@ -59,6 +59,12 @@ const screenAwake = (on) => (hasNativeCall() || globalThis.navigator?.wakeLock
 let shown = null;
 export const runPage = () => shown;
 
+// B278: a record of an installed app that didn't land is written again this many times, this far apart (and on each
+// of RECORD_FRONTS returns to the front)
+export const RECORD_TRIES = 5;
+export const RECORD_RETRY = 3000;
+export const RECORD_FRONTS = 3;
+
 let runs = 0;
 export const laneRunId = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}${++runs}`;
 export function phoneLanes(sc, { native, run = laneRunId() } = {}) {
@@ -281,11 +287,57 @@ export async function runAppRun(jobs, deps) {
   const recordIf = (r, onPhone) => {
     if (recorded.has(r.id) || recordWhen(r, onPhone) !== "now") return;
     const id = r.job?.id ?? r.id;
-    recorded.set(r.id, Promise.resolve().then(async () => {
+    const p = Promise.resolve().then(async () => {
       const before = await recordOf(id);
-      try { await record(r.job); } catch { /* no store: Installed won't list it */ }
-      return { before, wrote: await recordOf(id) };
-    }));
+      try { await record(r.job); } catch (e) { return missedRecord(r, onPhone, p, before, e); }
+      forget(r);
+      return { before, wrote: await recordOf(id), ok: true };
+    });
+    recorded.set(r.id, p);
+  };
+  // B278: a record that didn't land (record threw: in the background iOS can suspend the page's IndexedDB in the
+  // middle of the write) is written again, RECORD_TRIES times RECORD_RETRY apart and on each return to the front,
+  // instead of the app staying at its old version in Installed and Changes keeping its upgrade. A This iPhone install
+  // ends confirmed, so nothing else would ever ask for its record again.
+  // One timer at a time per row; RECORD_FRONTS returns to the front at most, then it gives up (a store that never
+  // works again, until iFizBox restarts). The Log says so on the first failure and when it gives up.
+  const missed = new Map(); // row id -> { onPhone, left, fronts, waiting }
+  const doc = deps.doc ?? globalThis.document;
+  const retryLater = deps.later ?? ((f, ms) => { const t = setTimeout(f, ms); t?.unref?.(); return t; });
+  const forget = (r) => { if (missed.delete(r.id) && !missed.size) doc?.removeEventListener?.("visibilitychange", onFront); };
+  const recordAgain = (r) => {
+    const m = missed.get(r.id);
+    if (!m || recorded.has(r.id)) return;
+    recordIf(r, m.onPhone);
+    const p = recorded.get(r.id);
+    // written now: the badge counts again (B264), as at the app's end
+    if (p) p.then((x) => { if (x?.ok) try { onAppEnd(r, p); } catch { /* counted on the next open */ } }, () => {});
+    else forget(r); // the row changed (retried, failed): nothing to record now
+  };
+  const onFront = () => {
+    if (doc?.visibilityState === "hidden") return;
+    for (const r of rows) {
+      const m = missed.get(r.id);
+      if (!m) continue;
+      if (m.fronts-- <= 0) { forget(r); line("raw", `Couldn't record ${r.name || r.id} as installed`, r.id); continue; }
+      m.left = RECORD_TRIES;
+      recordAgain(r);
+    }
+  };
+  const missedRecord = (r, onPhone, p, before, e) => {
+    if (recorded.get(r.id) === p) recorded.delete(r.id); // a later recordIf may write it again
+    let m = missed.get(r.id);
+    if (!m) {
+      m = { onPhone, left: RECORD_TRIES, fronts: RECORD_FRONTS, waiting: false };
+      if (!missed.size) doc?.addEventListener?.("visibilitychange", onFront);
+      missed.set(r.id, m);
+      line("raw", `Couldn't record ${r.name || r.id} as installed (${e?.message || e}); trying again`, r.id);
+    }
+    if (!m.waiting && m.left-- > 0) {
+      m.waiting = true;
+      retryLater(() => { m.waiting = false; recordAgain(r); }, RECORD_RETRY);
+    }
+    return { before, wrote: null, ok: false };
   };
   const unrecord = (r) => {
     const p = recorded.get(r.id);

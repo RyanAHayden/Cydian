@@ -372,8 +372,8 @@ export function leaveQuestion(step) {
 // after one, comes back on the route it had. At launch, with nothing stored here, the kept route is taken; otherwise
 // what is stored is kept (a build from before this kept nothing); then every change is kept. Sideload app only (the
 // setting shows nowhere else). Returns true when it started.
-//   keepRoute({ settings, native: globalThis.ifizboxNative, storage: globalThis.localStorage })
-export function keepRoute({ settings, native = globalThis.ifizboxNative, storage = globalThis.localStorage } = {}) {
+//   keepRoute({ settings, native: nativeBridge(), storage: globalThis.localStorage })   (native.js; none: no start)
+export function keepRoute({ settings, native = null, storage = globalThis.localStorage } = {}) {
   if (!settings || typeof native?.call !== "function" || !settings.isShown?.(ROUTE_KEY)) return false;
   const call = (name, params) => Promise.resolve().then(() => native.call(name, params));
   const stored = () => { try { return storage?.getItem(STORAGE_KEY) ?? null; } catch { return null; } };

@@ -37,6 +37,7 @@ import { catalog } from "./catalog.js";
 import { createUpgradeNotices } from "./settings.js";
 import { createPrefsMirror } from "./settings.js";
 import { keepRoute } from "./core/installroute.js"; // B218
+import { nativeBridge } from "./native.js";
 import { NAME } from "./brand.js";
 import { takeInstallParam, askFromInstallLink, launchRefresh } from "./websign-gate.js";
 import { notIphonePage } from "./core/platform.js";
@@ -533,7 +534,7 @@ if (globalThis.ifizboxNative) {
 }
 upgradeNotices.start();
 createPrefsMirror({ settings: settingsScreen.settings }).start(); // F70: N7's settings to the daemon
-keepRoute({ settings: settingsScreen.settings }); // B218: Install Apps With kept in the Keychain (sideload)
+keepRoute({ settings: settingsScreen.settings, native: nativeBridge() }); // B218: Install Apps With kept in the Keychain (sideload)
 if (addFrom) requestAnimationFrame(() => load("manage").then((m) => m.addSource(ctx, addFrom)).catch(() => {}));
 
 // Refresh Sources on Launch (Settings): in the background, no HUD; the Sources tab shows the result when it next loads.

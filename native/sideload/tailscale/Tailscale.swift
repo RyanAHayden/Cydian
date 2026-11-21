@@ -11,7 +11,8 @@
 //                         [{step: "approval"}] when the tailnet wants it approved; replies status once it's in
 //   tailscale.signInCancel ends a running tailscale.signIn (it replies "canceled: ..."); the page asks it when it's left
 //                         while the sign-in starts or waits for approval
-//   tailscale.test        RemotePairing's handshake to this phone through the tailnet: {ok, code, detail, peer, ms}
+//   tailscale.test        RemotePairing's handshake to this phone through the tailnet: {ok, code, detail, peer, ms}; {verify: true}
+//                         then checks the kept pairing through it (idevice.verify): {verified} or code verify_failed
 //   tailscale.signOut     logs the node out and deletes its state (the Keychain's copy too) -> status
 //   tailscale.keepRoute   {value: "iphone"|"server"}: B218, Install Apps With kept in the Keychain beside the node
 //   tailscale.keptRoute   -> the kept Install Apps With, or null (core/installroute.js keepRoute takes it on a fresh start)
@@ -215,7 +216,7 @@ enum TailscaleBridge {
             setCanceled(true)
             Apt.reply(c, ["ok": true], nil)
         }
-        b.on("tailscale.test") { c in IDeviceBridge.run(c) { try test() } }
+        b.on("tailscale.test") { c in IDeviceBridge.run(c) { try test(verify: c.params["verify"] as? Bool == true) } }
         b.on("tailscale.signOut") { c in
             IDeviceBridge.run(c) {
                 if Tailscale.node != nil {
@@ -298,7 +299,7 @@ enum TailscaleBridge {
     }
 
     /// RemotePairing's handshake to this phone's own Tailscale address, through the tailnet.
-    static func test() throws -> Any? {
+    static func test(verify: Bool = false) throws -> Any? {
         guard Tailscale.node != nil else { throw IDevice.Failure(code: "not_signed_in", text: "sign in to Tailscale first") }
         guard let own = Tailscale.ownAddress() else { return ["ok": false, "code": "no_interface"] }
         defer { Tailscale.stop() }
@@ -323,6 +324,22 @@ enum TailscaleBridge {
         if r["code"] as? String == "no_answer", (r["detail"] as? String)?.contains("reset by peer") == true {
             r["code"] = "not_paired"
             r["paired"] = IDevice.pairing() != nil
+        }
+        // B274: reaching RemotePairing isn't proof the phone still accepts this app's pairing (R55: remotepairingd ran
+        // verifyManualPairing and dropped the channel, while this test said Connected). With `verify` and a pairing
+        // kept, it connects once with it through Tailscale (IDevice.verify) and answers `verify_failed` with the
+        // shell's error in `detail` (the page words it: core/installroute.js verifyFailure).
+        if verify, r["ok"] as? Bool == true, IDevice.pairing() != nil, Tailscale.useForInstall() {
+            do {
+                _ = try IDevice.verify(tailscale: true)
+                r["verified"] = true
+            } catch {
+                let d = (error as? IDevice.Failure)?.errorDescription ?? error.localizedDescription
+                r["ok"] = false
+                r["code"] = "verify_failed"
+                r["detail"] = d
+                r["paired"] = true
+            }
         }
         Tailscale.log("test \(own):\(port): \(r)")
         return r

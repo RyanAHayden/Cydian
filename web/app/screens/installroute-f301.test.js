@@ -131,8 +131,9 @@ test("a row kept from an earlier draw calls the latest draw's handler", async ()
 test("Test Connection spins Testing… in its own row (no HUD); past its deadline the alert says Not Responding", async () => {
   forgetStatus();
   huds.length = 0;
-  const was = TIMEOUTS.test;
+  const was = TIMEOUTS.test, wasVerify = TIMEOUTS.verify;
   TIMEOUTS.test = 20;
+  TIMEOUTS.verify = 0; // B274: Test Connection's deadline adds idevice.verify's
   try {
     const alerts = [];
     const box = make("div");
@@ -148,7 +149,7 @@ test("Test Connection spins Testing… in its own row (no HUD); past its deadlin
     assert.deepEqual(alerts.map((a) => a.title), [NOT_RESPONDING]);
     assert.ok(!spins(box, "Test Connection"));
     assert.equal(native.calls.filter((c) => c === "tailscale.test").length, 1);
-  } finally { TIMEOUTS.test = was; }
+  } finally { TIMEOUTS.test = was; TIMEOUTS.verify = wasVerify; }
 });
 
 test("Check Connection on the Pairing page: VPN off by the time it's tapped, the answer comes from idevice.status alone", async () => {

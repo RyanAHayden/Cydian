@@ -631,6 +631,19 @@ enum IDevice {
         return e
     }
 
+    /// B274: the phone took the TCP connection, then reset the RemotePairing channel during pair-verify (idevice's
+    /// Socket(UnexpectedEof "early eof") from tunnel_create_rppairing; remotepairingd's verifyManualPairing dropping
+    /// it, R55 on the iPhone 15 Pro): a pairing it no longer accepts. Matched as the page does (core/installroute.js
+    /// earlyEOF). Not folded into connectFailure: on a reconnect mid-install it stays a drop that is tried again.
+    static func isEarlyEOF(_ e: Failure) -> Bool {
+        e.code == "connect_failed" && (e.text.contains("UnexpectedEof") || e.text.localizedCaseInsensitiveContains("early eof"))
+    }
+
+    /// B274: the install's first connect ending in isEarlyEOF, in the words Check Connection uses for it (Pair Again).
+    static func pairAgain(_ e: Failure, via: String) -> Failure {
+        Failure(code: "pair_again", text: "this iPhone answered through \(via), then closed the connection: it no longer accepts \(Brand.name)'s pairing. Pair again in Settings > Installation", lib: e.lib)
+    }
+
     // ---- Connecting
 
     static func sockaddr4(_ port: UInt16, host: String = address) -> sockaddr_in {
@@ -839,9 +852,10 @@ enum IDevice {
     }
 
     /// Connects once with the stored pairing: "is the pairing still good and LocalDevVPN on". Blocking.
-    static func verify() throws -> Kind {
+    /// B274: `tailscale` pins the route (Tailscale's Test Connection checks the pairing through Tailscale only).
+    static func verify(tailscale pinned: Bool? = nil) throws -> Kind {
         try watched("verify") { w in
-            let s = try Session(watch: w)
+            let s = try Session(watch: w, tailscale: pinned)
             if let u = try? s.udid() { PhoneID.remember(u) } // a check is a free chance to learn it
             return s.kind
         }
@@ -929,6 +943,11 @@ enum IDevice {
                 note("iOS lists \(run.bundleID ?? "the app") \(run.version ?? ""): installed")
                 progress(.install(1))
                 return
+            } catch let f as Failure where !run.connected && isEarlyEOF(f) {
+                // B274: Pair Again, not the socket error (the row and its log say what to do)
+                let via = Tailscale.useForInstall() ? "Tailscale" : "LocalDevVPN"
+                ilog("first connect reset during pair-verify through \(via): \(f.text); the pairing is stale")
+                throw pairAgain(f, via: via)
             } catch let f as Failure where run.connected && HereRecheck.shouldReconnect(code: f.code, lib: f.lib, reconnecting: firstDrop != nil) {
                 attempt += 1
                 if firstDrop == nil { firstDrop = f }

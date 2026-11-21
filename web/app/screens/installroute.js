@@ -473,18 +473,31 @@ export async function recheckPairing(native, alert, redraw) {
 
 // F301: the test runs with the spinner in its own row (installationGroups' `testing`, no HUD), at most TIMEOUTS.test;
 // `ended()` stops the row's spinner before the answer's alert.
+// B274: with `verify`, tailscale.test also connects once with the kept pairing through Tailscale (idevice.verify), so
+// Connected means an install would connect; its deadline adds idevice.verify's.
 async function tailscaleTest(native, alert, ended = () => {}) {
   let r;
-  try { r = await within(call(native, "tailscale.test"), TIMEOUTS.test); } catch (e) { r = isLate(e) ? { ok: false, code: "not_responding" } : { ok: false, code: "error", detail: e?.message }; }
+  const ms = TIMEOUTS.test + TIMEOUTS.verify;
+  try { r = await within(call(native, "tailscale.test", { verify: true }), ms); } catch (e) { r = isLate(e) ? { ok: false, code: "not_responding" } : { ok: false, code: "error", detail: e?.message }; }
   ended();
-  return testAlert(alert, r);
+  return testAlert(alert, r, { native, ms });
 }
 
 // tailscale.test's answer `r` as an alert (core tailscaleTestResult; Copy Rule when the tailnet's rules block it).
-async function testAlert(alert, r) {
+// B274: Pair Again (`again`: the phone no longer accepts the kept pairing) forgets it and opens the pairing page.
+async function testAlert(alert, r, { native = null, ms = TIMEOUTS.test } = {}) {
   const why = r?.code === "not_responding"
-    ? { title: NOT_RESPONDING, message: `Tailscale didn't answer in ${TIMEOUTS.test / 1000} seconds. Check that the Tailscale app's VPN is on, then test again.` }
+    ? { title: NOT_RESPONDING, message: `Tailscale didn't answer in ${Math.round(ms / 1000)} seconds. Check that the Tailscale app's VPN is on, then test again.` }
     : tailscaleTestResult(r);
+  if (why.again) {
+    const { index } = await alert({ title: why.title, message: why.message, buttons: ["Cancel", "Pair Again"], cancel: 0 }) || {};
+    if (index !== 1) return;
+    await busy("Forgetting Pairing", () => call(native, "idevice.forget").catch(() => {}));
+    forgetStatus();
+    if (visit) visit.started = false;
+    recheckHooks.goPair();
+    return;
+  }
   if (why.pair) { // B246: the route works, the pairing is missing: Pair opens the pairing page
     const { index } = await alert({ title: why.title, message: why.message, buttons: ["Not Now", "Pair"], cancel: 0 });
     if (index === 1) recheckHooks.goPair();

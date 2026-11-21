@@ -4,6 +4,10 @@
 //
 //   source: { kind: "source", url, name, why, jailbreak?, for? }   jailbreak: an APT repo (hidden on Not Jailbroken);
 //                                                                 for: the jailbreaks it suits (F19)
+//   tag: "dev" | "modded"   F327: every AltStore source says which More Sources group it goes in: From the Developer
+//                           (the app's own makers, or a team's pick of open-source apps) or Modded Apps (a store app
+//                           with a tweak built in, from that mod's own maintainer). Never a source of cracked or
+//                           decrypted paid apps.
 //
 // F142: the list is what today's package managers and sideloaders ship, read from their source (CHECKED is when):
 //   APT (the jailbreak build, above its AltStore sources)  Sileo's first-run repos (Sileo RepoManager.swift: Havoc, Chariz); Zebra's own repo
@@ -22,7 +26,7 @@ import { NAME } from "../brand.js";
 export const CHECKED = "2026-11-18";
 
 export const RECOMMENDED_SOURCES = [
-  { kind: "source", name: "FIZL0", url: "https://fizl0.github.io/apps/source.json", own: true,
+  { kind: "source", name: "FIZL0", tag: "dev", url: "https://fizl0.github.io/apps/source.json", own: true,
     why: `openMX, OpenTennis and Party Board in one source: the games ${NAME}'s default list is built around.` },
   // ---- APT repos: the jailbreak build ----
   { kind: "source", name: "Havoc", url: "https://havoc.app/", jailbreak: true, for: ["dopamine", "palera1n", "nathanlr"],
@@ -36,38 +40,38 @@ export const RECOMMENDED_SOURCES = [
   { kind: "source", name: "Zebra", url: "https://getzbra.com/repo/", jailbreak: true, for: ["dopamine", "palera1n", "nathanlr"],
     why: "Zebra: only the Zebra package manager itself, from its own developers." },
   // ---- AltStore sources: the sideload IPA and the website ----
-  { kind: "source", name: "AltStore", url: "https://apps.altstore.io/",
+  { kind: "source", name: "AltStore", tag: "dev", url: "https://apps.altstore.io/",
     why: "AltStore: AltStore, the Delta game emulator and the Clip clipboard manager, each with a beta, iOS 16+." },
-  { kind: "source", name: "SideStore", url: "https://sidestore.io/apps-v2.json/",
+  { kind: "source", name: "SideStore", tag: "dev", url: "https://sidestore.io/apps-v2.json/",
     why: "SideStore: the SideStore app, an AltStore that refreshes its apps on the phone without a computer." },
-  { kind: "source", name: "Feather", url: "https://raw.githubusercontent.com/claration/Feather/refs/heads/main/app-repo.json",
+  { kind: "source", name: "Feather", tag: "dev", url: "https://raw.githubusercontent.com/claration/Feather/refs/heads/main/app-repo.json",
     why: "Feather: the Feather on-device IPA signer and installer." },
-  { kind: "source", name: "SideStore Team Picks", url: "https://community-apps.sidestore.io/sidecommunity.json",
+  { kind: "source", name: "SideStore Team Picks", tag: "dev", url: "https://community-apps.sidestore.io/sidecommunity.json",
     why: "Over 20 apps SideStore's team picked: RetroArch, PPSSPP, Play!, MAME4iOS, ScummVM, iSH, iTorrent and more." },
-  { kind: "source", name: "StikDebug", url: "https://stikdebug.xyz/index.json",
+  { kind: "source", name: "StikDebug", tag: "dev", url: "https://stikdebug.xyz/index.json",
     why: "StikDebug and StikPair: turn on JIT for emulators on the phone, no computer needed." },
-  { kind: "source", name: "LiveContainer", url: "https://github.com/LiveContainer/LiveContainer/releases/download/1.0/apps.json",
+  { kind: "source", name: "LiveContainer", tag: "dev", url: "https://github.com/LiveContainer/LiveContainer/releases/download/1.0/apps.json",
     why: "LiveContainer: runs other IPAs inside one app, past the free account's three-app limit." },
-  { kind: "source", name: "Provenance", url: "https://provenance-emu.com/apps.json",
+  { kind: "source", name: "Provenance", tag: "dev", url: "https://provenance-emu.com/apps.json",
     why: "Provenance and its alpha builds, plus iCube (GameCube and Wii) and iFly (Dreamcast): retro emulators." },
-  { kind: "source", name: "Manic EMU", url: "https://apps.manicemu.site/altstore",
+  { kind: "source", name: "Manic EMU", tag: "dev", url: "https://apps.manicemu.site/altstore",
     why: "Manic EMU: an all-in-one emulator, from NES and Game Boy to 3DS, GameCube and Wii, iOS 15+." },
-  { kind: "source", name: "DolphiniOS", url: "https://altstore.oatmealdome.me/",
+  { kind: "source", name: "DolphiniOS", tag: "dev", url: "https://altstore.oatmealdome.me/",
     why: "DolphiniOS and its public beta: the Dolphin GameCube and Wii emulator for iPhone." },
-  { kind: "source", name: "Flycast", url: "https://github.com/chachillie/Flycast-iOS/raw/refs/heads/main/flycast-ios.json",
+  { kind: "source", name: "Flycast", tag: "dev", url: "https://github.com/chachillie/Flycast-iOS/raw/refs/heads/main/flycast-ios.json",
     why: "Flycast: the Sega Dreamcast, Naomi and Atomiswave emulator." },
-  { kind: "source", name: "UTM", url: "https://alt.getutm.app",
+  { kind: "source", name: "UTM", tag: "dev", url: "https://alt.getutm.app",
     why: "UTM and UTM SE: virtual machines on the iPhone, for Windows, Linux and classic Mac OS." },
-  { kind: "source", name: "Amethyst", url: "https://alt.crystall1ne.dev",
+  { kind: "source", name: "Amethyst", tag: "dev", url: "https://alt.crystall1ne.dev",
     why: "Angel Aura Amethyst and PojavLauncher: launchers that run Minecraft: Java Edition." },
   // Asked for by the user (2026-11-18): tweaked-app sources, each from the app's own maintainer or its README.
-  { kind: "source", name: "YouMod", url: "https://raw.githubusercontent.com/MountainofPenguin/Altstore-Repository/main/apps.json",
+  { kind: "source", name: "YouMod", tag: "modded", url: "https://raw.githubusercontent.com/MountainofPenguin/Altstore-Repository/main/apps.json",
     why: "YouMod: YouTube with ad blocking, background play, Return YouTube Dislike and YTUHD built in." },
-  { kind: "source", name: "Unbound", url: "https://repo.unbound.rip/app-repo.json",
+  { kind: "source", name: "Unbound", tag: "modded", url: "https://repo.unbound.rip/app-repo.json",
     why: "Unbound: a Discord client mod with plugins and themes, plus its TestFlight builds." },
-  { kind: "source", name: "RyukGram", url: "https://source.ryuksign.com/",
+  { kind: "source", name: "RyukGram", tag: "modded", url: "https://source.ryuksign.com/",
     why: "RyukGram: Instagram with downloads, a built-in gallery and privacy options, with no-plugin builds too." },
-  { kind: "source", name: "PokeMMO", url: "https://pokemmo.com/altstore",
+  { kind: "source", name: "PokeMMO", tag: "dev", url: "https://pokemmo.com/altstore",
     why: "PokeMMO: a free-to-play online multiplayer monster-catching RPG." },
 ];
 
@@ -161,4 +165,31 @@ export function matchRecommendedApps(sources, q, limit = 25) {
     }
   }
   return out.slice(0, limit);
+}
+
+// ---- F327: More Sources (screens/moresources.js) --------------------------------------------------------------
+// The Recommended group's sub-groups, in order: Tweak Sources (APT repos, jailbroken only), From the Developer and
+// Modded Apps (AltStore sources by `tag`).
+export const REC_GROUPS = [
+  { id: "tweaks", header: "Tweak Sources" },
+  { id: "dev", header: "From the Developer" },
+  { id: "modded", header: "Modded Apps" },
+];
+export const recGroupOf = (rec) => (rec?.jailbreak ? "tweaks" : rec?.tag === "modded" ? "modded" : "dev");
+
+// rows: [{ rec, … }] (core/sourcelist.js recommendedRows) -> [{ id, header, rows }], empty groups left out, each
+// group's rows in the order given.
+export function recommendedGroups(rows) {
+  return REC_GROUPS.map((g) => ({ ...g, rows: (rows ?? []).filter((r) => recGroupOf(r.rec) === g.id) }))
+    .filter((g) => g.rows.length);
+}
+
+// A row's two-line reason without the name it starts with ("Havoc: over 500 …" -> "Over 500 …"): the name is the
+// row's label already.
+export function shortWhy(rec) {
+  const why = String(rec?.why ?? "");
+  const name = String(rec?.name ?? "");
+  if (!name || !why.startsWith(`${name}: `)) return why;
+  const rest = why.slice(name.length + 2);
+  return rest.charAt(0).toUpperCase() + rest.slice(1);
 }

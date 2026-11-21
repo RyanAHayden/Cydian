@@ -31,7 +31,7 @@ function openManage() {
   return { route: went[0], ctx };
 }
 
-test("Manage opens #/sources/manage with its rows (jailbroken: Find More Sources too)", async () => {
+test("Manage opens #/sources/manage with its rows, More Sources last (F327: Recommended and Find More are on it)", async () => {
   const { route, ctx } = openManage();
   assert.equal(format(route), "#/sources/manage");
   assert.equal(sources.nav(route, ctx).title, "Manage");
@@ -39,12 +39,12 @@ test("Manage opens #/sources/manage with its rows (jailbroken: Find More Sources
   sources.render(body, route, ctx); // threw "no row icon globe"
   await tick();
   const rows = labels(body);
-  for (const l of ["Sources", "Import & Export", "Hidden", "Recommended", "Find More Sources"]) {
+  for (const l of ["Sources", "Import & Export", "Hidden", "More Sources"]) {
     assert.ok(rows.some((r) => r.startsWith(l)), `Manage lists ${l} (got ${rows.join(", ")})`);
   }
 });
 
-test("Manage, not jailbroken: the same rows without Find More Sources", async () => {
+test("Manage, not jailbroken: the same rows, More Sources among them", async () => {
   globalThis.localStorage.setItem("ifizbox.device", "none");
   try {
     const { route, ctx } = openManage();
@@ -52,8 +52,8 @@ test("Manage, not jailbroken: the same rows without Find More Sources", async ()
     sources.render(body, route, ctx);
     await tick();
     const rows = labels(body);
-    assert.ok(rows.some((r) => r.startsWith("Recommended")), rows.join(", "));
-    assert.ok(!rows.some((r) => r.startsWith("Find More")), "no Find More where APT repos aren't kept");
+    assert.ok(rows.some((r) => r.startsWith("More Sources")), rows.join(", "));
+    assert.ok(!rows.some((r) => r.startsWith("Recommended") || r.startsWith("Find More")), "F327: both moved to More Sources");
   } finally {
     globalThis.localStorage.setItem("ifizbox.device", "iphoneos-arm64");
   }

@@ -1,12 +1,9 @@
-// Sources > Manage (F45), a grouped page after Cydia's Manage tab: a row per page, Recommended among them (user
-// 2026-11-18: its own page after all, with Add All in the nav bar as the iOS 6 App Store's Update All).
+// Sources > Manage (F45), a grouped page after Cydia's Manage tab: a row per page.
 //
-//   #/sources/manage                     Sources, Import & Export, Hidden; then Recommended, its badge the sources
-//                                        not added yet
-//   #/sources/manage/recommended         core/recommended.js's sources as Sources draws them, a round Add on each,
-//                                        icons and counts filled in lazily; jailbroken: the Jailbreak row, then
-//                                        Tweak Repos and App Sources; Not Jailbroken: app sources only. Add All.
-//   #/sources/manage/sources             the edit list: Add, the red minus and Delete, drag the grabber to reorder
+//   #/sources/manage                     Sources, Import & Export, Hidden; then More Sources (F327,
+//                                        screens/moresources.js), its badge the recommended sources not added yet
+//   #/sources/manage/recommended         F327: More Sources' page (screens/sources.js hands it to moresources.js)
+//   #/sources/manage/sources            the edit list: Add, the red minus and Delete, drag the grabber to reorder
 //   #/sources/manage/io                  Export (share text, save a file, QR code) and Import (file or the clipboard)
 //   #/sources/manage/io/review           what an import found: new ones (ticked), already listed, can't add; Add
 //   #/sources/manage/hidden              F104: what's hidden, sections (Section Visibility) and authors (Hide
@@ -20,7 +17,6 @@ import { cleanSourceUrl, httpsInput } from "../core/sources.js";
 import { grouped, plain, collapse, placeholder, el, note } from "../nav/ui.js";
 import { showAlert } from "../nav/alert.js";
 import { showSheet } from "../nav/sheet.js";
-import { showActionSheet } from "../nav/actionsheet.js";
 import { format } from "../router.js";
 import { getBackend, getParser, getArch, siteJailbroken } from "../backend.js";
 import { detectMode } from "../core/settings.js";
@@ -37,8 +33,7 @@ import {
 import { qrSvg } from "../core/qr.js";
 import { sourceWarning, warningAlert } from "../core/warnings.js";
 import {
-  RECOMMENDED_SOURCES, JAILBREAKS, jailbreakName, detectJailbreak, jailbreakFromMarkers, recommendedFor, savedJailbreak, saveJailbreak,
-  markRecommendedSeen,
+  RECOMMENDED_SOURCES, detectJailbreak, jailbreakFromMarkers, recommendedFor, savedJailbreak,
 } from "../core/recommended.js";
 import { copyText, nativePaste } from "../nav/menu.js";
 import { builtinFirst, isBuiltin, exportable } from "../core/essential.js";
@@ -47,7 +42,7 @@ import { settings } from "../settings-store.js";
 import { createSwitch } from "../nav/switch.js";
 import { NAME } from "../brand.js";
 import { rowIcon } from "../icons/rowicons.js";
-import { confirmUnknownSource, markTrusted, labelSource } from "./safety.js"; // F291
+import { confirmUnknownSource, markTrusted } from "./safety.js"; // F291
 import * as findMore from "./findmore.js"; // F305: #/sources/manage/find(/<slug>), Find More Sources
 
 export const SEGMENT = "manage";
@@ -64,13 +59,15 @@ export const sourcesChanged = (ctx) => changed(ctx);
 let pending = null; // the import under review: [entry with status and `pick`]
 
 const here = (...path) => format({ tab: "sources", path: [SEGMENT, ...path] });
+// F327: More Sources' route (screens/moresources.js MORE), spelled here so this file needn't import that one (it
+// imports this).
+const MORE_HREF = format({ tab: "sources", path: ["more"] });
 
 function page(route) {
   const p = route.path.slice(1);
   if (!p.length) return "root";
   if (p[0] === "sources" && p.length === 1) return "sources";
   if (p[0] === "hidden" && p.length === 1) return "hidden";
-  if (p[0] === "recommended" && p.length === 1) return "recommended";
   if (p[0] === "recommended" && p.length === 2) return "preview";
   if (p[0] === "io") {
     if (p.length === 1) return "io";
@@ -86,7 +83,6 @@ export function nav(route, ctx) {
     case "sources": return { title: "Sources", style: "plain", right: { label: "Add", onClick: () => addSource(ctx) } };
     case "io": return { title: "Import & Export" };
     case "hidden": return { title: "Hidden" };
-    case "recommended": return { title: "Recommended", right: { label: "Add All", onClick: () => addAll(ctx) } };
     case "review": return { title: "Import", right: { label: "Add", onClick: () => addPicked(ctx) } };
     case "preview": return { title: RECOMMENDED_SOURCES.find((r) => recommendedSeed(r).key === route.path[2])?.name || "Source",
       right: { label: "Add", onClick: () => addFromPreview(route, ctx) } };
@@ -101,7 +97,6 @@ export function render(body, route, ctx) {
     case "sources": return renderSources(body);
     case "io": return renderIO(body, route, ctx);
     case "hidden": return renderHidden(body);
-    case "recommended": return renderRecommendedPage(body, ctx);
     case "review": return renderReview(body);
     case "preview": return renderPreview(body, route);
     default: body.append(note("Nothing here."));
@@ -128,13 +123,10 @@ function renderRoot(body, ctx) {
     { label: "Import & Export", href: here("io"), icon: rowIcon("transfer") },
     { ...hiddenRow(), icon: rowIcon("hidden") },
   ];
-  const jailbroken = settings.deviceType() !== "none";
+  // F327: Recommended and Find More Sources are one page now, More Sources (screens/moresources.js).
   body.replaceChildren(grouped([{ rows, footer: "Add, delete and reorder your sources, or move them to another phone "
-    + "or package manager." }, { rows: [{ label: "Recommended", href: here("recommended"), cls: "rec-entry", icon: rowIcon("recommended") },
-    // F305: Canister's repo index, where APT repos are kept (jailbroken, or the sideload app's Tweak Sources)
-    ...(findMore.findMoreOn() ? [{ label: "Find More Sources", href: findMore.findHref(), cls: "find-entry", icon: rowIcon("findMore") }] : [])],
-    footer: jailbroken ? "Tweak repos that suit your jailbreak, and app sources."
-      : findMore.findMoreOn() ? "App sources to add in one tap, and tweak repos from Canister." : "App sources to add in one tap." }]));
+    + "or package manager." }, { rows: [{ label: "More Sources", href: MORE_HREF, cls: "rec-entry", icon: rowIcon("moreSources") }],
+    footer: findMore.findMoreOn() ? "Recommended sources, and more to find for tweaks and apps." : "Recommended app sources, and more to find." }]));
   // The badge: how many aren't added yet.
   recRows().then((rs) => {
     const n = rs.filter((r) => !r.added).length;
@@ -577,10 +569,10 @@ async function addPicked(ctx) {
 }
 
 // ---- Recommended (F52) ----------------------------------------------------------------------------------------
-// Rows as the Sources tab draws them (icon, name, URL, app count once loaded; core/sourcelist.js recommendedRows),
-// with a round Get-style Add on the right instead of Delete. A row opens the source: an added one its real page,
-// one not added yet a preview here (#/sources/manage/recommended/<key>) read straight from its URL. No Games: this
-// page lists sources; a game is a package and belongs on Home.
+// The data behind More Sources' Recommended group (F327, screens/moresources.js draws it): recRows (core/sourcelist.js
+// recommendedRows for this device), loadPreview, addRecommended, recHref. A row opens the source: an added one its
+// real page, one not added yet a preview here (#/sources/manage/recommended/<key>) read straight from its URL. No
+// Games: this page lists sources; a game is a package and belongs on Home.
 
 const previews = new Map(); // key -> { record fields read before adding (name, iconURL, count), apps }
 
@@ -604,35 +596,15 @@ export async function currentJailbreak() {
   return { id, detected: Boolean(id) };
 }
 
-const recRows = async () => {
+export const recRows = async () => {
   const sources = await getBackend().sources().catch(() => []);
   const jailbroken = settings.deviceType() !== "none";
   const recs = jailbroken ? recommendedFor(RECOMMENDED_SOURCES, (await currentJailbreak()).id) : RECOMMENDED_SOURCES;
   return recommendedRows(recs, sources, { jailbroken, previews });
 };
 
-// F19: the Jailbreak row's picker: one button per jailbreak, then Cancel.
-async function pickJailbreak(body, ctx) {
-  const buttons = [...JAILBREAKS.map((j) => j.name), "Cancel"];
-  const { index } = await showAlert({ title: "Jailbreak", message: "Recommended lists the sources that suit it.",
-    buttons, cancel: buttons.length - 1 });
-  if (index >= JAILBREAKS.length) return;
-  saveJailbreak(JAILBREAKS[index].id);
-  renderRecommended(body, ctx);
-}
-
-function jailbreakRow(jb, body, ctx) {
-  const ul = plain([{ rows: [{
-    label: "Jailbreak",
-    subtitle: jb.id ? `${jailbreakName(jb.id)}${jb.detected ? " (found on this iPhone)" : ""}` : "Not set: every tweak repo is listed",
-    onClick: () => pickJailbreak(body, ctx), chevron: true,
-  }] }]);
-  ul.classList.add("rec-jailbreak");
-  return ul;
-}
-
 // An AltStore source's JSON, read once per visit, so its row gets a name, icon and count and its preview its apps.
-async function loadPreview(row) {
+export async function loadPreview(row) {
   if (row.rec.jailbreak) return null;
   if (previews.has(row.key)) return previews.get(row.key);
   const text = await getBackend().text(row.record.uri);
@@ -671,103 +643,7 @@ export async function addRecommended(row, ctx, { backend = getBackend(), alert =
   return true;
 }
 
-// The GET look: a white pill with blue text, blue while held; "Added", greyed, once the source is listed.
-function getButton(row, onAdd) {
-  const b = el("button", "rec-get" + (row.added ? " added" : ""), row.added ? "Added" : "Add");
-  b.type = "button";
-  b.disabled = row.added;
-  b.setAttribute("aria-label", (row.added ? "Added: " : "Add ") + row.label);
-  const up = () => b.classList.remove("is-pressed");
-  b.addEventListener("pointerdown", () => { if (!b.disabled) b.classList.add("is-pressed"); });
-  for (const t of ["pointerup", "pointercancel", "pointerleave"]) b.addEventListener(t, up);
-  b.addEventListener("click", (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (!b.disabled) onAdd(b);
-  });
-  return b;
-}
-
-function recIcon(li, row) {
-  const backend = getBackend();
-  li.querySelector(".cell-icon img")?.remove();
-  li.querySelector(".cell-icon").append(sourceIconImage(row.key, row.icons, backend)); // B58: cached
-}
-
-const recHref = (row) => (row.added ? format({ tab: "sources", path: [row.key] }) : here("recommended", row.key));
-
-let recBox = null; // the Recommended page's list, for Add All to redraw
-function renderRecommendedPage(body, ctx) {
-  const box = recBox = el("div", "manage-rec");
-  body.replaceChildren(box);
-  renderRecommended(box, ctx);
-}
-
-// Add All (the nav bar's, as the App Store's Update All): an action sheet with the count, then each source not added
-// yet in turn under the Verifying URL HUD, as one Add does. Failures are named in one alert at the end.
-async function addAll(ctx) {
-  const todo = (await recRows()).filter((r) => !r.added);
-  if (!todo.length) {
-    await showAlert({ title: "Recommended", message: "Every recommended source is in your list.", buttons: ["OK"] });
-    return;
-  }
-  const what = todo.length === 1 ? "the 1 recommended source" : `the ${todo.length} recommended sources`;
-  const i = await showActionSheet({ title: `Add ${what} that aren't in your list yet?`, buttons: ["Add All"] });
-  if (i !== 0) return;
-  const failed = [];
-  const hide = ctx.showHUD("Verifying URL");
-  try {
-    for (const r of todo) {
-      try { await getBackend().addSource(r.input); } catch { failed.push(r.label); }
-    }
-  } finally {
-    hide();
-  }
-  changed(ctx);
-  if (failed.length) await showAlert({ title: "Verification Error", message: `Couldn't add ${failed.join(", ")}.`, buttons: ["OK"] });
-  if (recBox?.isConnected) renderRecommended(recBox, ctx);
-}
-
-async function renderRecommended(body, ctx) {
-  const rows = await recRows();
-  const toCell = (r) => ({
-    label: r.label, subtitle: r.subtitle, icon: { text: r.label[0]?.toUpperCase() ?? "?" },
-    badge: r.count != null ? r.count.toLocaleString() : undefined, href: recHref(r), chevron: false,
-  });
-  // Jailbroken: tweak repos, then app sources (the jailbreak app installs IPAs too), each under its own header.
-  // Cells stay in `rows` order, so the index lookups below hold.
-  const apt = rows.filter((r) => r.rec.jailbreak);
-  const ul = plain(apt.length
-    ? [{ header: "Tweak Repos", rows: apt.map(toCell) }, { header: "App Sources", rows: rows.filter((r) => !r.rec.jailbreak).map(toCell) }]
-    : [{ rows: rows.map(toCell) }]);
-  ul.classList.add("rec-list");
-  markRecommendedSeen(); // F19: the Sources tab's first-run row has done its job
-  const cells = [...ul.querySelectorAll(":scope > .cell")];
-  rows.forEach((r, i) => {
-    const li = cells[i];
-    li.classList.add("source-row", "rec-row");
-    li.dataset.key = r.key;
-    recIcon(li, r);
-    labelSource(li, { uri: r.rec.url }); // F291: every Recommended source is Known Safe (core/safe-sources.js)
-    li.append(getButton(r, async () => { if (await addRecommended(r, ctx)) renderRecommended(body, ctx); }));
-  });
-  body.replaceChildren(ul);
-  if (settings.deviceType() !== "none") body.prepend(jailbreakRow(await currentJailbreak(), body, ctx));
-  // Fill in icons and app counts as each AltStore source answers: those not added, and added ones nothing has been
-  // read from yet (a default the Sources tab hasn't loaded). Tweak repos wait for Refresh (their Packages is big).
-  rows.forEach((r, i) => {
-    if (r.rec.jailbreak || r.count != null) return;
-    loadPreview(r).then((p) => {
-      const li = cells[i];
-      if (!p || !li.isConnected) return;
-      const record = { ...r.record, iconURL: r.record.iconURL || p.iconURL };
-      const next = { ...r, record, icons: sourceIcons(record), count: p.count };
-      recIcon(li, next);
-      const inner = li.querySelector(".cell-inner");
-      if (!inner.querySelector(".cell-count")) inner.append(el("span", "cell-count", p.count.toLocaleString()));
-    }).catch(() => {});
-  });
-}
+export const recHref = (row) => (row.added ? format({ tab: "sources", path: [row.key] }) : here("recommended", row.key));
 
 // A recommended source before it is added: its apps as read from its URL (an AltStore source), or its packages
 // by section (a tweak repo, F54: its Packages parsed in the worker). Add in the nav bar adds it and opens

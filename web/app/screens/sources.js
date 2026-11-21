@@ -1,10 +1,11 @@
 // Sources tab, after Cydia's (docs/cydia.md "Sources tab"): one row per source, sorted by name, with its
 // CydiaIcon.png, name, URL and (iFizBox's own addition) how many packages it has for this device's architecture.
 // Nav bar: Refresh (F150 reload bar, refetch every source) and Manage (F45, screens/manage.js: the edit list with Add, delete
-// and reorder, Import & Export, Recommended). A left swipe on a row shows Delete. Rows keep the order set there. The list lives on the
+// and reorder, Import & Export). A left swipe on a row shows Delete. Rows keep the order set there. The list lives on the
 // device and comes through the backend (core/sources.js sourceCalls), so the app runs this file unchanged.
-// Above the sources, Cydia's "All Sources" row; a source (or All Sources) opens its Sections, and everything
-// below that is screens/browse.js.
+// Above the sources, Cydia's "All Sources" row, then More Sources (F327, screens/moresources.js: Recommended and the
+// Find pages); the sources in Tweak Sources and App Sources (sourceGroups). A source (or All Sources) opens its
+// Sections, and everything below that is screens/browse.js.
 import { plain, collapse, note } from "../nav/ui.js";
 import * as browse from "./browse.js";
 import { showAlert } from "../nav/alert.js";
@@ -15,8 +16,10 @@ import { displayName, sourceIcons, sourceSubtitle, sourcesFor, sourceFilter, loa
 import { tweakSourcesFor, tweakSourcesOn } from "../core/sources.js"; // F302
 import { detectMode } from "../core/settings.js"; // F302
 
-// F302: the sideload app's group of APT sources (injectable tweaks only), under Individual Sources.
+// F302: the sideload app's group of APT sources (injectable tweaks only), under App Sources. F327: the list's groups
+// are named by what they hold, Tweak Sources (APT repos) and App Sources (AltStore sources).
 export const TWEAK_SOURCES = "Tweak Sources";
+export const APP_SOURCES = "App Sources";
 // Refresh's filter: in the sideload app the Tweak Sources are refreshed too.
 const refreshFilter = () => sourceFilter(settings.deviceType(), { tweaks: tweakSourcesOn(settings.deviceType(), detectMode()) });
 import { sourceIconImage } from "../source-icon.js";
@@ -24,7 +27,6 @@ import { settings } from "../settings-store.js";
 import * as manage from "./manage.js";
 import { orderSources, loadOrder, filterSources } from "../core/sourcelist.js";
 import { healthOf } from "../core/health.js";
-import { recommendedSeen, jailbreakName } from "../core/recommended.js";
 import { builtinFirst, isBuiltin } from "../core/essential.js";
 import { lockMark } from "../nav/lock.js";
 import { searchBar, pinned } from "../nav/searchbar.js";
@@ -35,7 +37,8 @@ import { go as navGo } from "../nav/go.js";
 import { failedBanner, FAILED_BANNER_MS } from "../core/aptupdate.js";
 import { refreshRows, tabBadge, coalesce, ROW } from "../core/refreshrows.js";
 import { labelSource, toggleTrust, trustMenuLabel } from "./safety.js"; // F291
-import { findMoreOn, findMoreRow, labelCanister } from "./findmore.js"; // F305
+import { labelCanister } from "./findmore.js"; // F305
+import * as more from "./moresources.js"; // F327: #/sources/more, More Sources
 import { pageViews } from "../nav/pageviews.js"; // C25
 import { setSourceErrorHooks } from "./sourceerror.js"; // B177
 
@@ -118,6 +121,7 @@ async function addFromPasteboard(ctx, button, native, open) {
 }
 
 export function nav(route, ctx) {
+  if (more.isMore(route)) return more.nav(route, ctx); // F327 (and the old manage/recommended)
   if (manage.isManage(route)) return manage.nav(route, ctx);
   if (route.path.length) {
     return browse.nav(route, (key) => { const s = byKey(key); return s ? displayName(s) : null; });
@@ -174,6 +178,10 @@ setSourceErrorHooks({
 export function useContext(ctx) { state.ctx ??= ctx; }
 
 export function render(el, route, ctx) {
+  if (more.isMore(route)) {
+    more.render(el, route, ctx); // F327
+    return;
+  }
   if (manage.isManage(route)) {
     manage.render(el, route, ctx);
     return;
@@ -529,13 +537,8 @@ function sourcesSearchBar(view) {
     className: "sources-search", onQuery: (q) => { if (q !== view.query) { view.query = q; draw(view); } } }));
 }
 
-// F19 first run: on a jailbroken type, a row to Recommended (named for the jailbreak once it's known) until
-// Recommended has been opened once.
-function recommendedRow() {
-  if (settings.deviceType() === "none" || recommendedSeen()) return null;
-  return { label: "Recommended Sources", subtitle: "sources that suit this jailbreak",
-    href: format({ tab: "sources", path: [manage.SEGMENT, "recommended"] }) };
-}
+// F327: More Sources (screens/moresources.js) under All Sources, its badge the recommended sources not added yet.
+const moreSourcesRow = () => more.moreRow();
 
 function draw(view) {
   const el = view?.body;
@@ -568,12 +571,11 @@ function draw(view) {
   // F302: the sideload app's APT sources, in their own group under the AltStore ones, counting injectable tweaks.
   const tweakShown = tweakSourcesFor(ordered, settings.deviceType(), detectMode());
   const tweakList = filterSources(tweakShown, view.query, displayName);
-  const rec = searching ? null : recommendedRow();
   const top = searching ? [] : [{
     label: "All Sources",
     subtitle: "combined package list for the sources below",
     href: format({ tab: "sources", path: ["*"] }),
-  }, ...(rec ? [rec] : [])];
+  }, moreSourcesRow()];
   const sourceRow = (s) => {
     const health = healthOf(s);
     return {
@@ -585,36 +587,58 @@ function draw(view) {
       href: format({ tab: "sources", path: [s.key] }),
     };
   };
-  // F305: Find More Sources (Canister's repos) as the last row of Tweak Sources, or of Individual Sources where the
-  // device is jailbroken; not while searching.
-  const tweakGroupOn = tweakSourcesOn(settings.deviceType(), detectMode());
-  const find = !searching && findMoreOn() ? [findMoreRow()] : [];
-  const ul = plain([...(top.length ? [{ rows: top }] : []), {
-    header: searching ? `${list.length} of ${shown.length}` : "Individual Sources",
-    rows: [...list.map(sourceRow), ...(tweakGroupOn ? [] : find)],
-  }, ...(tweakShown.length || (tweakGroupOn && find.length) ? [{
-    header: searching ? `Tweak Sources: ${tweakList.length} of ${tweakShown.length}` : TWEAK_SOURCES,
-    rows: [...tweakList.map(sourceRow), ...(tweakGroupOn ? find : [])],
-  }] : [])]);
+  // F327: the groups by what they hold (sourceGroups): jailbroken, Tweak Sources then App Sources; the sideload app,
+  // App Sources then its Tweak Sources (F302); a group with nothing in it (searching: nothing to search) is left out.
+  const groups = sourceGroups({ shown, list, tweakShown, tweakList, searching, sideload: tweakSourcesOn(settings.deviceType(), detectMode()) });
+  const ul = plain([...(top.length ? [{ rows: top }] : []), ...groups.map((g) => ({ header: g.header, rows: g.list.map(sourceRow) }))]);
   const cells = ul.querySelectorAll(":scope > .cell");
   if (top.length) {
     cells[0].classList.add("all-sources-row");
     cells[0].querySelector(".cell-inner").prepend(Object.assign(document.createElement("span"), { className: "folder" }));
+    moreBadge(cells[1]);
   }
-  if (rec) {
-    cells[1].classList.add("recommended-row");
-    manage.currentJailbreak().then((jb) => {
-      const label = cells[1].querySelector(".cell-label");
-      if (jb.id && jb.id !== "other" && label) label.textContent = `Recommended for ${jailbreakName(jb.id)}`;
-    }).catch(() => {});
+  let at = top.length;
+  for (const g of groups) {
+    g.list.forEach((s, i) => {
+      const li = cells[at + i];
+      decorate(li, s, backend);
+      if (g.tweak) li.classList.add("tweak-source-row");
+    });
+    at += g.list.length;
   }
-  list.forEach((s, i) => decorate(cells[i + top.length], s, backend));
-  tweakList.forEach((s, i) => { const li = cells[i + top.length + list.length]; decorate(li, s, backend); li.classList.add("tweak-source-row"); });
   attachRowGestures(ul);
   box.replaceChildren(ul);
   if (!list.length && !tweakList.length) {
     box.append(note(searching ? "No sources match." : "No sources. Tap Manage, then Sources."));
   }
+}
+
+// F327: the list's groups, named by what they hold (never "AltStore"):
+//   shown/list          the sources this device type shows, and those the search keeps (jailbroken: APT and AltStore
+//                       mixed, split here; Not Jailbroken: AltStore only)
+//   tweakShown/tweakList  the sideload app's Tweak Sources (F302), and those the search keeps
+// -> [{ header, list, tweak }], tweak: the sideload app's APT group (its rows get .tweak-source-row). The jailbroken
+// list leads with Tweak Sources, the sideload app with App Sources (as before). Searching, each header counts:
+// "Tweak Sources: 2 of 5".
+export function sourceGroups({ shown = [], list = [], tweakShown = [], tweakList = [], searching = false, sideload = false } = {}) {
+  const isApt = (s) => !String(s?.key ?? "").startsWith("alt:");
+  const kinds = [
+    { header: TWEAK_SOURCES, all: shown.filter(isApt), list: list.filter(isApt), tweak: false },
+    { header: APP_SOURCES, all: shown.filter((s) => !isApt(s)), list: list.filter((s) => !isApt(s)), tweak: false },
+  ];
+  if (sideload) kinds.push({ header: TWEAK_SOURCES, all: tweakShown, list: tweakList, tweak: true });
+  const order = sideload ? [kinds[1], kinds[2], kinds[0]] : kinds;
+  return order.filter((g) => g.all.length)
+    .map((g) => ({ header: searching ? `${g.header}: ${g.list.length} of ${g.all.length}` : g.header, list: g.list, tweak: g.tweak }));
+}
+
+// The More Sources row's badge: the recommended sources not added yet, once that is known.
+function moreBadge(li) {
+  const inner = li?.querySelector(".cell-inner");
+  if (!inner) return;
+  more.notAddedCount().then((n) => {
+    if (n && !inner.querySelector(".cell-count")) inner.append(Object.assign(document.createElement("span"), { className: "cell-count", textContent: String(n) }));
+  }).catch(() => {});
 }
 
 function decorate(li, source, backend) {

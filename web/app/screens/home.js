@@ -5,7 +5,7 @@
 //   - a full-width green tile for the current state (stateTile: Add a Source, n Upgrades Available, ...; Cydia's
 //     Manage Account)
 //   - a grouped list like Cydia's help links: Upgrading & Jailbreaking Help (our page), Find Extensions for
-//     Applications (Search), Recommended Sources (a curated list, one tap adds a source); User Guides (screens/guides.js); Credits
+//     Applications (Search), More Sources (F327: Recommended and finding more, screens/moresources.js); User Guides (screens/guides.js); Credits
 // Every tile and row is a .cell-inner link, so it gets the table cells' held look (blue selection) from ios6.css
 // and app.js. No featured banners above the tiles (F154: Browse's Tweak of the Day card instead).
 //
@@ -160,8 +160,9 @@ export function homeLinks() {
     rows: [
       { label: "Upgrading & Jailbreaking Help", href: format({ tab: "home", path: ["help"] }) },
       { label: "Find Extensions for Applications", href: SEARCH_HREF, chevron: true },
-      // Sources > Manage > Recommended, straight there (user 2026-11-18), on Home's own stack (router mountLink): Back comes home.
-      { label: "Recommended Sources", href: format({ tab: "sources", path: ["manage", "recommended"] }) },
+      // F327: More Sources (screens/moresources.js), with the Sources tab's plus tile, on Home's own stack (router
+      // mountLink): Back comes home.
+      { label: "More Sources", href: format({ tab: "sources", path: ["more"] }), icon: rowIcon("moreSources"), cls: "home-more-sources" },
     ],
   }, { header: "User Guides", rows: guideRows(format, guidesLite()) },
   { rows: [{ label: "Credits / Thank You", href: format({ tab: "home", path: ["credits"] }) }] }];
@@ -169,7 +170,7 @@ export function homeLinks() {
 
 // F156: Home's link rows that stay open on the locked website (user 2026-11-18: "dont lock credits and thank you or
 // jailbreaking help"): Settings (F123), Upgrading & Jailbreaking Help, the User Guides and Credits / Thank You. They
-// need no install and help people get to one. Find Extensions and Recommended Sources stay locked.
+// need no install and help people get to one. Find Extensions and More Sources stay locked.
 const OPEN_WHILE_LOCKED = new Set(["settings", "help", "guides", "credits", "why"]); // F303: Why <NAME> too
 export function openWhileLocked(href) {
   if (!href?.startsWith?.("#/")) return false;

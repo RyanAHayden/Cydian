@@ -12,7 +12,7 @@ globalThis.ifizboxNative = fakeNative({ "sources.list": [] }, { mode: "sideload"
 const sources = await import("./sources.js");
 const { format } = await import("../router.js");
 
-test("Lite: Manage opens #/sources/manage with its rows, Find More Sources among them", async () => {
+test("Lite: Manage opens #/sources/manage with its rows, More Sources among them", async () => {
   const went = [];
   const ctx = { go: (r) => went.push(r), setBadge() {}, setTitle() {} };
   const button = [sources.nav({ tab: "sources", path: [] }, ctx).right].flat().find((b) => b.label === "Manage");
@@ -23,7 +23,7 @@ test("Lite: Manage opens #/sources/manage with its rows, Find More Sources among
   sources.render(body, went[0], ctx);
   await tick();
   const rows = body.querySelectorAll(".cell-label").map((n) => n.textContent);
-  for (const l of ["Sources", "Import & Export", "Hidden", "Recommended", "Find More Sources"]) {
+  for (const l of ["Sources", "Import & Export", "Hidden", "More Sources"]) {
     assert.ok(rows.some((r) => r.startsWith(l)), `Manage lists ${l} (got ${rows.join(", ")})`);
   }
 });

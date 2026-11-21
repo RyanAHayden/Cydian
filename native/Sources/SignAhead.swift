@@ -190,13 +190,14 @@ enum SignAhead {
             signer.stop = { job.cancelled }
             let nslog = signer.log
             signer.log = { nslog($0); log($0) }
+            signer.installedAppID = { Sideload.installedAppID($0, log: log) } // B280: an update keeps its App ID (B138)
             let app = try signer.sign(input, to: output) { emit($0, $1) }
             log("Signed \(options.shownName(app.name)) \(app.version) as \(app.bundleID), \(Sideload.size(output))")
             try job.check()
             let record = SignedRecord(bundleID: app.bundleID, originalBundleID: app.originalBundleID, name: app.name,
                                       version: app.version, url: url, signed: Date(),
                                       expires: profile.signatureExpiry(certificate: identity.certificate), options: options.stored,
-                                      signer: app.stamp, // B259
+                                      appID: app.appID, signer: app.stamp, // B259; B280: appID as signAndOpen's record
                                       sha256: Sideload.keepOriginal(input, app: app, source: url, sha256: sha256, log: log)) // F343
             return (app, record, output)
         } catch {

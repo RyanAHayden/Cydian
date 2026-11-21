@@ -1556,6 +1556,15 @@ function versionCell({ label, tags = [], detail = null, sub = null, notes = null
   return li;
 }
 
+// The title of a Version History version's sheet (altstore.js installRows' rows). The sideloader line only fits when
+// no row installs it here: an Install (iFizBox signs it with your certificate, the jailbreak installs it, the website
+// signs it, or the source's own signed link) or a Custom Install says otherwise, so the name and version stand alone.
+export function versionSheetTitle(name, version, rows, options = {}) {
+  const title = `${name} ${version}`;
+  const installsHere = options.itms || rows.some((r) => r.label !== "Download IPA");
+  return installsHere ? title : `${title}\nA sideloader signs it on the iPhone with your Apple ID.`;
+}
+
 function versionsGroup(cells, footer) {
   const g = el("div", "group");
   const ul = el("ul", "table grouped versions");
@@ -1609,7 +1618,7 @@ async function renderVersions(body, route, key, id) {
           if (!customOffered && await signIfReady(pkg.stanza.ipa ?? { name: history.name, sourceUrl: history.sourceUrl }, v, record)) return;
           const { rows, options } = installRows(v, history.sourceUrl, undefined, record, queue, history.name,
             { ...(customize ? { customize } : {}), bundleId: appBundleId(pkg.stanza.ipa, history.id) });
-          sheet(options.itms ? `${history.name} ${v.version}` : `${history.name} ${v.version}\nA sideloader signs it on the iPhone with your Apple ID.`,
+          sheet(versionSheetTitle(history.name, v.version, rows, options),
             rows.map((r) => ({ label: r.label, run: r.onClick })));
         } : null,
       });

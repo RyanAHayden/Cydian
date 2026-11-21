@@ -8,7 +8,10 @@ lockdown gave (`ifizbox.phone.udid`) only in UserDefaults, which goes with the c
 
 - `native/Sources/PhoneID.swift`: `remember` also writes the UDID to a generic-password item (service
   `com.ryha.ifizbox.phone`, account `udid`), `AfterFirstUnlockThisDeviceOnly`, in iFizBox's own group
-  (`OwnKeychain.scoped`), the same shape as B276's signing items. Not a secret.
+  (`OwnKeychain.scoped`), the same shape as B276's signing items (only the add is scoped; reads and updates match
+  any reachable group, as B276's do). Not a secret. A UDID the website's Profile Service visit found
+  (`device.udid.set`) goes through `remember` too, so it is kept the same way.
+- The header comment lists `"lockdown"` as a `source` value, as the getter already returned it.
 - `read()` (sideload build): UserDefaults first, and if the Keychain lacks it (paired before this build) it is
   written there; on a fresh container the kept item is read back into UserDefaults, before the embedded profile's
   guess. `source` then reads "lockdown" as before.
@@ -27,4 +30,4 @@ lockdown gave (`ifizbox.phone.udid`) only in UserDefaults, which goes with the c
 - Delete + reinstall on the iPhone 15 Pro (the task's Check): not run in this unattended session. It means deleting
   the app on the owner's test phone (its container, signed records and probe files go too; R59 had to put them
   back by hand) and the 15 Pro may be in use by other slots. The gate builds the Swift and runs the source test. A
-  device check is filed as a follow-up R task (see commit).
+  device check is filed as R61.

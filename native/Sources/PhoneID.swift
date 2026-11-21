@@ -4,7 +4,7 @@
 // Read once and kept: neither changes while the app runs. A UDID lockdown or the website gave is kept in UserDefaults
 // and the Keychain (B284), so a delete + reinstall still knows it.
 //
-//   device.udid   -> {udid | null, candidates: [udid], source: "helper" | "profile" | null}   (every build)
+//   device.udid   -> {udid | null, candidates: [udid], source: "helper" | "lockdown" | "profile" | null}   (every build)
 //   device.udid.set {udid} -> as device.udid: the UDID the website's Profile Service visit found, kept as a paired one
 // SPDX-License-Identifier: GPL-3.0-or-later
 import Foundation

@@ -114,6 +114,10 @@ html.native .navbar, html.native .tabbar { display: none; }
   --banner-pad: 6px 12px 7px;                                       /* the notification banner */
   /* C54: large titles (nav/navbar.js setLargeTitles), drawn only under html[data-nav="large"] */
   --large-title-h: 52px; --large-title-pad: 3px 16px 8px;           /* the big title at the top of a root page */
+  /* C52: the floating tab bar (nav/tabbar.js setFloatingTabbar), used only under html[data-tabbar="float"] */
+  --tabbar-float-h: 62px; --tabbar-float-pad: 4px;                  /* the pill's height (and the circle's), inside */
+  --tabbar-float-inset: 21px; --tabbar-float-gap: 10px;             /* from the screen's sides; pill to circle */
+  --tabbar-float-bottom: max(12px, calc(var(--safe-bottom) - 13px)); /* from the screen's bottom */
 }
 /* Large titles: the root page's title, big, bold and left, at the top of its body; it scrolls with the content and
    fades into the nav bar's own title (navbar.js writes only its opacity). Never drawn in iOS 6. */
@@ -155,6 +159,19 @@ html:not([data-shell="app"]) .navbar::before {
 .tab-icon::before { content: ""; display: block; width: 100%; height: 100%; }
 .badge { min-width: var(--badge-h); height: var(--badge-h); padding: var(--badge-pad); }
 .tab .badge { position: absolute; top: -2px; left: calc(50% + 5px); }
+/* Floating tab bar: a pill inset from the edges, the Search tab its own circle to its right (out of the flex row,
+   same height as the pill), the screens scrolling under both. --tab-h becomes the pill plus its gap to the bottom,
+   so every scroller's end room and the bars that sit on the tab bar (reload, undo, Filter) follow. Never in iOS 6. */
+html[data-tabbar="float"] { --tab-h: calc(var(--tabbar-float-h) + var(--tabbar-float-bottom)); }
+html[data-tabbar="float"] .tabbar {
+  left: max(var(--tabbar-float-inset), env(safe-area-inset-left));
+  right: calc(max(var(--tabbar-float-inset), env(safe-area-inset-right)) + var(--tabbar-float-h) + var(--tabbar-float-gap));
+  bottom: var(--tabbar-float-bottom); height: var(--tabbar-float-h); padding: var(--tabbar-float-pad);
+}
+html[data-tabbar="float"] .tab[data-tab="search"] {
+  position: absolute; top: 0; bottom: 0; right: calc(-1 * (var(--tabbar-float-h) + var(--tabbar-float-gap)));
+  width: var(--tabbar-float-h); height: auto; margin: 0; padding-top: 0; justify-content: center;
+}
 /* Grouped tables and their cells (the cells are every table's) */
 .page-body.grouped { padding-bottom: calc(var(--tab-h) + 20px); } /* clear the fixed tab bar, then the table's own 20px; the last hint must scroll into view */
 .group { margin: var(--group-margin); }

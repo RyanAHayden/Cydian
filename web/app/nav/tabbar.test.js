@@ -1,6 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { tapTab, scrollToTop } from "./tabbar.js";
+import { readFileSync } from "node:fs";
+import { tapTab, scrollToTop, setFloatingTabbar, floatingTabbarOn, FLOAT_OWN_TAB } from "./tabbar.js";
+import { BAR_TABS } from "../router.js";
 import * as search from "../screens/search.js";
 
 function spy() {
@@ -115,4 +117,76 @@ test("scrollToTop does nothing already at the top or without a page", () => {
   assert.equal(scrollToTop(f.body, {}), false);
   assert.deepEqual(f.calls, []);
   assert.equal(scrollToTop(null), false);
+});
+
+// C52: the floating tab bar era hook (docs/eras.md). setFloatingTabbar only flips <html data-tabbar="float">; the
+// layout is style.css's, behind that attribute, so iOS 6 (attribute absent) is untouched.
+function fakeRoot() {
+  const attrs = new Map();
+  return {
+    attrs,
+    documentElement: {
+      getAttribute: (k) => (attrs.has(k) ? attrs.get(k) : null),
+      setAttribute: (k, v) => attrs.set(k, String(v)),
+      removeAttribute: (k) => attrs.delete(k),
+    },
+  };
+}
+
+test("C52: the floating tab bar is off by default, and setFloatingTabbar turns the attribute on and off", () => {
+  const doc = fakeRoot();
+  assert.equal(floatingTabbarOn(doc), false);
+  setFloatingTabbar(true, doc);
+  assert.equal(doc.attrs.get("data-tabbar"), "float");
+  assert.equal(floatingTabbarOn(doc), true);
+  setFloatingTabbar(true, doc); // idempotent
+  assert.equal(doc.attrs.size, 1);
+  setFloatingTabbar(false, doc);
+  assert.equal(doc.attrs.has("data-tabbar"), false);
+  assert.equal(floatingTabbarOn(doc), false);
+  setFloatingTabbar(true, {}); // no document: nothing to do, no throw
+});
+
+const css = readFileSync(new URL("../style.css", import.meta.url), "utf8");
+const rulesOf = (src) => [...src.replace(/\/\*[\s\S]*?\*\//g, "").matchAll(/([^{}]+)\{([^}]*)\}/g)]
+  .map((m) => ({ sel: m[1].trim(), decl: m[2] }));
+
+test("C52: style.css floats the bar only behind html[data-tabbar=float]; iOS 6's --tab-h and bar stay as they were", () => {
+  const rules = rulesOf(css);
+  // iOS 6: the 49 pt bar edge to edge, its height --tab-h
+  assert.match(css, /:root \{ --nav-h: calc\(44px \+ env\(safe-area-inset-top\)\); --tab-h: calc\(49px \+ var\(--safe-bottom\)\); \}/);
+  const base = rules.find((r) => r.sel === ".tabbar");
+  assert.match(base.decl, /left: 0; right: 0; bottom: 0;/);
+  assert.match(base.decl, /height: var\(--tab-h\)/);
+  // every rule that reads a --tabbar-float-* hook is behind the attribute (the :root defining them aside)
+  const readers = rules.filter((r) => /var\(--tabbar-float-/.test(r.decl) && r.sel !== ":root");
+  // and nothing hides overflow on the bar, which would clip the circle sitting past its right edge
+  for (const r of rules.filter((x) => /\.tabbar\b/.test(x.sel) && !/\.tab\b/.test(x.sel))) assert.doesNotMatch(r.decl, /overflow/, r.sel);
+  assert.ok(readers.length >= 3, readers.map((r) => r.sel).join());
+  for (const r of readers) assert.match(r.sel, /^html\[data-tabbar="float"\]/, `${r.sel} is drawn in iOS 6`);
+  assert.equal(rules.filter((r) => /data-tabbar/.test(r.sel) && !r.sel.startsWith('html[data-tabbar="float"]')).length, 0);
+});
+
+test("C52: floating, --tab-h is the pill plus its gap, so the scrollers' end room and bars on the tab bar follow", () => {
+  const rules = rulesOf(css);
+  const root = rules.find((r) => r.sel === 'html[data-tabbar="float"]');
+  assert.match(root.decl, /--tab-h: calc\(var\(--tabbar-float-h\) \+ var\(--tabbar-float-bottom\)\)/);
+  const bar = rules.find((r) => r.sel === 'html[data-tabbar="float"] .tabbar').decl;
+  assert.match(bar, /bottom: var\(--tabbar-float-bottom\)/);
+  assert.match(bar, /height: var\(--tabbar-float-h\)/);
+  assert.match(bar, /left: max\(var\(--tabbar-float-inset\), env\(safe-area-inset-left\)\)/);
+  // the right edge leaves room for the circle and the gap before it
+  assert.match(bar, /right: calc\(max\(var\(--tabbar-float-inset\), env\(safe-area-inset-right\)\) \+ var\(--tabbar-float-h\) \+ var\(--tabbar-float-gap\)\)/);
+  // the scrollers fill the screen (content scrolls under the pill) and end --tab-h + 20px up
+  const body = rules.find((r) => r.sel === ".page-body" && /inset: 0/.test(r.decl)).decl;
+  assert.match(body, /padding: var\(--nav-h\) [^;]*calc\(var\(--tab-h\) \+ 20px\)/);
+  assert.match(rules.find((r) => r.sel === ".page-body.grouped").decl, /calc\(var\(--tab-h\) \+ 20px\)/);
+});
+
+test("C52: Search is its own circle beside the pill, as tall as it, out of the tabs' row", () => {
+  assert.ok(BAR_TABS.includes(FLOAT_OWN_TAB));
+  const own = rulesOf(css).find((r) => r.sel === `html[data-tabbar="float"] .tab[data-tab="${FLOAT_OWN_TAB}"]`)?.decl ?? "";
+  assert.match(own, /position: absolute; top: 0; bottom: 0;/);
+  assert.match(own, /right: calc\(-1 \* \(var\(--tabbar-float-h\) \+ var\(--tabbar-float-gap\)\)\)/);
+  assert.match(own, /width: var\(--tabbar-float-h\)/);
 });

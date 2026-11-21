@@ -350,3 +350,99 @@ html[data-style="ios13"][data-theme] .rec-add:active:not(:disabled) {
 }
 html[data-style="ios13"][data-theme] .rec-add.added, html[data-style="ios13"][data-theme] .rec-add:disabled { color: var(--i13-get-dim-text); }
 html[data-style="ios13"][data-theme] .rec-add.adding { color: var(--i13-tint); }
+
+/* ---- B270: the leftovers that still drew iOS 6 ---- */
+/* Home's tiles: inset 16pt like the grouped tables under them (the Settings | Theme pair and the help links), white
+   10pt cards with no outline. The GitHub | Discord pair gets the card's fill (iOS 6 leaves it empty for the
+   pinstripes), and both pairs are split by a .5pt separator with no stray top line (the grouped tables' inset
+   separator, drawn on a second cell, sat 16pt into the right half). */
+html[data-style="ios13"] { --home-inset: 16px; }
+html[data-style="ios13"] .home { --tile: var(--table); --tile-edge: transparent; --tile-radius: 10px; }
+html[data-style="ios13"] .home-row > .table { border-width: 0; }
+html[data-style="ios13"] .home-row.pair > .table { background: var(--tile); }
+html[data-style="ios13"] .home-row .home-pair > .cell + .cell,
+html[data-style="ios13"] .home-links .home-pair > .cell + .cell {
+  border-top-width: 0; border-left: .5px solid var(--divider); background: none;
+}
+html[data-style="ios13"] .home-links .table.grouped,
+html[data-style="ios13"][data-theme="dark"] .home-links .table.grouped { border-width: 0; background: var(--table); }
+
+/* Installed's and Install IPAs' Manage: iOS 13's multi-select circle, a 1.5pt grey ring, picked a tinted disc with a
+   white tick and no rim or shadow; a picked row the light grey selection, not iOS 6's pale blue. */
+html[data-style="ios13"][data-theme="light"] { --i13-check-ring: #c7c7cc; --i13-picked: #e5e5ea; }
+html[data-style="ios13"][data-theme="dark"] { --i13-check-ring: #545458; --i13-picked: #2c2c2e; }
+html[data-style="ios13"][data-theme] .manage-check { border: 1.5px solid var(--i13-check-ring); box-shadow: none; background: none; }
+html[data-style="ios13"][data-theme] .manage-row.picked .manage-check {
+  border-color: var(--i13-tint); box-shadow: none;
+  background: var(--i13-tint) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 22 22'%3E%3Cpath d='M6.3 11.4 9.6 14.6 15.9 7.6' fill='none' stroke='%23fff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 100% 100% no-repeat border-box;
+}
+html[data-style="ios13"][data-theme] .managing .manage-row.picked,
+html[data-style="ios13"][data-theme] .managing .manage-row.picked .cell-inner,
+html[data-style="ios13"][data-theme] .managing .myipa-row.picked,
+html[data-style="ios13"][data-theme] .managing .myipa-row.picked .cell-inner { background-color: var(--i13-picked); }
+/* Manage's toolbar: the bars' flat #f9f9f9 (black in OLED Black) under a hairline; Delete is red text like the other
+   bar buttons' tinted text, dimming while held, with no glossy red box. */
+html[data-style="ios13"][data-theme] .manage-toolbar {
+  background: linear-gradient(var(--i13-hairline), var(--i13-hairline)) top / 100% .5px no-repeat, var(--i13-bar);
+}
+html[data-style="ios13"][data-theme] .manage-toolbar .bar-button.manage-delete:not(.back):not(.done),
+html[data-style="ios13"][data-theme] .manage-toolbar .bar-button.manage-delete:not(.back):not(.done):is(:active, .is-pressed) {
+  color: var(--i13-red); border-color: transparent; background: none; box-shadow: none;
+}
+
+/* Alerts and prompts (nav/alert.js: About, Add Source's field, every showAlert): UIAlertController's box, 270pt wide
+   with 14pt corners, white (#1c1c1e in OLED Black) over a blur, a 17pt semibold title and 13pt message, a rounded
+   field, then 44pt flat tinted buttons edge to edge under .5pt separators, a .5pt line between two side by side; the
+   preferred (last) button semibold, a destructive one red. The row meets the box's sides and bottom (its margin
+   undoes the 16pt padding), so each button draws its own lines, and the bottom ones take the box's corners. */
+html[data-style="ios13"] {
+  --alert-w: 270px; --alert-pad: 19px 16px 0;
+  --alert-buttons-margin: 15px -16px 0; --alert-buttons-gap: 0px; --alert-stacked-gap: 0px; --alert-button-h: 44px;
+}
+html[data-style="ios13"][data-theme="light"] {
+  --i13-alert: rgba(255,255,255,.88); --i13-alert-line: rgba(60,60,67,.29); --i13-alert-pressed: rgba(0,0,0,.08);
+  --i13-alert-dim: rgba(60,60,67,.3); --i13-alert-field: #fff; --i13-alert-field-edge: rgba(60,60,67,.29);
+  --i13-scrim: rgba(0,0,0,.2);
+}
+html[data-style="ios13"][data-theme="dark"] {
+  --i13-alert: rgba(28,28,30,.92); --i13-alert-line: rgba(84,84,88,.65); --i13-alert-pressed: rgba(255,255,255,.1);
+  --i13-alert-dim: rgba(235,235,245,.3); --i13-alert-field: #2c2c2e; --i13-alert-field-edge: #3a3a3c;
+  --i13-scrim: rgba(0,0,0,.48);
+}
+html[data-style="ios13"] .alert-scrim { background: var(--i13-scrim); }
+html[data-style="ios13"] .alert {
+  border: 0; border-radius: 14px; box-shadow: none; color: var(--i13-label); text-shadow: none;
+  background: var(--i13-alert); -webkit-backdrop-filter: blur(20px) saturate(1.8); backdrop-filter: blur(20px) saturate(1.8);
+}
+html[data-style="ios13"] .alert::before { background: none; }
+html[data-style="ios13"] .alert-title { font-size: 17px; line-height: 22px; font-weight: 600; }
+html[data-style="ios13"] .alert-message { font-size: 13px; line-height: 16px; }
+html[data-style="ios13"] .alert-field {
+  border-radius: 7px; font-size: 14px; color: var(--i13-label);
+  background: var(--i13-alert-field); border: .5px solid var(--i13-alert-field-edge); box-shadow: none;
+}
+html[data-style="ios13"] .alert-paste,
+html[data-style="ios13"] .alert-paste:active {
+  border: 0; border-radius: 0; font-size: 15px; font-weight: 400; color: var(--i13-tint); text-shadow: none; background: none;
+}
+html[data-style="ios13"] .alert-paste:active { opacity: .3; }
+html[data-style="ios13"] .alert-button,
+html[data-style="ios13"] .alert-button.cancel,
+html[data-style="ios13"] .alert-button.green,
+html[data-style="ios13"] .alert-button.red,
+html[data-style="ios13"] .alert-button.blue,
+html[data-style="ios13"] .alert-button:disabled {
+  border: 0; border-radius: 0; box-shadow: inset 0 .5px 0 var(--i13-alert-line); text-shadow: none; background: none;
+  font-size: 17px; font-weight: 400; color: var(--i13-tint);
+}
+html[data-style="ios13"] .alert-buttons:not(.stacked) > .alert-button + .alert-button {
+  box-shadow: inset 0 .5px 0 var(--i13-alert-line), inset .5px 0 0 var(--i13-alert-line);
+}
+html[data-style="ios13"] .alert-buttons:not(.stacked) > .alert-button:first-child { border-bottom-left-radius: 14px; }
+html[data-style="ios13"] .alert-buttons:not(.stacked) > .alert-button:last-child { border-bottom-right-radius: 14px; }
+html[data-style="ios13"] .alert-buttons.stacked > .alert-button:last-child { border-radius: 0 0 14px 14px; }
+html[data-style="ios13"] .alert-button:last-child:not(.cancel) { font-weight: 600; }
+html[data-style="ios13"] .alert-button.red { color: var(--i13-red); }
+html[data-style="ios13"] .alert-button:disabled { color: var(--i13-alert-dim); opacity: 1; }
+html[data-style="ios13"] .alert-button:active:not(:disabled),
+html[data-style="ios13"] .alert-button.is-pressed { background: var(--i13-alert-pressed); }

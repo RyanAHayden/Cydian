@@ -1,0 +1,87 @@
+[
+ {
+  "wait": 1500
+ },
+ {
+  "eval": "localStorage.setItem('ifizbox.firstVisit','later'); localStorage.setItem('ifizbox.style','ios13'); localStorage.setItem('ifizbox.appearance','dark'); 'ok'"
+ },
+ {
+  "nav": "#/home",
+  "ms": 3500
+ },
+ {
+  "shot": "ios13-dark-home"
+ },
+ {
+  "eval": "document.querySelector('.page.is-top .page-body').scrollTop=2000; 'ok'"
+ },
+ {
+  "wait": 500
+ },
+ {
+  "shot": "ios13-dark-home-bottom"
+ },
+ {
+  "eval": "document.querySelector('.page.is-top .page-body').scrollTop=0; 'ok'"
+ },
+ {
+  "clicktext": "About",
+  "ms": 1200
+ },
+ {
+  "shot": "ios13-dark-about"
+ },
+ {
+  "eval": "document.querySelector('.alert-button:last-child').click(); 'ok'"
+ },
+ {
+  "wait": 800
+ },
+ {
+  "eval": "import('./nav/alert.js').then(m=>{m.showAlert({title:'Enter Cydia/APT URL', input:{placeholder:'http://', paste:true, value:''}, buttons:['Cancel','Add Source']}); return 'ok'})"
+ },
+ {
+  "wait": 900
+ },
+ {
+  "shot": "ios13-dark-prompt"
+ },
+ {
+  "eval": "document.querySelector('.alert-button').click(); 'ok'"
+ },
+ {
+  "wait": 800
+ },
+ {
+  "eval": "import('./nav/alert.js').then(m=>{m.showAlert({title:'Delete 2 Apps?', message:'iSH and iTorrent are removed from this iPhone.', buttons:['Cancel','Keep Data','Delete'], colors:{2:'red'}}); return 'ok'})"
+ },
+ {
+  "wait": 900
+ },
+ {
+  "shot": "ios13-dark-alert-stacked"
+ },
+ {
+  "eval": "document.querySelector('.alert-button').click(); 'ok'"
+ },
+ {
+  "wait": 800
+ },
+ {
+  "nav": "#/installed",
+  "ms": 4000
+ },
+ {
+  "clicktext": "Manage",
+  "ms": 1200
+ },
+ {
+  "eval": "(()=>{const r=document.querySelectorAll('.page.is-top .installed-app .cell-inner'); if(r[0]) r[0].click(); return r.length})()"
+ },
+ {
+  "wait": 900
+ },
+ {
+  "shot": "ios13-dark-manage"
+ }
+]

@@ -491,3 +491,26 @@ html[data-style="ios7"][data-theme] .rec-add.added, html[data-style="ios7"][data
   color: var(--i7-get-dim-text); border-color: var(--i7-get-dim); background: none;
 }
 html[data-style="ios7"][data-theme] .rec-add.adding { color: var(--i7-tint); border-color: var(--i7-tint); }
+
+/* B270: Installed's and Install IPAs' Manage, after iOS 7's Mail edit list: a thin 1pt grey ring, picked a tinted disc
+   with a thin white tick, no rim, gloss or shadow; a picked row the tables' light grey, not iOS 6's pale blue. */
+html[data-style="ios7"][data-theme="light"] { --i7-check-ring: #c7c7cc; --i7-picked: #ebebf0; }
+html[data-style="ios7"][data-theme="dark"] { --i7-check-ring: #48484a; --i7-picked: #2c2c2e; }
+html[data-style="ios7"][data-theme] .manage-check { border: 1px solid var(--i7-check-ring); box-shadow: none; background: none; }
+html[data-style="ios7"][data-theme] .manage-row.picked .manage-check {
+  border-color: var(--i7-tint); box-shadow: none;
+  background: var(--i7-tint) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 22 22'%3E%3Cpath d='M6.2 11.3 9.5 14.6 15.9 7.4' fill='none' stroke='%23fff' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 100% 100% no-repeat border-box;
+}
+html[data-style="ios7"][data-theme] .managing .manage-row.picked,
+html[data-style="ios7"][data-theme] .managing .manage-row.picked .cell-inner,
+html[data-style="ios7"][data-theme] .managing .myipa-row.picked,
+html[data-style="ios7"][data-theme] .managing .myipa-row.picked .cell-inner { background-color: var(--i7-picked); }
+/* Manage's toolbar: the bars' flat #f7f7f7 (black in OLED Black) under a hairline; Delete is red text like the kit's
+   destructive bar items, dimming while held, with no glossy red box. */
+html[data-style="ios7"][data-theme] .manage-toolbar {
+  background: linear-gradient(var(--i7-hairline), var(--i7-hairline)) top / 100% .5px no-repeat, var(--i7-bar);
+}
+html[data-style="ios7"][data-theme] .manage-toolbar .bar-button.manage-delete:not(.back):not(.done),
+html[data-style="ios7"][data-theme] .manage-toolbar .bar-button.manage-delete:not(.back):not(.done):is(:active, .is-pressed) {
+  color: var(--i7-red); border-color: transparent; background: none; box-shadow: none;
+}

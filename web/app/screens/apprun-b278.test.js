@@ -4,7 +4,7 @@
 // now written again, a few times apart and on each return to the front.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { runAppRun, RECORD_TRIES } from "./apprun.js";
+import { runAppRun, RECORD_TRIES, RECORD_FRONTS } from "./apprun.js";
 import { createAppQueue } from "../core/appqueue.js";
 import { memoryAppStore, recordInstall } from "../core/installed.js";
 import { fakeDocument as fakeDom } from "../fakes.test-helper.js";
@@ -124,4 +124,33 @@ test("B278: a record that never fails is written once, with no retry", () => wit
   await s.t.fire(); // only the run's own (spent) stall timers
   assert.deepEqual(s.tries, { a: 1, b: 1 });
   assert.equal(await s.version("a"), "2.0");
+}));
+
+test("B278: a store that never works again: one timer at a time, gives up after RECORD_FRONTS returns, two Log lines", () => withDom(async () => {
+  const s = await setup({ fails: (id) => id === "a" });
+  s.doc.set("hidden");
+  await s.l.release("a");
+  await s.l.release("b");
+  await s.done;
+  s.doc.set("visible"); // a return while a timer waits: no second chain
+  await settle();
+  const pending = s.t.list.length;
+  await s.t.fire(); // the waiting timer, and stall timers that are spent
+  assert.ok(s.t.list.length <= 1, `one retry chain, not two (had ${pending} timers)`);
+  for (let i = 0; i < RECORD_FRONTS + 2; i++) {
+    for (let k = 0; k < RECORD_TRIES + 2; k++) await s.t.fire();
+    s.doc.set("hidden");
+    s.doc.set("visible");
+    await settle();
+  }
+  const tries = s.tries.a;
+  for (let k = 0; k < RECORD_TRIES + 2; k++) await s.t.fire();
+  s.doc.set("hidden");
+  s.doc.set("visible");
+  await settle();
+  assert.equal(s.tries.a, tries, "given up: nothing tries again");
+  assert.equal(s.doc.listeners.filter((f) => f.name === "onFront").length, 0, "its listener is gone");
+  const said = s.page.lines.filter((x) => x.id === "a" && /Couldn't record/.test(x.text));
+  assert.equal(said.length, 2, "the first failure and the give-up");
+  assert.equal(s.ends.filter(([id]) => id === "a").length, 1, "only the app's end: no recount for a write that failed");
 }));

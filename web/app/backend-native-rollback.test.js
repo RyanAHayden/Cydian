@@ -9,7 +9,7 @@ import { createNativeBackend, parseRollbacks } from "./backend-native.js";
 import { createQueue } from "./core/queue.js";
 import { rollbackRows } from "./screens/rollback.js";
 import { createFakeNative, makeFixture } from "../../native/fake/fake-native.mjs";
-import { fakeIndexedDB } from "../../native/fake/fake-indexeddb.mjs";
+import { fakeIndexedDB } from "./fakes.test-helper.js";
 
 const ID = "com.example.tweak";
 

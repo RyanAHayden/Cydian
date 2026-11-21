@@ -5,6 +5,7 @@ import assert from "node:assert/strict";
 import { nextHint, createQueueHint, HINT_TEXT, SHOW_MS } from "./queuehint.js";
 import { HOLD_MS } from "./menu.js";
 import { createSettings } from "../core/settings.js";
+import { fakeDocument } from "./fakedom.test-helper.js";
 
 test("rules: shows on a tap of Installed with the badge up, never held, not yet shown this run", () => {
   const tapped = true;
@@ -45,42 +46,29 @@ test("settings remember the hold on the device", () => {
   assert.equal(createSettings({ storage }).queueHint.held(), true, "a new launch still knows");
 });
 
-// A small DOM: the tab bar with its Installed tab, the document's body, event dispatch with capture and bubble.
-function target(extra = {}) {
+// The shared fake DOM, plus: the tab bar with its Installed tab, the document's body, event dispatch with capture
+// and bubble. Listeners are kept by phase in `on` ("<type>c" for capture, "<type>b" for bubble).
+function phased(el) {
   const on = {};
-  return {
-    on,
-    addEventListener(t, f, o) { const c = o === true || o?.capture ? "c" : "b"; (on[t + c] ??= new Set()).add(f); },
-    removeEventListener(t, f, o) { const c = o === true || o?.capture ? "c" : "b"; on[t + c]?.delete(f); },
-    ...extra,
-  };
-}
-function node(cls = "") {
-  const el = target({
-    children: [], parent: null, style: {}, attrs: {}, textContent: "", offsetWidth: 220, offsetHeight: 38, dataset: {},
-    classList: { set: new Set(cls.split(" ").filter(Boolean)), add(c) { this.set.add(c); }, remove(c) { this.set.delete(c); },
-      contains(c) { return this.set.has(c); }, toggle(c, v) { (v ?? !this.set.has(c)) ? this.set.add(c) : this.set.delete(c); } },
-    setAttribute(k, v) { el.attrs[k] = v; },
-    append(...k) { for (const c of k) { c.parent = el; el.children.push(c); } },
-    remove() { if (el.parent) el.parent.children = el.parent.children.filter((c) => c !== el); el.parent = null; },
-    contains(x) { for (let n = x; n; n = n.parent) if (n === el) return true; return false; },
-    // "a.tab.hold-queue" style selectors: every class after the tag must be on the node
-    closest(sel) {
-      const want = sel.split(".").slice(1);
-      for (let n = el; n; n = n.parent) if (want.every((c) => n.classList.contains(c))) return n;
-      return null;
-    },
-    getBoundingClientRect: () => ({ left: 192, top: 431, width: 64, height: 49, bottom: 480 }),
-    animate: () => ({ finished: Promise.resolve() }),
-  });
-  Object.defineProperty(el, "className", { set(v) { el.classList.set = new Set(String(v).split(" ").filter(Boolean)); } });
+  el.on = on;
+  el.addEventListener = (t, f, o) => { const c = o === true || o?.capture ? "c" : "b"; (on[t + c] ??= new Set()).add(f); };
+  el.removeEventListener = (t, f, o) => { const c = o === true || o?.capture ? "c" : "b"; on[t + c]?.delete(f); };
   return el;
+}
+const target = (extra = {}) => Object.assign(phased(fakeDocument()), extra);
+const dom = fakeDocument();
+// An element with the tab bar's sizes; `tag` "a" for a tab (queuehint.js looks for "a.tab").
+function node(cls = "", tag = "div") {
+  return Object.assign(phased(dom.createElement(tag)), {
+    className: cls, offsetWidth: 220, offsetHeight: 38,
+    getBoundingClientRect: () => ({ left: 192, top: 431, width: 64, height: 49, bottom: 480 }),
+  });
 }
 function dispatch(doc, t, type, e = {}) {
   const ev = { type, target: t, detail: 1, isPrimary: true, clientX: 220, clientY: 450, defaultPrevented: false, stopped: false,
     preventDefault() { this.defaultPrevented = true; }, stopPropagation() { this.stopped = true; }, ...e };
   const path = [];
-  for (let n = t; n; n = n.parent) path.push(n);
+  for (let n = t; n; n = n.parentNode) path.push(n);
   const run = (n, phase) => { for (const f of [...(n.on[type + phase] ?? [])]) f(ev); };
   run(doc, "c");
   for (const n of [...path].reverse()) { if (ev.stopped) return ev; run(n, "c"); }
@@ -91,7 +79,7 @@ function setup({ held = false } = {}) {
   const body = node();
   const doc = target({ body, createElement: () => node() });
   const bar = node("tabbar");
-  const tab = node("tab");
+  const tab = node("tab", "a");
   bar.append(tab);
   bar.querySelector = (sel) => (sel.includes('data-tab="installed"') ? tab : null);
   let isHeld = held;
@@ -114,7 +102,7 @@ test("B130: queuing never shows the hint (it would cover the 'added to queue' to
 
 test("a tap on another tab does not show the hint", () => {
   const t = setup();
-  const other = node("tab");
+  const other = node("tab", "a");
   t.bar.append(other);
   t.hint.update({ queued: true, badge: true });
   dispatch(t.doc, other, "click");
@@ -177,7 +165,7 @@ test("it fades by itself after SHOW_MS", async () => {
     const body = node();
     const doc = target({ body, createElement: () => node() });
     const bar = node();
-    const tab = node("tab");
+    const tab = node("tab", "a");
     bar.append(tab);
     bar.querySelector = () => tab;
     const hint = createQueueHint({ bar, store: { held: () => false }, doc, win: { innerWidth: 320, innerHeight: 480 } });

@@ -2,22 +2,15 @@
 // and library.* calls carrying Keep Bundle IDs (libraryCall).
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { memStorage } from "./fakes.test-helper.js";
+import { memStorage, fakeNative as bridge } from "./fakes.test-helper.js";
 import { originalWarning, ORIGINAL_WARNED_KEY, libraryCall } from "./signing-client.js";
 import { IFIZBOX_ID } from "./core/websign.js";
 
-function fakeNative({ installed = {}, records = [] } = {}) {
-  const calls = [];
-  return {
-    calls,
-    async call(method, params) {
-      calls.push({ method, params });
-      if (method === "apps.isInstalled") return { installed: Object.fromEntries(params.bundleIds.map((b) => [b, Boolean(installed[b])])) };
-      if (method === "signing.installed") return { apps: records };
-      return {};
-    },
-  };
-}
+// The shared bridge, answering apps.isInstalled from `installed` and signing.installed with `records`.
+const fakeNative = ({ installed = {}, records = [] } = {}) => bridge({
+  "apps.isInstalled": (params) => ({ installed: Object.fromEntries(params.bundleIds.map((b) => [b, Boolean(installed[b])])) }),
+  "signing.installed": { apps: records },
+});
 const answering = (index, seen) => async (a) => { seen.push(a); return { index }; };
 
 test("the original on the phone: the alert, Install remembered so the next Install goes straight on", async () => {

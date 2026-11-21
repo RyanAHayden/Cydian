@@ -3,6 +3,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { swipeDecide, swipeOffset, swipeArmed, attachRowSwipe, EDGE, SLOP, ARM } from "./rowswipe.js";
+import { fakeDocument } from "./fakedom.test-helper.js";
 
 test("a move is a swipe only when clearly leftward; vertical is the list's, rightward the back swipe's", () => {
   assert.equal(swipeDecide(-5, 2), "wait");               // inside the slop
@@ -31,29 +32,17 @@ test("the row follows the finger to ARM, then rubber-bands and never passes ARM 
 });
 
 // A list element and rows good enough for the gesture (no browser in node).
+// The shared fake DOM's element, as wide as a phone; fire(t, e) runs the listeners with `e` as it is.
 function fakeEl(cls = "") {
-  const on = {};
-  const el = {
-    className: cls, dataset: {}, style: {}, children: [], parent: null, clientWidth: 375,
-    classList: {
-      set: new Set(cls.split(" ").filter(Boolean)),
-      add(...c) { c.forEach((x) => this.set.add(x)); }, remove(...c) { c.forEach((x) => this.set.delete(x)); },
-      contains(c) { return this.set.has(c); }, toggle(c, on) { (on ?? !this.set.has(c)) ? this.set.add(c) : this.set.delete(c); },
-    },
-    addEventListener: (t, f) => { (on[t] ??= []).push(f); }, removeEventListener() {},
-    fire: (t, e) => { for (const f of on[t] ?? []) f(e); },
-    setAttribute() {}, setPointerCapture() {}, click() {}, remove() {},
-    append(...k) { for (const c of k) { c.parent = el; el.children.push(c); } },
-    prepend(...k) { for (const c of k) { c.parent = el; el.children.unshift(c); } },
-    contains: (x) => { for (let n = x; n; n = n.parent) if (n === el) return true; return false; },
-    closest(sel) { for (let n = el; n; n = n.parent) if (n.classList.contains(sel.slice(1))) return n; return null; },
-    querySelector: (sel) => el.children.find((c) => c.classList.contains(sel.replace(":scope > .", ""))) ?? null,
-  };
+  const el = document.createElement("div");
+  el.className = cls;
+  el.clientWidth = 375;
+  el.fire = (t, e) => { for (const f of el.listeners[t] ?? []) f(e); };
   return el;
 }
 
 function setup(action = { kind: "add" }) {
-  globalThis.document = { createElement: () => fakeEl(), body: fakeEl() }; // haptic() draws a hidden switch
+  globalThis.document = fakeDocument(); // haptic() draws a hidden switch
   globalThis.requestAnimationFrame = (f) => { queueMicrotask(f); return 1; }; // a frame later, as a browser
   globalThis.cancelAnimationFrame = () => {};
   const list = fakeEl("vlist");

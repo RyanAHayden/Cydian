@@ -9,7 +9,7 @@ import { join } from "node:path";
 import { createNativeBackend, parseAppVersions, withRealVersions } from "./backend-native.js";
 import { createQueue } from "./core/queue.js";
 import { createFakeNative, makeFixture } from "../../native/fake/fake-native.mjs";
-import { fakeIndexedDB } from "../../native/fake/fake-indexeddb.mjs";
+import { fakeIndexedDB } from "./fakes.test-helper.js";
 
 const plist = (values) => `<?xml version="1.0" encoding="UTF-8"?>\n<plist version="1.0">\n<dict>\n${
   Object.entries(values).map(([k, v]) => `\t<key>${k}</key>\n\t<string>${v}</string>\n`).join("")}</dict>\n</plist>\n`;

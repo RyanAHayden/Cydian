@@ -7,7 +7,7 @@ import { createKeepAwake, wakeLockScreen } from "./keepawake.js";
 import { createAppRun, appRows } from "./apprun.js";
 import { createNativeBackend, longCall } from "../backend-native.js";
 import { createHttpBackend } from "../backend-http.js";
-import { fakeIndexedDB } from "../../../native/fake/fake-indexeddb.mjs";
+import { fakeIndexedDB } from "../fakes.test-helper.js";
 
 const tick = () => new Promise((r) => setTimeout(r, 0));
 

@@ -5,38 +5,30 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { reloadSteps, STEP_TEXT } from "../core/reloadsteps.js";
 import { showReloadBar, phaseOf, PHASES, MIN_STEP_MS } from "./reloadbar.js";
+import { fakeDocument } from "./fakedom.test-helper.js";
 import { startRun } from "../screens/sources.js";
 
-// ---- a small DOM: what reloadbar.js and sources.js touch ----
-function fakeEl(tag, doc) {
-  const kids = [];
-  const listeners = {};
-  const cls = new Set();
-  const el = {
-    tagName: tag.toUpperCase(), attrs: {}, children: kids, parent: null, textContent: "", type: "",
-    classList: { add: (c) => cls.add(c), remove: (c) => cls.delete(c), contains: (c) => cls.has(c), toggle: (c, on) => (on ? cls.add(c) : cls.delete(c)) },
-    get className() { return [...cls].join(" "); },
-    set className(v) { cls.clear(); for (const c of String(v).split(/\s+/).filter(Boolean)) cls.add(c); },
-    setAttribute(k, v) { this.attrs[k] = String(v); },
-    set innerHTML(html) {
-      kids.length = 0;
-      for (const m of String(html).matchAll(/<(svg|span)[^>]*class="([^"]+)"/g)) { const k = fakeEl(m[1], doc); k.className = m[2]; k.parent = el; kids.push(k); }
-    },
-    querySelector(sel) { return kids.find((k) => k.classList.contains(sel.replace(/^\./, ""))) ?? null; },
-    append(...xs) { for (const x of xs) { x.parent = el; kids.push(x); } },
-    remove() { if (el.parent) { const i = el.parent.children.indexOf(el); if (i >= 0) el.parent.children.splice(i, 1); el.parent = null; } },
-    addEventListener(t, f) { (listeners[t] ??= []).push(f); },
-    click() { for (const f of listeners.click ?? []) f({ stopPropagation() {} }); },
-    animations: [],
-    animate(frames, opts) { const a = { frames, opts, finished: Promise.resolve() }; el.animations.push(a); return a; },
-  };
-  return el;
-}
+// ---- the shared fake DOM, plus what reloadbar.js and sources.js need of it ----
+// Each element records its animations, and innerHTML turns the bar's <svg>/<span class="…"> markup into children.
 function fakeDoc() {
-  const doc = {};
-  doc.createElement = (t) => fakeEl(t, doc);
-  doc.body = fakeEl("body", doc);
-  doc.documentElement = fakeEl("html", doc);
+  const doc = fakeDocument();
+  const make = doc.createElement;
+  const own = (el) => {
+    el.animations = [];
+    el.animate = (frames, opts) => { const a = { frames, opts, finished: Promise.resolve() }; el.animations.push(a); return a; };
+    Object.defineProperty(el, "innerHTML", {
+      configurable: true,
+      get: () => "",
+      set(html) {
+        el.replaceChildren();
+        for (const m of String(html).matchAll(/<(svg|span)[^>]*class="([^"]+)"/g)) el.append(Object.assign(doc.createElement(m[1]), { className: m[2] }));
+      },
+    });
+    return el;
+  };
+  doc.createElement = (t) => own(make(t));
+  own(doc.body);
+  own(doc.documentElement);
   return doc;
 }
 const tick = () => new Promise((r) => setTimeout(r, 0));

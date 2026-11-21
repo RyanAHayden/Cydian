@@ -4,6 +4,7 @@
 // still fails, and This iPhone's real answer (installd) still counts.
 import test from "node:test";
 import assert from "node:assert/strict";
+import { fakeNative } from "./fakes.test-helper.js";
 
 const store = new Map();
 Object.defineProperty(globalThis, "localStorage", { configurable: true, writable: true,
@@ -14,17 +15,6 @@ const { appRows, createAppRun, rowStatus } = await import("./core/apprun.js");
 
 const flush = async (n = 6) => { for (let i = 0; i < n; i++) await new Promise((r) => setTimeout(r, 0)); };
 
-function fakeNative(script = {}) {
-  const calls = [];
-  return {
-    calls,
-    call(method, params, onEvent) {
-      calls.push(method);
-      const f = script[method];
-      return f ? f(params, onEvent) : Promise.resolve({});
-    },
-  };
-}
 
 // The prompt route: signing.open, then signing.progress answers `reply`.
 const promptNative = (reply) => fakeNative({
@@ -93,7 +83,7 @@ test("B146: This iPhone route keeps installd's real answer: false still fails", 
   const n = native();
   assert.deepEqual(await openPrepared({ id: "a", name: "Alpha", token: "t", bundleId: "com.a" }, { tag: "a#1", native: n }),
     { installed: false, expires: null });
-  assert.ok(!n.calls.includes("signing.progress"));
+  assert.ok(!n.calls.some((c) => c.method === "signing.progress"));
   forgetRoute();
   const { row } = await runOne(native());
   assert.equal(row.state, "failed");

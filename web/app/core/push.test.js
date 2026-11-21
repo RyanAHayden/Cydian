@@ -1,7 +1,7 @@
 // F280: core/push.js, with a fake shell and a fake server.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { memStorage as memory } from "../fakes.test-helper.js";
+import { memStorage as memory, fakeNative as bridge } from "../fakes.test-helper.js";
 import { offReason, registration, expiresOf, enablePush, disablePush, syncPush, pushInfo, pushRows, pushState,
   storedWatch, rememberWatch, RENAMED_TEXT, NO_APS_TEXT, DENIED_TEXT, PUSH_KEY } from "./push.js";
 import { BUNDLE_ID, NAME } from "../brand.js";
@@ -11,15 +11,12 @@ const ST = { mode: "sideload", bundleId: BUNDLE_ID, team: "ABCDE12345", environm
   version: "1.2", ios: "17.2", profileExpires: "2027-01-01T00:00:00Z" };
 const WATCH = { apps: [{ id: "com.x.app", name: "X", version: "1.0", source: "https://s.example/a.json", extra: 1 }], known: ["com.x.app 1.1"] };
 
-function fakeNative({ st = ST, register = { token: TOKEN }, fail = null } = {}) {
-  const calls = [];
-  return { calls, call: async (name, params) => {
-    calls.push(name);
-    if (name === "push.status") return st;
-    if (name === "push.register") { if (fail) throw Object.assign(new Error(fail), { code: fail }); return register; }
-    return {};
-  } };
-}
+// The shared bridge: push.status answers `st`, push.register `register` or throws `fail` as its code.
+const fakeNative = ({ st = ST, register = { token: TOKEN }, fail = null } = {}) => bridge({
+  "push.status": st,
+  "push.register": fail ? Object.assign(new Error(fail), { code: fail }) : register,
+});
+const called = (native) => native.calls.map((c) => c.method);
 function fakeServer({ info = { enabled: true, reason: null, topics: [BUNDLE_ID] }, refuse = false } = {}) {
   const posts = [];
   const fetcher = async (url, init = {}) => {
@@ -70,7 +67,7 @@ test("enable registers with the server; sync sends only changes; disable forgets
   const storage = memory(), native = fakeNative(), srv = fakeServer();
   const r = await enablePush({ native, server, fetcher: srv.fetcher, storage, watch: WATCH });
   assert.deepEqual(r, { ok: true });
-  assert.deepEqual(native.calls, ["push.status", "push.register"]);
+  assert.deepEqual(called(native), ["push.status", "push.register"]);
   assert.equal(srv.posts[0].path, "/api/push/register");
   assert.equal(srv.posts[0].body.token, TOKEN);
   assert.equal(pushState(storage).on, true);
@@ -81,7 +78,7 @@ test("enable registers with the server; sync sends only changes; disable forgets
   assert.equal(storedWatch(storage).apps.length, 2, "remembered for the next Push on");
   await disablePush({ native, server, fetcher: srv.fetcher, storage });
   assert.deepEqual(srv.posts.at(-1), { path: "/api/push/unregister", body: { token: TOKEN } });
-  assert.equal(native.calls.at(-1), "push.unregister");
+  assert.equal(called(native).at(-1), "push.unregister");
   assert.deepEqual(pushState(storage), { on: false, token: null, sent: null, lastError: null });
   assert.deepEqual(await syncPush({ native, server, fetcher: srv.fetcher, storage, watch: WATCH }), { sent: false }, "off: nothing sent");
 });
@@ -143,7 +140,7 @@ test("Push turns itself on once the server can push, and never after an explicit
   assert.deepEqual(await autoEnablePush({ native, server, fetcher: srv.fetcher, storage, watch: WATCH }), { enabled: false });
   assert.equal(pushState(storage).on, false);
   assert.equal(pushState(storage).lastError, null, "no error left behind");
-  assert.deepEqual(native.calls, ["push.status"]);
+  assert.deepEqual(called(native), ["push.status"]);
   // the key arrives (no app update): the next launch turns it on
   srv = fakeServer();
   assert.deepEqual(await autoEnablePush({ native, server, fetcher: srv.fetcher, storage, watch: WATCH }), { enabled: true });
@@ -165,7 +162,7 @@ test("Push turns itself on once the server can push, and never after an explicit
   storage = store(); srv = fakeServer();
   native = fakeNative({ st: { ...ST, authorization: "notDetermined" } });
   assert.deepEqual(await autoEnablePush({ native, server, fetcher: srv.fetcher, storage, watch: WATCH }), { enabled: true });
-  assert.deepEqual(native.calls, ["push.status", "push.status", "push.register"]);
+  assert.deepEqual(called(native), ["push.status", "push.status", "push.register"]);
   storage = store(); srv = fakeServer();
   const r0 = await autoEnablePush({ native: fakeNative({ st: { ...ST, authorization: "notDetermined" }, fail: "denied" }), server, fetcher: srv.fetcher, storage, watch: WATCH });
   assert.equal(r0.enabled, false);
